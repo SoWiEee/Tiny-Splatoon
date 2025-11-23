@@ -16,7 +16,7 @@ public:
     glm::vec3 inkColor;         // 墨水顏色 (紅隊或綠隊)
     bool isDead = false;        // 標記是否該被刪除
 
-    float floorSize = 20.0f;
+    float floorSize = 40.0f;
 
     InkProjectile(glm::vec3 startVel, glm::vec3 color, InkMap* map, unsigned int tex)
         : velocity(startVel), inkColor(color), inkMap(map), brushTex(tex) {

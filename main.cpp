@@ -90,8 +90,8 @@ int main() {
     // --- 地板 (Floor) ---
     GameObject* floorObj = new GameObject("Floor");
     floorObj->transform->position = glm::vec3(0.0f, 0.0f, 0.0f);
-    floorObj->transform->scale = glm::vec3(20.0f, 1.0f, 20.0f); // 20倍大
-    floorObj->AddComponent<MeshRenderer>("Plane", glm::vec3(0.8f, 0.8f, 0.8f)); // 灰色
+    floorObj->transform->scale = glm::vec3(40.0f, 1.0f, 40.0f);
+    floorObj->AddComponent<MeshRenderer>("Plane", glm::vec3(0.8f, 0.8f, 0.8f));
     scene.push_back(floorObj);
 
     // --- 四面牆壁 ---
@@ -100,10 +100,10 @@ int main() {
 
     struct WallConfig { glm::vec3 pos; glm::vec3 scale; };
     std::vector<WallConfig> walls = {
-        {{ 0.0f, 2.5f, -10.5f}, {20.0f, 5.0f, 1.0f}}, // 北牆
-        {{ 0.0f, 2.5f,  10.5f}, {20.0f, 5.0f, 1.0f}}, // 南牆
-        {{-10.5f, 2.5f,  0.0f}, {1.0f, 5.0f, 20.0f}}, // 西牆
-        {{ 10.5f, 2.5f,  0.0f}, {1.0f, 5.0f, 20.0f}}  // 東牆
+        {{ 0.0f, 2.5f, -20.5f}, {40.0f, 5.0f, 1.0f}}, // 北
+        {{ 0.0f, 2.5f,  20.5f}, {40.0f, 5.0f, 1.0f}}, // 南
+        {{-20.5f, 2.5f,  0.0f}, {1.0f, 5.0f, 40.0f}}, // 西
+        {{ 20.5f, 2.5f,  0.0f}, {1.0f, 5.0f, 40.0f}}  // 東
     };
 
     for (const auto& w : walls) {
@@ -201,18 +201,17 @@ int main() {
         shader.setInt("inkMap", 1);
         globalInkMap->BindTexture(1);
 
-        for (auto go : scene) go->Draw(shader);
-        for (auto bullet : projectiles) {
-            bullet->Draw(shader);
-
-            // 印出第一顆子彈的位置
-            if (bullet == projectiles[0]) {
-                std::cout << "Bullet Pos: "
-                    << bullet->transform->position.x << ", "
-                    << bullet->transform->position.y << ", "
-                    << bullet->transform->position.z << std::endl;
+        for (auto go : scene) {
+            if (go->name == "Floor") {
+                shader.setInt("useInk", 1);
             }
+            else {
+                shader.setInt("useInk", 0);
+            }
+            go->Draw(shader);
         }
+        shader.setInt("useInk", 0);
+        for (auto bullet : projectiles) bullet->Draw(shader);
 
         hudObj->Draw(shader);
 

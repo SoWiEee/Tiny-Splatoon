@@ -17,8 +17,8 @@ public:
     // 玩家身高 (眼睛的高度)
     float playerHeight = 2.0f;
 
-    // 場地邊界 (假設地板是 20x20，半徑就是 10)
-    float mapLimit = 9.5f; // 留 0.5 的緩衝給牆壁厚度
+    // 場地邊界
+    float mapLimit = 19.5f;
 
     void Update(float dt) override {
         // 這裡只處理物理運動，輸入處理放在 ProcessInput
