@@ -120,6 +120,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui\backends;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glad\include;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glm;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,6 +136,7 @@
   <ItemGroup>
     <ClInclude Include="components\Camera.h" />
     <ClInclude Include="components\HUD.h" />
+    <ClInclude Include="components\InkProjectile.h" />
     <ClInclude Include="components\InkShooter.h" />
     <ClInclude Include="components\MeshRenderer.h" />
     <ClInclude Include="engine\Component.h" />

@@ -18,6 +18,12 @@ public:
     float lastShootTime = 0.0f;
     InkMap* inkMap;             // 畫布
     unsigned int brushTexture;  // 筆刷貼圖 ID
+    // 發射請求佇列
+    struct ShootRequest {
+        glm::vec3 position;
+        glm::vec3 direction;
+    };
+    std::vector<ShootRequest> pendingShots; // 待處理的射擊請求
 
     InkShooter(Camera* cam, GameObject* cursor, HUD* h, InkMap* map, unsigned int brushTex)
         : camera(cam), debugCursor(cursor), hud(h), inkMap(map), brushTexture(brushTex) {
@@ -28,16 +34,24 @@ public:
 
         // 狀態 1: 按下左鍵 且 墨水 > 0 -> 射擊
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+            // 射擊頻率控制
+            float currentTime = (float)glfwGetTime();
+            if (currentTime - lastShootTime > shootRate && hud->currentInk > 0) {
 
-            if (hud->currentInk > 0) {
-                // 1. 消耗墨水
-                hud->ConsumeInk(0.5f * dt); // 每秒消耗 50% 墨水 (2秒射完)
+                hud->ConsumeInk(0.2f); // 消耗墨水
 
-                // 2. 執行射線運算
-                PerformRaycast(window);
+                ShootRequest req;
+                req.position = gameObject->transform->position; // 槍的位置(相機位置)
+                req.direction = gameObject->transform->GetForward(); // 槍的朝向
+
+                // 稍微把發射點往前移一點，不要跟相機重疊
+                req.position += req.direction * 1.0f;
+
+                pendingShots.push_back(req);
+
+                lastShootTime = currentTime;
             }
         }
-        // 回充
         else {
             hud->RefillInk();
         }
