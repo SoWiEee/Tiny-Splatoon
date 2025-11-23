@@ -140,6 +140,7 @@
     <ClInclude Include="engine\Component.h" />
     <ClInclude Include="engine\GameObject.h" />
     <ClInclude Include="engine\Transform.h" />
+    <ClInclude Include="graphics\InkMap.h" />
     <ClInclude Include="graphics\Shader.h" />
     <ClInclude Include="vendor\glad\include\glad\glad.h" />
   </ItemGroup>
