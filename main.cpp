@@ -11,6 +11,7 @@
 #include "components/InkShooter.h"
 #include "components/HUD.h"
 #include "components/InkProjectile.h"
+#include "components/PlayerController.h"
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -93,6 +94,27 @@ int main() {
     floorObj->AddComponent<MeshRenderer>("Plane", glm::vec3(0.8f, 0.8f, 0.8f)); // 灰色
     scene.push_back(floorObj);
 
+    // --- 四面牆壁 ---
+    // 牆壁厚度 1.0，高度 5.0，長度 20.0
+    // 因為地板是 20x20，牆壁中心點要在 10.5 或 -10.5 的位置
+
+    struct WallConfig { glm::vec3 pos; glm::vec3 scale; };
+    std::vector<WallConfig> walls = {
+        {{ 0.0f, 2.5f, -10.5f}, {20.0f, 5.0f, 1.0f}}, // 北牆
+        {{ 0.0f, 2.5f,  10.5f}, {20.0f, 5.0f, 1.0f}}, // 南牆
+        {{-10.5f, 2.5f,  0.0f}, {1.0f, 5.0f, 20.0f}}, // 西牆
+        {{ 10.5f, 2.5f,  0.0f}, {1.0f, 5.0f, 20.0f}}  // 東牆
+    };
+
+    for (const auto& w : walls) {
+        GameObject* wall = new GameObject("Wall");
+        wall->transform->position = w.pos;
+        wall->transform->scale = w.scale;
+        // 牆壁用深灰色
+        wall->AddComponent<MeshRenderer>("Cube", glm::vec3(0.3f, 0.3f, 0.3f));
+        scene.push_back(wall);
+    }
+
     // --- 障礙物 (Box) ---
     GameObject* boxObj = new GameObject("Box");
     boxObj->transform->position = glm::vec3(2.0f, 1.0f, -2.0f); // 浮空一點
@@ -102,20 +124,19 @@ int main() {
     // --- HUD ---
     GameObject* hudObj = new GameObject("HUD");
     HUD* hud = hudObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
-    //scene.push_back(hudObj);
 
     // --- 玩家 (Camera) ---
     GameObject* playerObj = new GameObject("Player");
-    playerObj->transform->position = glm::vec3(0.0f, 2.0f, 5.0f);
+    playerObj->transform->position = glm::vec3(0.0f, 2.5f, 5.0f);
     mainCamera = playerObj->AddComponent<Camera>();
+    PlayerController* controller = playerObj->AddComponent<PlayerController>();
+    InkShooter* shooter = playerObj->AddComponent<InkShooter>(mainCamera, hud, globalInkMap, brushTexID);
     scene.push_back(playerObj);
 
     // --- Debug Cursor (瞄準點標記) ---
     GameObject* cursorObj = new GameObject("Cursor");
     cursorObj->transform->scale = glm::vec3(0.2f); // 很小
     cursorObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.0f, 0.0f)); // 紅色
-
-    InkShooter* shooter = playerObj->AddComponent<InkShooter>(mainCamera, hud, globalInkMap, brushTexID);
 
     // Render Loop
     while (!glfwWindowShouldClose(window)) {
@@ -125,8 +146,10 @@ int main() {
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
-        mainCamera->ProcessKeyboard(window, deltaTime);
 
+        controller->ProcessInput(window, deltaTime,
+            mainCamera->gameObject->transform->GetForward(),
+            mainCamera->gameObject->transform->GetRight());
         // 處理射擊輸入
         shooter->ProcessInput(window, deltaTime);
 
