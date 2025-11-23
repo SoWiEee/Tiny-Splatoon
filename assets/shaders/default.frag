@@ -3,19 +3,22 @@ out vec4 FragColor;
 
 in vec2 TexCoord;
 
-uniform vec3 objectColor;
 uniform sampler2D floorTexture;
 uniform sampler2D inkMap;
+uniform vec3 objectColor;
+
+uniform int useInk; 
 
 void main() {
-    vec4 inkValue = texture(inkMap, TexCoord);
-    
-    // 2. 基礎地板顏色 (這裡暫時用 uniform 顏色，也可以換成地板貼圖)
-    vec3 baseColor = objectColor; 
-    // 如果你有地板貼圖，就用: vec3 baseColor = texture(floorTexture, TexCoord).rgb;
+    // 預設顏色
+    vec3 finalColor = objectColor;
 
-    // 3. 混合
-    vec3 finalColor = mix(baseColor, inkValue.rgb, inkValue.a);
+    // 只有當 useInk 開啟時，才去混合墨水
+    if (useInk == 1) {
+        vec4 inkValue = texture(inkMap, TexCoord);
+        // 混合：底色 + 墨水色 (根據墨水 Alpha)
+        finalColor = mix(finalColor, inkValue.rgb, inkValue.a);
+    }
 
     FragColor = vec4(finalColor, 1.0);
 }
