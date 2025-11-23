@@ -8,6 +8,7 @@
 #include "components/MeshRenderer.h"
 #include "components/Camera.h"
 #include "components/InkShooter.h"
+#include "components/HUD.h"
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -79,6 +80,10 @@ int main() {
     InkShooter* shooter = playerObj->AddComponent<InkShooter>(mainCamera, cursorObj);
     scene.push_back(playerObj);
 
+    GameObject* hudObj = new GameObject("HUD");
+    HUD* hud = hudObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
+    scene.push_back(hudObj);
+
 
     // Render Loop
     while (!glfwWindowShouldClose(window)) {
@@ -90,6 +95,13 @@ int main() {
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
         mainCamera->ProcessKeyboard(window, deltaTime);
+
+        if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+            hud->ConsumeInk(0.5f * deltaTime);
+        }
+        else {
+            hud->RefillInk(); // 放開自動回充
+        }
 
         // shoot input
         shooter->ProcessInput(window);
