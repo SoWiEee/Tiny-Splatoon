@@ -102,7 +102,7 @@ int main() {
     // --- HUD ---
     GameObject* hudObj = new GameObject("HUD");
     HUD* hud = hudObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
-    scene.push_back(hudObj);
+    //scene.push_back(hudObj);
 
     // --- ª±®a (Camera) ---
     GameObject* playerObj = new GameObject("Player");
@@ -190,6 +190,8 @@ int main() {
                     << bullet->transform->position.z << std::endl;
             }
         }
+
+        hudObj->Draw(shader);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
