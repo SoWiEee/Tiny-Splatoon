@@ -3,6 +3,7 @@
 #include "../engine/GameObject.h"
 #include "Camera.h"
 #include "HUD.h"
+#include "graphics/InkMap.h"
 #include <GLFW/glfw3.h>
 #include <iostream>
 
@@ -15,9 +16,11 @@ public:
     float floorSize = 20.0f;
     float shootRate = 0.1f;
     float lastShootTime = 0.0f;
+    InkMap* inkMap;             // 畫布
+    unsigned int brushTexture;  // 筆刷貼圖 ID
 
-    InkShooter(Camera* cam, GameObject* cursor, HUD* h)
-        : camera(cam), debugCursor(cursor), hud(h) {
+    InkShooter(Camera* cam, GameObject* cursor, HUD* h, InkMap* map, unsigned int brushTex)
+        : camera(cam), debugCursor(cursor), hud(h), inkMap(map), brushTexture(brushTex) {
     }
 
     void ProcessInput(GLFWwindow* window, float dt) {
@@ -34,7 +37,7 @@ public:
                 PerformRaycast(window);
             }
         }
-        // 狀態 2: 沒按左鍵 -> 回充
+        // 回充
         else {
             hud->RefillInk();
         }
@@ -61,8 +64,7 @@ private:
                 float u = (hitPoint.x + halfSize) / floorSize;
                 float v = (hitPoint.z + halfSize) / floorSize;
 
-                // 這裡之後會接上真正的繪圖函式
-                // std::cout << "Painting at: " << u << ", " << v << std::endl; 
+                inkMap->Paint(glm::vec2(u, v), 0.08f, glm::vec3(1.0f, 0.0f, 0.0f), brushTexture);
             }
         }
     }
