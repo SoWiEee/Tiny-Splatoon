@@ -51,12 +51,6 @@ int main() {
     // Scene Graph
     std::vector<GameObject*> scene;
 
-    // --- 玩家 (Camera) ---
-    GameObject* playerObj = new GameObject("Player");
-    playerObj->transform->position = glm::vec3(0.0f, 2.0f, 5.0f);
-    mainCamera = playerObj->AddComponent<Camera>(); // 存起來給 Callback 用
-    scene.push_back(playerObj);
-
     // --- 地板 (Floor) ---
     GameObject* floorObj = new GameObject("Floor");
     floorObj->transform->position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -70,20 +64,25 @@ int main() {
     boxObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.5f, 0.2f)); // 橘色
     scene.push_back(boxObj);
 
-    // --- Debug Cursor (瞄準點標記) ---
-    GameObject* cursorObj = new GameObject("Cursor");
-    cursorObj->transform->scale = glm::vec3(0.2f); // 很小
-    cursorObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.0f, 0.0f)); // 紅色
-    scene.push_back(cursorObj);
-
-    // 掛載射擊器，並把相機和游標傳給它
-    InkShooter* shooter = playerObj->AddComponent<InkShooter>(mainCamera, cursorObj);
-    scene.push_back(playerObj);
-
+    // --- HUD ---
     GameObject* hudObj = new GameObject("HUD");
     HUD* hud = hudObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
     scene.push_back(hudObj);
 
+    // --- 玩家 (Camera) ---
+    GameObject* playerObj = new GameObject("Player");
+    playerObj->transform->position = glm::vec3(0.0f, 2.0f, 5.0f);
+    mainCamera = playerObj->AddComponent<Camera>();
+    scene.push_back(playerObj);
+
+    // --- Debug Cursor (瞄準點標記) ---
+    GameObject* cursorObj = new GameObject("Cursor");
+    cursorObj->transform->scale = glm::vec3(0.2f); // 很小
+    cursorObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.0f, 0.0f)); // 紅色
+
+    // 掛載射擊器，並把相機和游標傳給它
+    InkShooter* shooter = playerObj->AddComponent<InkShooter>(mainCamera, cursorObj, hud);
+    scene.push_back(playerObj);
 
     // Render Loop
     while (!glfwWindowShouldClose(window)) {
@@ -94,17 +93,11 @@ int main() {
         // Input
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
+
         mainCamera->ProcessKeyboard(window, deltaTime);
 
-        if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-            hud->ConsumeInk(0.5f * deltaTime);
-        }
-        else {
-            hud->RefillInk(); // 放開自動回充
-        }
-
         // shoot input
-        shooter->ProcessInput(window);
+        shooter->ProcessInput(window, deltaTime);
 
         // Update
         for (auto go : scene) go->Update(deltaTime);
