@@ -134,6 +134,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="components\Camera.h" />
+    <ClInclude Include="components\InkShooter.h" />
     <ClInclude Include="components\MeshRenderer.h" />
     <ClInclude Include="engine\Component.h" />
     <ClInclude Include="engine\GameObject.h" />

@@ -7,12 +7,11 @@
 #include "engine/GameObject.h"
 #include "components/MeshRenderer.h"
 #include "components/Camera.h"
+#include "components/InkShooter.h"
 
-// Settings
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
-// Timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
@@ -23,7 +22,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 int main() {
-    // 1. 初始化 GLFW
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
@@ -39,7 +37,6 @@ int main() {
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    // 2. 初始化 GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
@@ -47,10 +44,10 @@ int main() {
 
     glEnable(GL_DEPTH_TEST);
 
-    // 3. 建立 Shader
-    Shader shader("Assets/Shaders/default.vert", "Assets/Shaders/default.frag");
+    // Create Shader
+    Shader shader("assets/shaders/default.vert", "assets/shaders/default.frag");
 
-    // 4. 建立場景 (Scene Graph)
+    // Scene Graph
     std::vector<GameObject*> scene;
 
     // --- 玩家 (Camera) ---
@@ -72,10 +69,19 @@ int main() {
     boxObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.5f, 0.2f)); // 橘色
     scene.push_back(boxObj);
 
+    // --- Debug Cursor (瞄準點標記) ---
+    GameObject* cursorObj = new GameObject("Cursor");
+    cursorObj->transform->scale = glm::vec3(0.2f); // 很小
+    cursorObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.0f, 0.0f)); // 紅色
+    scene.push_back(cursorObj);
 
-    // 5. Render Loop
+    // 掛載射擊器，並把相機和游標傳給它
+    InkShooter* shooter = playerObj->AddComponent<InkShooter>(mainCamera, cursorObj);
+    scene.push_back(playerObj);
+
+
+    // Render Loop
     while (!glfwWindowShouldClose(window)) {
-        // Time Logic
         float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -84,6 +90,9 @@ int main() {
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
         mainCamera->ProcessKeyboard(window, deltaTime);
+
+        // shoot input
+        shooter->ProcessInput(window);
 
         // Update
         for (auto go : scene) go->Update(deltaTime);
