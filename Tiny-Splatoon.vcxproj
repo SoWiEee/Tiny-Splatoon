@@ -148,6 +148,8 @@
     <None Include=".gitignore" />
     <None Include="assets\shaders\default.frag" />
     <None Include="assets\shaders\default.vert" />
+    <None Include="assets\shaders\paint.frag" />
+    <None Include="assets\shaders\paint.vert" />
     <None Include="assets\shaders\ui.frag" />
     <None Include="assets\shaders\ui.vert" />
   </ItemGroup>
