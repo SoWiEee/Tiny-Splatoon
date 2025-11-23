@@ -47,22 +47,4 @@ public:
         if (rot.x > 89.0f) rot.x = 89.0f;
         if (rot.x < -89.0f) rot.x = -89.0f;
     }
-
-    void ProcessKeyboard(GLFWwindow* window, float dt) {
-        Transform* t = gameObject->transform;
-        float velocity = speed * dt;
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            t->position += t->GetForward() * velocity;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            t->position -= t->GetForward() * velocity;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            t->position -= t->GetRight() * velocity;
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            t->position += t->GetRight() * velocity;
-        // 空白鍵上升，Shift下降
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-            t->position.y += velocity;
-        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-            t->position.y -= velocity;
-    }
 };
