@@ -18,7 +18,6 @@ public:
 
     float floorSize = 20.0f;
 
-    // 建構子：初始化速度、顏色與畫布
     InkProjectile(glm::vec3 startVel, glm::vec3 color, InkMap* map, unsigned int tex)
         : velocity(startVel), inkColor(color), inkMap(map), brushTex(tex) {
     }
@@ -26,25 +25,40 @@ public:
     void Update(float dt) override {
         if (isDead) return;
 
-        // 1. 物理運動計算
-        // v = v0 + at (重力向下)
-        velocity.y -= gravity * dt;
+        // 保存上一幀的位置 (選擇性，用速度回推比較簡單)
 
-        // p = p0 + vt
+        // 1. 物理運動
+        velocity.y -= gravity * dt;
         gameObject->transform->position += velocity * dt;
 
-        // 2. 視覺效果：讓子彈在空中瘋狂旋轉
-        gameObject->transform->rotation.x += 720.0f * dt; // 每秒轉兩圈
+        // 2. 旋轉視覺
+        gameObject->transform->rotation.x += 720.0f * dt;
         gameObject->transform->rotation.z += 360.0f * dt;
 
-        // 3. 碰撞偵測 (假設地板高度為 y=0)
-        // 如果穿過地板，就觸發碰撞
+        // 3. [修正] 精確碰撞偵測
         if (gameObject->transform->position.y <= 0.0f) {
-            gameObject->transform->position.y = 0.0f;
+            // 我們現在在地底下 (y < 0)，需要回推到 y = 0 的時刻
+
+            // 計算我們「多跑了」多少時間
+            // 公式: time_overshoot = current_y / current_velocity_y
+            // 因為 y 和 vel.y 都是負的，所以結果是正的時間
+            float timeOvershoot = 0.0f;
+            if (abs(velocity.y) > 0.001f) {
+                timeOvershoot = gameObject->transform->position.y / velocity.y;
+            }
+
+            // 回推 X 和 Z 座標
+            glm::vec3 correctedPos = gameObject->transform->position;
+            correctedPos.x -= velocity.x * timeOvershoot;
+            correctedPos.z -= velocity.z * timeOvershoot;
+            correctedPos.y = 0.0f; // 強制設為地板高度
+
+            // 更新物件位置到正確的撞擊點 (這樣視覺上也會剛好停在地板)
+            gameObject->transform->position = correctedPos;
+
             HitFloor();
         }
 
-        // 4. 安全邊界檢查
         if (gameObject->transform->position.y < -10.0f) {
             isDead = true;
         }
@@ -66,7 +80,7 @@ private:
             // 3. 座標轉換：世界座標 (World) -> 紋理座標 (UV)
             // map x from [-10, 10] to [0, 1]
             float u = (x + halfSize) / floorSize;
-            float v = (z + halfSize) / floorSize;
+            float v = 1.0f - ((z + halfSize) / floorSize);
 
 
             // 隨機大小：在 0.06 到 0.12 之間浮動
