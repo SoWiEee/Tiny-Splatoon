@@ -1,4 +1,5 @@
 #pragma once
+#include "Shader.h"
 #include <glad/glad.h>
 #include <iostream>
 #include <vector>
@@ -9,21 +10,28 @@ public:
     unsigned int textureID;
     int width, height;
 
+    // 繪圖相關資源
+    unsigned int quadVAO = 0, quadVBO;
+    Shader* paintShader;
+
     InkMap(int w, int h) : width(w), height(h) {
         Init();
+        InitPaintResources();
     }
 
     ~InkMap() {
         glDeleteFramebuffers(1, &FBO);
         glDeleteTextures(1, &textureID);
+        glDeleteVertexArrays(1, &quadVAO);
+        glDeleteBuffers(1, &quadVBO);
+        delete paintShader;
     }
 
     void Init() {
-        // 1. 建立 FBO
         glGenFramebuffers(1, &FBO);
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 
-        // 2. 建立 Texture (用來存顏色)
+        // 建立 Texture
         glGenTextures(1, &textureID);
         glBindTexture(GL_TEXTURE_2D, textureID);
 
@@ -50,6 +58,33 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
+    // 初始化畫筆用的 Shader 和 Quad
+    void InitPaintResources() {
+        paintShader = new Shader("assets/shaders/paint.vert", "assets/shaders/paint.frag");
+
+        // 建立一個簡單的 Quad (-1 到 1)
+        float quadVertices[] = {
+            // positions   // texCoords
+            -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+             1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+             1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+             1.0f,  1.0f, 0.0f,  1.0f, 1.0f
+        };
+
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+
     void BindTexture(int slot = 0) {
         glActiveTexture(GL_TEXTURE0 + slot);
         glBindTexture(GL_TEXTURE_2D, textureID);
@@ -63,5 +98,40 @@ public:
     void DisableWriting(int screenW, int screenH) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, screenW, screenH); // Viewport 改回螢幕大小
+    }
+
+    // 在指定 UV 位置畫一筆
+    // brushTexID: 筆刷形狀的 Texture ID
+    void Paint(glm::vec2 hitUV, float size, glm::vec3 color, unsigned int brushTexID) {
+        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+        glViewport(0, 0, width, height);
+
+        // 2. 希望新的墨水直接蓋上去
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // 如果想要永遠覆蓋不變淡，可以用: glBlendFunc(GL_ONE, GL_ZERO);
+
+        // 3. 設定 Shader
+        paintShader->use();
+        paintShader->setVec2("hitUV", hitUV);
+        paintShader->setFloat("brushSize", size); // 筆刷大小 (0.0 ~ 1.0)
+        paintShader->setVec3("paintColor", color);
+
+        // 綁定筆刷形狀貼圖
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, brushTexID);
+        paintShader->setInt("brushTexture", 0);
+
+        // 4. 畫出 Quad
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        // 5. 復原狀態
+        glDisable(GL_BLEND);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 恢復原本螢幕的 Viewport，假設是 1280x720
+        glViewport(0, 0, 1280, 720);
     }
 };
