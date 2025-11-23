@@ -1,7 +1,6 @@
-// Source/Components/InkShooter.h
 #pragma once
-#include "../Engine/Component.h"
-#include "../Engine/GameObject.h"
+#include "../engine/Component.h"
+#include "../engine/GameObject.h"
 #include "Camera.h"
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -28,11 +27,6 @@ public:
         glm::vec3 rayDir = camera->gameObject->transform->GetForward();
 
         // 2. 計算射線與平面 (y=0) 的交點
-        // 平面公式: P dot N = d (我們假設平面在 y=0, Normal=(0,1,0))
-        // 射線公式: R(t) = Origin + t * Dir
-        // 解 t:
-        // (Origin.y + t * Dir.y) = 0
-        // t = -Origin.y / Dir.y
 
         // 避免除以 0 (如果幾乎水平看出去)
         if (abs(rayDir.y) < 0.001f) return;
