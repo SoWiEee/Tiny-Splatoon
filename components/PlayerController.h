@@ -8,7 +8,7 @@ class PlayerController : public Component {
 public:
     float moveSpeed = 5.0f;
     float jumpHeight = 2.0f;
-    float gravity = -9.8f;
+    float gravity = -9.8f * 3;
 
     // --- 狀態變數 ---
     glm::vec3 velocity = glm::vec3(0.0f); // 當前的 3D 速度
