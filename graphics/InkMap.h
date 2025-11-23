@@ -102,7 +102,7 @@ public:
 
     // 在指定 UV 位置畫一筆
     // brushTexID: 筆刷形狀的 Texture ID
-    void Paint(glm::vec2 hitUV, float size, glm::vec3 color, unsigned int brushTexID) {
+    void Paint(glm::vec2 hitUV, float size, glm::vec3 color, unsigned int brushTexID, float rotation = 0.0f) {
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
         glViewport(0, 0, width, height);
 
@@ -114,8 +114,9 @@ public:
         // 3. 設定 Shader
         paintShader->use();
         paintShader->setVec2("hitUV", hitUV);
-        paintShader->setFloat("brushSize", size); // 筆刷大小 (0.0 ~ 1.0)
+        paintShader->setFloat("brushSize", size);
         paintShader->setVec3("paintColor", color);
+        paintShader->setFloat("rotation", rotation); // 傳入旋轉角度給 Shader
 
         // 綁定筆刷形狀貼圖
         glActiveTexture(GL_TEXTURE0);
