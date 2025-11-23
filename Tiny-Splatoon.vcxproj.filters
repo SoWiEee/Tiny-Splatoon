@@ -18,6 +18,9 @@
     <ClCompile Include="main.cpp">
       <Filter>來源檔案</Filter>
     </ClCompile>
+    <ClCompile Include="vendor\glad\src\glad.c">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\Component.h">
@@ -29,11 +32,22 @@
     <ClInclude Include="engine\GameObject.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="components\Camera.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
     <ClInclude Include="components\MeshRenderer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\Shader.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\glad\include\glad\glad.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="assets\shaders\default.frag" />
+    <None Include="assets\shaders\default.vert" />
   </ItemGroup>
 </Project>

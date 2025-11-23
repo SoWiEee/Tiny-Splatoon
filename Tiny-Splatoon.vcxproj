@@ -130,15 +130,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="vendor\glad\src\glad.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="components\Camera.h" />
     <ClInclude Include="components\MeshRenderer.h" />
     <ClInclude Include="engine\Component.h" />
     <ClInclude Include="engine\GameObject.h" />
     <ClInclude Include="engine\Transform.h" />
+    <ClInclude Include="graphics\Shader.h" />
+    <ClInclude Include="vendor\glad\include\glad\glad.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="assets\shaders\default.frag" />
+    <None Include="assets\shaders\default.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
