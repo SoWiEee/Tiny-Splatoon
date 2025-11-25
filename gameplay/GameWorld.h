@@ -21,17 +21,15 @@ public:
     std::vector<Projectile*> projectiles;
 
     // --- 初始化 ---
-    void Init(GameObject* mainCamera) {
-        // 1. 建立 Level (地板與牆壁)
+    void Init(GameObject* mainCamera, HUD* hud) {
         level = new Level();
         level->Load();
 
-        // 2. 建立 Splat 系統
         splatMap = new SplatMap(1024, 1024);
         painter = new SplatPainter();
 
-        // 3. 建立玩家 (傳入相機)
-        localPlayer = new Player(glm::vec3(-5, 0, -5), 1, splatMap, mainCamera);
+        // create player
+        localPlayer = new Player(glm::vec3(-5, 2.0f, -5), 1, splatMap, mainCamera, hud);
     }
 
     // --- 主邏輯迴圈 ---

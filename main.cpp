@@ -39,13 +39,12 @@ int main() {
 
     // GameWorld init
     GameWorld game;
-    game.Init(cameraObj);
-
     // UI init
     GameObject* uiObj = new GameObject("UI");
 
     // HUD
     HUD* hud = uiObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
+    game.Init(cameraObj, hud);
 
     // Scoreboard
     Scoreboard* scoreboard = uiObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, game.splatMap);

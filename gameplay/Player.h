@@ -25,12 +25,13 @@ public:
     SplatMap* splatMapRef;
     GameObject* cameraRef;
     GameObject* visualBody;
+    HUD* hudRef = nullptr;
 
     float mapLimit = 19.5f;
     float floorSize = 40.0f;
 
-    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam)
-        : Entity("Player"), teamID(team), splatMapRef(map), cameraRef(cam),
+    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
+        : Entity("Player"), teamID(team), splatMapRef(map), cameraRef(cam), hudRef(hud),
         weapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0))
     {
         transform->position = startPos;
@@ -87,11 +88,14 @@ private:
             isGrounded = false;
         }
 
-        bool isFiring = Input::GetMouseButton(0) && !isSwimming;
+        bool hasInk = (hudRef && hudRef->currentInk > 0.0f);
+        bool isFiring = Input::GetMouseButton(0) && !isSwimming && hasInk;
 
         glm::vec3 gunPos = transform->position + glm::vec3(0, 1.5f, 0) + right * 0.5f + front * 0.5f;
 
-        weapon.Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring);
+        if (weapon.Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
+            if (hudRef) hudRef->ConsumeInk(0.2f);
+        }
     }
 
     void ApplyPhysics(float dt) {
@@ -114,6 +118,11 @@ private:
     }
 
     void UpdateVisuals() {
+        if (hudRef) {
+            float refillRate = isSwimming ? 0.5f : 0.1f;
+            hudRef->RefillInk(refillRate * 0.016f);
+        }
+
         if (!visualBody) return;
 
         if (isSwimming) {

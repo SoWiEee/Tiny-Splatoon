@@ -23,7 +23,7 @@ public:
     Weapon(int team, glm::vec3 color) : teamID(team), inkColor(color) {}
 
     // ¹Á¸Õ¶}¤õ
-    void Trigger(float dt, glm::vec3 nozzlePos, glm::vec3 aimDir, bool isFiring) {
+    bool Trigger(float dt, glm::vec3 nozzlePos, glm::vec3 aimDir, bool isFiring) {
         if (isFiring) {
             float currentTime = (float)glfwGetTime();
             if (currentTime - lastFireTime > fireRate) {
@@ -37,7 +37,9 @@ public:
                 pendingSpawns.push_back(info);
 
                 lastFireTime = currentTime;
+                return true;
             }
         }
+        return false;
     }
 };
