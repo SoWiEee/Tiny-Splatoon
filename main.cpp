@@ -12,6 +12,7 @@
 #include "components/HUD.h"
 #include "components/InkProjectile.h"
 #include "components/PlayerController.h"
+#include "components/Scoreboard.h"
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -123,6 +124,10 @@ int main() {
     GameObject* hudObj = new GameObject("HUD");
     HUD* hud = hudObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
+    // --- [NEW] Scoreboard ---
+    GameObject* scoreObj = new GameObject("Scoreboard");
+    Scoreboard* scoreboard = scoreObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, globalInkMap);
+
     // --- 玩家 (Camera) ---
     GameObject* playerObj = new GameObject("Player");
     playerObj->transform->position = glm::vec3(0.0f, 2.5f, 5.0f);
@@ -130,7 +135,7 @@ int main() {
     playerBody->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 1.0f, 0.0f)); // 黃色的人
     scene.push_back(playerBody);
     PlayerController* controller = playerObj->AddComponent<PlayerController>();
-    controller->Setup(globalInkMap, playerBody, 1); // 紅隊
+    controller->Setup(globalInkMap, playerBody, 1, hud);
 
     InkShooter* shooter = playerObj->AddComponent<InkShooter>(nullptr, hud, globalInkMap, brushTexID);
 
@@ -200,6 +205,9 @@ int main() {
 
         // --- Update Scene ---
         for (auto go : scene) go->Update(deltaTime);
+        
+        hudObj->Update(deltaTime);
+        scoreObj->Update(deltaTime);
 
         // --- Render ---
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -224,6 +232,7 @@ int main() {
         for (auto bullet : projectiles) bullet->Draw(shader);
 
         hudObj->Draw(shader);
+        scoreObj->Draw(shader);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

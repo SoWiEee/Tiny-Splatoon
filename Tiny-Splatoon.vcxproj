@@ -140,6 +140,7 @@
     <ClInclude Include="components\InkShooter.h" />
     <ClInclude Include="components\MeshRenderer.h" />
     <ClInclude Include="components\PlayerController.h" />
+    <ClInclude Include="components\Scoreboard.h" />
     <ClInclude Include="engine\Component.h" />
     <ClInclude Include="engine\GameObject.h" />
     <ClInclude Include="engine\Transform.h" />
@@ -153,6 +154,7 @@
     <None Include="assets\shaders\default.vert" />
     <None Include="assets\shaders\paint.frag" />
     <None Include="assets\shaders\paint.vert" />
+    <None Include="assets\shaders\scoreboard.frag" />
     <None Include="assets\shaders\ui.frag" />
     <None Include="assets\shaders\ui.vert" />
   </ItemGroup>

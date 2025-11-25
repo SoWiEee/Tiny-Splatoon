@@ -59,6 +59,9 @@
     <ClInclude Include="components\PlayerController.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="components\Scoreboard.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
@@ -68,5 +71,6 @@
     <None Include="assets\shaders\ui.vert" />
     <None Include="assets\shaders\paint.frag" />
     <None Include="assets\shaders\paint.vert" />
+    <None Include="assets\shaders\scoreboard.frag" />
   </ItemGroup>
 </Project>

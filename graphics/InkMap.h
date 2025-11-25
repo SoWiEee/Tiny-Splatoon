@@ -1,5 +1,6 @@
 #pragma once
 #include "Shader.h"
+#include <glm/glm.hpp>
 #include <glad/glad.h>
 #include <iostream>
 #include <vector>
@@ -189,5 +190,19 @@ public:
             }
         }
         return false;
+    }
+
+    glm::vec2 CalculateScore() {
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        int maxLevel = (int)std::floor(std::log2(std::max(width, height)));
+
+        float pixelData[4];
+        glGetTexImage(GL_TEXTURE_2D, maxLevel, GL_RGBA, GL_FLOAT, pixelData);
+
+        // pixelData[0] = Red Channel Sum
+        // pixelData[1] = Green Channel Sum
+        return glm::vec2(pixelData[0], pixelData[1]);
     }
 };
