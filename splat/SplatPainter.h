@@ -43,7 +43,6 @@ public:
 
 private:
     void InitQuad() {
-        // 全螢幕/任意大小 Quad (-1 ~ 1)
         float quadVertices[] = {
             // positions   // texCoords
             -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,

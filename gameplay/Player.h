@@ -43,7 +43,7 @@ public:
     void UpdateLogic(float dt) {
         HandleInput(dt);
         ApplyPhysics(dt);
-        UpdateVisuals();
+        UpdateVisuals(dt);
     }
 
     GameObject* GetVisualBody() { return visualBody; }
@@ -117,10 +117,10 @@ private:
         if (transform->position.z < -mapLimit) transform->position.z = -mapLimit;
     }
 
-    void UpdateVisuals() {
+    void UpdateVisuals(float dt) {
         if (hudRef) {
             float refillRate = isSwimming ? 0.5f : 0.1f;
-            hudRef->RefillInk(refillRate * 0.016f);
+            hudRef->RefillInk(refillRate * dt);
         }
 
         if (!visualBody) return;
