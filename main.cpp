@@ -96,8 +96,6 @@ int main() {
 
     // --- 四面牆壁 ---
     // 牆壁厚度 1.0，高度 5.0，長度 20.0
-    // 因為地板是 20x20，牆壁中心點要在 10.5 或 -10.5 的位置
-
     struct WallConfig { glm::vec3 pos; glm::vec3 scale; };
     std::vector<WallConfig> walls = {
         {{ 0.0f, 2.5f, -20.5f}, {40.0f, 5.0f, 1.0f}}, // 北
@@ -128,29 +126,41 @@ int main() {
     // --- 玩家 (Camera) ---
     GameObject* playerObj = new GameObject("Player");
     playerObj->transform->position = glm::vec3(0.0f, 2.5f, 5.0f);
-    mainCamera = playerObj->AddComponent<Camera>();
+    GameObject* playerBody = new GameObject("PlayerBody");
+    playerBody->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 1.0f, 0.0f)); // 黃色的人
+    scene.push_back(playerBody);
     PlayerController* controller = playerObj->AddComponent<PlayerController>();
-    InkShooter* shooter = playerObj->AddComponent<InkShooter>(mainCamera, hud, globalInkMap, brushTexID);
-    scene.push_back(playerObj);
+    controller->Setup(globalInkMap, playerBody, 1); // 紅隊
 
-    // --- Debug Cursor (瞄準點標記) ---
-    GameObject* cursorObj = new GameObject("Cursor");
-    cursorObj->transform->scale = glm::vec3(0.2f); // 很小
-    cursorObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.0f, 0.0f)); // 紅色
+    InkShooter* shooter = playerObj->AddComponent<InkShooter>(nullptr, hud, globalInkMap, brushTexID);
+
+    GameObject* cameraObj = new GameObject("MainCamera");
+    mainCamera = cameraObj->AddComponent<Camera>();
+    shooter->camera = mainCamera;
+    scene.push_back(playerObj);
 
     // Render Loop
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+        glm::vec3 targetPos = playerObj->transform->position;
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
 
+        // 簡單 TPS 算法
+        float camDist = 5.0f;
+        float camHeight = 2.0f;
+        glm::vec3 camDir = cameraObj->transform->GetForward();
+        cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+        playerObj->transform->rotation.y = cameraObj->transform->rotation.y;
+        playerObj->transform->rotation.x = 0.0f; // 保持直立
+        playerObj->transform->rotation.z = 0.0f;
         controller->ProcessInput(window, deltaTime,
-            mainCamera->gameObject->transform->GetForward(),
-            mainCamera->gameObject->transform->GetRight());
-        // 處理射擊輸入
+            cameraObj->transform->GetForward(),
+            cameraObj->transform->GetRight());
+
         shooter->ProcessInput(window, deltaTime);
 
         // 生成新子彈
