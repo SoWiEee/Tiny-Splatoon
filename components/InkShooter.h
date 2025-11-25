@@ -1,6 +1,7 @@
 #pragma once
 #include "../engine/Component.h"
 #include "../engine/GameObject.h"
+#include "../engine/core/Input.h"
 #include "Camera.h"
 #include "HUD.h"
 #include "graphics/InkMap.h"
@@ -13,7 +14,8 @@ public:
     HUD* hud;
     InkMap* inkMap;
     unsigned int brushTexture;
-    glm::vec3 inkColor = glm::vec3(1.0f, 0.0f, 0.0f);
+
+    glm::vec3 inkColor = glm::vec3(1.0f, 0.0f, 0.0f);   // red
 
     struct ShootRequest {
         glm::vec3 position;
@@ -32,10 +34,10 @@ public:
         inkColor = color;
     }
 
-    void ProcessInput(GLFWwindow* window, float dt) {
+    void ProcessInput(float dt) {
         if (!camera || !hud) return;
 
-        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        if (Input::GetMouseButton(0)) {
             float currentTime = (float)glfwGetTime();
             if (currentTime - lastShootTime > shootRate && hud->currentInk > 0) {
 

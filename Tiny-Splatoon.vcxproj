@@ -130,11 +130,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="engine\core\Input.cpp" />
+    <ClCompile Include="engine\core\Window.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="vendor\glad\src\glad.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="components\Camera.h" />
+    <ClInclude Include="components\Health.h" />
     <ClInclude Include="components\HUD.h" />
     <ClInclude Include="components\InkProjectile.h" />
     <ClInclude Include="components\InkShooter.h" />
@@ -143,6 +146,10 @@
     <ClInclude Include="components\Scoreboard.h" />
     <ClInclude Include="components\SimpleAI.h" />
     <ClInclude Include="engine\Component.h" />
+    <ClInclude Include="engine\core\Input.h" />
+    <ClInclude Include="engine\core\Logger.h" />
+    <ClInclude Include="engine\core\Timer.h" />
+    <ClInclude Include="engine\core\Window.h" />
     <ClInclude Include="engine\GameObject.h" />
     <ClInclude Include="engine\Transform.h" />
     <ClInclude Include="graphics\InkMap.h" />

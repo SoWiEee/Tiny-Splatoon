@@ -21,6 +21,12 @@
     <ClCompile Include="vendor\glad\src\glad.c">
       <Filter>來源檔案</Filter>
     </ClCompile>
+    <ClCompile Include="engine\core\Input.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\core\Window.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\Component.h">
@@ -63,6 +69,21 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="components\SimpleAI.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\Health.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Logger.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Input.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Timer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Window.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>
