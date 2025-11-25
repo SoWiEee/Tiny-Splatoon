@@ -14,13 +14,11 @@
 #include "components/Scoreboard.h"
 #include "gameplay/GameWorld.h"
 
-// --- 設定 ---
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
 Camera* mainCamera = nullptr;
 
-// 滑鼠回呼函式
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     if (mainCamera) mainCamera->ProcessMouseMovement((float)xpos, (float)ypos);
 }
@@ -86,6 +84,8 @@ int main() {
         // 更新 UI 邏輯 (計分板計時器等)
         scoreboard->Update(dt);
         hud->Update(dt);
+
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
