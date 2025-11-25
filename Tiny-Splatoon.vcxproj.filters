@@ -62,6 +62,9 @@
     <ClInclude Include="components\Scoreboard.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="components\SimpleAI.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />

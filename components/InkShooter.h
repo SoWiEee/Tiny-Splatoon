@@ -13,6 +13,7 @@ public:
     HUD* hud;
     InkMap* inkMap;
     unsigned int brushTexture;
+    glm::vec3 inkColor = glm::vec3(1.0f, 0.0f, 0.0f);
 
     struct ShootRequest {
         glm::vec3 position;
@@ -23,9 +24,12 @@ public:
     float shootRate = 0.1f;
     float lastShootTime = 0.0f;
 
-    // [修改] 建構子移除 cursor 參數
     InkShooter(Camera* cam, HUD* h, InkMap* map, unsigned int brushTex)
         : camera(cam), hud(h), inkMap(map), brushTexture(brushTex) {
+    }
+
+    void SetColor(glm::vec3 color) {
+        inkColor = color;
     }
 
     void ProcessInput(GLFWwindow* window, float dt) {
@@ -38,19 +42,22 @@ public:
                 hud->ConsumeInk(0.2f);
 
                 ShootRequest req;
-
-                // [修正 1] 射擊方向：直接拿相機的前方向量 (包含上下視角)
                 req.direction = camera->gameObject->transform->GetForward();
 
-                // [修正 2] 發射位置：
                 glm::vec3 playerPos = gameObject->transform->position;
-                glm::vec3 spawnOffset = glm::vec3(0.0f, 1.5f, 0.0f); // 假設槍在 1.5m 高
-
+                glm::vec3 spawnOffset = glm::vec3(0.0f, 1.5f, 0.0f);
                 req.position = playerPos + spawnOffset + (req.direction * 0.8f);
 
                 pendingShots.push_back(req);
                 lastShootTime = currentTime;
             }
         }
+    }
+
+    void AIShoot(glm::vec3 pos, glm::vec3 dir) {
+        ShootRequest req;
+        req.position = pos;
+        req.direction = dir;
+        pendingShots.push_back(req);
     }
 };

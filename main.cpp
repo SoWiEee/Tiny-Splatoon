@@ -13,20 +13,17 @@
 #include "components/InkProjectile.h"
 #include "components/PlayerController.h"
 #include "components/Scoreboard.h"
+#include "components/SimpleAI.h"
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
-
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-
-// Mouse Callback
 Camera* mainCamera = nullptr;
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     if (mainCamera) mainCamera->ProcessMouseMovement((float)xpos, (float)ypos);
 }
 
-// 產生一個簡單的圓形筆刷貼圖
 unsigned int CreateBrushTexture() {
     const int SIZE = 64; // 64x64 像素
     std::vector<unsigned char> data(SIZE * SIZE * 4); // RGBA
@@ -80,13 +77,11 @@ int main() {
     glEnable(GL_DEPTH_TEST);
     unsigned int brushTexID = CreateBrushTexture();
     InkMap* globalInkMap = new InkMap(1024, 1024);
-
-    // Create Shader
     Shader shader("assets/shaders/default.vert", "assets/shaders/default.frag");
 
-    // Scene Graph
     std::vector<GameObject*> scene;
     std::vector<GameObject*> projectiles;
+    std::vector<InkShooter*> activeShooters;
 
     // --- 地板 (Floor) ---
     GameObject* floorObj = new GameObject("Floor");
@@ -128,71 +123,103 @@ int main() {
     GameObject* scoreObj = new GameObject("Scoreboard");
     Scoreboard* scoreboard = scoreObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, globalInkMap);
 
-    // --- 玩家 (Camera) ---
+    // ==========================================
+    // 1. 玩家設定 (Team 1: Red)
+    // ==========================================
     GameObject* playerObj = new GameObject("Player");
-    playerObj->transform->position = glm::vec3(0.0f, 2.5f, 5.0f);
+    playerObj->transform->position = glm::vec3(-5.0f, 2.5f, -5.0f); // 出生點 A
+
+    // 玩家模型 (黃色)
     GameObject* playerBody = new GameObject("PlayerBody");
-    playerBody->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 1.0f, 0.0f)); // 黃色的人
+    playerBody->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 1.0f, 0.0f));
     scene.push_back(playerBody);
+
     PlayerController* controller = playerObj->AddComponent<PlayerController>();
     controller->Setup(globalInkMap, playerBody, 1, hud);
 
-    InkShooter* shooter = playerObj->AddComponent<InkShooter>(nullptr, hud, globalInkMap, brushTexID);
+    InkShooter* playerShooter = playerObj->AddComponent<InkShooter>(nullptr, hud, globalInkMap, brushTexID);
+    playerShooter->SetColor(glm::vec3(1.0f, 0.0f, 0.0f)); // 紅色墨水
+    activeShooters.push_back(playerShooter); // 加入管理清單
 
     GameObject* cameraObj = new GameObject("MainCamera");
     mainCamera = cameraObj->AddComponent<Camera>();
-    shooter->camera = mainCamera;
+    playerShooter->camera = mainCamera;
+
     scene.push_back(playerObj);
+
+    // ==========================================
+    // 2. AI 敵人設定 (Team 2: Green)
+    // ==========================================
+    GameObject* enemyObj = new GameObject("Enemy");
+    enemyObj->transform->position = glm::vec3(5.0f, 2.0f, 5.0f); // 出生點 B
+
+    // 敵人模型 (綠色)
+    enemyObj->AddComponent<MeshRenderer>("Cube", glm::vec3(0.0f, 1.0f, 0.0f));
+
+    // AI 射擊器 (沒有 Camera, 沒有 HUD)
+    InkShooter* enemyShooter = enemyObj->AddComponent<InkShooter>(nullptr, nullptr, globalInkMap, brushTexID);
+    enemyShooter->SetColor(glm::vec3(0.0f, 1.0f, 0.0f)); // 綠色墨水
+    activeShooters.push_back(enemyShooter); // 加入管理清單
+
+    SimpleAI* ai = enemyObj->AddComponent<SimpleAI>();
+    ai->Setup(enemyShooter);
+    scene.push_back(enemyObj);
 
     // Render Loop
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        glm::vec3 targetPos = playerObj->transform->position;
 
+        // Input
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
 
-        // 簡單 TPS 算法
+        // TPS Camera Logic
+        glm::vec3 targetPos = playerObj->transform->position;
         float camDist = 5.0f;
         float camHeight = 2.0f;
         glm::vec3 camDir = cameraObj->transform->GetForward();
         cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+
         playerObj->transform->rotation.y = cameraObj->transform->rotation.y;
-        playerObj->transform->rotation.x = 0.0f; // 保持直立
+        playerObj->transform->rotation.x = 0.0f;
         playerObj->transform->rotation.z = 0.0f;
+
         controller->ProcessInput(window, deltaTime,
             cameraObj->transform->GetForward(),
             cameraObj->transform->GetRight());
 
-        shooter->ProcessInput(window, deltaTime);
+        // 玩家輸入射擊
+        playerShooter->ProcessInput(window, deltaTime);
 
-        // 生成新子彈
-        for (const auto& req : shooter->pendingShots) {
-            GameObject* bulletObj = new GameObject("Bullet");
+        // ==========================================
+        // 統一處理所有射擊器的子彈生成
+        // ==========================================
+        for (InkShooter* shooter : activeShooters) {
+            for (const auto& req : shooter->pendingShots) {
+                GameObject* bulletObj = new GameObject("Bullet");
 
-            // 設定位置：從槍口出發
-            bulletObj->transform->position = req.position;
-            bulletObj->transform->scale = glm::vec3(0.1f);
+                bulletObj->transform->position = req.position;
+                bulletObj->transform->scale = glm::vec3(0.1f);
 
-            // 加入紅色方塊
-            bulletObj->AddComponent<MeshRenderer>("Cube", glm::vec3(1.0f, 0.0f, 0.0f));
+                // 子彈顏色跟墨水顏色一樣
+                bulletObj->AddComponent<MeshRenderer>("Cube", shooter->inkColor);
 
-            glm::vec3 velocity = req.direction * 20.0f;
-            velocity.y += 2.0f;
+                glm::vec3 velocity = req.direction * 20.0f;
+                velocity.y += 2.0f;
 
-            bulletObj->AddComponent<InkProjectile>(velocity, glm::vec3(1, 0, 0), globalInkMap, brushTexID);
-            projectiles.push_back(bulletObj);
+                // 傳入 shooter->inkColor
+                bulletObj->AddComponent<InkProjectile>(velocity, shooter->inkColor, globalInkMap, brushTexID);
+                projectiles.push_back(bulletObj);
+            }
+            shooter->pendingShots.clear();
         }
-        shooter->pendingShots.clear();
 
-        // 2. 更新子彈位置 & 刪除死掉的子彈
+        // 子彈物理
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
             GameObject* bullet = *it;
-
             bullet->Update(deltaTime);
-
             InkProjectile* proj = bullet->GetComponent<InkProjectile>();
             if (proj && proj->isDead) {
                 delete bullet;
@@ -205,7 +232,7 @@ int main() {
 
         // --- Update Scene ---
         for (auto go : scene) go->Update(deltaTime);
-        
+        scoreboard->Update(deltaTime);
         hudObj->Update(deltaTime);
         scoreObj->Update(deltaTime);
 
@@ -219,15 +246,13 @@ int main() {
         shader.setInt("inkMap", 1);
         globalInkMap->BindTexture(1);
 
+        // 畫場景
         for (auto go : scene) {
-            if (go->name == "Floor") {
-                shader.setInt("useInk", 1);
-            }
-            else {
-                shader.setInt("useInk", 0);
-            }
+            if (go->name == "Floor") shader.setInt("useInk", 1);
+            else shader.setInt("useInk", 0);
             go->Draw(shader);
         }
+
         shader.setInt("useInk", 0);
         for (auto bullet : projectiles) bullet->Draw(shader);
 
