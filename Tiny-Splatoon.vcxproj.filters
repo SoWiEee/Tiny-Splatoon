@@ -30,9 +30,6 @@
     <ClCompile Include="engine\rendering\Mesh.h">
       <Filter>來源檔案</Filter>
     </ClCompile>
-    <ClCompile Include="engine\rendering\Camera.h">
-      <Filter>來源檔案</Filter>
-    </ClCompile>
     <ClCompile Include="engine\rendering\Mesh.cpp">
       <Filter>來源檔案</Filter>
     </ClCompile>
@@ -48,9 +45,6 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="engine\GameObject.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="components\Camera.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="components\MeshRenderer.h">
@@ -98,10 +92,7 @@
     <ClInclude Include="engine\rendering\Shader.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-    <ClInclude Include="engine\rendering\Texture.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\rendering\Renderer.h">
+    <ClInclude Include="components\Camera.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

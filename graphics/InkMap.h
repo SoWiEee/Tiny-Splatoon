@@ -1,5 +1,5 @@
 #pragma once
-#include "Shader.h"
+#include "engine/rendering/Shader.h"
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 #include <iostream>
@@ -120,16 +120,16 @@ public:
         // 如果想要永遠覆蓋不變淡，可以用: glBlendFunc(GL_ONE, GL_ZERO);
 
         // 3. 設定 Shader
-        paintShader->use();
-        paintShader->setVec2("hitUV", hitUV);
-        paintShader->setFloat("brushSize", size);
-        paintShader->setVec3("paintColor", color);
-        paintShader->setFloat("rotation", rotation); // 傳入旋轉角度給 Shader
+        paintShader->Bind();
+        paintShader->SetVec2("hitUV", hitUV);
+        paintShader->SetFloat("brushSize", size);
+        paintShader->SetVec3("paintColor", color);
+        paintShader->SetFloat("rotation", rotation); // 傳入旋轉角度給 Shader
 
         // 綁定筆刷形狀貼圖
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, brushTexID);
-        paintShader->setInt("brushTexture", 0);
+        paintShader->SetInt("brushTexture", 0);
 
         // 4. 畫出 Quad
         glBindVertexArray(quadVAO);

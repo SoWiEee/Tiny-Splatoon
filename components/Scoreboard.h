@@ -1,7 +1,7 @@
 #pragma once
 #include "../engine/Component.h"
 #include "../graphics/InkMap.h"
-#include "../graphics/Shader.h"
+#include "../engine/rendering/Shader.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -42,11 +42,11 @@ public:
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        barShader->use();
+        barShader->Bind();
 
         // 2. 設定投影 (Orthographic)
         glm::mat4 projection = glm::ortho(0.0f, screenW, 0.0f, screenH);
-        barShader->setMat4("projection", projection);
+        barShader->SetMat4("projection", projection);
 
         // 3. 設定位置與大小 (畫在螢幕頂端中央)
         float barWidth = screenW * 0.6f; // 佔螢幕寬度 60%
@@ -57,13 +57,13 @@ public:
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(xPos, yPos, 0.0f));
         model = glm::scale(model, glm::vec3(barWidth, barHeight, 1.0f));
-        barShader->setMat4("model", model);
+        barShader->SetMat4("model", model);
 
         // 4. 傳入分數與顏色
-        barShader->setFloat("scoreA", currentScores.x); // 紅隊
-        barShader->setFloat("scoreB", currentScores.y); // 綠隊
-        barShader->setVec3("colorA", glm::vec3(1.0, 0.2, 0.2)); // 紅色
-        barShader->setVec3("colorB", glm::vec3(0.2, 1.0, 0.2)); // 綠色
+        barShader->SetFloat("scoreA", currentScores.x); // 紅隊
+        barShader->SetFloat("scoreB", currentScores.y); // 綠隊
+        barShader->SetVec3("colorA", glm::vec3(1.0, 0.2, 0.2)); // 紅色
+        barShader->SetVec3("colorB", glm::vec3(0.2, 1.0, 0.2)); // 綠色
 
         // 5. 繪製
         glBindVertexArray(VAO);

@@ -4,12 +4,10 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<unsigned int>&
     this->m_Vertices = vertices;
     this->m_Indices = indices;
 
-    // 在建構時立刻設定好 OpenGL 緩衝區
     SetupMesh();
 }
 
 Mesh::~Mesh() {
-    // 資源釋放 (RAII)
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     if (!m_Indices.empty()) {
