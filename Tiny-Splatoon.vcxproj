@@ -135,6 +135,7 @@
     <ClCompile Include="engine\rendering\Mesh.cpp" />
     <ClCompile Include="engine\rendering\Mesh.h" />
     <ClCompile Include="engine\rendering\Shader.cpp" />
+    <ClCompile Include="gameplay\Enemy.h" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="vendor\glad\src\glad.c" />
   </ItemGroup>
@@ -143,7 +144,6 @@
     <ClInclude Include="components\Health.h" />
     <ClInclude Include="components\HUD.h" />
     <ClInclude Include="components\InkProjectile.h" />
-    <ClInclude Include="components\InkShooter.h" />
     <ClInclude Include="components\MeshRenderer.h" />
     <ClInclude Include="components\PlayerController.h" />
     <ClInclude Include="components\Scoreboard.h" />

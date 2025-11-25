@@ -36,6 +36,9 @@
     <ClCompile Include="engine\rendering\Shader.cpp">
       <Filter>來源檔案</Filter>
     </ClCompile>
+    <ClCompile Include="gameplay\Enemy.h">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\Component.h">
@@ -51,9 +54,6 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="vendor\glad\include\glad\glad.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="components\InkShooter.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="components\HUD.h">
