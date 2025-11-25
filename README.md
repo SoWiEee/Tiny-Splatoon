@@ -28,7 +28,7 @@ Tiny-Splatoon/
 - Timer：計算 deltaTime、FPS
 - Logger：統一 log 輸出
 
-#### render
+#### rendering
 
 - Shader：加載、編譯、綁定 Shader
 - Texture：貼圖加載、綁定、支援 HDR / 高精度格式（如 RGBA32F）
