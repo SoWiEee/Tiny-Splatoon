@@ -1,5 +1,4 @@
 #pragma once
-
 #include "../engine/Component.h"
 #include "../engine/GameObject.h"
 #include "../engine/rendering/Mesh.h"
@@ -7,7 +6,6 @@
 #include <vector>
 #include <string>
 #include <memory>
-
 
 class MeshFactory {
 public:
