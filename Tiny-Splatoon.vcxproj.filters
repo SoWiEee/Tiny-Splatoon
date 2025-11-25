@@ -59,9 +59,6 @@
     <ClInclude Include="components\HUD.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\InkMap.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
     <ClInclude Include="components\InkProjectile.h">
       <Filter>標頭檔</Filter>
     </ClInclude>

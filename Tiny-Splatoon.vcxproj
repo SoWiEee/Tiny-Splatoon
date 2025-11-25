@@ -160,7 +160,6 @@
     <ClInclude Include="gameplay\Player.h" />
     <ClInclude Include="gameplay\Projectile.h" />
     <ClInclude Include="gameplay\Weapon.h" />
-    <ClInclude Include="graphics\InkMap.h" />
     <ClInclude Include="scene\Entity.h" />
     <ClInclude Include="scene\FloorMesh.h" />
     <ClInclude Include="scene\Level.h" />
