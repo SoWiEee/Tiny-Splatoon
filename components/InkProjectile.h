@@ -15,11 +15,12 @@ public:
     unsigned int brushTex;      // 筆刷貼圖 ID
     glm::vec3 inkColor;         // 墨水顏色 (紅隊或綠隊)
     bool isDead = false;        // 標記是否該被刪除
+    int ownerTeam;
 
     float floorSize = 40.0f;
 
-    InkProjectile(glm::vec3 startVel, glm::vec3 color, InkMap* map, unsigned int tex)
-        : velocity(startVel), inkColor(color), inkMap(map), brushTex(tex) {
+    InkProjectile(glm::vec3 startVel, glm::vec3 color, InkMap* map, unsigned int tex, int team)
+        : velocity(startVel), inkColor(color), inkMap(map), brushTex(tex), ownerTeam(team) {
     }
 
     void Update(float dt) override {

@@ -21,6 +21,24 @@
     <ClCompile Include="vendor\glad\src\glad.c">
       <Filter>來源檔案</Filter>
     </ClCompile>
+    <ClCompile Include="engine\core\Input.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\core\Window.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Mesh.h">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Mesh.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Shader.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="gameplay\Enemy.h">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\Component.h">
@@ -32,25 +50,13 @@
     <ClInclude Include="engine\GameObject.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-    <ClInclude Include="components\Camera.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
     <ClInclude Include="components\MeshRenderer.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\Shader.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="vendor\glad\include\glad\glad.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-    <ClInclude Include="components\InkShooter.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
     <ClInclude Include="components\HUD.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\InkMap.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="components\InkProjectile.h">
@@ -60,6 +66,63 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="components\Scoreboard.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\SimpleAI.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\Health.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Logger.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Input.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Timer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Window.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\rendering\Shader.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\Camera.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\Entity.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\FloorMesh.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\Level.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatMap.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatPhysics.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatPainter.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\Projectile.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\Weapon.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\GameWorld.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\Player.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatRenderer.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,6 +1,6 @@
 #pragma once
 #include "../engine/Component.h"
-#include "../graphics/Shader.h"
+#include "../engine/rendering/Shader.h"
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -30,11 +30,11 @@ public:
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        uiShader->use();
+        uiShader->Bind();
 
         // 2. 設定正交投影矩陣 (左, 右, 下, 上)
         glm::mat4 projection = glm::ortho(0.0f, screenWidth, 0.0f, screenHeight);
-        uiShader->setMat4("projection", projection);
+        uiShader->SetMat4("projection", projection);
 
         // 3. 設定 UI 位置與大小 (置中)
         glm::mat4 model = glm::mat4(1.0f);
@@ -45,11 +45,11 @@ public:
         // 縮放
         model = glm::scale(model, glm::vec3(crosshairSize, crosshairSize, 1.0f));
 
-        uiShader->setMat4("model", model);
+        uiShader->SetMat4("model", model);
 
         // 4. 更新墨水資訊
-        uiShader->setFloat("inkLevel", currentInk); // 之後可以把這個變數跟玩家邏輯綁定
-        uiShader->setVec3("inkColor", glm::vec3(1.0f, 0.5f, 0.2f)); // 橘色墨水
+        uiShader->SetFloat("inkLevel", currentInk); // 之後可以把這個變數跟玩家邏輯綁定
+        uiShader->SetVec3("inkColor", glm::vec3(1.0f, 0.5f, 0.2f)); // 橘色墨水
 
         // 5. 繪製
         glBindVertexArray(VAO);

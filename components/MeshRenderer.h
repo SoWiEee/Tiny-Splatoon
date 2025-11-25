@@ -1,121 +1,128 @@
 #pragma once
 #include "../engine/Component.h"
 #include "../engine/GameObject.h"
-#include "../graphics/Shader.h"
+#include "../engine/rendering/Mesh.h"
+#include "../engine/rendering/Shader.h"
 #include <vector>
 #include <string>
+#include <memory>
 
-struct Vertex {
-    glm::vec3 Position;
-    glm::vec2 TexCoords;
-    glm::vec3 Normal;
+class MeshFactory {
+public:
+    static std::shared_ptr<Mesh> GetCube() {
+        static std::shared_ptr<Mesh> cubeMesh = nullptr;
+        if (!cubeMesh) {
+            // 定義 36 個頂點 (位置, UV, 法線)
+            std::vector<Vertex> vertices = {
+                // Back face
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f, -1.0f}},
+                {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f, -1.0f}},
+                {{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}, {0.0f,  0.0f, -1.0f}},
+                {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f, -1.0f}},
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f, -1.0f}},
+                {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f,  0.0f, -1.0f}},
+
+                // Front face
+                {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f,  1.0f}},
+                {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f,  0.0f,  1.0f}},
+                {{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f,  1.0f}},
+                {{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f,  1.0f}},
+                {{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}, {0.0f,  0.0f,  1.0f}},
+                {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f,  1.0f}},
+
+                // Left face
+                {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {-1.0f,  0.0f,  0.0f}},
+                {{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}},
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}},
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}},
+                {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {-1.0f,  0.0f,  0.0f}},
+                {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {-1.0f,  0.0f,  0.0f}},
+
+                // Right face
+                {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {1.0f,  0.0f,  0.0f}},
+                {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {1.0f,  0.0f,  0.0f}},
+                {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {1.0f,  0.0f,  0.0f}},
+                {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {1.0f,  0.0f,  0.0f}},
+                {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {1.0f,  0.0f,  0.0f}},
+                {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {1.0f,  0.0f,  0.0f}},
+
+                // Bottom face
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f, -1.0f,  0.0f}},
+                {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f, -1.0f,  0.0f}},
+                {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f, -1.0f,  0.0f}},
+                {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f, -1.0f,  0.0f}},
+                {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f, -1.0f,  0.0f}},
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f, -1.0f,  0.0f}},
+
+                // Top face
+                {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f,  1.0f,  0.0f}},
+                {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f,  1.0f,  0.0f}},
+                {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f,  1.0f,  0.0f}},
+                {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f,  1.0f,  0.0f}},
+                {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f,  1.0f,  0.0f}},
+                {{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f,  1.0f,  0.0f}}
+            };
+            cubeMesh = std::make_shared<Mesh>(vertices);
+        }
+        return cubeMesh;
+    }
+
+    static std::shared_ptr<Mesh> GetPlane() {
+        static std::shared_ptr<Mesh> planeMesh = nullptr;
+        if (!planeMesh) {
+            std::vector<Vertex> vertices = {
+                {{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
+                {{ 0.5f, 0.0f, -0.5f}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
+                {{ 0.5f, 0.0f,  0.5f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+                {{ 0.5f, 0.0f,  0.5f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+                {{-0.5f, 0.0f,  0.5f}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+                {{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}}
+            };
+            planeMesh = std::make_shared<Mesh>(vertices);
+        }
+        return planeMesh;
+    }
 };
 
 class MeshRenderer : public Component {
-    unsigned int VAO, VBO;
-    std::vector<Vertex> vertices;
-    glm::vec3 color;
+    std::shared_ptr<Mesh> m_Mesh;
+    glm::vec3 m_Color;
 
 public:
-    MeshRenderer(std::string type, glm::vec3 c = glm::vec3(1.0f)) : color(c) {
-        if (type == "Cube") SetupCube();
-        else if (type == "Plane") SetupPlane();
-        SetupMesh();
-    }
-
-    ~MeshRenderer() {
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
-    }
-
-    // 確保這裡是 override，並且設定 model 矩陣
-    void Draw(Shader& shader) override {
-        shader.setVec3("objectColor", color);
-        shader.setMat4("model", gameObject->transform->GetModelMatrix());
-
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, vertices.size());
-        glBindVertexArray(0);
-    }
-
-private:
-    void SetupMesh() {
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-
-        glBindVertexArray(VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        if (!vertices.empty()) {
-            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+    // 建構子：根據字串決定載入哪個 Mesh
+    MeshRenderer(std::string type, glm::vec3 c = glm::vec3(1.0f)) : m_Color(c) {
+        if (type == "Cube") {
+            m_Mesh = MeshFactory::GetCube();
         }
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
-
-        glBindVertexArray(0);
+        else if (type == "Plane") {
+            m_Mesh = MeshFactory::GetPlane();
+        }
     }
 
-    void SetupPlane() {
-        vertices = {
-            {{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-            {{ 0.5f, 0.0f, -0.5f}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-            {{ 0.5f, 0.0f,  0.5f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-            {{ 0.5f, 0.0f,  0.5f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.5f, 0.0f,  0.5f}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-            {{-0.5f, 0.0f, -0.5f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}}
-        };
+    // 支援直接傳入 Mesh (給未來載入模型用)
+    MeshRenderer(std::shared_ptr<Mesh> mesh, glm::vec3 c = glm::vec3(1.0f))
+        : m_Mesh(mesh), m_Color(c) {
     }
 
-    void SetupCube() {
-        vertices = {
-            // 為了簡潔，請確保這裡填入了我上一則回覆中完整的 36 個頂點資料
-            // 包含 Back, Front, Left, Right, Bottom, Top 六個面
-            // 如果這裡是空的，子彈也會看不見
-            {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f, -1.0f}},
-            {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f, -1.0f}},
-            {{ 0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}, {0.0f,  0.0f, -1.0f}},
-            {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f, -1.0f}},
-            {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f, -1.0f}},
-            {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f,  0.0f, -1.0f}},
+    // 繪製
+    void Draw(Shader& shader) override {
+        if (m_Mesh) {
+            // 1. 設定顏色
+            shader.SetVec3("objectColor", m_Color);
 
-            {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f,  1.0f}},
-            {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f,  0.0f,  1.0f}},
-            {{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f,  1.0f}},
-            {{ 0.5f,  0.5f,  0.5f}, {1.0f, 1.0f}, {0.0f,  0.0f,  1.0f}},
-            {{-0.5f,  0.5f,  0.5f}, {0.0f, 1.0f}, {0.0f,  0.0f,  1.0f}},
-            {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f,  1.0f}},
+            // 2. 設定 Model Matrix
+            shader.SetMat4("model", gameObject->transform->GetModelMatrix());
 
-            {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {-1.0f,  0.0f,  0.0f}},
-            {{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}},
-            {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}},
-            {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {-1.0f,  0.0f,  0.0f}},
-            {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {-1.0f,  0.0f,  0.0f}},
-            {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {-1.0f,  0.0f,  0.0f}},
+            // 3. 綁定 Mesh
+            m_Mesh->Bind();
 
-            {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {1.0f,  0.0f,  0.0f}},
-            {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {1.0f,  0.0f,  0.0f}},
-            {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {1.0f,  0.0f,  0.0f}},
-            {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {1.0f,  0.0f,  0.0f}},
-            {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {1.0f,  0.0f,  0.0f}},
-            {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {1.0f,  0.0f,  0.0f}},
+            // 4. 繪製
+            // 根據 Mesh 是否有索引來決定用 DrawElements 還是 DrawArrays
+            // 這裡因為 Cube/Plane 都沒有索引，直接用 DrawArrays
+            glDrawArrays(GL_TRIANGLES, 0, m_Mesh->GetCount());
 
-            {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f, -1.0f,  0.0f}},
-            {{ 0.5f, -0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f, -1.0f,  0.0f}},
-            {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f, -1.0f,  0.0f}},
-            {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f, -1.0f,  0.0f}},
-            {{-0.5f, -0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f, -1.0f,  0.0f}},
-            {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f, -1.0f,  0.0f}},
-
-            {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f,  1.0f,  0.0f}},
-            {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f,  1.0f,  0.0f}},
-            {{ 0.5f,  0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f,  1.0f,  0.0f}},
-            {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f}, {0.0f,  1.0f,  0.0f}},
-            {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f,  1.0f,  0.0f}},
-            {{-0.5f,  0.5f,  0.5f}, {0.0f, 0.0f}, {0.0f,  1.0f,  0.0f}}
-        };
+            // 5. 解除綁定
+            m_Mesh->Unbind();
+        }
     }
 };

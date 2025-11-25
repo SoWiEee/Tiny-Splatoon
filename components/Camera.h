@@ -2,6 +2,8 @@
 #include "../engine/Component.h"
 #include "../engine/GameObject.h"
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 class Camera : public Component {
 public:
@@ -13,20 +15,25 @@ public:
     float lastX = 640, lastY = 360;
     bool firstMouse = true;
 
+    float aspectRatio = 1280.0f / 720.0f;
+
     void Start() override {
-        projection = glm::perspective(glm::radians(fov), 1280.0f / 720.0f, 0.1f, 100.0f);
+        projection = glm::perspective(glm::radians(fov), aspectRatio, 0.1f, 100.0f);
     }
 
     void Update(float dt) override {
-        // 這裡通常會需要傳入 Window 指標來讀取 Input，
-        // 為求簡化，假設我們透過全域變數或 InputManager 取得輸入
-        // 這裡僅示範 View Matrix 計算
+        // 這裡通常會需要傳入 Window 指標來讀取 Input
     }
 
     glm::mat4 GetViewMatrix() {
         return glm::lookAt(gameObject->transform->position,
             gameObject->transform->position + gameObject->transform->GetForward(),
             glm::vec3(0, 1, 0));
+    }
+
+    glm::mat4 GetProjectionMatrix() {
+        projection = glm::perspective(glm::radians(fov), aspectRatio, 0.1f, 100.0f);
+        return projection;
     }
 
     void ProcessMouseMovement(float xpos, float ypos) {
