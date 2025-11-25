@@ -118,12 +118,15 @@ private:
     }
 
     void UpdateVisuals(float dt) {
-        if (hudRef) {
-            float refillRate = isSwimming ? 0.5f : 0.1f;
-            hudRef->RefillInk(refillRate * dt);
-        }
-
         if (!visualBody) return;
+
+        if (hudRef) {
+            bool isTryingToShoot = Input::GetMouseButton(0) && !isSwimming;
+            if (!isTryingToShoot) {
+                float refillRate = isSwimming ? 0.5f : 0.1f;
+                hudRef->RefillInk(refillRate * dt);
+            }
+        }
 
         if (isSwimming) {
             visualBody->transform->scale = glm::vec3(0.6f, 0.1f, 0.6f);
