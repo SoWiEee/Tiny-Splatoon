@@ -3,12 +3,12 @@
 #include <iostream>
 #include <vector>
 
-#include "graphics/Shader.h"
 #include "graphics/InkMap.h"
 #include "engine/core/Window.h"
 #include "engine/core/Timer.h"
 #include "engine/core/Input.h"
 #include "engine/core/Logger.h"
+#include "engine/rendering/Shader.h"
 #include "engine/GameObject.h"
 #include "components/MeshRenderer.h"
 #include "components/Camera.h"
@@ -293,20 +293,20 @@ int main() {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shader.use();
-        shader.setMat4("view", mainCamera->GetViewMatrix());
-        shader.setMat4("projection", mainCamera->projection);
-        shader.setInt("inkMap", 1);
+        shader.Bind();
+        shader.SetMat4("view", mainCamera->GetViewMatrix());
+        shader.SetMat4("projection", mainCamera->projection);
+        shader.SetInt("inkMap", 1);
         globalInkMap->BindTexture(1);
 
         // µe³õ´º
         for (auto go : scene) {
-            if (go->name == "Floor") shader.setInt("useInk", 1);
-            else shader.setInt("useInk", 0);
+            if (go->name == "Floor") shader.SetInt("useInk", 1);
+            else shader.SetInt("useInk", 0);
             go->Draw(shader);
         }
 
-        shader.setInt("useInk", 0);
+        shader.SetInt("useInk", 0);
         for (auto bullet : projectiles) bullet->Draw(shader);
 
         hudObj->Draw(shader);

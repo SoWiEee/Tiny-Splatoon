@@ -27,6 +27,18 @@
     <ClCompile Include="engine\core\Window.cpp">
       <Filter>來源檔案</Filter>
     </ClCompile>
+    <ClCompile Include="engine\rendering\Mesh.h">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Camera.h">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Mesh.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Shader.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\Component.h">
@@ -42,9 +54,6 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="components\MeshRenderer.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\Shader.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="vendor\glad\include\glad\glad.h">
@@ -84,6 +93,15 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="engine\core\Window.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\rendering\Shader.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\rendering\Texture.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\rendering\Renderer.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

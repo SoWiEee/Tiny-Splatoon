@@ -132,6 +132,10 @@
   <ItemGroup>
     <ClCompile Include="engine\core\Input.cpp" />
     <ClCompile Include="engine\core\Window.cpp" />
+    <ClCompile Include="engine\rendering\Camera.h" />
+    <ClCompile Include="engine\rendering\Mesh.cpp" />
+    <ClCompile Include="engine\rendering\Mesh.h" />
+    <ClCompile Include="engine\rendering\Shader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="vendor\glad\src\glad.c" />
   </ItemGroup>
@@ -151,9 +155,11 @@
     <ClInclude Include="engine\core\Timer.h" />
     <ClInclude Include="engine\core\Window.h" />
     <ClInclude Include="engine\GameObject.h" />
+    <ClInclude Include="engine\rendering\Renderer.h" />
+    <ClInclude Include="engine\rendering\Shader.h" />
+    <ClInclude Include="engine\rendering\Texture.h" />
     <ClInclude Include="engine\Transform.h" />
     <ClInclude Include="graphics\InkMap.h" />
-    <ClInclude Include="graphics\Shader.h" />
     <ClInclude Include="vendor\glad\include\glad\glad.h" />
   </ItemGroup>
   <ItemGroup>
