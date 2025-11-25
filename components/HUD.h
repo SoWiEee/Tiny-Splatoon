@@ -1,6 +1,6 @@
 #pragma once
 #include "../engine/Component.h"
-#include "engine/rendering/Shader.h"
+#include "../engine/rendering/Shader.h"
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
