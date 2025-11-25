@@ -17,7 +17,7 @@ Tiny-Splatoon/
 
 ## Module Overview
 
-### engine
+### 1. engine
 
 > 提供低階系統、OpenGL 操作、資源管理
 
@@ -36,7 +36,7 @@ Tiny-Splatoon/
 - Camera：控制視角、投影
 - Renderer：統一場景渲染流程、負責繪製所有 Mesh
 
-### gameplay
+### 2. gameplay
 
 > 包含玩家、武器、子彈邏輯，不直接接觸 OpenGL。
 
@@ -47,7 +47,7 @@ Tiny-Splatoon/
 - GameWorld：管理所有 gameplay 物件（player、projectile、武器）
 
 
-### splat
+### 3. splat
 
 > 此區負責整個墨水塗地技術實作。
 
@@ -60,14 +60,14 @@ Tiny-Splatoon/
 - SplatRenderer：將 SplatMap（顏色）與地板原始材質混色後輸出
 	- 根據 splat texture、base texture 及地板 UV，回傳最終地板顯示結果（fragment color）
 
-### scene
+### 4. scene
 
 - Level：載入場景模型（地板、障礙物）、提供碰撞資訊
 - FloorMesh：地板的 mesh（必須有 UV）、提供給 SplatPhysics 用來轉換 UV 座標
 	- 回傳 mesh + UV
 - Entity：所有場景物件的基本類別
 
-# Module Interaction Diagram
+## Module Interaction Diagram
 
 ```
 Player Input → Gameplay → Projectile
