@@ -151,7 +151,7 @@ public:
         int cy = (int)(v * GRID_SIZE);
 
         // 簡單塗一個 3x3 的格子，模擬墨水擴散
-        int radius = 2.5;
+        int radius = 2;
         for (int x = cx - radius; x <= cx + radius; x++) {
             for (int y = cy - radius; y <= cy + radius; y++) {
                 if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
