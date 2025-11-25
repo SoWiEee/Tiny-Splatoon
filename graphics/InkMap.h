@@ -13,10 +13,17 @@ public:
     // 繪圖相關資源
     unsigned int quadVAO = 0, quadVBO;
     Shader* paintShader;
+    // CPU 端的地圖資料
+    static const int GRID_SIZE = 100;
+    int mapData[GRID_SIZE][GRID_SIZE]; // 0:無, 1:紅隊, 2:綠隊
 
     InkMap(int w, int h) : width(w), height(h) {
         Init();
         InitPaintResources();
+
+        for (int i = 0; i < GRID_SIZE; i++)
+            for (int j = 0; j < GRID_SIZE; j++)
+                mapData[i][j] = 0;
     }
 
     ~InkMap() {
@@ -134,5 +141,33 @@ public:
 
         // 恢復原本螢幕的 Viewport，假設是 1280x720
         glViewport(0, 0, 1280, 720);
+    }
+
+    // 更新 CPU 地圖資料 (當子彈擊中時呼叫)
+    // u, v: 0.0 ~ 1.0
+    // colorID: 1=Red, 2=Green
+    void UpdateMapData(float u, float v, int colorID) {
+        int cx = (int)(u * GRID_SIZE);
+        int cy = (int)(v * GRID_SIZE);
+
+        // 簡單塗一個 3x3 的格子，模擬墨水擴散
+        int radius = 2;
+        for (int x = cx - radius; x <= cx + radius; x++) {
+            for (int y = cy - radius; y <= cy + radius; y++) {
+                if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+                    mapData[x][y] = colorID;
+                }
+            }
+        }
+    }
+
+    // 查詢某個位置的顏色
+    int GetColorAt(float u, float v) {
+        int x = (int)(u * GRID_SIZE);
+        int y = (int)(v * GRID_SIZE);
+        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+            return mapData[x][y];
+        }
+        return 0; // 沒墨水
     }
 };
