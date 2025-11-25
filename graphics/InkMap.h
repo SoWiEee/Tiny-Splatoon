@@ -151,7 +151,7 @@ public:
         int cy = (int)(v * GRID_SIZE);
 
         // 簡單塗一個 3x3 的格子，模擬墨水擴散
-        int radius = 2;
+        int radius = 2.5;
         for (int x = cx - radius; x <= cx + radius; x++) {
             for (int y = cy - radius; y <= cy + radius; y++) {
                 if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
@@ -169,5 +169,25 @@ public:
             return mapData[x][y];
         }
         return 0; // 沒墨水
+    }
+
+    // 寬容檢查：只要 (u,v) 周圍的半徑內有這個顏色，就回傳 true
+    bool IsColorInArea(float u, float v, int targetColor, int radius = 1) {
+        int cx = (int)(u * GRID_SIZE);
+        int cy = (int)(v * GRID_SIZE);
+
+        // 檢查周圍 radius 格的範圍
+        for (int x = cx - radius; x <= cx + radius; x++) {
+            for (int y = cy - radius; y <= cy + radius; y++) {
+
+                // 邊界檢查 (防止陣列越界崩潰)
+                if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+                    if (mapData[x][y] == targetColor) {
+                        return true; // 只要找到一格符合，就通過
+                    }
+                }
+            }
+        }
+        return false;
     }
 };

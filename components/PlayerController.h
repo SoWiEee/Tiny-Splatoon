@@ -51,18 +51,23 @@ public:
     }
 
     void ProcessInput(GLFWwindow* window, float dt, glm::vec3 cameraForward, glm::vec3 cameraRight) {
-        // 1. 計算 UV 座標
+        // 1. 計算 UV
         float u = (gameObject->transform->position.x + floorSize / 2.0f) / floorSize;
         float v = 1.0f - ((gameObject->transform->position.z + floorSize / 2.0f) / floorSize);
 
-        // 2. 檢查腳下顏色
-        int colorOnGround = 0;
-        if (inkMap) colorOnGround = inkMap->GetColorAt(u, v);
+        // 2. [修改] 使用寬容檢查
+        // 不再只讀取一個點，而是問 Map: "我腳下這附近有沒有我的顏色?"
+        // radius 傳 1 或 2，代表檢查周圍 3x3 或 5x5 的格子
+        bool onMyInk = false;
+        if (inkMap) {
+            onMyInk = inkMap->IsColorInArea(u, v, myTeamID, 1);
+        }
 
-        // 3. 潛水判定 (按住 Left Shift 且 腳下顏色正確)
+        // 3. 潛水判定
         bool wantSwim = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
 
-        if (wantSwim && colorOnGround == myTeamID) {
+        // 只要 onMyInk 為真，就不會彈起來
+        if (wantSwim && onMyInk) {
             isSwimming = true;
         }
         else {
