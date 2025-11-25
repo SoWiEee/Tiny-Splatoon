@@ -61,15 +61,13 @@ public:
         glEnable(GL_DEPTH_TEST);
     }
 
-    // 測試用：減少墨水
     void ConsumeInk(float amount) {
         currentInk -= amount;
         if (currentInk < 0) currentInk = 0;
     }
 
-    // 測試用：補充墨水
-    void RefillInk() {
-        currentInk += 0.01f;
+    void RefillInk(float amount) {
+        currentInk += amount;
         if (currentInk > 1.0f) currentInk = 1.0f;
     }
 

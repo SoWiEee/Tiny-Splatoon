@@ -43,7 +43,6 @@ public:
                 req.direction = camera->gameObject->transform->GetForward();
 
                 // [修正 2] 發射位置：
-                // 起點 = 玩家腳底位置 + 高度偏移(眼睛/槍口) + 往前一點點(避免打到自己)
                 glm::vec3 playerPos = gameObject->transform->position;
                 glm::vec3 spawnOffset = glm::vec3(0.0f, 1.5f, 0.0f); // 假設槍在 1.5m 高
 
@@ -52,9 +51,6 @@ public:
                 pendingShots.push_back(req);
                 lastShootTime = currentTime;
             }
-        }
-        else {
-            hud->RefillInk();
         }
     }
 };

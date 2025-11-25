@@ -2,6 +2,7 @@
 #include "../engine/Component.h"
 #include "../engine/GameObject.h"
 #include "../graphics/InkMap.h"
+#include "HUD.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
@@ -12,20 +13,24 @@ public:
     float gravity = -9.8f * 3;
     float runSpeed = 5.0f;
     float swimSpeed = 10.0f; 
-    InkMap* inkMap;        // 用來查顏色
+    InkMap* inkMap;
     GameObject* visualBody;
+    HUD* hud;
     int myTeamID = 1;      // 紅隊
     float floorSize = 40.0f;
     bool isSwimming = false;
-    glm::vec3 velocity = glm::vec3(0.0f); // 當前的 3D 速度
+    glm::vec3 velocity = glm::vec3(0.0f);
     bool isGrounded = false;
     float playerHeight = 2.0f;
     float mapLimit = 19.5f;
+    float refillSpeedSwim = 0.5f;
+    float refillSpeedStand = 0.10f;
 
-    void Setup(InkMap* map, GameObject* body, int team) {
+    void Setup(InkMap* map, GameObject* body, int team, HUD* h) {
         inkMap = map;
         visualBody = body;
         myTeamID = team;
+        hud = h;
     }
 
     void Update(float dt) override {
@@ -72,6 +77,15 @@ public:
         }
         else {
             isSwimming = false;
+        }
+
+        if (hud) {
+            if (isSwimming) {
+                hud->RefillInk(refillSpeedSwim * dt);
+            }
+            else {
+                hud->RefillInk(refillSpeedStand * dt);
+            }
         }
 
         // 4. 根據狀態改變行為
