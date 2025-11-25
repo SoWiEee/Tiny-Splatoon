@@ -36,7 +36,7 @@ Tiny-Splatoon/
 - Camera：控制視角、投影
 - Renderer：統一場景渲染流程、負責繪製所有 Mesh
 
-#### gameplay
+### gameplay
 
 > 包含玩家、武器、子彈邏輯，不直接接觸 OpenGL。
 
@@ -47,7 +47,7 @@ Tiny-Splatoon/
 - GameWorld：管理所有 gameplay 物件（player、projectile、武器）
 
 
-#### splat
+### splat
 
 > 此區負責整個墨水塗地技術實作。
 
