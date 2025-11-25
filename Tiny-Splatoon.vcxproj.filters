@@ -125,6 +125,9 @@
     <ClInclude Include="gameplay\Player.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="splat\SplatRenderer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />

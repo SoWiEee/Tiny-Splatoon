@@ -6,7 +6,8 @@
 class Weapon {
 public:
     float fireRate = 0.1f;
-    float timer = 0.0f;
+    float lastFireTime = 0.0f;
+
     int teamID;
     glm::vec3 inkColor;
 
@@ -17,15 +18,15 @@ public:
         int team;
     };
 
-    // 武器回傳「我要生成子彈」的請求，而不是直接 new GameObject
     std::vector<SpawnInfo> pendingSpawns;
 
     Weapon(int team, glm::vec3 color) : teamID(team), inkColor(color) {}
 
+    // 嘗試開火
     void Trigger(float dt, glm::vec3 nozzlePos, glm::vec3 aimDir, bool isFiring) {
         if (isFiring) {
-            float currentTime = (float)glfwGetTime(); // 或傳入 time
-            if (currentTime - timer > fireRate) {
+            float currentTime = (float)glfwGetTime();
+            if (currentTime - lastFireTime > fireRate) {
 
                 SpawnInfo info;
                 info.pos = nozzlePos;
@@ -34,7 +35,8 @@ public:
                 info.team = teamID;
 
                 pendingSpawns.push_back(info);
-                timer = currentTime;
+
+                lastFireTime = currentTime;
             }
         }
     }

@@ -167,6 +167,7 @@
     <ClInclude Include="splat\SplatMap.h" />
     <ClInclude Include="splat\SplatPainter.h" />
     <ClInclude Include="splat\SplatPhysics.h" />
+    <ClInclude Include="splat\SplatRenderer.h" />
     <ClInclude Include="vendor\glad\include\glad\glad.h" />
   </ItemGroup>
   <ItemGroup>

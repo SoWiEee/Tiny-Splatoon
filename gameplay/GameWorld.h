@@ -1,55 +1,89 @@
 #pragma once
+
 #include "../scene/Level.h"
 #include "../splat/SplatMap.h"
 #include "../splat/SplatPainter.h"
-#include "Projectile.h"
+#include "../splat/SplatPhysics.h"
+#include "../splat/SplatRenderer.h"
 #include "Player.h"
+#include "Projectile.h"
+#include "../components/Scoreboard.h"
 
 class GameWorld {
 public:
+    // --- 系統 ---
     Level* level;
     SplatMap* splatMap;
     SplatPainter* painter;
+
+    // --- 實體清單 ---
     Player* localPlayer;
-
     std::vector<Projectile*> projectiles;
-    std::vector<Player*> players;
 
+    // --- 初始化 ---
     void Init(GameObject* mainCamera) {
+        // 1. 建立 Level (地板與牆壁)
         level = new Level();
         level->Load();
 
+        // 2. 建立 Splat 系統
         splatMap = new SplatMap(1024, 1024);
         painter = new SplatPainter();
-        localPlayer = new Player(glm::vec3(0, 0, 0), 1, splatMap, mainCamera);
+
+        // 3. 建立玩家 (傳入相機)
+        localPlayer = new Player(glm::vec3(-5, 0, -5), 1, splatMap, mainCamera);
     }
 
+    // --- 主邏輯迴圈 ---
     void Update(float dt) {
+        // 1. 更新玩家
         localPlayer->UpdateLogic(dt);
 
-        // bullet collect
-        for (const auto& spawn : localPlayer->weapon.pendingSpawns) {
-            Projectile* p = new Projectile(spawn.dir * 20.0f, spawn.color, spawn.team);
-            p->transform->position = spawn.pos;
+        // 2. 處理玩家武器生成的子彈
+        // 將 pendingSpawns 轉換為 Projectile 物件
+        for (const auto& info : localPlayer->weapon.pendingSpawns) {
+            // 計算初速度 (拋物線)
+            glm::vec3 velocity = info.dir * 25.0f; // 速度快一點
+            velocity.y += 3.0f; // 稍微上拋
+
+            Projectile* p = new Projectile(velocity, info.color, info.team);
+            p->transform->position = info.pos;
             projectiles.push_back(p);
         }
         localPlayer->weapon.pendingSpawns.clear();
 
-		// physics update & collision
+        // 3. 更新所有子彈 & 處理塗地
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
             Projectile* p = *it;
+
+            // 更新物理
             p->UpdatePhysics(dt);
 
-            // 處理撞擊事件 (Gameplay -> Splat 溝通)
+            // 檢查是否撞到地板
             if (p->hasHitFloor) {
-                // 使用 SplatPhysics 計算 UV
-                auto result = SplatPhysics::WorldToUV(p->hitPosition, level->floor);
+                // 使用物理系統計算 UV
+                auto result = SplatPhysics::WorldToUV(
+                    p->hitPosition,
+                    level->floor->transform->position,
+                    level->floor->width,
+                    level->floor->depth
+                );
 
                 if (result.hit) {
-                    // 呼叫畫家塗地
-                    painter->Paint(splatMap, result.uv, 0.1f, p->inkColor, 0.0f);
+                    // 隨機旋轉墨漬
+                    float rot = (float)(rand() % 360) * 3.14159f / 180.0f;
+                    float size = 0.08f + ((rand() % 100) / 500.0f); // 隨機大小
+
+                    // 執行塗地
+                    painter->Paint(splatMap, result.uv, size, p->inkColor, rot, p->ownerTeam);
                 }
 
+                // 任務完成，刪除子彈
+                delete p;
+                it = projectiles.erase(it);
+            }
+            else if (p->isDead) {
+                // 其他原因死亡 (掉出邊界)
                 delete p;
                 it = projectiles.erase(it);
             }
@@ -59,16 +93,25 @@ public:
         }
     }
 
-    // 用於 main.cpp 渲染迴圈
     void Render(Shader& shader) {
-        // 綁定 SplatMap 到 shader
-        shader.SetInt("inkMap", 1);
-        splatMap->BindTexture(1);
+        SplatRenderer::RenderFloor(shader, level->floor, splatMap);
 
-        // 渲染場景
-        // ... level->floor->Draw(shader)...
-        // ... projectiles->Draw(shader)...
+        shader.SetInt("useInk", 0);
+        for (auto wall : level->walls) wall->Draw(shader);
+        for (auto obs : level->obstacles) obs->Draw(shader);
 
-        localPlayer->GetVisualBody()->Draw(shader);
+        for (auto p : projectiles) p->Draw(shader);
+
+        if (localPlayer->GetVisualBody()) {
+            localPlayer->GetVisualBody()->Draw(shader);
+        }
+    }
+
+    void CleanUp() {
+        delete level;
+        delete splatMap;
+        delete painter;
+        delete localPlayer;
+        for (auto p : projectiles) delete p;
     }
 };
