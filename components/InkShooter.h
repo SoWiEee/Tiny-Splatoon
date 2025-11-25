@@ -14,7 +14,6 @@ public:
     InkMap* inkMap;
     unsigned int brushTexture;
 
-    // 射擊請求結構
     struct ShootRequest {
         glm::vec3 position;
         glm::vec3 direction;
@@ -39,9 +38,16 @@ public:
                 hud->ConsumeInk(0.2f);
 
                 ShootRequest req;
-                req.position = gameObject->transform->position;
-                req.direction = gameObject->transform->GetForward();
-                req.position += req.direction * 1.0f; // 稍微往前一點生成
+
+                // [修正 1] 射擊方向：直接拿相機的前方向量 (包含上下視角)
+                req.direction = camera->gameObject->transform->GetForward();
+
+                // [修正 2] 發射位置：
+                // 起點 = 玩家腳底位置 + 高度偏移(眼睛/槍口) + 往前一點點(避免打到自己)
+                glm::vec3 playerPos = gameObject->transform->position;
+                glm::vec3 spawnOffset = glm::vec3(0.0f, 1.5f, 0.0f); // 假設槍在 1.5m 高
+
+                req.position = playerPos + spawnOffset + (req.direction * 0.8f);
 
                 pendingShots.push_back(req);
                 lastShootTime = currentTime;
