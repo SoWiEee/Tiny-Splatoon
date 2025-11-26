@@ -1,0 +1,142 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="來源檔案">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="標頭檔">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="資源檔">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\glad\src\glad.c">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\core\Input.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\core\Window.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Mesh.h">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Mesh.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\rendering\Shader.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="gameplay\Enemy.h">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+    <ClCompile Include="network\NetworkManager.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="engine\Component.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\Transform.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\GameObject.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\MeshRenderer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\glad\include\glad\glad.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\HUD.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\Scoreboard.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\Health.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Logger.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Input.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Timer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\core\Window.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\rendering\Shader.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="components\Camera.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\Entity.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\FloorMesh.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="scene\Level.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatMap.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatPhysics.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatPainter.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\Projectile.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\Weapon.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\GameWorld.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\Player.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="splat\SplatRenderer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="network\NetworkManager.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="network\NetworkProtocol.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\RemotePlayer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
+    <None Include="assets\shaders\default.frag" />
+    <None Include="assets\shaders\default.vert" />
+    <None Include="assets\shaders\ui.frag" />
+    <None Include="assets\shaders\ui.vert" />
+    <None Include="assets\shaders\paint.frag" />
+    <None Include="assets\shaders\paint.vert" />
+    <None Include="assets\shaders\scoreboard.frag" />
+  </ItemGroup>
+</Project>
