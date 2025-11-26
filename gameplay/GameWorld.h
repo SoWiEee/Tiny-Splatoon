@@ -9,6 +9,7 @@
 #include "Enemy.h"
 #include "Projectile.h"
 #include "../components/Scoreboard.h"
+#include "../components/Health.h"
 
 class GameWorld {
 public:
@@ -34,6 +35,17 @@ public:
         enemyAI = new Enemy(glm::vec3(5, 0, 5), 2);
     }
 
+	// AABB collision check
+    bool CheckCollision(GameObject* bullet, GameObject* target) {
+        glm::vec3 posB = bullet->transform->position;
+        glm::vec3 posT = target->transform->position;
+
+        glm::vec3 centerT = posT + glm::vec3(0, 1.0f, 0);
+
+        float dist = glm::distance(posB, centerT);
+        return dist < 1.0f;
+    }
+
     void Update(float dt) {
         localPlayer->UpdateLogic(dt);
         CollectProjectiles(localPlayer->weapon);
@@ -55,6 +67,30 @@ public:
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
             Projectile* p = *it;
             p->UpdatePhysics(dt);
+
+            bool hitSomething = false;
+
+			// player collision
+            // 建立一個目標清單 (目前只有兩個，以後可以用 vector 存所有 entity)
+            Entity* targets[] = { localPlayer, enemyAI };
+
+            for (Entity* target : targets) {
+                // non-PVP
+                Health* hp = target->GetComponent<Health>();
+                if (hp && hp->teamID != p->ownerTeam) {
+                    if (CheckCollision(p, target)) {
+                        hp->TakeDamage(10.0f);
+                        hitSomething = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hitSomething) {
+                delete p;
+                it = projectiles.erase(it);
+                continue;
+            }
 
             if (p->hasHitFloor) {
                 // 使用物理系統計算 UV
