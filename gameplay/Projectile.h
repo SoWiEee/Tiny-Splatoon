@@ -2,6 +2,7 @@
 #include "../scene/Entity.h"
 #include "../components/MeshRenderer.h"
 #include <glm/glm.hpp>
+#include <cstdlib>
 
 class Projectile : public Entity {
 public:
@@ -13,16 +14,16 @@ public:
     glm::vec3 inkColor;
     bool isDead = false;
 
-    // --- 撞擊事件資料 (傳給 GameWorld 用) ---
     bool hasHitFloor = false;
     glm::vec3 hitPosition;
 
     Projectile(glm::vec3 startVel, glm::vec3 color, int team)
         : Entity("Projectile"), velocity(startVel), inkColor(color), ownerTeam(team)
     {
-        // 加入視覺組件 (子彈是一顆小方塊)
-        transform->scale = glm::vec3(0.15f);
-        AddComponent<MeshRenderer>("Cube", color);
+        float randomScale = 0.1f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.15f));
+
+        transform->scale = glm::vec3(randomScale);
+        AddComponent<MeshRenderer>("Sphere", color);
     }
 
     void UpdatePhysics(float dt) {

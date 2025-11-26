@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <cmath>
 
 class MeshFactory {
 public:
@@ -81,6 +82,48 @@ public:
         }
         return planeMesh;
     }
+
+    static std::shared_ptr<Mesh> GetSphere() {
+        static std::shared_ptr<Mesh> sphereMesh = nullptr;
+        if (!sphereMesh) {
+            std::vector<Vertex> vertices;
+            std::vector<unsigned int> indices;
+
+            const unsigned int X_SEGMENTS = 16; // 切分密度 (越高越圓，但效能越耗)
+            const unsigned int Y_SEGMENTS = 16;
+            const float PI = 3.14159265359f;
+
+            for (unsigned int y = 0; y <= Y_SEGMENTS; ++y) {
+                for (unsigned int x = 0; x <= X_SEGMENTS; ++x) {
+                    float xSegment = (float)x / (float)X_SEGMENTS;
+                    float ySegment = (float)y / (float)Y_SEGMENTS;
+                    float xPos = std::cos(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+                    float yPos = std::cos(ySegment * PI);
+                    float zPos = std::sin(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+
+                    Vertex v;
+                    v.Position = glm::vec3(xPos, yPos, zPos) * 0.5f; // 半徑 0.5，直徑 1.0
+                    v.TexCoords = glm::vec2(xSegment, ySegment);
+                    v.Normal = glm::normalize(glm::vec3(xPos, yPos, zPos));
+                    vertices.push_back(v);
+                }
+            }
+
+            for (unsigned int y = 0; y < Y_SEGMENTS; ++y) {
+                for (unsigned int x = 0; x < X_SEGMENTS; ++x) {
+                    indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
+                    indices.push_back(y * (X_SEGMENTS + 1) + x);
+                    indices.push_back(y * (X_SEGMENTS + 1) + x + 1);
+
+                    indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
+                    indices.push_back(y * (X_SEGMENTS + 1) + x + 1);
+                    indices.push_back((y + 1) * (X_SEGMENTS + 1) + x + 1);
+                }
+            }
+            sphereMesh = std::make_shared<Mesh>(vertices, indices);
+        }
+        return sphereMesh;
+    }
 };
 
 class MeshRenderer : public Component {
@@ -88,14 +131,10 @@ class MeshRenderer : public Component {
     glm::vec3 m_Color;
 
 public:
-    // 建構子：根據字串決定載入哪個 Mesh
     MeshRenderer(std::string type, glm::vec3 c = glm::vec3(1.0f)) : m_Color(c) {
-        if (type == "Cube") {
-            m_Mesh = MeshFactory::GetCube();
-        }
-        else if (type == "Plane") {
-            m_Mesh = MeshFactory::GetPlane();
-        }
+        if (type == "Cube") m_Mesh = MeshFactory::GetCube();
+        else if (type == "Plane") m_Mesh = MeshFactory::GetPlane();
+        else if (type == "Sphere") m_Mesh = MeshFactory::GetSphere();
     }
 
     // 支援直接傳入 Mesh (給未來載入模型用)
@@ -103,7 +142,6 @@ public:
         : m_Mesh(mesh), m_Color(c) {
     }
 
-    // 繪製
     void Draw(Shader& shader) override {
         if (m_Mesh) {
             shader.SetVec3("objectColor", m_Color);

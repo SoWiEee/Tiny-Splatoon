@@ -41,9 +41,12 @@ public:
         glm::vec3 posT = target->transform->position;
 
         glm::vec3 centerT = posT + glm::vec3(0, 1.0f, 0);
+        float bulletRadius = bullet->transform->scale.x * 0.5f;
 
         float dist = glm::distance(posB, centerT);
-        return dist < 1.0f;
+
+        // §P©w¶ZÂ÷ = ¤H¨­¥b®| (0.5) + ¤l¼u¥b®|
+        return dist < (0.5f + bulletRadius);
     }
 
     void Update(float dt) {
