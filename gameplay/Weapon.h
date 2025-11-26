@@ -2,6 +2,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <GLFW/glfw3.h>
+#include <cstdlib>
 
 struct SpawnInfo {
     glm::vec3 pos;

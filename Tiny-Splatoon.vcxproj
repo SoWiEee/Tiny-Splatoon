@@ -141,6 +141,7 @@
     <ClCompile Include="engine\rendering\Mesh.cpp" />
     <ClCompile Include="engine\rendering\Mesh.h" />
     <ClCompile Include="engine\rendering\Shader.cpp" />
+    <ClCompile Include="engine\rendering\Texture.cpp" />
     <ClCompile Include="gameplay\Enemy.h" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="network\NetworkManager.cpp" />
@@ -161,6 +162,7 @@
     <ClInclude Include="network\NetworkManager.h" />
     <ClInclude Include="network\NetworkProtocol.h" />
     <ClInclude Include="engine\rendering\Shader.h" />
+    <ClInclude Include="engine\rendering\Texture.h" />
     <ClInclude Include="engine\Transform.h" />
     <ClInclude Include="gameplay\GameWorld.h" />
     <ClInclude Include="gameplay\Player.h" />
@@ -175,6 +177,7 @@
     <ClInclude Include="splat\SplatPhysics.h" />
     <ClInclude Include="splat\SplatRenderer.h" />
     <ClInclude Include="vendor\glad\include\glad\glad.h" />
+    <ClInclude Include="vendor\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
