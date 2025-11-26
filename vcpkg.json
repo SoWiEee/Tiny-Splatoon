@@ -12,6 +12,7 @@
       ]
     },
     "opengl",
-    "stb"
+    "stb",
+    "gamenetworkingsockets"
   ]
 }
