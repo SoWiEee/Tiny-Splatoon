@@ -3,6 +3,7 @@
 #include "../engine/GameObject.h"
 #include "../engine/rendering/Mesh.h"
 #include "../engine/rendering/Shader.h"
+#include "../engine/rendering/Texture.h"
 #include <vector>
 #include <string>
 #include <memory>
@@ -128,7 +129,9 @@ public:
 
 class MeshRenderer : public Component {
     std::shared_ptr<Mesh> m_Mesh;
+    std::shared_ptr<Texture> m_Texture;
     glm::vec3 m_Color;
+    float m_Tiling = 1.0f;
 
 public:
     MeshRenderer(std::string type, glm::vec3 c = glm::vec3(1.0f)) : m_Color(c) {
@@ -142,13 +145,29 @@ public:
         : m_Mesh(mesh), m_Color(c) {
     }
 
+    void SetTexture(std::shared_ptr<Texture> tex, float tiling = 1.0f) {
+        m_Texture = tex;
+        m_Tiling = tiling;
+    }
+
     void Draw(Shader& shader) override {
         if (m_Mesh) {
             shader.SetVec3("objectColor", m_Color);
             shader.SetMat4("model", gameObject->transform->GetModelMatrix());
 
+            if (m_Texture) {
+                m_Texture->Bind(0);
+                shader.SetInt("useTexture", 1);
+                shader.SetInt("mainTexture", 0);
+                shader.SetFloat("tiling", m_Tiling);
+            }
+            else {
+                shader.SetInt("useTexture", 0);
+            }
+
             m_Mesh->Bind();
-            glDrawArrays(GL_TRIANGLES, 0, m_Mesh->GetCount());
+            if (m_Mesh->HasIndices()) glDrawElements(GL_TRIANGLES, m_Mesh->GetCount(), GL_UNSIGNED_INT, 0);
+            else glDrawArrays(GL_TRIANGLES, 0, m_Mesh->GetCount());
             m_Mesh->Unbind();
         }
     }

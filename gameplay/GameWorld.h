@@ -72,7 +72,6 @@ public:
             bool hitSomething = false;
 
 			// player collision
-            // 建立一個目標清單 (目前只有兩個，以後可以用 vector 存所有 entity)
             Entity* targets[] = { localPlayer, enemyAI };
 
             for (Entity* target : targets) {
@@ -137,6 +136,47 @@ public:
         }
         if (enemyAI->GetVisualBody()) {
             enemyAI->GetVisualBody()->Draw(shader);
+        }
+
+        // 畫陰影
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // 關閉深度寫入，避免陰影遮擋其他東西
+        glDepthMask(GL_FALSE);
+
+        if (localPlayer) {
+            // 陰影跟隨玩家，但貼地
+            glm::vec3 shadowPos = localPlayer->transform->position;
+            shadowPos.y = 0.02f; // 永遠在地板上
+
+            // 根據玩家高度縮放陰影 (跳起來時陰影變小)
+            float height = localPlayer->transform->position.y;
+            float scale = 1.5f - (height * 0.3f);
+            if (scale < 0) scale = 0;
+
+            // 我們需要存取 shadow 物件，建議 Player 提供 GetShadow()
+            // 假設 localPlayer->shadow 是 public 或者有 getter
+            GameObject* s = localPlayer->shadow;
+            s->transform->position = shadowPos;
+            s->transform->scale = glm::vec3(scale, 1.0f, scale);
+            s->Draw(shader);
+        }
+
+        if (enemyAI) {
+            glm::vec3 shadowPos = enemyAI->transform->position;
+            shadowPos.y = 0.02f;
+
+            float height = enemyAI->transform->position.y;
+            float scale = 1.5f - (height * 0.3f);
+            if (scale < 0) scale = 0;
+
+            GameObject* s = enemyAI->shadow;
+            s->transform->position = shadowPos;
+            s->transform->scale = glm::vec3(scale, 1.0f, scale);
+            s->Draw(shader);
+
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
         }
     }
 

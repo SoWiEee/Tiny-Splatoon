@@ -25,6 +25,7 @@ public:
     Weapon* weapon = nullptr;
     SplatMap* splatMapRef;
     GameObject* cameraRef;
+    GameObject* shadow;
     GameObject* visualBody;
     HUD* hudRef = nullptr;
 
@@ -34,6 +35,11 @@ public:
     Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
         : Entity("Player"), teamID(team), splatMapRef(map), cameraRef(cam), hudRef(hud)
     {
+        shadow = new GameObject("ShadowBlob");
+        shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f));
+        shadow->transform->position = transform->position + glm::vec3(0, 0.02f, 0);
+        shadow->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f);
+
         transform->position = startPos;
         weapon = new ShotgunWeapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0));
         AddComponent<Health>(team, startPos);

@@ -21,8 +21,14 @@ public:
     // reference
     Weapon* weapon = nullptr;;
     GameObject* visualBody;
+    GameObject* shadow;
 
     Enemy(glm::vec3 startPos, int team) : Entity("Enemy"), teamID(team) {
+        shadow = new GameObject("ShadowBlob");
+        shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f)); // 黑色
+        // 稍微浮在地板上一點點，避免 Z-Fighting
+        shadow->transform->position = transform->position + glm::vec3(0, 0.02f, 0);
+        shadow->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f); // 陰影比人稍微大一點
         transform->position = startPos;
         AddComponent<Health>(team, startPos);
         weapon = new ShooterWeapon(team, glm::vec3(0, 1, 0));
