@@ -3,6 +3,7 @@
 #include "../scene/Entity.h"
 #include "../engine/core/Input.h"
 #include "../components/MeshRenderer.h"
+#include "../components/Health.h"
 #include "Weapon.h"
 #include "../splat/SplatMap.h"
 
@@ -35,6 +36,7 @@ public:
         weapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0))
     {
         transform->position = startPos;
+        AddComponent<Health>(team, startPos);
         visualBody = new GameObject("PlayerBody");
         visualBody->AddComponent<MeshRenderer>("Cube", weapon.inkColor);
     }

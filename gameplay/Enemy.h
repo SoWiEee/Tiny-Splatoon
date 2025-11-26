@@ -2,6 +2,7 @@
 #include "../scene/Entity.h"
 #include "Weapon.h"
 #include "../components/MeshRenderer.h"
+#include "../components/Health.h"
 #include <glm/glm.hpp>
 #include <cstdlib>
 
@@ -12,7 +13,7 @@ public:
     float moveSpeed = 3.0f;
     float mapLimit = 18.0f;
 
-    // --- AI 狀態 ---
+    // state
     float changeDirTime = 2.0f;
     float timer = 0.0f;
     glm::vec3 currentDir = glm::vec3(0, 0, 1);
@@ -26,6 +27,7 @@ public:
         weapon(team, glm::vec3(0, 1, 0)) // 預設綠色
     {
         transform->position = startPos;
+        AddComponent<Health>(team, startPos);
 
         visualBody = new GameObject("EnemyBody");
         visualBody->AddComponent<MeshRenderer>("Cube", weapon.inkColor);
@@ -34,7 +36,7 @@ public:
     }
 
     void UpdateLogic(float dt) {
-        // 1. AI 移動邏輯 (隨機亂走)
+        // walk
         timer += dt;
         if (timer > changeDirTime) {
             RandomizeDir();
@@ -42,30 +44,25 @@ public:
             changeDirTime = 1.0f + (float)(rand() % 20) / 10.0f;
         }
 
-        // 移動
+        // move
         transform->position += currentDir * moveSpeed * dt;
 
-        // 轉向
+        // rotate
         if (glm::length(currentDir) > 0.01f) {
-            // 簡單轉向 (看向移動方向)
             float angle = atan2(currentDir.x, currentDir.z);
             transform->rotation.y = glm::degrees(angle);
         }
 
-        // 邊界檢查
         CheckBounds(dt);
 
-        // 更新視覺位置
         if (visualBody) {
             visualBody->transform->position = transform->position + glm::vec3(0, 0.9f, 0);
             visualBody->transform->rotation = transform->rotation;
         }
 
-        // 2. AI 射擊邏輯 (自動開火)
-        // 槍口位置
+        // auto fire
         glm::vec3 gunPos = transform->position + glm::vec3(0, 1.5f, 0) + currentDir * 0.8f;
 
-        // 稍微隨機的射擊方向
         float spread = ((rand() % 100) / 100.0f - 0.5f) * 0.5f;
         glm::vec3 aimDir = glm::normalize(currentDir + glm::vec3(spread, -0.2f, 0.0f));
 
