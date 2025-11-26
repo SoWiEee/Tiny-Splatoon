@@ -12,7 +12,6 @@ public:
     static std::shared_ptr<Mesh> GetCube() {
         static std::shared_ptr<Mesh> cubeMesh = nullptr;
         if (!cubeMesh) {
-            // 定義 36 個頂點 (位置, UV, 法線)
             std::vector<Vertex> vertices = {
                 // Back face
                 {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f,  0.0f, -1.0f}},
@@ -107,21 +106,11 @@ public:
     // 繪製
     void Draw(Shader& shader) override {
         if (m_Mesh) {
-            // 1. 設定顏色
             shader.SetVec3("objectColor", m_Color);
-
-            // 2. 設定 Model Matrix
             shader.SetMat4("model", gameObject->transform->GetModelMatrix());
 
-            // 3. 綁定 Mesh
             m_Mesh->Bind();
-
-            // 4. 繪製
-            // 根據 Mesh 是否有索引來決定用 DrawElements 還是 DrawArrays
-            // 這裡因為 Cube/Plane 都沒有索引，直接用 DrawArrays
             glDrawArrays(GL_TRIANGLES, 0, m_Mesh->GetCount());
-
-            // 5. 解除綁定
             m_Mesh->Unbind();
         }
     }
