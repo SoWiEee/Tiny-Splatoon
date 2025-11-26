@@ -18,7 +18,7 @@ class Scoreboard : public Component {
 
 public:
     Scoreboard(float w, float h, SplatMap* map) : m_ScreenW(w), m_ScreenH(h), m_SplatMap(map) {
-        m_Shader = std::make_unique<Shader>("assets/shaders/ui.vert", "assets/shaders/scoreboard.frag");
+        m_Shader = std::make_unique<Shader>("../assets/shaders/ui.vert", "../assets/shaders/scoreboard.frag");
         SetupMesh();
     }
 

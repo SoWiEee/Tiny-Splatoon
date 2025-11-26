@@ -5,6 +5,9 @@
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
 #include "Weapon.h"
+#include "ShooterWeapon.h"
+#include "ShotgunWeapon.h"
+#include "BowWeapon.h"
 #include "../splat/SplatMap.h"
 
 class Player : public Entity {

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -71,7 +71,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glm;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glm</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glm</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -105,10 +108,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glm;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\enet\include;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glad\include;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui\backends;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glfw\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;enet.lib;enet64.lib;ws2_32.lib;winmm.lib;gdi32.lib;user32.lib;shell32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\enet;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glfw\lib-vc2022</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -119,14 +125,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui\backends;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glad\include;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glm;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glm;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\enet\include;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glad\include;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui\backends;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\imgui;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glfw\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glfw\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\enet;C:\Users\MintIce\Programming\Tiny-Splatoon\vendor\glfw\lib-vc2022</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;enet.lib;enet64.lib;ws2_32.lib;winmm.lib;gdi32.lib;user32.lib;shell32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -138,6 +144,7 @@
     <ClCompile Include="engine\rendering\Texture.cpp" />
     <ClCompile Include="gameplay\Enemy.h" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="network\NetworkManager.cpp" />
     <ClCompile Include="vendor\glad\src\glad.c" />
   </ItemGroup>
   <ItemGroup>
@@ -152,12 +159,15 @@
     <ClInclude Include="engine\core\Timer.h" />
     <ClInclude Include="engine\core\Window.h" />
     <ClInclude Include="engine\GameObject.h" />
+    <ClInclude Include="network\NetworkManager.h" />
+    <ClInclude Include="network\NetworkProtocol.h" />
     <ClInclude Include="engine\rendering\Shader.h" />
     <ClInclude Include="engine\rendering\Texture.h" />
     <ClInclude Include="engine\Transform.h" />
     <ClInclude Include="gameplay\GameWorld.h" />
     <ClInclude Include="gameplay\Player.h" />
     <ClInclude Include="gameplay\Projectile.h" />
+    <ClInclude Include="gameplay\RemotePlayer.h" />
     <ClInclude Include="gameplay\Weapon.h" />
     <ClInclude Include="scene\Entity.h" />
     <ClInclude Include="scene\FloorMesh.h" />

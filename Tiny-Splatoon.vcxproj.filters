@@ -39,6 +39,9 @@
     <ClCompile Include="gameplay\Enemy.h">
       <Filter>來源檔案</Filter>
     </ClCompile>
+    <ClCompile Include="network\NetworkManager.cpp">
+      <Filter>來源檔案</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\Component.h">
@@ -59,16 +62,7 @@
     <ClInclude Include="components\HUD.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
-    <ClInclude Include="components\InkProjectile.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="components\PlayerController.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
     <ClInclude Include="components\Scoreboard.h">
-      <Filter>標頭檔</Filter>
-    </ClInclude>
-    <ClInclude Include="components\SimpleAI.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="components\Health.h">
@@ -123,6 +117,15 @@
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="splat\SplatRenderer.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="network\NetworkManager.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="network\NetworkProtocol.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="gameplay\RemotePlayer.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,7 +2,8 @@
 #include <iostream>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../../../vendor/stb_image.h"
+#include "stb_image.h"
+
 
 
 Texture::Texture() : Width(0), Height(0), InternalFormat(GL_RGBA), ImageFormat(GL_RGBA), WrapS(GL_REPEAT), WrapT(GL_REPEAT), FilterMin(GL_LINEAR_MIPMAP_LINEAR), FilterMag(GL_LINEAR) {
@@ -17,7 +18,7 @@ void Texture::Load(const std::string& path) {
     glBindTexture(GL_TEXTURE_2D, ID);
 
     int width, height, nrChannels;
-    // OpenGL ªº UV ­ìÂI¦b¥ª¤U¨¤¡A¹Ï¤ù³q±`¦b¥ª¤W¨¤¡A©Ò¥H­nÂ½Âà
+    // OpenGL çš„ UV åŸé»åœ¨å·¦ä¸‹è§’ï¼Œåœ–ç‰‡é€šå¸¸åœ¨å·¦ä¸Šè§’ï¼Œæ‰€ä»¥è¦ç¿»è½‰
     stbi_set_flip_vertically_on_load(true);
 
     unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
@@ -36,11 +37,11 @@ void Texture::Load(const std::string& path) {
         glTexImage2D(GL_TEXTURE_2D, 0, InternalFormat, width, height, 0, ImageFormat, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        // ³]©w­«½Æ¼Ò¦¡ (Åı¦aªO¯¾²z¥i¥H tiling)
+        // è¨­å®šé‡è¤‡æ¨¡å¼ (è®“åœ°æ¿ç´‹ç†å¯ä»¥ tiling)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-        // ³]©w¹LÂo¼Ò¦¡ (Mipmap Åı»·³B¤£°{Ã{)
+        // è¨­å®šéæ¿¾æ¨¡å¼ (Mipmap è®“é è™•ä¸é–ƒçˆ)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -52,7 +53,7 @@ void Texture::Load(const std::string& path) {
     }
 }
 
-// ¤ä´©«Ø¥ßªÅ¶K¹Ï (µ¹ SplatMap ¥Î)
+// æ”¯æ´å»ºç«‹ç©ºè²¼åœ– (çµ¦ SplatMap ç”¨)
 void Texture::Generate(int width, int height, unsigned int internalFormat, unsigned int format, void* data) {
     Width = width;
     Height = height;
@@ -62,7 +63,7 @@ void Texture::Generate(int width, int height, unsigned int internalFormat, unsig
     glBindTexture(GL_TEXTURE_2D, ID);
     glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 
-    // ¹w³]°Ñ¼Æ
+    // é è¨­åƒæ•¸
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

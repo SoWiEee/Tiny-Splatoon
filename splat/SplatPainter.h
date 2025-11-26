@@ -1,6 +1,8 @@
 #pragma once
 #include "SplatMap.h"
 #include "../engine/rendering/Shader.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
 class SplatPainter {
 private:
@@ -9,7 +11,7 @@ private:
 
 public:
     SplatPainter() {
-        paintShader = new Shader("assets/shaders/paint.vert", "assets/shaders/paint.frag");
+        paintShader = new Shader("../assets/shaders/paint.vert", "../assets/shaders/paint.frag");
         InitQuad();
     }
 
