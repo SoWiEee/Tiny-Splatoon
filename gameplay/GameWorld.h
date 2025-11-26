@@ -107,7 +107,7 @@ public:
                 if (result.hit) {
                     // 隨機旋轉墨漬
                     float rot = (float)(rand() % 360) * 3.14159f / 180.0f;
-                    float size = 0.08f + ((rand() % 100) / 500.0f); // 隨機大小
+                    float size = p->transform->scale.x * 0.3f;
 
                     painter->Paint(splatMap, result.uv, size, p->inkColor, rot, p->ownerTeam);
                 }
