@@ -126,6 +126,7 @@ public:
         SplatRenderer::RenderFloor(shader, level->floor, splatMap);
 
         shader.SetInt("useInk", 0);
+        shader.SetFloat("alpha", 1.0f);
         for (auto wall : level->walls) wall->Draw(shader);
         for (auto obs : level->obstacles) obs->Draw(shader);
 
@@ -141,8 +142,8 @@ public:
         // 畫陰影
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        // 關閉深度寫入，避免陰影遮擋其他東西
         glDepthMask(GL_FALSE);
+        shader.SetFloat("alpha", 0.5f);
 
         if (localPlayer) {
             // 陰影跟隨玩家，但貼地
@@ -175,6 +176,7 @@ public:
             s->transform->scale = glm::vec3(scale, 1.0f, scale);
             s->Draw(shader);
 
+            shader.SetFloat("alpha", 1.0f);
             glDepthMask(GL_TRUE);
             glDisable(GL_BLEND);
         }

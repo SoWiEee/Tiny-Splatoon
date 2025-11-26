@@ -19,14 +19,13 @@ uniform int useInk;
 uniform vec3 viewPos;
 vec3 lightDir = normalize(vec3(0.5, 0.8, 0.3)); 
 vec3 lightColor = vec3(1.0, 0.95, 0.9);
+uniform float alpha = 1.0;
 
 void main() {
     vec4 baseColor = vec4(objectColor, 1.0);
     
     if (useTexture == 1) {
         baseColor = texture(mainTexture, TexCoord * tiling);
-        // 可以乘上 objectColor 做染色效果
-        // baseColor *= vec4(objectColor, 1.0); 
     }
 
     // Ink Mixing
@@ -37,14 +36,10 @@ void main() {
     if (useInk == 1) {
         vec4 inkSample = texture(inkMap, TexCoord); // 墨水不用 tiling
         inkFactor = inkSample.a;
-        
-        // 混合顏色：地板貼圖 <-> 墨水顏色
         baseColor.rgb = mix(baseColor.rgb, inkSample.rgb, inkFactor);
-        
-        // 混合材質屬性：地板粗糙 <-> 墨水光滑
         roughness = mix(0.8, 0.1, inkFactor); 
 
-        // [進階] 假法線凸起 (Optional)
+        // simple bump map
         if (inkFactor > 0.01) {
             float h = 2.0;
             float dx = dFdx(inkFactor) * h;
@@ -75,5 +70,5 @@ void main() {
     // float fogFactor = smoothstep(10.0, 50.0, dist);
     // result = mix(result, vec3(0.1, 0.1, 0.1), fogFactor);
 
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(result, alpha);
 }
