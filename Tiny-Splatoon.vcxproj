@@ -143,11 +143,8 @@
     <ClInclude Include="components\Camera.h" />
     <ClInclude Include="components\Health.h" />
     <ClInclude Include="components\HUD.h" />
-    <ClInclude Include="components\InkProjectile.h" />
     <ClInclude Include="components\MeshRenderer.h" />
-    <ClInclude Include="components\PlayerController.h" />
     <ClInclude Include="components\Scoreboard.h" />
-    <ClInclude Include="components\SimpleAI.h" />
     <ClInclude Include="engine\Component.h" />
     <ClInclude Include="engine\core\Input.h" />
     <ClInclude Include="engine\core\Logger.h" />
