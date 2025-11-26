@@ -14,7 +14,7 @@ public:
     float currentInk = 1.0f; // 100% ¾¥¤ô
 
     HUD(float width, float height) : screenWidth(width), screenHeight(height) {
-        uiShader = new Shader("assets/shaders/ui.vert", "assets/shaders/ui.frag");
+        uiShader = new Shader("../assets/shaders/ui.vert", "../assets/shaders/ui.frag");
         SetupQuad();
     }
 

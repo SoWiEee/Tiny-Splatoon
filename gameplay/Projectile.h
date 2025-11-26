@@ -17,12 +17,10 @@ public:
     bool hasHitFloor = false;
     glm::vec3 hitPosition;
 
-    Projectile(glm::vec3 startVel, glm::vec3 color, int team)
+    Projectile(glm::vec3 startVel, glm::vec3 color, int team, float scale)
         : Entity("Projectile"), velocity(startVel), inkColor(color), ownerTeam(team)
     {
-        float randomScale = 0.1f + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 0.15f));
-
-        transform->scale = glm::vec3(randomScale);
+        transform->scale = glm::vec3(scale);
         AddComponent<MeshRenderer>("Sphere", color);
     }
 
