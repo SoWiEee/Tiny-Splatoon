@@ -72,9 +72,6 @@ int main() {
 
             glm::vec3 camDir = cameraObj->transform->GetForward();
             cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
-
-            // [可選] 平滑移動 (Lerp) 讓相機不要太生硬
-            // cameraObj->transform->position = glm::mix(cameraObj->transform->position, desiredPos, dt * 10.0f);
         }
 
         // Update Player, Physics, Projectiles, SplatMap

@@ -50,21 +50,19 @@ public:
     }
 
     void Update(float dt) {
-        localPlayer->UpdateLogic(dt);
-        CollectProjectiles(localPlayer->weapon);
-        enemyAI->UpdateLogic(dt);
-        CollectProjectiles(enemyAI->weapon);
-
-		// bullet spawning
-        for (const auto& info : localPlayer->weapon.pendingSpawns) {
-            glm::vec3 velocity = info.dir * 25.0f; // 速度快一點
-            velocity.y += 3.0f; // 稍微上拋
-
-            Projectile* p = new Projectile(velocity, info.color, info.team);
-            p->transform->position = info.pos;
-            projectiles.push_back(p);
+        // Update players
+        if (localPlayer) {
+            localPlayer->UpdateLogic(dt);
+            if (localPlayer->weapon) {
+                CollectProjectiles(*(localPlayer->weapon));
+            }
         }
-        localPlayer->weapon.pendingSpawns.clear();
+        if (enemyAI) {
+            enemyAI->UpdateLogic(dt);
+            if (enemyAI->weapon) {
+                CollectProjectiles(*(enemyAI->weapon));
+            }
+        }
 
         // 3. 更新所有子彈 & 處理塗地
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
@@ -74,7 +72,6 @@ public:
             bool hitSomething = false;
 
 			// player collision
-            // 建立一個目標清單 (目前只有兩個，以後可以用 vector 存所有 entity)
             Entity* targets[] = { localPlayer, enemyAI };
 
             for (Entity* target : targets) {
@@ -129,6 +126,7 @@ public:
         SplatRenderer::RenderFloor(shader, level->floor, splatMap);
 
         shader.SetInt("useInk", 0);
+        shader.SetFloat("alpha", 1.0f);
         for (auto wall : level->walls) wall->Draw(shader);
         for (auto obs : level->obstacles) obs->Draw(shader);
 
@@ -140,14 +138,58 @@ public:
         if (enemyAI->GetVisualBody()) {
             enemyAI->GetVisualBody()->Draw(shader);
         }
+
+        // 畫陰影
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        shader.SetFloat("alpha", 0.5f);
+
+        if (localPlayer) {
+            // 陰影跟隨玩家，但貼地
+            glm::vec3 shadowPos = localPlayer->transform->position;
+            shadowPos.y = 0.02f; // 永遠在地板上
+
+            // 根據玩家高度縮放陰影 (跳起來時陰影變小)
+            float height = localPlayer->transform->position.y;
+            float scale = 1.5f - (height * 0.3f);
+            if (scale < 0) scale = 0;
+
+            // 我們需要存取 shadow 物件，建議 Player 提供 GetShadow()
+            // 假設 localPlayer->shadow 是 public 或者有 getter
+            GameObject* s = localPlayer->shadow;
+            s->transform->position = shadowPos;
+            s->transform->scale = glm::vec3(scale, 1.0f, scale);
+            s->Draw(shader);
+        }
+
+        if (enemyAI) {
+            glm::vec3 shadowPos = enemyAI->transform->position;
+            shadowPos.y = 0.02f;
+
+            float height = enemyAI->transform->position.y;
+            float scale = 1.5f - (height * 0.3f);
+            if (scale < 0) scale = 0;
+
+            GameObject* s = enemyAI->shadow;
+            s->transform->position = shadowPos;
+            s->transform->scale = glm::vec3(scale, 1.0f, scale);
+            s->Draw(shader);
+
+            shader.SetFloat("alpha", 1.0f);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
+        }
     }
 
     void CollectProjectiles(Weapon& weapon) {
         for (const auto& info : weapon.pendingSpawns) {
-            glm::vec3 velocity = info.dir * 25.0f;
-            velocity.y += 3.0f;
-            Projectile* p = new Projectile(velocity, info.color, info.team);
+            glm::vec3 velocity = info.dir * info.speed;
+            velocity.y += 2.0f;
+
+            Projectile* p = new Projectile(velocity, info.color, info.team, info.scale);
             p->transform->position = info.pos;
+
             projectiles.push_back(p);
         }
         weapon.pendingSpawns.clear();
