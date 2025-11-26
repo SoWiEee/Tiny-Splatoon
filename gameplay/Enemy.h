@@ -19,20 +19,22 @@ public:
     glm::vec3 currentDir = glm::vec3(0, 0, 1);
 
     // reference
-    Weapon weapon;
+    Weapon* weapon = nullptr;;
     GameObject* visualBody;
 
-    Enemy(glm::vec3 startPos, int team)
-        : Entity("Enemy"), teamID(team),
-        weapon(team, glm::vec3(0, 1, 0)) // 預設綠色
-    {
+    Enemy(glm::vec3 startPos, int team) : Entity("Enemy"), teamID(team) {
         transform->position = startPos;
         AddComponent<Health>(team, startPos);
+        weapon = new ShooterWeapon(team, glm::vec3(0, 1, 0));
 
         visualBody = new GameObject("EnemyBody");
-        visualBody->AddComponent<MeshRenderer>("Cube", weapon.inkColor);
+        visualBody->AddComponent<MeshRenderer>("Cube", weapon->inkColor);
 
         RandomizeDir();
+    }
+
+    ~Enemy() {
+        if (weapon) delete weapon;
     }
 
     void UpdateLogic(float dt) {
@@ -60,14 +62,13 @@ public:
             visualBody->transform->rotation = transform->rotation;
         }
 
-        // auto fire
-        glm::vec3 gunPos = transform->position + glm::vec3(0, 1.5f, 0) + currentDir * 0.8f;
+        if (weapon) {
+            glm::vec3 gunPos = transform->position + glm::vec3(0, 1.5f, 0) + currentDir * 0.8f;
+            float spread = ((rand() % 100) / 100.0f - 0.5f) * 0.5f;
+            glm::vec3 aimDir = glm::normalize(currentDir + glm::vec3(spread, -0.2f, 0.0f));
 
-        float spread = ((rand() % 100) / 100.0f - 0.5f) * 0.5f;
-        glm::vec3 aimDir = glm::normalize(currentDir + glm::vec3(spread, -0.2f, 0.0f));
-
-        // 自動扣扳機 (true)
-        weapon.Trigger(dt, gunPos, aimDir, true);
+            weapon->Trigger(dt, gunPos, aimDir, true);
+        }
     }
 
     GameObject* GetVisualBody() { return visualBody; }

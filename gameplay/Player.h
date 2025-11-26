@@ -22,7 +22,7 @@ public:
     bool isSwimming = false;
 
     // reference
-    Weapon weapon;
+    Weapon* weapon = nullptr;
     SplatMap* splatMapRef;
     GameObject* cameraRef;
     GameObject* visualBody;
@@ -32,13 +32,22 @@ public:
     float floorSize = 40.0f;
 
     Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
-        : Entity("Player"), teamID(team), splatMapRef(map), cameraRef(cam), hudRef(hud),
-        weapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0))
+        : Entity("Player"), teamID(team), splatMapRef(map), cameraRef(cam), hudRef(hud)
     {
         transform->position = startPos;
+        weapon = new ShotgunWeapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0));
         AddComponent<Health>(team, startPos);
         visualBody = new GameObject("PlayerBody");
-        visualBody->AddComponent<MeshRenderer>("Cube", weapon.inkColor);
+        visualBody->AddComponent<MeshRenderer>("Cube", weapon->inkColor);
+    }
+
+    ~Player() {
+        if (weapon) delete weapon;
+    }
+
+    void EquipWeapon(Weapon* newWeapon) {
+        if (weapon) delete weapon;
+        weapon = newWeapon;
     }
 
     // ¥DÅÞ¿è§ó·s
@@ -95,8 +104,15 @@ private:
 
         glm::vec3 gunPos = transform->position + glm::vec3(0, 1.5f, 0) + right * 0.5f + front * 0.5f;
 
-        if (weapon.Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
-            if (hudRef) hudRef->ConsumeInk(0.2f);
+        if (weapon) {
+            bool hasInk = (hudRef && hudRef->currentInk >= weapon->inkCost);
+            bool isFiring = Input::GetMouseButton(0) && !isSwimming && hasInk;
+
+            glm::vec3 gunPos = transform->position + glm::vec3(0, 1.5f, 0) + right * 0.5f + front * 0.5f;
+
+            if (weapon->Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
+                if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
+            }
         }
     }
 

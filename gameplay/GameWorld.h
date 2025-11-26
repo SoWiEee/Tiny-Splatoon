@@ -50,21 +50,19 @@ public:
     }
 
     void Update(float dt) {
-        localPlayer->UpdateLogic(dt);
-        CollectProjectiles(localPlayer->weapon);
-        enemyAI->UpdateLogic(dt);
-        CollectProjectiles(enemyAI->weapon);
-
-		// bullet spawning
-        for (const auto& info : localPlayer->weapon.pendingSpawns) {
-            glm::vec3 velocity = info.dir * 25.0f; // 速度快一點
-            velocity.y += 3.0f; // 稍微上拋
-
-            Projectile* p = new Projectile(velocity, info.color, info.team);
-            p->transform->position = info.pos;
-            projectiles.push_back(p);
+        // Update players
+        if (localPlayer) {
+            localPlayer->UpdateLogic(dt);
+            if (localPlayer->weapon) {
+                CollectProjectiles(*(localPlayer->weapon));
+            }
         }
-        localPlayer->weapon.pendingSpawns.clear();
+        if (enemyAI) {
+            enemyAI->UpdateLogic(dt);
+            if (enemyAI->weapon) {
+                CollectProjectiles(*(enemyAI->weapon));
+            }
+        }
 
         // 3. 更新所有子彈 & 處理塗地
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
@@ -144,10 +142,12 @@ public:
 
     void CollectProjectiles(Weapon& weapon) {
         for (const auto& info : weapon.pendingSpawns) {
-            glm::vec3 velocity = info.dir * 25.0f;
-            velocity.y += 3.0f;
-            Projectile* p = new Projectile(velocity, info.color, info.team);
+            glm::vec3 velocity = info.dir * info.speed;
+            velocity.y += 2.0f;
+
+            Projectile* p = new Projectile(velocity, info.color, info.team, info.scale);
             p->transform->position = info.pos;
+
             projectiles.push_back(p);
         }
         weapon.pendingSpawns.clear();
