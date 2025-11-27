@@ -12,6 +12,7 @@
 struct ReceivedPacket {
     PacketType type;
     std::vector<uint8_t> data;
+    int fromID;
     HSteamNetConnection fromConnection; // connection handle
 };
 
@@ -49,6 +50,8 @@ public:
     // --- 狀態 ---
     bool IsServer() const { return m_IsServer; }
     bool IsConnected() const { return m_IsConnected; }
+    int GetMyPlayerID() const { return m_MyID; }
+    void SetMyPlayerID(int id) { m_MyID = id; }
 
 private:
     NetworkManager() {}
@@ -70,6 +73,7 @@ private:
     // 狀態與佇列
     bool m_IsServer = false;
     bool m_IsConnected = false;
+    int m_MyID = -1; // -1 代表尚未分配
     std::queue<ReceivedPacket> m_PacketQueue;
 
     // --- GNS 回呼函式 (處理連線狀態改變) ---

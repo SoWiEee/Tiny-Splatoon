@@ -159,9 +159,15 @@ void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusCha
             std::cout << "Incoming connection request..." << std::endl;
             // 接受連線
             if (m_pInterface->AcceptConnection(pInfo->m_hConn) != k_EResultOK) {
-                m_pInterface->CloseConnection(pInfo->m_hConn, 0, nullptr, false);
-                std::cout << "Can't accept connection." << std::endl;
-                return;
+                std::cout << "Accepted connection " << pInfo->m_hConn << std::endl;
+
+				// welcome packet
+                PacketJoinAccept pkt;
+                pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
+                // 簡單用 Connection Handle 當作 Player ID (實務上建議用獨立計數器)
+                pkt.yourPlayerID = (int)pInfo->m_hConn;
+                pkt.yourTeamID = (pkt.yourPlayerID % 2) + 1; // 簡單分隊: 1 或 2
+                Send(pInfo->m_hConn, &pkt, sizeof(pkt), true);  // TCP
             }
         }
         break;
