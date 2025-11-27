@@ -56,7 +56,9 @@ bool NetworkManager::StartServer(int port) {
     }
 
     std::cout << "GNS Server started on port " << port << std::endl;
+    m_MyID = 0;
     m_IsConnected = true;
+    m_IsServer = true;
     return true;
 }
 
@@ -128,7 +130,7 @@ void NetworkManager::Update() {
     }
 }
 
-// 處理連線狀態改變 (這是 GNS 最重要的邏輯)
+// 處理連線狀態改變
 void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusChangedCallback_t* pInfo) {
     switch (pInfo->m_info.m_eState) {
     case k_ESteamNetworkingConnectionState_None:
@@ -149,25 +151,23 @@ void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusCha
         }
         std::cout << "Connection closed: " << pInfo->m_info.m_szEndDebug << std::endl;
 
-        // 記得關閉連線釋放資源
         m_pInterface->CloseConnection(pInfo->m_hConn, 0, nullptr, false);
         break;
 
     case k_ESteamNetworkingConnectionState_Connecting:
-        // [Server Only] 有人嘗試連線
         if (m_IsServer) {
             std::cout << "Incoming connection request..." << std::endl;
-            // 接受連線
             if (m_pInterface->AcceptConnection(pInfo->m_hConn) != k_EResultOK) {
                 std::cout << "Accepted connection " << pInfo->m_hConn << std::endl;
 
-				// welcome packet
+                // S2C_JOIN_ACCEPT
                 PacketJoinAccept pkt;
                 pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
-                // 簡單用 Connection Handle 當作 Player ID (實務上建議用獨立計數器)
+                // Connection Handle as Player ID
                 pkt.yourPlayerID = (int)pInfo->m_hConn;
-                pkt.yourTeamID = (pkt.yourPlayerID % 2) + 1; // 簡單分隊: 1 或 2
-                Send(pInfo->m_hConn, &pkt, sizeof(pkt), true);  // TCP
+                pkt.yourTeamID = (pkt.yourPlayerID % 2) + 1; // team 1/2
+
+                Send(pInfo->m_hConn, &pkt, sizeof(pkt), true);
             }
         }
         break;
@@ -175,8 +175,21 @@ void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusCha
     case k_ESteamNetworkingConnectionState_Connected:
         // 連線成功！
         if (m_IsServer) {
-            std::cout << "Client connected!" << std::endl;
+            std::cout << "Client connected! Handle: " << pInfo->m_hConn << std::endl;
             m_ClientConnections.push_back(pInfo->m_hConn);
+
+            PacketJoinAccept pkt;
+            pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
+
+            // [修改] 使用計數器分配 ID (Server=0, Clients=1,2,3...)
+            pkt.yourPlayerID = m_NextClientID++;
+
+            // 隊伍分配：Server(0)是紅，ID 1 是綠，ID 2 是紅...
+            // 偶數 ID = Team 1 (紅), 奇數 ID = Team 2 (綠)
+            pkt.yourTeamID = (pkt.yourPlayerID % 2 == 0) ? 1 : 2;
+
+            m_pInterface->SendMessageToConnection(pInfo->m_hConn, &pkt, sizeof(pkt), k_nSteamNetworkingSend_Reliable, nullptr);
+            std::cout << ">> Sent Welcome Packet to ID: " << pkt.yourPlayerID << std::endl;
         }
         else {
             std::cout << "Connected to server!" << std::endl;

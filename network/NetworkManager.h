@@ -74,6 +74,7 @@ private:
     bool m_IsServer = false;
     bool m_IsConnected = false;
     int m_MyID = -1; // -1 代表尚未分配
+    int m_NextClientID = 1;
     std::queue<ReceivedPacket> m_PacketQueue;
 
     // --- GNS 回呼函式 (處理連線狀態改變) ---

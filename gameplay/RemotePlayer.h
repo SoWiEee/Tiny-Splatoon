@@ -6,20 +6,25 @@
 class RemotePlayer : public Entity {
 public:
     int playerID;
+    int teamID;
 
-    glm::vec3 targetPos;
-    float targetRot;
+    // --- 插值變數 ---
+    glm::vec3 targetPos; // 伺服器告訴我們他在哪
+    float targetRot;     // 伺服器告訴我們他面向哪
 
+    // 視覺身體
     GameObject* visualBody;
 
     RemotePlayer(int id, int team, glm::vec3 startPos)
         : Entity("RemotePlayer"), playerID(id)
     {
+        // 初始化位置
         this->teamID = team;
         transform->position = startPos;
         targetPos = startPos;
         targetRot = 0.0f;
 
+        // 建立視覺模型
         visualBody = new GameObject("RemoteBody");
 
         // 根據隊伍決定顏色 (1=紅, 2=綠, 其他=藍)
@@ -33,6 +38,7 @@ public:
         if (visualBody) delete visualBody;
     }
 
+    // [核心] 插值更新：每一幀呼叫，讓移動平滑
     void UpdateInterp(float dt) {
         // 1. 位置插值 (Lerp)
         // 10.0f 是插值速度，數值越大越緊跟(但抖動)，越小越平滑(但延遲)
@@ -57,5 +63,6 @@ public:
         targetRot = rot;
     }
 
+    // 提供 getter 讓 GameWorld 渲染
     GameObject* GetVisualBody() { return visualBody; }
 };

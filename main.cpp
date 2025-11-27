@@ -109,7 +109,6 @@ int main() {
         // [測試] 發送封包
         // -----------------------------------------------------
         // 按下 T 鍵發送測試封包
-        // 為了避免按住一直發，你可以稍微改一下 Input 類別支援 GetKeyDown，或用簡單的 Timer 卡住
         static float sendTimer = 0.0f;
         sendTimer += dt;
 
@@ -130,18 +129,6 @@ int main() {
                 std::cout << "[Send] Client sent a test packet!" << std::endl;
             }
         }
-        // [測試] 接收封包
-        while (NetworkManager::Instance().HasPackets()) {
-            auto received = NetworkManager::Instance().PopPacket();
-
-            std::cout << "[Recv] Got Packet Type: " << (int)received.type
-                << " Size: " << received.data.size() << " bytes" << std::endl;
-
-            if (received.type == PacketType::C2S_SHOOT) {
-                std::cout << "   -> It's a Shoot Packet! (Test successful)" << std::endl;
-            }
-        }
-
 
         // TPS camera
         if (game.localPlayer) {

@@ -1,8 +1,8 @@
 #pragma once
+
 #include <map>
 #include <vector>
 #include <iostream>
-
 #include "../scene/Level.h"
 #include "../splat/SplatMap.h"
 #include "../splat/SplatPainter.h"
@@ -24,11 +24,15 @@ public:
     SplatMap* splatMap;
     SplatPainter* painter;
 
+    // --- 實體物件 ---
     Player* localPlayer;
     Enemy* enemyAI;
     std::vector<Projectile*> projectiles;
+
+    // 遠端玩家列表 (ID -> 物件指標)
     std::map<int, RemotePlayer*> remotePlayers;
 
+    // 同步計時器
     float syncTimer = 0.0f;
 
     void Init(GameObject* mainCamera, HUD* hud) {
@@ -42,6 +46,13 @@ public:
         // 2. 建立本機玩家
         // 預設先給 Team 1 (紅)，連線後會被 Server 修正
         localPlayer = new Player(glm::vec3(-5, 0, -5), 1, splatMap, mainCamera, hud);
+
+        // [關鍵修正] 再次確保 Server 狀態正確
+        if (NetworkManager::Instance().IsServer()) {
+            NetworkManager::Instance().SetMyPlayerID(0); // 強制設為 0
+            localPlayer->teamID = 1;
+            localPlayer->weapon->inkColor = glm::vec3(1, 0, 0);
+        }
 
         // 3. 建立 AI (連線測試時可考慮註解掉，或是只由 Server 生成)
         enemyAI = new Enemy(glm::vec3(5, 0, 5), 2);
@@ -77,19 +88,30 @@ public:
         // --- 2. 網路同步 (發送本機狀態) ---
         if (NetworkManager::Instance().IsConnected()) {
             syncTimer += dt;
-            // 每秒發送 20 次 (0.05s)
             if (syncTimer > 0.05f) {
                 PacketPlayerState pkt;
+                // 填寫基本資料
                 pkt.header.type = PacketType::C2S_PLAYER_STATE;
                 pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
                 pkt.position = localPlayer->transform->position;
                 pkt.rotationY = localPlayer->transform->rotation.y;
                 pkt.isSwimming = localPlayer->isSwimming;
 
-                // Client 傳給 Server，Server 稍後會廣播
-                // 如果是 Server 自己玩，其實可以不用傳 C2S，直接 Broadcast S2C
-                // 但為了邏輯統一，我們先全部走 SendToServer
-                NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false); // Unreliable UDP
+                // [關鍵修正] 區分 Server 和 Client
+                if (NetworkManager::Instance().IsServer()) {
+                    // 如果我是 Server，我要把「我的位置」直接變成 WorldState 廣播給大家
+                    // 這樣 Client 才會收到 ID:0 的位置
+                    PacketPlayerState worldStatePkt = pkt;
+                    worldStatePkt.header.type = PacketType::S2C_WORLD_STATE;
+
+                    // 廣播給所有 Client
+                    NetworkManager::Instance().Broadcast(&worldStatePkt, sizeof(worldStatePkt), false);
+                }
+                else {
+                    // 如果我是 Client，我傳給 Server
+                    NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false);
+                }
+
                 syncTimer = 0.0f;
             }
         }
@@ -128,8 +150,8 @@ public:
         // 4. 畫陰影 (開啟半透明混合)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE);
-        shader.SetFloat("alpha", 0.5f);
+        glDepthMask(GL_FALSE); // 關閉深度寫入
+        shader.SetFloat("alpha", 0.5f); // 設定半透明
 
         // Helper Lambda: 繪製單個陰影
         auto DrawShadow = [&](GameObject* owner) {
@@ -279,7 +301,10 @@ private:
     // 更新或建立遠端玩家
     void HandleWorldState(PacketPlayerState* pkt) {
         int id = pkt->playerID;
+        // [關鍵] 如果收到 ID 0 的封包，且我自己就是 ID 0 (Server)，那就要忽略
+        // 如果收到 ID -1，這是不合法的，也忽略
         if (id == NetworkManager::Instance().GetMyPlayerID()) return;
+        if (id == -1) return;
 
         if (remotePlayers.find(id) != remotePlayers.end()) {
             remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY);
@@ -310,13 +335,19 @@ private:
             for (Entity* target : targets) {
                 if (!target) continue;
 
+                // 必須要有 Health 才能被打
                 Health* hp = target->GetComponent<Health>();
-                if (target->teamID != p->ownerTeam) {
+                // 簡單防呆: 如果是 Projectile 自己人射的就不打 (ownerTeam)
+                // 這裡假設 target 也有 teamID 屬性 (Entity 沒有，但 Player/Enemy/RemotePlayer 有)
+                // 為了方便，我們 cast 一下，或者在 Entity 加 teamID
+                int targetTeam = 0;
+                if (auto pl = dynamic_cast<Player*>(target)) targetTeam = pl->teamID;
+                else if (auto en = dynamic_cast<Enemy*>(target)) targetTeam = en->teamID;
+                else if (auto rm = dynamic_cast<RemotePlayer*>(target)) targetTeam = rm->teamID;
+
+                if (hp && targetTeam != p->ownerTeam) {
                     if (CheckCollision(p, target)) {
-                        Health* hp = target->GetComponent<Health>();
-                        if (hp) {
-                            hp->TakeDamage(10.0f);
-                        }
+                        hp->TakeDamage(10.0f);
                         hitSomething = true;
                         break;
                     }
