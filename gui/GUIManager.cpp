@@ -6,7 +6,7 @@ GUIManager::GUIManager(GLFWwindow* window) : m_Window(window) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark(); // 或是 StyleColorsClassic();
+    ImGui::StyleColorsDark();
 
     // 設定字型放大 (選用)
     io.FontGlobalScale = 1.2f;
@@ -158,7 +158,8 @@ void GUIManager::DrawLobbyCircles(int w, int h) {
         // 畫名字 (P1, P2...)
         // 如果是自己，可以標註 (You)
         std::string name = "P" + std::to_string(i + 1);
-        if (lobbySlots[i].playerID == NetworkManager::Instance().GetMyPlayerID()) {
+        int myID = NetworkManager::Instance().GetMyPlayerID();
+        if (lobbySlots[i].playerID != -1 && lobbySlots[i].playerID == myID) {
             name += "\n(You)";
         }
 
