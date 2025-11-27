@@ -19,7 +19,27 @@ enum class PacketType : uint8_t {
     // --- 遊戲事件 ---
     C2S_SHOOT,           // Client -> Server: 我開槍了
     S2C_SHOOT_EVENT,     // Server -> Client: 某人開槍了 (大家生成子彈)
-    S2C_SPLAT_UPDATE     // Server -> Client: 地板這裡髒了 (大家畫圖)
+    S2C_SPLAT_UPDATE,    // Server -> Client: 地板這裡髒了 (大家畫圖)
+    S2C_LOBBY_UPDATE,    // Server -> Client: 更新大廳 8 個格子的狀態
+    S2C_GAME_START       // Server -> Client: 遊戲開始！
+};
+
+// 大廳單個格子的資訊
+struct LobbySlotInfo {
+    int playerID;   // -1 代表沒人
+    int teamID;     // 1=紅, 2=綠
+    bool isReady;   // (可選)
+};
+
+// 大廳狀態封包
+struct PacketLobbyState {
+    PacketHeader header;
+    LobbySlotInfo slots[8]; // 固定 8 個位置
+};
+
+// 開始遊戲封包 (內容空的沒關係，只是訊號)
+struct PacketGameStart {
+    PacketHeader header;
 };
 
 // 所有封包的共通標頭
