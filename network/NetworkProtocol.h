@@ -1,0 +1,73 @@
+#pragma once
+#include <glm/glm.hpp>
+#include <cstdint>
+
+// 為了確保不同電腦/編譯器之間的記憶體對齊一致，我們強制 1 byte 對齊
+#pragma pack(push, 1)
+
+// 封包類型 ID
+enum class PacketType : uint8_t {
+    // --- 連線管理 ---
+    C2S_JOIN_REQUEST,    // Client -> Server: 我想加入
+    S2C_JOIN_ACCEPT,     // Server -> Client: 歡迎，你的 ID 是這個
+
+    // --- 遊戲同步 ---
+    C2S_PLAYER_STATE,    // Client -> Server: 我移動到了哪裡
+    S2C_WORLD_STATE,     // Server -> Client: 所有人的位置在這裡
+
+    // --- 遊戲事件 ---
+    C2S_SHOOT,           // Client -> Server: 我開槍了
+    S2C_SHOOT_EVENT,     // Server -> Client: 某人開槍了 (大家生成子彈)
+    S2C_SPLAT_UPDATE     // Server -> Client: 地板這裡髒了 (大家畫圖)
+};
+
+// 所有封包的共通標頭
+struct PacketHeader {
+    PacketType type;
+};
+
+// 1. 加入請求
+struct PacketJoinRequest {
+    PacketHeader header;
+    // 可以加 char name[32];
+};
+
+// 2. 加入許可
+struct PacketJoinAccept {
+    PacketHeader header;
+    int yourPlayerID;   // Server 分配給你的 ID
+    int yourTeamID;     // 1=Red, 2=Green
+};
+
+// 3. 玩家狀態 (位置同步)
+struct PacketPlayerState {
+    PacketHeader header;
+    int playerID;       // 誰的狀態
+    glm::vec3 position;
+    glm::vec3 velocity; // 用於預測插值
+    float rotationY;
+    bool isSwimming;
+};
+
+// 4. 射擊請求
+struct PacketShoot {
+    PacketHeader header;
+    int playerID;       // 誰射的
+    glm::vec3 origin;
+    glm::vec3 direction;
+    int weaponType;     // 武器類型
+    float speed;
+    float scale;
+    glm::vec3 color;
+};
+
+// 5. 塗地同步 (最精簡的資料)
+struct PacketSplatUpdate {
+    PacketHeader header;
+    float u;
+    float v;
+    float radius;
+    int teamID;
+};
+
+#pragma pack(pop)
