@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
+#include <string>
 
 #include "engine/core/Window.h"
 #include "engine/core/Timer.h"
@@ -14,6 +15,15 @@
 #include "components/Scoreboard.h"
 #include "gameplay/GameWorld.h"
 #include "network/NetworkManager.h"
+#include "gui/GUIManager.h"
+#include "scene/Lobby.h"
+#include "network/NetworkProtocol.h"
+
+enum class GameState {
+    LOGIN_MENU,
+    LOBBY,
+    PLAYING
+};
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -25,79 +35,34 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 int main() {
-    // =========================================================
-    // 1. 網路初始化與模式選擇
-    // =========================================================
-
-    // 初始化 GameNetworkingSockets
+    // 1. Network Init
     if (!NetworkManager::Instance().Initialize()) {
         std::cerr << "Failed to initialize NetworkManager!" << std::endl;
         return -1;
     }
 
-    std::cout << "========================================" << std::endl;
-    std::cout << " Tiny Splatoon Network Test " << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "Select Mode: [S]erver or [C]lient? ";
-    char mode;
-    std::cin >> mode;
-
-    bool isServerMode = (mode == 's' || mode == 'S');
-
-    if (isServerMode) {
-        if (NetworkManager::Instance().StartServer(7777)) {
-            std::cout << ">> Server Mode Started on Port 7777" << std::endl;
-        }
-    }
-    else {
-        std::string ip;
-        std::cout << "Enter Server IP (default 127.0.0.1): ";
-        // 為了避免 cin 讀取換行符號問題，這裡簡單處理
-        std::cin.ignore();
-        std::getline(std::cin, ip);
-        if (ip.empty()) ip = "127.0.0.1";
-
-        if (NetworkManager::Instance().Connect(ip, 7777)) {
-            std::cout << ">> Client Mode Started, connecting to " << ip << "..." << std::endl;
-        }
-    }
-
-    // =========================================================
-    // 2. 視窗與引擎初始化
-    // =========================================================
-    std::string winTitle = isServerMode ? "Tiny Splatoon [SERVER]" : "Tiny Splatoon [CLIENT]";
-    Window window(SCR_WIDTH, SCR_HEIGHT, winTitle);
-    Timer timer;
-
+    // 2. Window Init
+    Window window(SCR_WIDTH, SCR_HEIGHT, "Tiny Splatoon");
     glfwSetCursorPosCallback(window.GetNativeWindow(), mouse_callback);
 
-    glEnable(GL_DEPTH_TEST);
+    // 3. GUI Init
+    GUIManager gui(window.GetNativeWindow());
 
+    glEnable(GL_DEPTH_TEST);
     Shader shader("assets/shaders/default.vert", "assets/shaders/default.frag");
 
-    // create camera
+    // 4. GameObject Init
     GameObject* cameraObj = new GameObject("MainCamera");
     mainCamera = cameraObj->AddComponent<Camera>();
 
-    // GameWorld init
     GameWorld game;
-    // UI init
+    GameState currentState = GameState::LOGIN_MENU;
+    Timer timer;
+
+    // [修正 1] UI 物件先宣告指標，但暫時不初始化內容
     GameObject* uiObj = new GameObject("UI");
-
-    // HUD
-    HUD* hud = uiObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
-    
-
-    // Scoreboard
-    Scoreboard* scoreboard = uiObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, game.splatMap);
-
-    game.Init(cameraObj, hud, scoreboard);
-
-    // 把 HUD 傳給 Player 讓他控制回充顯示 (如果 Player 支援的話)
-    // 假設你在 Player.h 裡有 SetHUD 之類的函式，或者直接存取
-    if (game.localPlayer) {
-        // game.localPlayer->hud = hud; // 視你的 Player 實作而定
-    }
+    HUD* hud = nullptr;
+    Scoreboard* scoreboard = nullptr;
 
     // Game Loop
     while (!window.ShouldClose()) {
@@ -107,70 +72,169 @@ int main() {
         if (Input::GetKey(GLFW_KEY_ESCAPE)) break;
 
         NetworkManager::Instance().Update();
-        // -----------------------------------------------------
-        // [測試] 發送封包
-        // -----------------------------------------------------
-        // 按下 T 鍵發送測試封包
-        static float sendTimer = 0.0f;
-        sendTimer += dt;
 
-        if (Input::GetKey(GLFW_KEY_T) && sendTimer > 0.5f) {
-            sendTimer = 0.0f;
+        // ---------------------------------------------
+        // 封包處理
+        // ---------------------------------------------
+        while (NetworkManager::Instance().HasPackets()) {
+            auto received = NetworkManager::Instance().PopPacket();
 
-            PacketShoot pkt; // 借用射擊封包來測試
-            pkt.header.type = PacketType::C2S_SHOOT;
-            pkt.playerID = 999; // 測試 ID
-            pkt.origin = glm::vec3(1, 2, 3); // 測試數據
+            if (currentState == GameState::LOBBY) {
+                if (received.type == PacketType::S2C_LOBBY_UPDATE) {
+                    gui.UpdateLobbyState(*(PacketLobbyState*)received.data.data());
+                }
+                else if (received.type == PacketType::S2C_GAME_START) {
+                    // Client 收到開始訊號
+                    std::cout << "Game Started by Host!" << std::endl;
+                    currentState = GameState::PLAYING;
+                    gui.SetState(UIState::HUD);
 
-            if (isServerMode) {
-                NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
-                std::cout << "[Send] Server broadcasted a test packet!" << std::endl;
+                    // 遊戲開始時才初始化 HUD 和 Scoreboard
+                    if (!hud) hud = uiObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
+
+                    // 先 Init Game (這樣 splatMap 才會被 new 出來)
+                    // 注意：這裡先傳 hud 和 nullptr 給 scoreboard
+                    game.Init(cameraObj, hud, nullptr);
+
+                    // 現在 game.splatMap 有東西了，再建立 Scoreboard
+                    if (!scoreboard) scoreboard = uiObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, game.splatMap);
+
+                    game.scoreboardRef = scoreboard;
+                }
+                else if (received.type == PacketType::S2C_JOIN_ACCEPT) {
+                    auto* pkt = (PacketJoinAccept*)received.data.data();
+
+                    // 1. 設定 Client 自己的 ID (這樣 GUI 才能畫出 "You")
+                    NetworkManager::Instance().SetMyPlayerID(pkt->yourPlayerID);
+                    NetworkManager::Instance().SetMyTeamID(pkt->yourTeamID);
+
+                    std::cout << ">> Lobby Joined! My ID: " << pkt->yourPlayerID << std::endl;
+                }
             }
-            else {
-                NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
-                std::cout << "[Send] Client sent a test packet!" << std::endl;
+            else if (currentState == GameState::PLAYING) {
+                game.HandlePacket(received);
             }
         }
 
-        // TPS camera
-        if (game.localPlayer) {
-            glm::vec3 targetPos = game.localPlayer->transform->position;
+        // ---------------------------------------------
+        // GUI 邏輯
+        // ---------------------------------------------
+        gui.BeginFrame();
 
-            // camera parameter
-            float camDist = 5.0f;
-            float camHeight = 2.5f;
+        if (currentState == GameState::LOGIN_MENU) {
+            glfwSetInputMode(window.GetNativeWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            bool startServer = false;
+            bool connectClient = false;
+            gui.DrawLogin(startServer, connectClient);
 
-            glm::vec3 camDir = cameraObj->transform->GetForward();
-            cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+            if (startServer) {
+                if (NetworkManager::Instance().StartServer(7777)) {
+                    currentState = GameState::LOBBY;
+                    gui.SetState(UIState::LOBBY);
+                    gui.lobbySlots[0].playerID = 0;
+                    gui.lobbySlots[0].teamID = 1;
+                }
+            }
+            if (connectClient) {
+                if (NetworkManager::Instance().Connect(gui.ipBuffer, 7777)) {
+                    currentState = GameState::LOBBY;
+                    gui.SetState(UIState::LOBBY);
+                }
+            }
+        }
+        else if (currentState == GameState::LOBBY) {
+            glfwSetInputMode(window.GetNativeWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+            bool startGame = false;
+            gui.DrawLobby(startGame);
+
+            if (NetworkManager::Instance().IsServer()) {
+                static float lobbyUpdateTimer = 0.0f;
+                lobbyUpdateTimer += dt;
+
+                if (lobbyUpdateTimer > 0.5f) {
+                    PacketLobbyState pkt;
+                    // 初始化
+                    for (int i = 0; i < 8; i++) {
+                        pkt.slots[i].playerID = -1;
+                        pkt.slots[i].teamID = 0;
+                    }
+                    // 填入 Server
+                    pkt.slots[0].playerID = 0;
+                    pkt.slots[0].teamID = 1;
+
+                    // 填入 Clients
+                    auto& clientIDs = NetworkManager::Instance().connectedPlayerIDs;
+                    for (size_t i = 0; i < clientIDs.size() && i < 7; i++) {
+                        int pid = clientIDs[i];
+                        pkt.slots[i + 1].playerID = pid;
+                        pkt.slots[i + 1].teamID = (pid % 2 == 0) ? 1 : 2;
+                    }
+
+                    NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+                    gui.UpdateLobbyState(pkt);
+                    lobbyUpdateTimer = 0.0f;
+                }
+
+                // 按下開始按鈕的邏輯
+                if (startGame) {
+                    PacketGameStart pkt;
+                    pkt.header.type = PacketType::S2C_GAME_START;
+                    NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+
+                    // Server 切換狀態
+                    currentState = GameState::PLAYING;
+                    gui.SetState(UIState::HUD);
+
+                    // [修正 1] Server 端也要依序初始化
+                    if (!hud) hud = uiObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
+                    game.Init(cameraObj, hud, nullptr);
+                    if (!scoreboard) scoreboard = uiObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, game.splatMap);
+                    game.scoreboardRef = scoreboard;
+                }
+            }
+        }
+        else if (currentState == GameState::PLAYING) {
+            // FPS 模式
+            glfwSetInputMode(window.GetNativeWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            if (game.localPlayer) {
+                glm::vec3 targetPos = game.localPlayer->transform->position;
+
+                // camera parameter
+                float camDist = 5.0f;
+                float camHeight = 2.5f;
+
+                glm::vec3 camDir = cameraObj->transform->GetForward();
+                cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+            }
+
+            game.Update(dt);
+            if (scoreboard) scoreboard->Update(dt);
+            if (hud) hud->Update(dt);
+
+            glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            shader.Bind();
+            shader.SetMat4("view", mainCamera->GetViewMatrix());
+            shader.SetMat4("projection", mainCamera->GetProjectionMatrix());
+            shader.SetVec3("viewPos", cameraObj->transform->position);
+
+            game.Render(shader);
+            if (hud) hud->Draw(shader);
+            if (scoreboard) scoreboard->Draw(shader);
         }
 
-        // Update Player, Physics, Projectiles, SplatMap
-        game.Update(dt);
-
-        // 更新 UI 邏輯 (計分板計時器等)
-        scoreboard->Update(dt);
-        hud->Update(dt);
-
-        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        shader.Bind();
-        shader.SetMat4("view", mainCamera->GetViewMatrix());
-        shader.SetMat4("projection", mainCamera->GetProjectionMatrix());
-        shader.SetVec3("viewPos", cameraObj->transform->position);
-
-        game.Render(shader);
-
-        hud->Draw(shader);
-        scoreboard->Draw(shader);
-
+        gui.Render();
         window.SwapBuffers();
         window.PollEvents();
     }
 
     game.CleanUp();
+    // 釋放記憶體
+    delete cameraObj;
+    delete uiObj;
 
     return 0;
 }
