@@ -31,6 +31,11 @@ struct LobbySlotInfo {
     bool isReady;   // (可選)
 };
 
+// 所有封包的共通標頭
+struct PacketHeader {
+    PacketType type;
+};
+
 // 大廳狀態封包
 struct PacketLobbyState {
     PacketHeader header;
@@ -40,11 +45,6 @@ struct PacketLobbyState {
 // 開始遊戲封包 (內容空的沒關係，只是訊號)
 struct PacketGameStart {
     PacketHeader header;
-};
-
-// 所有封包的共通標頭
-struct PacketHeader {
-    PacketType type;
 };
 
 // 1. 加入請求
