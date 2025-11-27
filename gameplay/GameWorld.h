@@ -45,8 +45,20 @@ public:
         painter = new SplatPainter();
         scoreboardRef = scoreboard;
 
-        // 2. 建立本機玩家
-        localPlayer = new Player(glm::vec3(-5, 0, -5), 1, splatMap, mainCamera, hud);
+        int myTeam = NetworkManager::Instance().GetMyTeamID();
+        // 如果是單機測試(沒連線)，預設給 1，否則用存好的 ID
+        if (!NetworkManager::Instance().IsConnected()) {
+            myTeam = 1;
+        }
+        // Server 強制為 0 號 ID, 1 號隊伍 (雖然在 Lobby 邏輯應該已經設好了，這裡保險起見)
+        if (NetworkManager::Instance().IsServer()) {
+            NetworkManager::Instance().SetMyPlayerID(0);
+            NetworkManager::Instance().SetMyTeamID(1);
+            myTeam = 1;
+        }
+
+        // 2. 使用正確的 Team ID 建立 Player
+        localPlayer = new Player(glm::vec3(-5, 0, -5), myTeam, splatMap, mainCamera, hud);
 
         if (NetworkManager::Instance().IsServer()) {
             NetworkManager::Instance().SetMyPlayerID(0); // 強制設為 0
@@ -81,7 +93,6 @@ public:
             localPlayer->UpdateLogic(dt);
             if (localPlayer->weapon) CollectProjectiles(*(localPlayer->weapon));
         }
-
         if (enemyAI) {
             enemyAI->UpdateLogic(dt);
             if (enemyAI->weapon) CollectProjectiles(*(enemyAI->weapon));
@@ -124,7 +135,6 @@ public:
                 syncTimer = 0.0f;
             }
 
-            // ==========================================
             // B. 分數與遊戲狀態同步 (低頻率: 0.5s = 2Hz)
             static float scoreTimer = 0.0f;
             scoreTimer += dt;
@@ -152,7 +162,7 @@ public:
         }
 
         // --- 3. 處理接收到的封包 ---
-        ProcessNetworkPackets();
+        //ProcessNetworkPackets();
 
         // --- 4. 更新遠端玩家 (插值) ---
         for (auto& pair : remotePlayers) {
@@ -277,6 +287,82 @@ public:
         for (auto p : projectiles) delete p;
         for (auto& pair : remotePlayers) delete pair.second;
         remotePlayers.clear();
+    }
+
+    void HandlePacket(const ReceivedPacket& received) {
+        auto& net = NetworkManager::Instance();
+
+        // =================================================
+        // A. Server 專用邏輯：負責轉發 (Relay) Client 的請求
+        // =================================================
+        if (net.IsServer()) {
+            // 1. 收到 Client 的位置更新 -> 轉發為 WORLD_STATE
+            if (received.type == PacketType::C2S_PLAYER_STATE) {
+                auto* inPkt = (PacketPlayerState*)received.data.data();
+
+                PacketPlayerState outPkt = *inPkt;
+                outPkt.header.type = PacketType::S2C_WORLD_STATE; // 改頭換面
+
+                // 廣播給所有人 (UDP Unreliable)
+                net.Broadcast(&outPkt, sizeof(outPkt), false);
+
+                // Server 本地也需要更新這個遠端玩家的視覺位置
+                HandleWorldState(&outPkt);
+            }
+            // 2. 收到 Client 的射擊請求 -> 轉發為 SHOOT_EVENT
+            else if (received.type == PacketType::C2S_SHOOT) {
+                auto* inPkt = (PacketShoot*)received.data.data();
+
+                PacketShoot outPkt = *inPkt;
+                outPkt.header.type = PacketType::S2C_SHOOT_EVENT; // 改頭換面
+
+                // 廣播給所有人 (TCP-like Reliable)
+                net.Broadcast(&outPkt, sizeof(outPkt), true);
+
+                // Server 本地生成子彈 (除非是 Server 自己發的，那就重複了，需過濾)
+                if (inPkt->playerID != net.GetMyPlayerID()) {
+                    SpawnRemoteProjectile(outPkt);
+                }
+            }
+        }
+
+        // =================================================
+        // B. 通用邏輯 (Client 與 Server 都需要處理的接收邏輯)
+        // =================================================
+
+        // 1. 收到世界狀態 (別人移動了)
+        if (received.type == PacketType::S2C_WORLD_STATE) {
+            HandleWorldState((PacketPlayerState*)received.data.data());
+        }
+        // 2. 收到射擊事件 (別人開槍了)
+        else if (received.type == PacketType::S2C_SHOOT_EVENT) {
+            auto* pkt = (PacketShoot*)received.data.data();
+            // 關鍵：忽略自己發出的射擊 (因為 CollectProjectiles 已經在本地生成過了)
+            if (pkt->playerID != net.GetMyPlayerID()) {
+                SpawnRemoteProjectile(*pkt);
+            }
+        }
+        // 3. 收到分數與遊戲狀態更新 (計分板)
+        else if (received.type == PacketType::S2C_GAME_STATE) {
+            auto* pkt = (PacketGameState*)received.data.data();
+            // 更新計分板
+            if (scoreboardRef) {
+                scoreboardRef->SetScores(pkt->scoreTeam1, pkt->scoreTeam2);
+            }
+        }
+        // 4. (選用) 收到 Join Accept
+        // 通常這在大廳階段就處理完了，但如果是中途加入(Hot Join)可能會用到
+        else if (received.type == PacketType::S2C_JOIN_ACCEPT) {
+            auto* pkt = (PacketJoinAccept*)received.data.data();
+            net.SetMyPlayerID(pkt->yourPlayerID);
+            localPlayer->teamID = pkt->yourTeamID;
+            // 更新顏色...
+            glm::vec3 c = (pkt->yourTeamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+            localPlayer->weapon->inkColor = c;
+            localPlayer->weapon->teamID = pkt->yourTeamID;
+            if (localPlayer->GetVisualBody())
+                localPlayer->GetVisualBody()->GetComponent<MeshRenderer>()->SetColor(c);
+        }
     }
 
 private:
