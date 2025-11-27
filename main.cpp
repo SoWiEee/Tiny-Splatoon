@@ -86,10 +86,12 @@ int main() {
 
     // HUD
     HUD* hud = uiObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
-    game.Init(cameraObj, hud);
+    
 
     // Scoreboard
     Scoreboard* scoreboard = uiObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, game.splatMap);
+
+    game.Init(cameraObj, hud, scoreboard);
 
     // 把 HUD 傳給 Player 讓他控制回充顯示 (如果 Player 支援的話)
     // 假設你在 Player.h 裡有 SetHUD 之類的函式，或者直接存取

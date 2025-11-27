@@ -23,6 +23,7 @@ public:
     Level* level;
     SplatMap* splatMap;
     SplatPainter* painter;
+    Scoreboard* scoreboardRef = nullptr;
 
     // --- 實體物件 ---
     Player* localPlayer;
@@ -35,13 +36,14 @@ public:
     // 同步計時器
     float syncTimer = 0.0f;
 
-    void Init(GameObject* mainCamera, HUD* hud) {
+    void Init(GameObject* mainCamera, HUD* hud, Scoreboard* scoreboard) {
         // 1. 初始化場景與塗地系統
         level = new Level();
         level->Load();
 
         splatMap = new SplatMap(1024, 1024);
         painter = new SplatPainter();
+        scoreboardRef = scoreboard;
 
         // 2. 建立本機玩家
         localPlayer = new Player(glm::vec3(-5, 0, -5), 1, splatMap, mainCamera, hud);
@@ -99,28 +101,53 @@ public:
 
                 // Server or Client
                 if (NetworkManager::Instance().IsServer()) {
+                    // Server: 廣播自己 (ID 0)
                     PacketPlayerState worldStatePkt = pkt;
                     worldStatePkt.header.type = PacketType::S2C_WORLD_STATE;
                     NetworkManager::Instance().Broadcast(&worldStatePkt, sizeof(worldStatePkt), false);
 
-                    // [新增] Server 額外廣播 AI 的狀態
+                    // Server: 廣播 AI (ID 100)
                     if (enemyAI) {
                         PacketPlayerState aiPkt;
                         aiPkt.header.type = PacketType::S2C_WORLD_STATE;
-                        aiPkt.playerID = 100; // [設定] AI 的固定 ID 為 100
+                        aiPkt.playerID = 100;
                         aiPkt.position = enemyAI->transform->position;
                         aiPkt.rotationY = enemyAI->transform->rotation.y;
-                        aiPkt.isSwimming = false; // AI 目前不會潛水
-
+                        aiPkt.isSwimming = false;
                         NetworkManager::Instance().Broadcast(&aiPkt, sizeof(aiPkt), false);
                     }
                 }
                 else {
-                    // 如果我是 Client，我傳給 Server
+                    // Client: 傳送給 Server
                     NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false);
                 }
-
                 syncTimer = 0.0f;
+            }
+
+            // ==========================================
+            // B. 分數與遊戲狀態同步 (低頻率: 0.5s = 2Hz)
+            static float scoreTimer = 0.0f;
+            scoreTimer += dt;
+
+            if (scoreTimer > 0.5f) {
+                // 只有 Server 有權力廣播分數
+                if (NetworkManager::Instance().IsServer()) {
+                    // 計算分數
+                    glm::vec2 scores = splatMap->CalculateScore();
+
+                    // 發送分數封包
+                    PacketGameState scorePkt;
+                    scorePkt.header.type = PacketType::S2C_GAME_STATE;
+                    scorePkt.scoreTeam1 = scores.x;
+                    scorePkt.scoreTeam2 = scores.y;
+                    scorePkt.timeRemaining = 180.0f; // 範例時間
+
+                    NetworkManager::Instance().Broadcast(&scorePkt, sizeof(scorePkt), true); // Reliable
+
+                    // Server 本地 Scoreboard 更新
+                    if (scoreboardRef) scoreboardRef->SetScores(scores.x, scores.y);
+                }
+                scoreTimer = 0.0f;
             }
         }
 
@@ -310,6 +337,16 @@ private:
                     }
                 }
                 std::cout << "Joined Game! ID: " << pkt->yourPlayerID << " Team: " << pkt->yourTeamID << std::endl;
+            }
+
+            // 處理分數同步
+            if (received.type == PacketType::S2C_GAME_STATE) {
+                auto* pkt = (PacketGameState*)received.data.data();
+
+                // 更新 Client 端的記分板
+                if (scoreboardRef) {
+                    scoreboardRef->SetScores(pkt->scoreTeam1, pkt->scoreTeam2);
+                }
             }
         }
     }

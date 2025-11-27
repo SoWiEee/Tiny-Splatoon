@@ -14,6 +14,7 @@ enum class PacketType : uint8_t {
     // --- 遊戲同步 ---
     C2S_PLAYER_STATE,    // Client -> Server: 我移動到了哪裡
     S2C_WORLD_STATE,     // Server -> Client: 所有人的位置在這裡
+	S2C_GAME_STATE,      // Server -> Client: 遊戲狀態更新 (比分)
 
     // --- 遊戲事件 ---
     C2S_SHOOT,           // Client -> Server: 我開槍了
@@ -68,6 +69,14 @@ struct PacketSplatUpdate {
     float v;
     float radius;
     int teamID;
+};
+
+// 分數與遊戲狀態封包
+struct PacketGameState {
+    PacketHeader header;
+    float scoreTeam1;   // 紅隊分數 (0.0 ~ 1.0 或 像素總數)
+    float scoreTeam2;   // 綠隊分數
+    float timeRemaining; // 剩餘時間 (秒)
 };
 
 #pragma pack(pop)
