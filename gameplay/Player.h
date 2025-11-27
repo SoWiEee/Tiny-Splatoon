@@ -19,7 +19,6 @@ public:
     float gravity = -20.0f;
 
     // state
-    int teamID;
     glm::vec3 velocity = glm::vec3(0.0f);
     bool isGrounded = false;
     bool isSwimming = false;
@@ -36,8 +35,9 @@ public:
     float floorSize = 40.0f;
 
     Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
-        : Entity("Player"), teamID(team), splatMapRef(map), cameraRef(cam), hudRef(hud)
+        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud)
     {
+        this->teamID = team;
         shadow = new GameObject("ShadowBlob");
         shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f));
         shadow->transform->position = transform->position + glm::vec3(0, 0.02f, 0);
