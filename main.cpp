@@ -13,6 +13,7 @@
 #include "components/HUD.h"
 #include "components/Scoreboard.h"
 #include "gameplay/GameWorld.h"
+#include "network/NetworkManager.h"
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -24,7 +25,48 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 int main() {
-    Window window(SCR_WIDTH, SCR_HEIGHT, "Splatoon Simulator");
+    // =========================================================
+    // 1. 網路初始化與模式選擇
+    // =========================================================
+
+    // 初始化 GameNetworkingSockets
+    if (!NetworkManager::Instance().Initialize()) {
+        std::cerr << "Failed to initialize NetworkManager!" << std::endl;
+        return -1;
+    }
+
+    std::cout << "========================================" << std::endl;
+    std::cout << " Tiny Splatoon Network Test " << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Select Mode: [S]erver or [C]lient? ";
+    char mode;
+    std::cin >> mode;
+
+    bool isServerMode = (mode == 's' || mode == 'S');
+
+    if (isServerMode) {
+        if (NetworkManager::Instance().StartServer(7777)) {
+            std::cout << ">> Server Mode Started on Port 7777" << std::endl;
+        }
+    }
+    else {
+        std::string ip;
+        std::cout << "Enter Server IP (default 127.0.0.1): ";
+        // 為了避免 cin 讀取換行符號問題，這裡簡單處理
+        std::cin.ignore();
+        std::getline(std::cin, ip);
+        if (ip.empty()) ip = "127.0.0.1";
+
+        if (NetworkManager::Instance().Connect(ip, 7777)) {
+            std::cout << ">> Client Mode Started, connecting to " << ip << "..." << std::endl;
+        }
+    }
+
+    // =========================================================
+    // 2. 視窗與引擎初始化
+    // =========================================================
+    std::string winTitle = isServerMode ? "Tiny Splatoon [SERVER]" : "Tiny Splatoon [CLIENT]";
+    Window window(SCR_WIDTH, SCR_HEIGHT, winTitle);
     Timer timer;
 
     glfwSetCursorPosCallback(window.GetNativeWindow(), mouse_callback);
@@ -61,6 +103,45 @@ int main() {
         float dt = timer.GetDeltaTime();
 
         if (Input::GetKey(GLFW_KEY_ESCAPE)) break;
+
+        NetworkManager::Instance().Update();
+        // -----------------------------------------------------
+        // [測試] 發送封包
+        // -----------------------------------------------------
+        // 按下 T 鍵發送測試封包
+        // 為了避免按住一直發，你可以稍微改一下 Input 類別支援 GetKeyDown，或用簡單的 Timer 卡住
+        static float sendTimer = 0.0f;
+        sendTimer += dt;
+
+        if (Input::GetKey(GLFW_KEY_T) && sendTimer > 0.5f) {
+            sendTimer = 0.0f;
+
+            PacketShoot pkt; // 借用射擊封包來測試
+            pkt.header.type = PacketType::C2S_SHOOT;
+            pkt.playerID = 999; // 測試 ID
+            pkt.origin = glm::vec3(1, 2, 3); // 測試數據
+
+            if (isServerMode) {
+                NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+                std::cout << "[Send] Server broadcasted a test packet!" << std::endl;
+            }
+            else {
+                NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+                std::cout << "[Send] Client sent a test packet!" << std::endl;
+            }
+        }
+        // [測試] 接收封包
+        while (NetworkManager::Instance().HasPackets()) {
+            auto received = NetworkManager::Instance().PopPacket();
+
+            std::cout << "[Recv] Got Packet Type: " << (int)received.type
+                << " Size: " << received.data.size() << " bytes" << std::endl;
+
+            if (received.type == PacketType::C2S_SHOOT) {
+                std::cout << "   -> It's a Shoot Packet! (Test successful)" << std::endl;
+            }
+        }
+
 
         // TPS camera
         if (game.localPlayer) {
