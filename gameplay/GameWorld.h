@@ -97,7 +97,7 @@ public:
                 pkt.rotationY = localPlayer->transform->rotation.y;
                 pkt.isSwimming = localPlayer->isSwimming;
 
-                // [關鍵修正] 區分 Server 和 Client
+                // Server or Client
                 if (NetworkManager::Instance().IsServer()) {
                     // 如果我是 Server，我要把「我的位置」直接變成 WorldState 廣播給大家
                     // 這樣 Client 才會收到 ID:0 的位置
@@ -278,9 +278,16 @@ private:
             }
             else if (received.type == PacketType::S2C_JOIN_ACCEPT) {
                 auto* pkt = (PacketJoinAccept*)received.data.data();
-                net.SetMyPlayerID(pkt->yourPlayerID);
-                localPlayer->teamID = pkt->yourTeamID;
-                localPlayer->weapon->inkColor = (pkt->yourTeamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+                net.SetMyPlayerID(pkt->yourPlayerID);   // ID
+                localPlayer->teamID = pkt->yourTeamID;  // team
+                glm::vec3 teamColor = (pkt->yourTeamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+                localPlayer->weapon->inkColor = teamColor;
+                if (localPlayer->GetVisualBody()) {
+                    auto mr = localPlayer->GetVisualBody()->GetComponent<MeshRenderer>();
+                    if (mr) {
+                        mr->SetColor(teamColor);
+                    }
+                }
                 std::cout << "Joined Game! ID: " << pkt->yourPlayerID << " Team: " << pkt->yourTeamID << std::endl;
             }
         }
@@ -306,15 +313,17 @@ private:
         if (id == NetworkManager::Instance().GetMyPlayerID()) return;
         if (id == -1) return;
 
-        if (remotePlayers.find(id) != remotePlayers.end()) {
-            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY);
-            // 可以在這裡同步 isSwimming 狀態
+        if (remotePlayers.find(id) == remotePlayers.end()) {
+            // [修正] 根據 ID 推算隊伍 (偶數=紅=1, 奇數=綠=2)
+            // Server(0) -> 紅, Client(1) -> 綠, Client(2) -> 紅...
+            int guessedTeam = (id % 2 == 0) ? 1 : 2;
+
+            RemotePlayer* newGuy = new RemotePlayer(id, guessedTeam, pkt->position);
+            remotePlayers[id] = newGuy;
+            std::cout << "New Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
         }
         else {
-            // 新玩家加入，預設給綠色 (Team 2)，實際上應該從封包讀取 TeamID
-            RemotePlayer* newGuy = new RemotePlayer(id, 2, pkt->position);
-            remotePlayers[id] = newGuy;
-            std::cout << "New Remote Player: " << id << std::endl;
+            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY);
         }
     }
 
