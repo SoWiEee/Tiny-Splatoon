@@ -44,18 +44,18 @@ public:
         painter = new SplatPainter();
 
         // 2. 建立本機玩家
-        // 預設先給 Team 1 (紅)，連線後會被 Server 修正
         localPlayer = new Player(glm::vec3(-5, 0, -5), 1, splatMap, mainCamera, hud);
 
-        // [關鍵修正] 再次確保 Server 狀態正確
         if (NetworkManager::Instance().IsServer()) {
             NetworkManager::Instance().SetMyPlayerID(0); // 強制設為 0
             localPlayer->teamID = 1;
             localPlayer->weapon->inkColor = glm::vec3(1, 0, 0);
+            // 只有 Server 建立 AI (具備邏輯的實體)
+            enemyAI = new Enemy(glm::vec3(5, 0, 5), 2);
         }
-
-        // 3. 建立 AI (連線測試時可考慮註解掉，或是只由 Server 生成)
-        enemyAI = new Enemy(glm::vec3(5, 0, 5), 2);
+        else {
+            enemyAI = nullptr;
+        }
     }
 
     // AABB 碰撞檢測 (包含球體半徑判定)
@@ -89,8 +89,8 @@ public:
         if (NetworkManager::Instance().IsConnected()) {
             syncTimer += dt;
             if (syncTimer > 0.05f) {
+                // 1. 發送玩家自己的狀態
                 PacketPlayerState pkt;
-                // 填寫基本資料
                 pkt.header.type = PacketType::C2S_PLAYER_STATE;
                 pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
                 pkt.position = localPlayer->transform->position;
@@ -99,13 +99,21 @@ public:
 
                 // Server or Client
                 if (NetworkManager::Instance().IsServer()) {
-                    // 如果我是 Server，我要把「我的位置」直接變成 WorldState 廣播給大家
-                    // 這樣 Client 才會收到 ID:0 的位置
                     PacketPlayerState worldStatePkt = pkt;
                     worldStatePkt.header.type = PacketType::S2C_WORLD_STATE;
-
-                    // 廣播給所有 Client
                     NetworkManager::Instance().Broadcast(&worldStatePkt, sizeof(worldStatePkt), false);
+
+                    // [新增] Server 額外廣播 AI 的狀態
+                    if (enemyAI) {
+                        PacketPlayerState aiPkt;
+                        aiPkt.header.type = PacketType::S2C_WORLD_STATE;
+                        aiPkt.playerID = 100; // [設定] AI 的固定 ID 為 100
+                        aiPkt.position = enemyAI->transform->position;
+                        aiPkt.rotationY = enemyAI->transform->rotation.y;
+                        aiPkt.isSwimming = false; // AI 目前不會潛水
+
+                        NetworkManager::Instance().Broadcast(&aiPkt, sizeof(aiPkt), false);
+                    }
                 }
                 else {
                     // 如果我是 Client，我傳給 Server
@@ -198,12 +206,24 @@ public:
             if (NetworkManager::Instance().IsConnected()) {
                 PacketShoot pkt;
                 pkt.header.type = PacketType::C2S_SHOOT;
+
+                // 判斷這把武器是誰的
+                if (weapon.teamID == localPlayer->teamID) {
+                    pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
+                }
+                else if (enemyAI && weapon.teamID == enemyAI->teamID) {
+                    pkt.playerID = 100; // 如果是 AI 的武器，ID 填 100
+                }
+                else {
+                    pkt.playerID = -1; // 防呆
+                }
+
                 pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
                 pkt.origin = info.pos;
                 pkt.direction = info.dir;
                 pkt.speed = info.speed;
                 pkt.scale = info.scale;
-                pkt.color = info.color; // 簡單傳顏色，正規應傳 teamID
+                pkt.color = info.color;
 
                 // 傳送邏輯
                 if (NetworkManager::Instance().IsServer()) {
@@ -310,21 +330,29 @@ private:
     void HandleWorldState(PacketPlayerState* pkt) {
         int id = pkt->playerID;
         // [關鍵] 如果收到 ID 0 的封包，且我自己就是 ID 0 (Server)，那就要忽略
-        // 如果收到 ID -1，這是不合法的，也忽略
         if (id == NetworkManager::Instance().GetMyPlayerID()) return;
         if (id == -1) return;
 
-        if (remotePlayers.find(id) == remotePlayers.end()) {
-            // [修正] 根據 ID 推算隊伍 (偶數=紅=1, 奇數=綠=2)
-            // Server(0) -> 紅, Client(1) -> 綠, Client(2) -> 紅...
-            int guessedTeam = (id % 2 == 0) ? 1 : 2;
+        if (remotePlayers.find(id) != remotePlayers.end()) {
+            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY);
+        }
+        else {
+
+            int guessedTeam = 1; // 預設紅隊
+
+            // [關鍵修正] 特判 AI 的 ID
+            if (id == 100) {
+                guessedTeam = 2; // AI (ID 100) 固定是綠隊
+            }
+            else {
+                // 其他玩家依照 ID 奇偶數分配
+                // Server(0)=紅, Client(1)=綠, Client(2)=紅...
+                guessedTeam = (id % 2 == 0) ? 1 : 2;
+            }
 
             RemotePlayer* newGuy = new RemotePlayer(id, guessedTeam, pkt->position);
             remotePlayers[id] = newGuy;
-            std::cout << "New Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
-        }
-        else {
-            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY);
+            std::cout << "Spawned Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
         }
     }
 
