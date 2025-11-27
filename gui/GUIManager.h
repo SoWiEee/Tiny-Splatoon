@@ -1,10 +1,11 @@
 #pragma once
 #include <imgui.h>
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
+#include <GLFW/glfw3.h>
 #include "../network/NetworkManager.h"
 #include "../network/NetworkProtocol.h"
 
