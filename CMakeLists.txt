@@ -13,7 +13,7 @@ find_package(fmt CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(GameNetworkingSockets CONFIG REQUIRED)
 
-file(GLOB_RECURSE MY_SOURCE_FILES "components/*" "engine/*" "gameplay/*" "splat/*" "scene/*" "network/*")
+file(GLOB_RECURSE MY_SOURCE_FILES "components/*" "engine/*" "gameplay/*" "splat/*" "scene/*" "network/*" "gui/*")
 
 
 add_executable(Tiny-Splatoon main.cpp ${MY_SOURCE_FILES})
