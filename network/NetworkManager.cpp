@@ -176,15 +176,14 @@ void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusCha
         // 硈絬Θ
         if (m_IsServer) {
             std::cout << "Client connected! Handle: " << pInfo->m_hConn << std::endl;
+            int newID = m_NextClientID++;
             m_ClientConnections.push_back(pInfo->m_hConn);
+            connectedPlayerIDs.push_back(newID);
 
             PacketJoinAccept pkt;
             pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
+            pkt.yourPlayerID = newID;   // Server=0, Clients=1,2,3...
 
-            // [э] ㄏノ璸计竟だ皌 ID (Server=0, Clients=1,2,3...)
-            pkt.yourPlayerID = m_NextClientID++;
-
-            // 钉ヮだ皌Server(0)琌ID 1 琌厚ID 2 琌...
             // 案计 ID = Team 1 (), 计 ID = Team 2 (厚)
             pkt.yourTeamID = (pkt.yourPlayerID % 2 == 0) ? 1 : 2;
 

@@ -19,6 +19,7 @@ struct ReceivedPacket {
 class NetworkManager {
 public:
     static NetworkManager& Instance();
+    std::vector<int> connectedPlayerIDs;
 
     // GNS init
     bool Initialize();
@@ -52,6 +53,8 @@ public:
     bool IsConnected() const { return m_IsConnected; }
     int GetMyPlayerID() const { return m_MyID; }
     void SetMyPlayerID(int id) { m_MyID = id; }
+    int GetMyTeamID() const { return m_MyTeamID; }
+    void SetMyTeamID(int team) { m_MyTeamID = team; }
 
 private:
     NetworkManager() {}
@@ -74,6 +77,7 @@ private:
     bool m_IsServer = false;
     bool m_IsConnected = false;
     int m_MyID = -1; // -1 代表尚未分配
+    int m_MyTeamID = 1;
     int m_NextClientID = 1;
     std::queue<ReceivedPacket> m_PacketQueue;
 
