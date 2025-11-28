@@ -211,6 +211,7 @@ int main() {
             game.Update(dt);
             if (scoreboard) scoreboard->Update(dt);
             if (hud) hud->Update(dt);
+            if (mainCamera) mainCamera->Update(dt);
 
             glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
             glClearColor(0.1f, 0.1f, 0.1f, 1.0f);

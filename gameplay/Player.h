@@ -4,6 +4,7 @@
 #include "../engine/core/Input.h"
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
+#include "../components/Camera.h"
 #include "Weapon.h"
 #include "ShooterWeapon.h"
 #include "ShotgunWeapon.h"
@@ -30,6 +31,7 @@ public:
     GameObject* shadow;
     GameObject* visualBody;
     HUD* hudRef = nullptr;
+    Camera* camera = nullptr;
 
     float mapLimit = 19.5f;
     float floorSize = 40.0f;
@@ -44,6 +46,7 @@ public:
         shadow->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f);
 
         transform->position = startPos;
+        camera = cam->GetComponent<Camera>();
         weapon = new ShotgunWeapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0));
         AddComponent<Health>(team, startPos);
         visualBody = new GameObject("PlayerBody");
@@ -121,6 +124,7 @@ private:
 
             if (weapon->Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
+                camera->TriggerShake(0.1f, 0.05f);
             }
         }
     }
