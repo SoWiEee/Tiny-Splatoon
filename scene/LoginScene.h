@@ -51,7 +51,7 @@ public:
                 gui->lobbySlots[0].teamID = 1;
 
                 // ち传芔初春 (Server 家Α)
-                SceneManager::Instance().SwitchTo(new LobbyScene(gui, true));
+                SceneManager::Instance().SwitchTo(std::make_unique<LobbyScene>(gui, true));
             }
         }
 
@@ -59,7 +59,7 @@ public:
         if (connectClient) {
             if (NetworkManager::Instance().Connect(gui->ipBuffer, 7777)) {
                 // ち传芔初春 (Client 家Α)
-                SceneManager::Instance().SwitchTo(new LobbyScene(gui, false));
+                SceneManager::Instance().SwitchTo(std::make_unique<LobbyScene>(gui, false));
             }
         }
     }

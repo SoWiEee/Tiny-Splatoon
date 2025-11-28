@@ -46,7 +46,7 @@ int main() {
     GUIManager gui(window.GetNativeWindow());
 
     glEnable(GL_DEPTH_TEST);
-    SceneManager::Instance().SwitchTo(new LoginScene(&gui));
+    SceneManager::Instance().SwitchTo(std::make_unique<LoginScene>(&gui));
     Timer timer;
 
     // Game Loop

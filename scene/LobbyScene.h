@@ -78,7 +78,7 @@ public:
             NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
 
             // 2. 切換到遊戲場景
-            SceneManager::Instance().SwitchTo(new GameScene());
+            SceneManager::Instance().SwitchTo(std::make_unique<GameScene>());
         }
     }
 
@@ -91,7 +91,7 @@ public:
         // Client: 接收開始遊戲訊號
         else if (pkt.type == PacketType::S2C_GAME_START) {
             std::cout << "[Lobby] Game Started!" << std::endl;
-            SceneManager::Instance().SwitchTo(new GameScene());
+            SceneManager::Instance().SwitchTo(std::make_unique<GameScene>());
         }
         // Client: 接收歡迎訊息 (設定 ID)
         else if (pkt.type == PacketType::S2C_JOIN_ACCEPT) {

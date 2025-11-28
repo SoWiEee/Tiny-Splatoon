@@ -6,21 +6,13 @@ SceneManager& SceneManager::Instance() {
     return instance;
 }
 
-SceneManager::~SceneManager() {
+SceneManager::~SceneManager() = default;
+
+void SceneManager::SwitchTo(std::unique_ptr<Scene> newScene) {
     if (m_CurrentScene) {
         m_CurrentScene->OnExit();
-        delete m_CurrentScene;
-        m_CurrentScene = nullptr;
     }
-}
-
-void SceneManager::SwitchTo(Scene* newScene) {
-    if (m_CurrentScene) {
-        m_CurrentScene->OnExit();
-        delete m_CurrentScene;
-    }
-
-    m_CurrentScene = newScene;
+    m_CurrentScene = std::move(newScene);
 
     if (m_CurrentScene) {
         m_CurrentScene->OnEnter();
