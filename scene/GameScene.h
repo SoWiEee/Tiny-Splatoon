@@ -2,7 +2,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "../engine/scene/Scene.h"
-#include "../engine/core/GameObject.h"
+#include "../engine/GameObject.h"
 #include "../engine/core/Input.h"
 #include "../gameplay/GameWorld.h"
 #include "../components/Camera.h"
@@ -17,8 +17,6 @@ public:
     HUD* hud = nullptr;
     Scoreboard* scoreboard = nullptr;
     Shader* shader = nullptr;
-
-    // 用來給外部存取相機 (為了滑鼠轉動)
     static Camera* CurrentCamera;
 
     GameScene() {}
@@ -32,7 +30,6 @@ public:
         std::cout << "[Scene] Enter GameScene" << std::endl;
 
         // A. 載入 Shader
-        // 這裡每次進入都重新讀取 Shader，方便開發時熱重載
         shader = new Shader("assets/shaders/default.vert", "assets/shaders/default.frag");
 
         // B. 建立相機
@@ -65,8 +62,12 @@ public:
 
         CurrentCamera = nullptr;
 
-        // 恢復滑鼠游標
         glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+        GLFWwindow* currentWindow = glfwGetCurrentContext();
+        if (currentWindow != nullptr) {
+            glfwSetInputMode(currentWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
 
         // 釋放記憶體 (順序很重要：先清邏輯，再清資源)
         if (world) {
@@ -87,6 +88,17 @@ public:
         if (hud) hud->Update(dt);
         if (scoreboard) scoreboard->Update(dt);
         if (CurrentCamera) CurrentCamera->Update(dt);
+
+        // 相機跟隨邏輯
+        if (world->localPlayer) {
+            glm::vec3 targetPos = world->localPlayer->transform->position;
+            float camDist = 5.0f;
+            float camHeight = 2.5f;
+            if (cameraObj) {
+                glm::vec3 camDir = cameraObj->transform->GetForward();
+                cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+            }
+        }
     }
 
     // --- 4. 遊戲迴圈 Render ---

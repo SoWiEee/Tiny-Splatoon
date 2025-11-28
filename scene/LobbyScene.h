@@ -22,15 +22,12 @@ public:
     }
 
     void OnExit() override {
-        // 離開大廳不需要特別釋放
     }
 
     void Update(float dt) override {
-        // Server 專用邏輯：定期廣播大廳狀態
         if (isServer) {
             lobbyUpdateTimer += dt;
 
-            // 每 0.5 秒廣播一次
             if (lobbyUpdateTimer > 0.5f) {
                 PacketLobbyState pkt;
 
@@ -71,12 +68,9 @@ public:
     void DrawUI() override {
         if (!gui) return;
 
-        gui->BeginFrame();
-
         bool startGame = false;
         gui->DrawLobby(startGame);
 
-        // Server 按下開始按鈕
         if (startGame && isServer) {
             // 1. 廣播開始封包
             PacketGameStart pkt;
@@ -86,8 +80,6 @@ public:
             // 2. 切換到遊戲場景
             SceneManager::Instance().SwitchTo(new GameScene());
         }
-
-        gui->Render();
     }
 
     // 處理網路封包

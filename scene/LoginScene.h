@@ -17,7 +17,10 @@ public:
     }
 
     void OnExit() override {
-        // 離開登入畫面不需要特別釋放什麼
+        GLFWwindow* currentWindow = glfwGetCurrentContext();
+        if (currentWindow != nullptr) {
+            glfwSetInputMode(currentWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
     }
 
     void Update(float dt) override {
@@ -31,8 +34,6 @@ public:
 
     void DrawUI() override {
         if (!gui) return;
-
-        gui->BeginFrame();
 
         bool startServer = false;
         bool connectClient = false;
@@ -61,9 +62,5 @@ public:
                 SceneManager::Instance().SwitchTo(new LobbyScene(gui, false));
             }
         }
-
-        gui->Render();
     }
-
-    // 登入階段通常還沒收到封包，所以 OnPacket 留空
 };
