@@ -1,6 +1,8 @@
 #pragma once
 #include "../engine/Component.h"
 #include "../engine/rendering/Shader.h"
+#include "../gui/GUIManager.h"
+#include <imgui.h>
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -12,6 +14,7 @@ class HUD : public Component {
 
 public:
     float currentInk = 1.0f; // 100% 墨水
+    float hitMarkerTimer = 0.0f;
 
     HUD(float width, float height) : screenWidth(width), screenHeight(height) {
         uiShader = new Shader("../assets/shaders/ui.vert", "../assets/shaders/ui.frag");
@@ -22,6 +25,12 @@ public:
         delete uiShader;
         glDeleteVertexArrays(1, &VAO);
         glDeleteBuffers(1, &VBO);
+    }
+
+    void Update(float dt) {
+        if (hitMarkerTimer > 0.0f) {
+            hitMarkerTimer -= dt;
+        }
     }
 
     void Draw(Shader& sceneShader) override {
@@ -71,6 +80,16 @@ public:
         if (currentInk > 1.0f) currentInk = 1.0f;
     }
 
+    void DrawOverlay() {
+        if (hitMarkerTimer > 0.0f) {
+            DrawHitMarkerImGui();
+        }
+    }
+
+    void ShowHitMarker() {
+        hitMarkerTimer = 0.2f; // 顯示 0.2 秒
+    }
+
 private:
     void SetupQuad() {
         // 一個簡單的 2D Quad (0,0 到 1,1)
@@ -96,5 +115,37 @@ private:
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    }
+
+    // 使用 ImGui 畫紅色 X
+    void DrawHitMarkerImGui() {
+        // 設定一個透明、無邊框、不可互動的視窗覆蓋全螢幕
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(screenWidth, screenHeight));
+        ImGui::Begin("HitOverlay", nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing);
+
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 center(screenWidth * 0.5f, screenHeight * 0.5f);
+        float size = 15.0f; // 叉叉的大小
+
+        // 畫紅色 X
+        // 左上 -> 右下
+        drawList->AddLine(
+            ImVec2(center.x - size, center.y - size),
+            ImVec2(center.x + size, center.y + size),
+            IM_COL32(255, 50, 50, 255), // 紅色
+            3.0f // 線條粗細
+        );
+        // 右上 -> 左下
+        drawList->AddLine(
+            ImVec2(center.x + size, center.y - size),
+            ImVec2(center.x - size, center.y + size),
+            IM_COL32(255, 50, 50, 255),
+            3.0f
+        );
+
+        ImGui::End();
     }
 };

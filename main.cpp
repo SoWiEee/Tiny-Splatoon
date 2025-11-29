@@ -51,6 +51,7 @@ int main() {
     Timer timer;
     AudioManager::Instance().Initialize();
     AudioManager::Instance().LoadSound("shoot", "assets/shoot.mp3");
+    AudioManager::Instance().LoadSound("hit", "assets/hit.wav");
 
     // Game Loop
     while (!window.ShouldClose()) {

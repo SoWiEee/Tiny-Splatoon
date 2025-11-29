@@ -106,15 +106,16 @@ public:
         // 畫 3D 世界
         world->Render(*shader);
 
-        // 畫 UI (HUD & Scoreboard)
+        // 畫 UI
         if (hud) hud->Draw(*shader);
         if (scoreboard) scoreboard->Draw(*shader);
     }
 
     // --- 5. ImGui UI (遊戲中通常只有簡單的 Debug UI 或 ESC 選單) ---
     void DrawUI() override {
-        // 如果想按 ESC 跳出選單，可以在這裡寫 ImGui
-        // 目前先留空
+        if (hud) {
+            hud->DrawOverlay();
+        }
     }
 
     // --- 6. 網路封包處理 ---

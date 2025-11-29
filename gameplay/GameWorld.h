@@ -29,6 +29,7 @@ public:
     std::unique_ptr<SplatMap> splatMap;
     std::unique_ptr<SplatPainter> painter;
     Scoreboard* scoreboardRef = nullptr;
+    HUD* hudRef = nullptr;
 
     // --- 實體物件 ---
     std::unique_ptr<Player> localPlayer;
@@ -47,6 +48,7 @@ public:
         splatMap = std::make_unique<SplatMap>(1024, 1024);
         painter = std::make_unique<SplatPainter>();
         scoreboardRef = scoreboard;
+        hudRef = hud;
 
         int myTeam = NetworkManager::Instance().GetMyTeamID();
         // 如果是單機測試(沒連線)，預設給 1，否則用存好的 ID
@@ -501,21 +503,22 @@ private:
             for (Entity* target : targets) {
                 if (!target) continue;
 
-                Health* hp = target->GetComponent<Health>();
-                // 簡單防呆: 如果是 Projectile 自己人射的就不打 (ownerTeam)
-                // 這裡假設 target 也有 teamID 屬性 (Entity 沒有，但 Player/Enemy/RemotePlayer 有)
-                // 為了方便，我們 cast 一下，或者在 Entity 加 teamID
-                int targetTeam = 0;
-                if (auto pl = dynamic_cast<Player*>(target)) targetTeam = pl->teamID;
-                else if (auto en = dynamic_cast<Enemy*>(target)) targetTeam = en->teamID;
-                else if (auto rm = dynamic_cast<RemotePlayer*>(target)) targetTeam = rm->teamID;
+                
+                int targetTeam = target->teamID; // 假設 Entity 已經有 teamID
+                if (targetTeam == p->ownerTeam) continue;
 
-                if (hp && targetTeam != p->ownerTeam) {
-                    if (CheckCollision(p, target)) {
-                        hp->TakeDamage(10.0f);
-                        hitSomething = true;
-                        break;
+                if (CheckCollision(p, target)) {
+                    Health* hp = target->GetComponent<Health>();
+                    hp->TakeDamage(10.0f);
+                    if (localPlayer && p->ownerTeam == localPlayer->teamID) {
+
+                        AudioManager::Instance().PlayOneShot("hit", 0.8f);
+                        if (hudRef) {
+                            hudRef->ShowHitMarker();
+                        }
                     }
+                    hitSomething = true;
+                    break;
                 }
             }
 
