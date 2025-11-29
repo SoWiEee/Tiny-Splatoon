@@ -6,13 +6,9 @@
 class RemotePlayer : public Entity {
 public:
     int playerID;
-    int teamID;
+    glm::vec3 targetPos;
+    float targetRot;
 
-    // --- 插值變數 ---
-    glm::vec3 targetPos; // 伺服器告訴我們他在哪
-    float targetRot;     // 伺服器告訴我們他面向哪
-
-    // 視覺身體
     GameObject* visualBody;
 
     RemotePlayer(int id, int team, glm::vec3 startPos)
@@ -23,11 +19,11 @@ public:
         transform->position = startPos;
         targetPos = startPos;
         targetRot = 0.0f;
+        AddComponent<Health>(team, startPos);
 
-        // 建立視覺模型
         visualBody = new GameObject("RemoteBody");
 
-        // 根據隊伍決定顏色 (1=紅, 2=綠, 其他=藍)
+        // 1=red, 1=green
         glm::vec3 color = (team == 1) ? glm::vec3(1, 0, 0) :
             (team == 2) ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
 
@@ -63,6 +59,5 @@ public:
         targetRot = rot;
     }
 
-    // 提供 getter 讓 GameWorld 渲染
     GameObject* GetVisualBody() { return visualBody; }
 };

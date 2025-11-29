@@ -464,7 +464,7 @@ private:
     // 更新或建立遠端玩家
     void HandleWorldState(PacketPlayerState* pkt) {
         int id = pkt->playerID;
-        // [關鍵] 如果收到 ID 0 的封包，且我自己就是 ID 0 (Server)，那就要忽略
+
         if (id == NetworkManager::Instance().GetMyPlayerID()) return;
         if (id == -1) return;
 
@@ -491,7 +491,6 @@ private:
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
             Projectile* p = it->get();
             p->UpdatePhysics(dt);
-
             bool hitSomething = false;
 
             // 檢查碰撞 (本機 + AI + 遠端玩家)
@@ -502,14 +501,15 @@ private:
 
             for (Entity* target : targets) {
                 if (!target) continue;
-
-                
-                int targetTeam = target->teamID; // 假設 Entity 已經有 teamID
+                int targetTeam = target->teamID;
                 if (targetTeam == p->ownerTeam) continue;
 
                 if (CheckCollision(p, target)) {
                     Health* hp = target->GetComponent<Health>();
-                    hp->TakeDamage(10.0f);
+                    if (hp) {
+                        hp->TakeDamage(10.0f);
+                        // 如果有死亡邏輯，也要寫在 if (hp) 裡面
+                    }
                     if (localPlayer && p->ownerTeam == localPlayer->teamID) {
 
                         AudioManager::Instance().PlayOneShot("hit", 0.8f);
@@ -536,7 +536,7 @@ private:
 
                 if (result.hit) {
                     float rot = (float)(rand() % 360) * 3.14159f / 180.0f;
-                    float size = 0.02f + ((rand() % 100) / 3000.0f); // 縮小的墨跡
+                    float size = 0.02f + ((rand() % 100) / 2000.0f); // 縮小的墨跡
                     painter->Paint(splatMap.get(), result.uv, size, p->inkColor, rot, p->ownerTeam);
                 }
                 it = projectiles.erase(it);
