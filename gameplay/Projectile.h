@@ -74,7 +74,7 @@ public:
         float baseScale = 0.3f;
 
         // 拉伸係數 (可調整)
-        float stretchFactor = 1.0f + (speed * 0.05f);
+        float stretchFactor = 1.0f + (speed * 0.1f);
         // 擠壓係數 (體積保持)
         float squashFactor = 1.0f / sqrt(stretchFactor);
 

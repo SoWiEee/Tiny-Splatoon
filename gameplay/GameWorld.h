@@ -535,9 +535,9 @@ private:
                 );
 
                 if (result.hit) {
-                    float rot = (float)(rand() % 360) * 3.14159f / 180.0f;
-                    float size = 0.02f + ((rand() % 100) / 500.0f);
-                    painter->Paint(splatMap.get(), result.uv, size, p->inkColor, rot, p->ownerTeam);
+                    float rot = (float)(rand() % 360);
+                    float paintSize = p->transform->scale.x * 0.7f;
+                    painter->Paint(splatMap.get(), result.uv, paintSize, p->inkColor, rot, p->ownerTeam);
                 }
                 it = projectiles.erase(it);
             }

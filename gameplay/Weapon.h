@@ -2,7 +2,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <GLFW/glfw3.h>
-#include <cstdlib>
+#include <cstdlib> // rand
 
 struct SpawnInfo {
     glm::vec3 pos;
@@ -44,4 +44,15 @@ public:
 
 protected:
     virtual void FireLogic(glm::vec3 pos, glm::vec3 dir) = 0;
+
+    float RandomFloat(float min, float max) {
+        return min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (max - min)));
+    }
+
+    glm::vec3 GetRandomSpread(float amount) {
+        float x = RandomFloat(-1.0f, 1.0f);
+        float y = RandomFloat(-1.0f, 1.0f);
+        float z = RandomFloat(-1.0f, 1.0f);
+        return glm::vec3(x, y, z) * amount;
+    }
 };
