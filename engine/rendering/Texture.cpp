@@ -1,10 +1,6 @@
 #include "Texture.h"
 #include <iostream>
-
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-
-
 
 Texture::Texture() : Width(0), Height(0), InternalFormat(GL_RGBA), ImageFormat(GL_RGBA), WrapS(GL_REPEAT), WrapT(GL_REPEAT), FilterMin(GL_LINEAR_MIPMAP_LINEAR), FilterMag(GL_LINEAR) {
     glGenTextures(1, &ID);

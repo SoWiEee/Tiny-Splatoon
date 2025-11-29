@@ -3,6 +3,9 @@
 #include <memory>
 #include <algorithm>
 #include <string>
+#include <glm/gtc/quaternion.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/matrix_decompose.hpp>
 #include "Transform.h"
 
 class GameObject {
