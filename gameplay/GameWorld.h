@@ -536,7 +536,7 @@ private:
 
                 if (result.hit) {
                     float rot = (float)(rand() % 360) * 3.14159f / 180.0f;
-                    float size = 0.02f + ((rand() % 100) / 2000.0f); // ÁY¤pªº¾¥¸ñ
+                    float size = 0.02f + ((rand() % 100) / 500.0f);
                     painter->Paint(splatMap.get(), result.uv, size, p->inkColor, rot, p->ownerTeam);
                 }
                 it = projectiles.erase(it);
