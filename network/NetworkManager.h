@@ -20,6 +20,7 @@ class NetworkManager {
 public:
     static NetworkManager& Instance();
     std::vector<int> connectedPlayerIDs;
+    std::map<int, WeaponType> playerWeaponMap;
 
     // GNS init
     bool Initialize();
@@ -55,6 +56,8 @@ public:
     void SetMyPlayerID(int id) { m_MyID = id; }
     int GetMyTeamID() const { return m_MyTeamID; }
     void SetMyTeamID(int team) { m_MyTeamID = team; }
+    WeaponType GetMyWeaponType() const { return m_MyWeaponType; }
+    void SetMyWeaponType(WeaponType type) { m_MyWeaponType = type; }
 
 private:
     NetworkManager() {}
@@ -74,6 +77,7 @@ private:
     HSteamNetConnection m_hConnection = k_HSteamNetConnection_Invalid;
 
     // 狀態與佇列
+    WeaponType m_MyWeaponType = WeaponType::SHOOTER;
     bool m_IsServer = false;
     bool m_IsConnected = false;
     int m_MyID = -1; // -1 代表尚未分配

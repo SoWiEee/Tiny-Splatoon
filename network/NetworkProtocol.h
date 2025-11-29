@@ -17,6 +17,7 @@ enum class PacketType : uint8_t {
 	S2C_GAME_STATE,      // Server -> Client: 遊戲狀態更新 (比分)
 
     // --- 遊戲事件 ---
+    C2S_LOBBY_CHANGE_WEAPON, // Client 通知 Server 我換武器了
     C2S_SHOOT,           // Client -> Server: 我開槍了
     S2C_SHOOT_EVENT,     // Server -> Client: 某人開槍了 (大家生成子彈)
     S2C_SPLAT_UPDATE,    // Server -> Client: 地板這裡髒了 (大家畫圖)
@@ -24,16 +25,31 @@ enum class PacketType : uint8_t {
     S2C_GAME_START       // Server -> Client: 遊戲開始！
 };
 
+// 所有封包的共通標頭
+struct PacketHeader {
+    PacketType type;
+};
+
+// 武器類型定義
+enum class WeaponType : uint8_t {
+    SHOOTER = 0, // 步槍 (標準)
+    SHOTGUN = 1, // 霰彈槍 (近距離)
+    BOW = 2      // 弓箭 (遠距離/拋物線)
+};
+
+// 換武器請求封包
+struct PacketLobbyChangeWeapon {
+    PacketHeader header;
+    int playerID;
+    WeaponType newWeapon;
+};
+
 // 大廳單個格子的資訊
 struct LobbySlotInfo {
     int playerID;   // -1 代表沒人
     int teamID;     // 1=紅, 2=綠
     bool isReady;   // (可選)
-};
-
-// 所有封包的共通標頭
-struct PacketHeader {
-    PacketType type;
+    WeaponType weaponType;
 };
 
 // 大廳狀態封包

@@ -47,6 +47,14 @@ public:
                     int pid = clientIDs[i];
                     pkt.slots[i + 1].playerID = pid;
                     pkt.slots[i + 1].teamID = (pid % 2 == 0) ? 1 : 2;
+
+                    // 從 Map 讀取武器類型填入封包
+                    if (NetworkManager::Instance().playerWeaponMap.count(pid)) {
+                        pkt.slots[i + 1].weaponType = NetworkManager::Instance().playerWeaponMap[pid];
+                    }
+                    else {
+                        pkt.slots[i + 1].weaponType = WeaponType::SHOOTER;
+                    }
                 }
 
                 // 4. 廣播
@@ -99,6 +107,12 @@ public:
             NetworkManager::Instance().SetMyPlayerID(p->yourPlayerID);
             NetworkManager::Instance().SetMyTeamID(p->yourTeamID);
             std::cout << ">> Lobby Joined! ID: " << p->yourPlayerID << std::endl;
+        }
+        // Server 處理換武器請求
+        if (isServer && pkt.type == PacketType::C2S_LOBBY_CHANGE_WEAPON) {
+            auto* p = (PacketLobbyChangeWeapon*)pkt.data.data();
+            NetworkManager::Instance().playerWeaponMap[p->playerID] = p->newWeapon;
+            std::cout << "[Lobby] Player " << p->playerID << " changed weapon to " << (int)p->newWeapon << std::endl;
         }
     }
 };

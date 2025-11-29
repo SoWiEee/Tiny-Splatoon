@@ -10,6 +10,9 @@
 #include "../splat/SplatPainter.h"
 #include "../splat/SplatPhysics.h"
 #include "../splat/SplatRenderer.h"
+#include "ShooterWeapon.h"
+#include "ShotgunWeapon.h"
+#include "BowWeapon.h"
 #include "Player.h"
 #include "Enemy.h"
 #include "RemotePlayer.h"
@@ -57,7 +60,23 @@ public:
             myTeam = 1;
         }
 
+        WeaponType myWeaponType = NetworkManager::Instance().GetMyWeaponType();
         localPlayer = std::make_unique<Player>(glm::vec3(-5, 0, -5), myTeam, splatMap.get(), mainCamera, hud);
+        glm::vec3 color = (myTeam == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);  // replace weapon
+        switch (myWeaponType) {
+        case WeaponType::SHOOTER:
+            localPlayer->weapon = new ShooterWeapon(myTeam, color);
+            break;
+        case WeaponType::SHOTGUN:
+            localPlayer->weapon = new ShotgunWeapon(myTeam, color);
+            break;
+        case WeaponType::BOW:
+            localPlayer->weapon = new BowWeapon(myTeam, color);
+            break;
+        default:
+            localPlayer->weapon = new ShooterWeapon(myTeam, color);
+            break;
+        }
 
         if (NetworkManager::Instance().IsServer()) {
             NetworkManager::Instance().SetMyPlayerID(0); // 強制設為 0
@@ -514,7 +533,7 @@ private:
 
                 if (result.hit) {
                     float rot = (float)(rand() % 360) * 3.14159f / 180.0f;
-                    float size = 0.02f + ((rand() % 100) / 4000.0f); // 縮小的墨跡
+                    float size = 0.02f + ((rand() % 100) / 3000.0f); // 縮小的墨跡
                     painter->Paint(splatMap.get(), result.uv, size, p->inkColor, rot, p->ownerTeam);
                 }
                 it = projectiles.erase(it);

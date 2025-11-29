@@ -42,6 +42,8 @@ public:
     void SetState(UIState newState) { currentState = newState; }
     UIState GetState() const { return currentState; }
 
+    bool DrawWeaponSelector(WeaponType& currentSelection);
+
 private:
     UIState currentState = UIState::LOGIN;
     GLFWwindow* m_Window;

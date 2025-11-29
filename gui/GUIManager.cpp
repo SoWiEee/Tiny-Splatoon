@@ -103,8 +103,23 @@ void GUIManager::DrawLobby(bool& outStartGame) {
         ImGui::SetCursorPos(ImVec2((w - textW) * 0.5f, h * 0.1f));
         ImGui::Text("%s", title.c_str());
 
-        // 2. 繪製 8 個圓圈 (呼叫私有函式)
+        // 2. 繪製 8 個圓圈
         DrawLobbyCircles(w, h);
+        // 武器選擇器
+        ImGui::SetCursorPos(ImVec2(w * 0.1f, h * 0.6f));
+        WeaponType currentWeapon = NetworkManager::Instance().GetMyWeaponType();
+        // 如果有變更，這個函式會回傳 true，並更新 currentWeapon
+        if (DrawWeaponSelector(currentWeapon)) {
+            // 更新本地記錄
+            NetworkManager::Instance().SetMyWeaponType(currentWeapon);
+
+            // 發送封包通知 Server
+            PacketLobbyChangeWeapon pkt;
+            pkt.header.type = PacketType::C2S_LOBBY_CHANGE_WEAPON;
+            pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
+            pkt.newWeapon = currentWeapon;
+            NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+        }
 
         // 3. 按鈕 (Server 顯示 Start, Client 顯示 Waiting)
         ImGui::SetWindowFontScale(2.0f);
@@ -169,4 +184,57 @@ void GUIManager::DrawLobbyCircles(int w, int h) {
         ImGui::SetCursorPos(ImVec2(x - nameW * 0.5f - 10, y + radius + 15)); // 微調位置
         ImGui::Text("%s", name.c_str());
     }
+}
+
+bool GUIManager::DrawWeaponSelector(WeaponType& currentSelection) {
+    bool changed = false;
+
+    ImGui::SetWindowFontScale(1.5f);
+    ImGui::Text("Select Weapon:");
+    ImGui::SameLine();
+
+    // 定義按鈕樣式
+    auto DrawWeaponBtn = [&](const char* label, WeaponType type) {
+        // 如果選中，改變按鈕顏色
+        if (currentSelection == type) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.8f, 0.2f, 1.0f)); // 亮綠色
+        }
+        else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // 灰色
+        }
+
+        if (ImGui::Button(label, ImVec2(120, 40))) {
+            currentSelection = type;
+            changed = true;
+        }
+        ImGui::PopStyleColor();
+        };
+
+    DrawWeaponBtn("Shooter", WeaponType::SHOOTER);
+    ImGui::SameLine();
+    DrawWeaponBtn("Shotgun", WeaponType::SHOTGUN);
+    ImGui::SameLine();
+    DrawWeaponBtn("Bow", WeaponType::BOW);
+
+    // 顯示屬性面板
+    ImGui::Spacing();
+    ImGui::Indent(20.0f);
+    ImGui::SetWindowFontScale(1.2f);
+
+    std::string statsText = "";
+    switch (currentSelection) {
+    case WeaponType::SHOOTER:
+        statsText = "Type: Automatic\nFire Rate: Fast\nInk Cost: Low\nRange: Medium";
+        break;
+    case WeaponType::SHOTGUN:
+        statsText = "Type: Spread\nFire Rate: Slow\nInk Cost: High\nRange: Short";
+        break;
+    case WeaponType::BOW:
+        statsText = "Type: Projectile\nFire Rate: Medium\nInk Cost: Very High\nRange: Long";
+        break;
+    }
+    ImGui::Text("%s", statsText.c_str());
+    ImGui::Unindent(20.0f);
+
+    return changed;
 }
