@@ -17,6 +17,7 @@
 #include "gui/GUIManager.h"
 #include "network/NetworkProtocol.h"
 #include "engine/scene/SceneManager.h"
+#include "engine/audio/AudioManager.h"
 #include "scene/Lobby.h"
 #include "scene/LoginScene.h"
 #include "scene/GameScene.h"
@@ -48,6 +49,8 @@ int main() {
     glEnable(GL_DEPTH_TEST);
     SceneManager::Instance().SwitchTo(std::make_unique<LoginScene>(&gui));
     Timer timer;
+    AudioManager::Instance().Initialize();
+    AudioManager::Instance().LoadSound("shoot", "assets/shoot.mp3");
 
     // Game Loop
     while (!window.ShouldClose()) {

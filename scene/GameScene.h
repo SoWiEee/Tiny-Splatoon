@@ -51,6 +51,7 @@ public:
         world->scoreboardRef = scoreboard;
 
         glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        AudioManager::Instance().PlayBGM("assets/battle.mp3", 0.3f);
     }
 
     // --- 2. 離開場景 (清理) ---

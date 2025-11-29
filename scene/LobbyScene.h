@@ -19,6 +19,7 @@ public:
     void OnEnter() override {
         glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         gui->SetState(UIState::LOBBY);
+        AudioManager::Instance().PlayBGM("assets/lobby.mp3", 0.4f);
     }
 
     void OnExit() override {

@@ -14,6 +14,7 @@ bool AudioManager::Initialize() {
 }
 
 void AudioManager::Shutdown() {
+    StopBGM();
     for (auto& pair : m_SoundBank) {
         for (int i = 0; i < pair.second.POOL_SIZE; i++) {
             ma_sound_uninit(&pair.second.sounds[i]);
@@ -60,4 +61,48 @@ void AudioManager::PlayOneShot(const std::string& name, float volume) {
 
     // 移動索引 (簡單的 Round Robin)
     data.poolIndex = (data.poolIndex + 1) % SoundData::POOL_SIZE;
+}
+
+void AudioManager::StopBGM() {
+    if (m_CurrentBGM) {
+        // 停止並釋放資源
+        ma_sound_stop(m_CurrentBGM);
+        ma_sound_uninit(m_CurrentBGM);
+        delete m_CurrentBGM;
+        m_CurrentBGM = nullptr;
+    }
+}
+
+void AudioManager::PlayBGM(const std::string& path, float volume, bool loop) {
+    // 1. 先停止上一首 (如果有)
+    StopBGM();
+
+    // 2. 建立新的 BGM 物件
+    m_CurrentBGM = new ma_sound;
+
+    // 3. 初始化 (使用 STREAM 模式，不佔用大量記憶體)
+    ma_result result = ma_sound_init_from_file(
+        &m_Engine,
+        path.c_str(),
+        MA_SOUND_FLAG_STREAM | MA_SOUND_FLAG_ASYNC,
+        NULL,
+        NULL,
+        m_CurrentBGM
+    );
+
+    if (result != MA_SUCCESS) {
+        std::cerr << "[Audio] Failed to load BGM: " << path << std::endl;
+        delete m_CurrentBGM;
+        m_CurrentBGM = nullptr;
+        return;
+    }
+
+    // 4. 設定參數
+    ma_sound_set_volume(m_CurrentBGM, volume);
+    ma_sound_set_looping(m_CurrentBGM, loop ? MA_TRUE : MA_FALSE);
+
+    // 5. 開始播放
+    ma_sound_start(m_CurrentBGM);
+
+    std::cout << "[Audio] Playing BGM: " << path << std::endl;
 }

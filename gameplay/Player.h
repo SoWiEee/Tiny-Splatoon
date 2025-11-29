@@ -2,6 +2,7 @@
 
 #include "../scene/Entity.h"
 #include "../engine/core/Input.h"
+#include "../engine/audio/AudioManager.h"
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
 #include "../components/Camera.h"
@@ -126,6 +127,7 @@ private:
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
                 camera->TriggerShake(0.1f, 0.05f);
             }
+            AudioManager::Instance().PlayOneShot("shoot", 0.5f);
         }
     }
 
