@@ -145,6 +145,10 @@ public:
         : m_Mesh(mesh), m_Color(c) {
     }
 
+    void SetColor(glm::vec3 newColor) {
+        m_Color = newColor;
+    }
+
     void SetTexture(std::shared_ptr<Texture> tex, float tiling = 1.0f) {
         m_Texture = tex;
         m_Tiling = tiling;

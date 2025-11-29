@@ -8,7 +8,6 @@ public:
     float currentHP;
     int teamID; // 1=紅隊(玩家), 2=綠隊(AI)
 
-    // 重生點 (死了要回這裡)
     glm::vec3 spawnPoint;
 
     Health(int team, glm::vec3 spawn) : teamID(team), spawnPoint(spawn) {

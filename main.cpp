@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
+#include <string>
 
 #include "engine/core/Window.h"
 #include "engine/core/Timer.h"
@@ -12,7 +13,20 @@
 #include "components/Camera.h"
 #include "components/HUD.h"
 #include "components/Scoreboard.h"
-#include "gameplay/GameWorld.h"
+#include "network/NetworkManager.h"
+#include "gui/GUIManager.h"
+#include "network/NetworkProtocol.h"
+#include "engine/scene/SceneManager.h"
+#include "engine/audio/AudioManager.h"
+#include "scene/Lobby.h"
+#include "scene/LoginScene.h"
+#include "scene/GameScene.h"
+
+enum class GameState {
+    LOGIN_MENU,
+    LOBBY,
+    PLAYING
+};
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -20,40 +34,24 @@ const unsigned int SCR_HEIGHT = 720;
 Camera* mainCamera = nullptr;
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (mainCamera) mainCamera->ProcessMouseMovement((float)xpos, (float)ypos);
+    if (GameScene::CurrentCamera) {
+        GameScene::CurrentCamera->ProcessMouseMovement((float)xpos, (float)ypos);
+    }
 }
 
 int main() {
-    Window window(SCR_WIDTH, SCR_HEIGHT, "Splatoon Simulator");
-    Timer timer;
-
+    // Network, Window, GUI Init
+    NetworkManager::Instance().Initialize();
+    Window window(SCR_WIDTH, SCR_HEIGHT, "Tiny Splatoon");
     glfwSetCursorPosCallback(window.GetNativeWindow(), mouse_callback);
+    GUIManager gui(window.GetNativeWindow());
 
     glEnable(GL_DEPTH_TEST);
-
-    Shader shader("assets/shaders/default.vert", "assets/shaders/default.frag");
-
-    // create camera
-    GameObject* cameraObj = new GameObject("MainCamera");
-    mainCamera = cameraObj->AddComponent<Camera>();
-
-    // GameWorld init
-    GameWorld game;
-    // UI init
-    GameObject* uiObj = new GameObject("UI");
-
-    // HUD
-    HUD* hud = uiObj->AddComponent<HUD>((float)SCR_WIDTH, (float)SCR_HEIGHT);
-    game.Init(cameraObj, hud);
-
-    // Scoreboard
-    Scoreboard* scoreboard = uiObj->AddComponent<Scoreboard>((float)SCR_WIDTH, (float)SCR_HEIGHT, game.splatMap);
-
-    // 把 HUD 傳給 Player 讓他控制回充顯示 (如果 Player 支援的話)
-    // 假設你在 Player.h 裡有 SetHUD 之類的函式，或者直接存取
-    if (game.localPlayer) {
-        // game.localPlayer->hud = hud; // 視你的 Player 實作而定
-    }
+    SceneManager::Instance().SwitchTo(std::make_unique<LoginScene>(&gui));
+    Timer timer;
+    AudioManager::Instance().Initialize();
+    AudioManager::Instance().LoadSound("shoot", "assets/shoot.mp3");
+    AudioManager::Instance().LoadSound("hit", "assets/hit.wav");
 
     // Game Loop
     while (!window.ShouldClose()) {
@@ -62,45 +60,18 @@ int main() {
 
         if (Input::GetKey(GLFW_KEY_ESCAPE)) break;
 
-        // TPS camera
-        if (game.localPlayer) {
-            glm::vec3 targetPos = game.localPlayer->transform->position;
-
-            // camera parameter
-            float camDist = 5.0f;
-            float camHeight = 2.5f;
-
-            glm::vec3 camDir = cameraObj->transform->GetForward();
-            cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+        NetworkManager::Instance().Update();
+        while (NetworkManager::Instance().HasPackets()) {
+            SceneManager::Instance().HandlePacket(NetworkManager::Instance().PopPacket());
         }
-
-        // Update Player, Physics, Projectiles, SplatMap
-        game.Update(dt);
-
-        // 更新 UI 邏輯 (計分板計時器等)
-        scoreboard->Update(dt);
-        hud->Update(dt);
-
-        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        shader.Bind();
-        shader.SetMat4("view", mainCamera->GetViewMatrix());
-        shader.SetMat4("projection", mainCamera->GetProjectionMatrix());
-        shader.SetVec3("viewPos", cameraObj->transform->position);
-
-        game.Render(shader);
-
-        hud->Draw(shader);
-        scoreboard->Draw(shader);
+        SceneManager::Instance().Update(dt);
+        SceneManager::Instance().Render();
+        gui.BeginFrame();
+        SceneManager::Instance().DrawUI();
+        gui.Render();
 
         window.SwapBuffers();
         window.PollEvents();
     }
-
-    game.CleanUp();
-
     return 0;
 }

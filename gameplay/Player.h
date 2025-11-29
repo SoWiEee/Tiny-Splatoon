@@ -2,8 +2,10 @@
 
 #include "../scene/Entity.h"
 #include "../engine/core/Input.h"
+#include "../engine/audio/AudioManager.h"
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
+#include "../components/Camera.h"
 #include "Weapon.h"
 #include "ShooterWeapon.h"
 #include "ShotgunWeapon.h"
@@ -19,7 +21,6 @@ public:
     float gravity = -20.0f;
 
     // state
-    int teamID;
     glm::vec3 velocity = glm::vec3(0.0f);
     bool isGrounded = false;
     bool isSwimming = false;
@@ -31,19 +32,22 @@ public:
     GameObject* shadow;
     GameObject* visualBody;
     HUD* hudRef = nullptr;
+    Camera* camera = nullptr;
 
     float mapLimit = 19.5f;
     float floorSize = 40.0f;
 
     Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
-        : Entity("Player"), teamID(team), splatMapRef(map), cameraRef(cam), hudRef(hud)
+        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud)
     {
+        this->teamID = team;
         shadow = new GameObject("ShadowBlob");
         shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f));
         shadow->transform->position = transform->position + glm::vec3(0, 0.02f, 0);
         shadow->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f);
 
         transform->position = startPos;
+        camera = cam->GetComponent<Camera>();
         weapon = new ShotgunWeapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0));
         AddComponent<Health>(team, startPos);
         visualBody = new GameObject("PlayerBody");
@@ -121,6 +125,8 @@ private:
 
             if (weapon->Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
+                camera->TriggerShake(0.1f, 0.05f);
+                AudioManager::Instance().PlayOneShot("shoot", 0.5f);
             }
         }
     }

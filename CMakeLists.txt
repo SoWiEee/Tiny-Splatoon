@@ -11,8 +11,9 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED) 
 find_package(imgui CONFIG REQUIRED)
+find_package(GameNetworkingSockets CONFIG REQUIRED)
 
-file(GLOB_RECURSE MY_SOURCE_FILES "components/*" "engine/*" "gameplay/*" "splat/*" "scene/*")
+file(GLOB_RECURSE MY_SOURCE_FILES "components/*" "engine/*" "gameplay/*" "splat/*" "scene/*" "network/*" "gui/*")
 
 
 add_executable(Tiny-Splatoon main.cpp ${MY_SOURCE_FILES})
@@ -24,6 +25,7 @@ target_link_libraries(Tiny-Splatoon PRIVATE
     fmt::fmt
     imgui::imgui
     glm::glm
+    GameNetworkingSockets::shared
 )
 
 add_custom_command(TARGET Tiny-Splatoon POST_BUILD

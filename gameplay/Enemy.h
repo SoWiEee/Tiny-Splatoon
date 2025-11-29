@@ -12,7 +12,6 @@
 class Enemy : public Entity {
 public:
     // --- 屬性 ---
-    int teamID;
     float moveSpeed = 3.0f;
     float mapLimit = 18.0f;
 
@@ -26,7 +25,9 @@ public:
     GameObject* visualBody;
     GameObject* shadow;
 
-    Enemy(glm::vec3 startPos, int team) : Entity("Enemy"), teamID(team) {
+    Enemy(glm::vec3 startPos, int team) : Entity("Enemy") {
+        this->teamID = team;
+
         shadow = new GameObject("ShadowBlob");
         shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f)); // 黑色
         // 稍微浮在地板上一點點，避免 Z-Fighting

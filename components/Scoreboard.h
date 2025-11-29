@@ -14,6 +14,7 @@ class Scoreboard : public Component {
 
     float m_ScreenW, m_ScreenH;
     float m_Timer = 0.0f;
+    bool useExternalScore = false;
     glm::vec2 m_CurrentScores = glm::vec2(0.0f);
 
 public:
@@ -22,9 +23,15 @@ public:
         SetupMesh();
     }
 
+    // 設定分數 (給網路連線用)
+    void SetScores(float scoreA, float scoreB) {
+        m_CurrentScores = glm::vec2(scoreA, scoreB);
+        useExternalScore = true; // 開啟外部模式，停止自己計算
+    }
+
     void Update(float dt) override {
         m_Timer += dt;
-        if (m_Timer > 0.5f) {
+        if (!useExternalScore && m_Timer > 0.5f) {
             if (m_SplatMap) {
                 m_CurrentScores = m_SplatMap->CalculateScore();
             }

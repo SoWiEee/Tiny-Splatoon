@@ -1,9 +1,11 @@
 #pragma once
 #include "../engine/GameObject.h"
 
-// 基本上 Entity 就是 GameObject
 class Entity : public GameObject {
 public:
+    int teamID = 0;
+
     Entity(std::string name) : GameObject(name) {}
-    // 可以加入 GetType(), GetTeam() 等通用介面
+
+    virtual ~Entity() {}
 };
