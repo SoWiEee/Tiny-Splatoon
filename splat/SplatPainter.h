@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "stb_image.h"
+#include "../components/HUD.h"
 
 class SplatPainter {
 private:
@@ -29,7 +30,6 @@ public:
         glGenTextures(1, &splatTextureID);
         glBindTexture(GL_TEXTURE_2D, splatTextureID);
 
-        // 設定重複模式 (避免邊緣採樣錯誤)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -54,8 +54,7 @@ public:
     void Paint(SplatMap* map, const glm::vec2& uv, float size, const glm::vec3& color, float rotation, int teamID) {
         glBindFramebuffer(GL_FRAMEBUFFER, map->fbo);
         glViewport(0, 0, map->width, map->height);
-        glEnable(GL_BLEND);
-        glBlendEquation(GL_FUNC_ADD);
+        glDisable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         splatShader->Bind();
@@ -92,12 +91,8 @@ public:
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
-
-        glDisable(GL_BLEND);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // 更新 CPU 端數據 (用於計分)
-        // 注意：這裡還是只更新中心點，如果要精確計分可能需要遍歷範圍，但效能考量暫時維持這樣
         map->UpdateCPUData(uv.x, uv.y, teamID);
     }
 
