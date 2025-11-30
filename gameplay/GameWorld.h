@@ -12,7 +12,7 @@
 #include "../splat/SplatRenderer.h"
 #include "ShooterWeapon.h"
 #include "ShotgunWeapon.h"
-#include "BowWeapon.h"
+#include "SlosherWeapon.h"
 #include "Player.h"
 #include "Enemy.h"
 #include "RemotePlayer.h"
@@ -72,8 +72,8 @@ public:
         case WeaponType::SHOTGUN:
             localPlayer->weapon = new ShotgunWeapon(myTeam, color);
             break;
-        case WeaponType::BOW:
-            localPlayer->weapon = new BowWeapon(myTeam, color);
+        case WeaponType::SLOSHER:
+            localPlayer->weapon = new SlosherWeapon(myTeam, color);
             break;
         default:
             localPlayer->weapon = new ShooterWeapon(myTeam, color);

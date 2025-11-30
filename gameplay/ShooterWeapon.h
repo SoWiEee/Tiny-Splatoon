@@ -5,7 +5,7 @@
 class ShooterWeapon : public Weapon {
 public:
     ShooterWeapon(int team, glm::vec3 color)
-        : Weapon(team, color, 0.1f, 0.04f) {
+        : Weapon(team, color, 0.1f, 0.05f) {
     }
 
 protected:

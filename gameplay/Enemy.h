@@ -3,7 +3,7 @@
 #include "Weapon.h"
 #include "ShooterWeapon.h"
 #include "ShotgunWeapon.h"
-#include "BowWeapon.h"
+#include "SlosherWeapon.h"
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
 #include <glm/glm.hpp>

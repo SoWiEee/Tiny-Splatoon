@@ -9,7 +9,7 @@
 #include "Weapon.h"
 #include "ShooterWeapon.h"
 #include "ShotgunWeapon.h"
-#include "BowWeapon.h"
+#include "SlosherWeapon.h"
 #include "../splat/SplatMap.h"
 
 class Player : public Entity {

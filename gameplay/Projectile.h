@@ -8,7 +8,7 @@ class Projectile : public Entity {
 public:
     // --- ª«²zÄÝ©Ê ---
     glm::vec3 velocity;
-    float gravity = 15.0f;
+    float gravity = 30.0f;
 
     int ownerTeam;
     glm::vec3 inkColor;
