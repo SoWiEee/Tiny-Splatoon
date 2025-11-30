@@ -52,7 +52,7 @@ int main() {
     AudioManager::Instance().Initialize();
     AudioManager::Instance().LoadSound("shoot", "assets/shoot.mp3");
     AudioManager::Instance().LoadSound("hit", "assets/hit.wav");
-    AudioManager::Instance().LoadSound("explode", "assets/explode.wav");
+    AudioManager::Instance().LoadSound("superjump", "assets/superjump.wav");
 
     // Game Loop
     while (!window.ShouldClose()) {

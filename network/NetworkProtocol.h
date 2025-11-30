@@ -20,11 +20,12 @@ enum class PacketType : uint8_t {
     C2S_LOBBY_CHANGE_WEAPON, // Client 通知 Server 我換武器了
     C2S_SHOOT,           // Client -> Server: 我開槍了
     S2C_SHOOT_EVENT,     // Server -> Client: 某人開槍了 (大家生成子彈)
-    C2S_THROW_BOMB,     // Client -> Server: 我丟炸彈了
-    S2C_SPAWN_BOMB,     // Server -> All: 有人丟炸彈了，請在你們的世界生成
+    C2S_THROW_BOMB,      // Client -> Server: 我丟炸彈了
+    S2C_SPAWN_BOMB,      // Server -> All: 有人丟炸彈了，請在你們的世界生成
     S2C_SPLAT_UPDATE,    // Server -> Client: 地板這裡髒了 (大家畫圖)
     S2C_LOBBY_UPDATE,    // Server -> Client: 更新大廳 8 個格子的狀態
-    S2C_GAME_START       // Server -> Client: 遊戲開始！
+    S2C_GAME_START,      // Server -> Client: 遊戲開始！
+    S2C_KILL_EVENT       // 擊殺通知
 };
 
 // 所有封包的共通標頭
@@ -124,6 +125,14 @@ struct PacketGameState {
     float scoreTeam1;   // 紅隊分數 (0.0 ~ 1.0 或 像素總數)
     float scoreTeam2;   // 綠隊分數
     float timeRemaining; // 剩餘時間 (秒)
+};
+
+struct PacketKillEvent {
+    PacketHeader header;
+    int killerID; // 兇手 ID
+    int victimID; // 死者 ID
+    int killerTeam; // 兇手隊伍 (用來顯示顏色)
+    int victimTeam; // 死者隊伍
 };
 
 #pragma pack(pop)

@@ -5,14 +5,23 @@
 #include "../gui/GUIManager.h"
 #include <imgui.h>
 #include <vector>
+#include <deque>
+#include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+struct KillLog {
+    std::string text;
+    int killerTeam; // 1=red, 2=green
+    float timer;    // 顯示時間
+};
 
 class HUD : public Component {
     unsigned int VAO, VBO;
     Shader* uiShader;
     float screenWidth, screenHeight;
     std::shared_ptr<Texture> damageTex;
+    std::deque<KillLog> killLogs;
 
 public:
     float currentInk = 1.0f; // 100% 墨水
@@ -34,6 +43,15 @@ public:
     void Update(float dt) {
         if (hitMarkerTimer > 0.0f) {
             hitMarkerTimer -= dt;
+        }
+        for (auto it = killLogs.begin(); it != killLogs.end(); ) {
+            it->timer -= dt;
+            if (it->timer <= 0) {
+                it = killLogs.erase(it);
+            }
+            else {
+                ++it;
+            }
         }
     }
 
@@ -86,6 +104,8 @@ public:
         if (hpPercent < 1.0f) {
             DrawDamageVignette(hpPercent);
         }
+
+        DrawKillFeed();
     }
 
     void ConsumeInk(float amount) {
@@ -98,10 +118,21 @@ public:
         if (currentInk > 1.0f) currentInk = 1.0f;
     }
 
-    void DrawOverlay() {
-        if (hitMarkerTimer > 0.0f) {
-            DrawHitMarkerImGui();
-        }
+    // 加入一條擊殺訊息
+    void AddKillLog(int killerID, int victimID, int kTeam, int vTeam) {
+        KillLog log;
+        log.killerTeam = kTeam;
+        log.timer = 4.0f; // 顯示 4 秒
+
+        // 簡單轉換 ID 為文字
+        std::string kName = (killerID == 0) ? "Host" : (killerID == 100 ? "AI" : "P" + std::to_string(killerID));
+        std::string vName = (victimID == 0) ? "Host" : (victimID == 100 ? "AI" : "P" + std::to_string(victimID));
+
+        // 格式: "Killer -> Victim"
+        log.text = kName + " > " + vName;
+
+        killLogs.push_back(log);
+        if (killLogs.size() > 5) killLogs.pop_front(); // 最多顯示 5 條
     }
 
     void ShowHitMarker() {
@@ -189,6 +220,34 @@ private:
             ImVec2(0, 0), ImVec2(1, 1),
             IM_COL32(255, 255, 255, (int)(alpha * 255)) // 控制 Alpha
         );
+
+        ImGui::End();
+    }
+
+    // 繪製擊殺列表
+    void DrawKillFeed() {
+        if (killLogs.empty()) return;
+
+        // 設定視窗在右上角
+        float pad = 10.0f;
+        ImGui::SetNextWindowPos(ImVec2(screenWidth - 200 - pad, pad));
+        ImGui::SetNextWindowSize(ImVec2(200, 0)); // 自動高度
+
+        ImGui::Begin("KillFeed", nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing);
+
+        for (const auto& log : killLogs) {
+            // 根據隊伍設定顏色 (簡單紅綠)
+            ImVec4 color = (log.killerTeam == 1) ? ImVec4(1, 0.2f, 0.2f, 1) : ImVec4(0.2f, 1, 0.2f, 1);
+
+            // 隨時間淡出
+            float alpha = 1.0f;
+            if (log.timer < 1.0f) alpha = log.timer;
+            color.w = alpha;
+
+            ImGui::TextColored(color, "%s", log.text.c_str());
+        }
 
         ImGui::End();
     }

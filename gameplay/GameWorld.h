@@ -254,7 +254,9 @@ public:
             // A. 本地生成 (視覺立即回饋)
             glm::vec3 velocity = info.dir * info.speed;
             velocity.y += 2.0f;
-            auto p = std::make_unique<Projectile>(velocity, info.color, info.team, info.scale);
+
+            int myID = NetworkManager::Instance().GetMyPlayerID();
+            auto p = std::make_unique<Projectile>(velocity, info.color, info.team, info.scale, myID);
             p->transform->position = info.pos;
             projectiles.push_back(std::move(p));
 
@@ -334,6 +336,14 @@ public:
                 // Server 本地生成子彈 (除非是 Server 自己發的，那就重複了，需過濾)
                 if (inPkt->playerID != net.GetMyPlayerID()) {
                     SpawnRemoteProjectile(outPkt);
+                }
+            }
+            else if (received.type == PacketType::S2C_KILL_EVENT) {
+                auto* pkt = (PacketKillEvent*)received.data.data();
+
+                // 顯示在 UI
+                if (hudRef) {
+                    hudRef->AddKillLog(pkt->killerID, pkt->victimID, pkt->killerTeam, pkt->victimTeam);
                 }
             }
         }
@@ -453,10 +463,10 @@ private:
     void SpawnRemoteProjectile(const PacketShoot& pkt) {
         glm::vec3 velocity = pkt.direction * pkt.speed;
         velocity.y += 2.0f;
-        // 簡單判斷隊伍 (紅=1, 綠=2)
-        int team = (pkt.color.x > 0.5f) ? 1 : 2;
 
-        auto p = std::make_unique<Projectile>(velocity, pkt.color, team, pkt.scale);
+        int team = (pkt.color.x > 0.5f) ? 1 : 2;    // red=1, green=2
+
+        auto p = std::make_unique<Projectile>(velocity, pkt.color, team, pkt.scale, pkt.playerID);
         p->transform->position = pkt.origin;
         projectiles.push_back(std::move(p));
     }
@@ -507,14 +517,42 @@ private:
                 if (CheckCollision(p, target)) {
                     Health* hp = target->GetComponent<Health>();
                     if (hp) {
+                        bool wasAlive = !hp->isDead;
                         hp->TakeDamage(10.0f);
-                        if (hp->isDead) {
+
+                        if (wasAlive && hp->isDead) {
+                            if (NetworkManager::Instance().IsServer()) {
+                                // 獲取受害者 ID
+                                int victimID = -99;
+                                if (target == localPlayer.get()) victimID = NetworkManager::Instance().GetMyPlayerID();
+                                else if (target == enemyAI.get()) victimID = 100;
+                                else {
+                                    // 找 RemotePlayer ID
+                                    for (auto& rp : remotePlayers) {
+                                        if (rp.second.get() == target) {
+                                            victimID = rp.first;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // 發送擊殺封包
+                                PacketKillEvent pkt;
+                                pkt.header.type = PacketType::S2C_KILL_EVENT;
+                                pkt.killerID = p->ownerID;
+                                pkt.victimID = victimID;
+                                pkt.killerTeam = p->ownerTeam;
+                                pkt.victimTeam = hp->teamID; // 受害者隊伍
+
+                                NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+
+                                // Server 自己也要顯示 UI
+                                if (hudRef) hudRef->AddKillLog(p->ownerID, victimID, p->ownerTeam, hp->teamID);
+                            }
+
                             // A. 如果是本機玩家
                             if (target == localPlayer.get()) {
-                                // 防止重複觸發 (只在活著變死掉的那一幀觸發)
-                                // 假設 Player 有我們之前加的 state 變數
-                                // 如果你還沒加 PlayerState，請看下面的 Player.h 補充
-                                localPlayer->Die(); // 呼叫 Player 的狀態切換
+                                localPlayer->Die();
                                 SpawnDeathSplat(localPlayer->transform->position, p->inkColor);
                             }
                             // B. 如果是 AI

@@ -11,14 +11,15 @@ public:
     float gravity = 30.0f;
 
     int ownerTeam;
+    int ownerID;
     glm::vec3 inkColor;
     bool isDead = false;
 
     bool hasHitFloor = false;
     glm::vec3 hitPosition;
 
-    Projectile(glm::vec3 startVel, glm::vec3 color, int team, float scale)
-        : Entity("Projectile"), velocity(startVel), inkColor(color), ownerTeam(team)
+    Projectile(glm::vec3 startVel, glm::vec3 color, int team, float scale, int owner)
+        : Entity("Projectile"), velocity(startVel), inkColor(color), ownerTeam(team), ownerID(owner)
     {
         transform->scale = glm::vec3(scale);
         AddComponent<MeshRenderer>("Sphere", color);
