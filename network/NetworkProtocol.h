@@ -20,6 +20,8 @@ enum class PacketType : uint8_t {
     C2S_LOBBY_CHANGE_WEAPON, // Client 通知 Server 我換武器了
     C2S_SHOOT,           // Client -> Server: 我開槍了
     S2C_SHOOT_EVENT,     // Server -> Client: 某人開槍了 (大家生成子彈)
+    C2S_THROW_BOMB,     // Client -> Server: 我丟炸彈了
+    S2C_SPAWN_BOMB,     // Server -> All: 有人丟炸彈了，請在你們的世界生成
     S2C_SPLAT_UPDATE,    // Server -> Client: 地板這裡髒了 (大家畫圖)
     S2C_LOBBY_UPDATE,    // Server -> Client: 更新大廳 8 個格子的狀態
     S2C_GAME_START       // Server -> Client: 遊戲開始！
@@ -105,6 +107,15 @@ struct PacketSplatUpdate {
     float v;
     float radius;
     int teamID;
+};
+
+struct PacketSpawnBomb {
+    PacketHeader header;
+    int ownerID;        // 是誰丟的 (避免炸到自己，或判斷隊伍)
+    int teamID;         // 隊伍顏色
+    glm::vec3 startPos; // 起始位置
+    glm::vec3 startVel; // 起始速度向量 (包含方向與力道)
+    glm::vec3 color;    // 墨水顏色
 };
 
 // 分數與遊戲狀態封包
