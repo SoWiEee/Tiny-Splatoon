@@ -32,9 +32,9 @@ struct PacketHeader {
 
 // 武器類型定義
 enum class WeaponType : uint8_t {
-    SHOOTER = 0, // 步槍 (標準)
-    SHOTGUN = 1, // 霰彈槍 (近距離)
-    BOW = 2      // 弓箭 (遠距離/拋物線)
+    SHOOTER = 0,
+    SHOTGUN = 1,
+    SLOSHER = 2
 };
 
 // 換武器請求封包

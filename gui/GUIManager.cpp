@@ -2,13 +2,10 @@
 #include <string>
 
 GUIManager::GUIManager(GLFWwindow* window) : m_Window(window) {
-    // 1. 初始化 ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     ImGui::StyleColorsDark();
-
-    // 設定字型放大 (選用)
     io.FontGlobalScale = 1.2f;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -214,7 +211,7 @@ bool GUIManager::DrawWeaponSelector(WeaponType& currentSelection) {
     ImGui::SameLine();
     DrawWeaponBtn("Shotgun", WeaponType::SHOTGUN);
     ImGui::SameLine();
-    DrawWeaponBtn("Bow", WeaponType::BOW);
+    DrawWeaponBtn("Slosher", WeaponType::SLOSHER);
 
     // 顯示屬性面板
     ImGui::Spacing();
@@ -229,8 +226,8 @@ bool GUIManager::DrawWeaponSelector(WeaponType& currentSelection) {
     case WeaponType::SHOTGUN:
         statsText = "Type: Spread\nFire Rate: Slow\nInk Cost: High\nRange: Short";
         break;
-    case WeaponType::BOW:
-        statsText = "Type: Projectile\nFire Rate: Medium\nInk Cost: Very High\nRange: Long";
+    case WeaponType::SLOSHER:
+        statsText = "Type: Projectile\nFire Rate: Slow\nInk Cost: Very High\nRange: Long";
         break;
     }
     ImGui::Text("%s", statsText.c_str());
