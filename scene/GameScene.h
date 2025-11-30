@@ -80,12 +80,26 @@ public:
 
         // 相機跟隨邏輯
         if (world->localPlayer) {
-            glm::vec3 targetPos = world->localPlayer->transform->position;
-            float camDist = 5.0f;
-            float camHeight = 2.5f;
-            if (cameraObj) {
-                glm::vec3 camDir = cameraObj->transform->GetForward();
-                cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+            auto playerState = world->localPlayer->state;
+            if (playerState == PlayerState::ALIVE || playerState == PlayerState::LAUNCHING) {
+
+                glm::vec3 targetPos = world->localPlayer->transform->position;
+
+                // 參數設定
+                float camDist = 5.0f;
+                float camHeight = 2.5f;
+
+                // 如果正在超級跳躍，相機可以拉遠一點，視野更好
+                if (playerState == PlayerState::LAUNCHING) {
+                    camDist = 8.0f;
+                    camHeight = 4.0f;
+                }
+
+                if (cameraObj) {
+                    glm::vec3 camDir = cameraObj->transform->GetForward();
+                    // 設定位置
+                    cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+                }
             }
         }
     }

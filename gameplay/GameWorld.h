@@ -630,7 +630,7 @@ private:
             painter->Paint(splatMap.get(), result.uv, uvSize, color, rot, 0);
 
             // ¼½©ñ­µ®Ä
-            AudioManager::Instance().PlayOneShot("splat_die", 1.0f);
+            AudioManager::Instance().PlayOneShot("splat_die", 0.5f);
         }
     }
 };
