@@ -508,7 +508,23 @@ private:
                     Health* hp = target->GetComponent<Health>();
                     if (hp) {
                         hp->TakeDamage(10.0f);
-                        // 如果有死亡邏輯，也要寫在 if (hp) 裡面
+                        if (hp->isDead) {
+                            // A. 如果是本機玩家
+                            if (target == localPlayer.get()) {
+                                // 防止重複觸發 (只在活著變死掉的那一幀觸發)
+                                // 假設 Player 有我們之前加的 state 變數
+                                // 如果你還沒加 PlayerState，請看下面的 Player.h 補充
+                                localPlayer->Die(); // 呼叫 Player 的狀態切換
+                                SpawnDeathSplat(localPlayer->transform->position, p->inkColor);
+                            }
+                            // B. 如果是 AI
+                            else if (target == enemyAI.get()) {
+                                // AI 可能直接重生，或者也寫一個 Die 邏輯
+                                SpawnDeathSplat(enemyAI->transform->position, p->inkColor);
+                                hp->Reset();
+                                enemyAI->transform->position = hp->spawnPoint;
+                            }
+                        }
                     }
                     if (localPlayer && p->ownerTeam == localPlayer->teamID) {
 
@@ -547,6 +563,36 @@ private:
             else {
                 ++it;
             }
+        }
+    }
+
+    void SpawnDeathSplat(glm::vec3 pos, glm::vec3 color) {
+        // 1. 準備參數
+        // 假設地板中心在 (0,0,0)，如果你的地板有位移，請填入 level->floor->transform->position
+        glm::vec3 floorPos = glm::vec3(0.0f, 0.0f, 0.0f);
+
+        // 取得地圖大小
+        // 確保這跟 Player.h 或 Level.h 裡的設定一致
+        float mapSize = 100.0f;
+        if (level) mapSize = level->mapSize;
+
+        // 2. 呼叫 SplatPhysics 計算 UV
+        auto result = SplatPhysics::WorldToUV(pos, floorPos, mapSize, mapSize);
+
+        // 3. 如果在範圍內，畫圖
+        if (result.hit) {
+            // 隨機旋轉
+            float rot = (float)(rand() % 360);
+
+            // 死亡墨跡通常很大 (例如 3.0f ~ 4.0f)
+            // 這裡的 size 是相對於 UV 空間的比例，需要換算
+            // 如果 painter->Paint 接受的是 UV 比例:
+            float uvSize = 4.0f / mapSize;
+
+            painter->Paint(splatMap.get(), result.uv, uvSize, color, rot, 0);
+
+            // 播放音效
+            AudioManager::Instance().PlayOneShot("splat_die", 1.0f);
         }
     }
 };

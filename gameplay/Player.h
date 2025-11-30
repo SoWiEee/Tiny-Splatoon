@@ -12,6 +12,12 @@
 #include "SlosherWeapon.h"
 #include "../splat/SplatMap.h"
 
+enum class PlayerState {
+    ALIVE,      // 正常遊玩
+    DEAD,       // 死亡 (等待重生)
+    LAUNCHING   // 超級跳躍進場中
+};
+
 class Player : public Entity {
 public:
     // parameter
@@ -24,6 +30,15 @@ public:
     glm::vec3 velocity = glm::vec3(0.0f);
     bool isGrounded = false;
     bool isSwimming = false;
+    PlayerState state = PlayerState::ALIVE;
+    float respawnTimer = 0.0f;
+    float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
+
+    // 超級跳躍參數
+    glm::vec3 jumpStartPos;
+    glm::vec3 jumpTargetPos;
+    float jumpTimer = 0.0f;
+    float const JUMP_DURATION = 1.5f; // 跳躍飛行時間
 
     // reference
     Weapon* weapon = nullptr;
@@ -34,8 +49,8 @@ public:
     HUD* hudRef = nullptr;
     Camera* camera = nullptr;
 
-    float mapLimit = 19.5f;
-    float floorSize = 40.0f;
+    float mapLimit = 39.5f;
+    float floorSize = 80.0f;
 
     Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
         : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud)
@@ -52,6 +67,7 @@ public:
         AddComponent<Health>(team, startPos);
         visualBody = new GameObject("PlayerBody");
         visualBody->AddComponent<MeshRenderer>("Cube", weapon->inkColor);
+        StartSuperJump();
     }
 
     ~Player() {
@@ -65,14 +81,110 @@ public:
 
     // 主邏輯更新
     void UpdateLogic(float dt) {
-        HandleInput(dt);
-        ApplyPhysics(dt);
+        switch (state) {
+        case PlayerState::ALIVE:
+            HandleInput(dt);
+            ApplyPhysics(dt);
+            break;
+
+        case PlayerState::DEAD:
+            UpdateDeadState(dt);
+            break;
+
+        case PlayerState::LAUNCHING:
+            UpdateSuperJump(dt);
+            break;
+        }
         UpdateVisuals(dt);
     }
 
     GameObject* GetVisualBody() { return visualBody; }
 
+    void Die() {
+        // 防止重複死亡
+        if (state == PlayerState::DEAD || state == PlayerState::LAUNCHING) return;
+
+        state = PlayerState::DEAD;
+        respawnTimer = RESPAWN_TIME; // 設定 3 秒倒數
+
+        // 隱藏模型
+        if (visualBody) visualBody->transform->scale = glm::vec3(0.0f);
+
+        // 播放音效
+        // AudioManager::Instance().PlayOneShot("die", 1.0f);
+    }
+
+    // 開始超級跳躍
+    void StartSuperJump() {
+        state = PlayerState::LAUNCHING;
+        jumpTimer = 0.0f;
+
+        // 顯示模型
+        if (visualBody) visualBody->active = true;
+
+        // 設定起點與終點 (根據隊伍)
+        // 這裡假設我們能拿到 Level 的資訊，或者寫死
+        // 假設 Team 1 在 -40, Team 2 在 40
+        float zDir = (teamID == 1) ? -1.0f : 1.0f;
+
+        jumpStartPos = glm::vec3(0, 15.0f, 40.0f * zDir); // 高空重生點
+        jumpTargetPos = glm::vec3(0, 0.0f, 30.0f * zDir); // 落地點
+
+        // 重置血量與墨水
+        GetComponent<Health>()->Reset();
+        if (hudRef) hudRef->RefillInk(100.0f);
+
+        // 播放跳躍音效
+        AudioManager::Instance().PlayOneShot("superjump", 1.0f);
+    }
+
 private:
+    void UpdateDeadState(float dt) {
+        respawnTimer -= dt;
+
+        // 可以在這裡讓 Camera 慢慢轉向重生點，或是看著屍體
+
+        if (respawnTimer <= 0.0f) {
+            StartSuperJump();
+        }
+    }
+
+    // 超級跳躍物理 (拋物線)
+    void UpdateSuperJump(float dt) {
+        jumpTimer += dt;
+        float t = jumpTimer / JUMP_DURATION; // 0.0 ~ 1.0
+
+        if (t >= 1.0f) {
+            // 落地
+            transform->position = jumpTargetPos;
+            state = PlayerState::ALIVE;
+
+            // 落地音效 & 震動
+            AudioManager::Instance().PlayOneShot("land", 0.8f);
+            if (camera) camera->TriggerShake(0.2f, 0.1f);
+
+            return;
+        }
+
+        // --- 拋物線公式 ---
+        // Lerp 插值水平位置
+        glm::vec3 currentPos = glm::mix(jumpStartPos, jumpTargetPos, t);
+
+        // 加上垂直高度曲線 (Sine wave 或 Parabola)
+        // 讓他在中間 (t=0.5) 飛最高
+        float heightOffset = 15.0f * sin(t * 3.14159f);
+        currentPos.y += heightOffset;
+
+        // 讓起點Y和終點Y平滑過渡
+        // 這裡直接用 mix 已經處理了 Y 的線性變化，加上 heightOffset 形成弧線
+
+        transform->position = currentPos;
+
+        // 讓角色旋轉 (帥氣進場)
+        transform->rotation.y += 720.0f * dt; // 旋轉兩圈
+        transform->rotation.x = -90.0f * (1.0f - t); // 從朝下變成朝前
+    }
+
     void HandleInput(float dt) {
         if (!cameraRef) return;
 

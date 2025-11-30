@@ -8,6 +8,7 @@ public:
     float currentHP;
     int teamID; // 1=紅隊(玩家), 2=綠隊(AI)
 
+    bool isDead = false;
     glm::vec3 spawnPoint;
 
     Health(int team, glm::vec3 spawn) : teamID(team), spawnPoint(spawn) {
@@ -15,25 +16,31 @@ public:
     }
 
     void TakeDamage(float amount) {
+        if (isDead) return;
+
         currentHP -= amount;
-        std::cout << "Unit took damage! HP: " << currentHP << std::endl;
 
         if (currentHP <= 0) {
-            Die();
+            currentHP = 0;
+            if (!isDead) {
+                Die();
+            }
         }
     }
 
     void Die() {
-        std::cout << "Unit Died! Respawning..." << std::endl;
-        // 簡單重生機制：補滿血，回到出生點
-        currentHP = maxHP;
-        if (gameObject) {
-            gameObject->transform->position = spawnPoint;
-        }
+        isDead = true;
+        std::cout << "Unit Died! Waiting for respawn logic..." << std::endl;
     }
 
-    // 簡單的回血機制 (例如潛水時可以回血，之後可擴充)
+    // 重置狀態 (當超級跳躍開始時呼叫)
+    void Reset() {
+        isDead = false;
+        currentHP = maxHP;
+    }
+
     void Heal(float amount) {
+        if (isDead) return;
         currentHP += amount;
         if (currentHP > maxHP) currentHP = maxHP;
     }

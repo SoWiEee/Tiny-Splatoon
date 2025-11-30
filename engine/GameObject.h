@@ -14,6 +14,8 @@ public:
     std::vector<std::unique_ptr<Component>> components;
     std::string name;
 
+    bool active = true;
+
     GameObject(std::string name = "GameObject") : name(name) {
         transform = AddComponent<Transform>();
     }
@@ -38,10 +40,14 @@ public:
     }
 
     void Update(float dt) {
+        if (!active) return;
+
         for (auto& comp : components) comp->Update(dt);
     }
 
     void Draw(Shader& shader) {
+        if (!active) return;
+
         for (auto& comp : components) comp->Draw(shader);
     }
 };
