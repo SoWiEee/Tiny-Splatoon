@@ -1,6 +1,7 @@
 #pragma once
 #include "../engine/Component.h"
 #include "../engine/rendering/Shader.h"
+#include "../engine/rendering/Texture.h"
 #include "../gui/GUIManager.h"
 #include <imgui.h>
 #include <vector>
@@ -11,6 +12,7 @@ class HUD : public Component {
     unsigned int VAO, VBO;
     Shader* uiShader;
     float screenWidth, screenHeight;
+    std::shared_ptr<Texture> damageTex;
 
 public:
     float currentInk = 1.0f; // 100% 墨水
@@ -19,6 +21,8 @@ public:
     HUD(float width, float height) : screenWidth(width), screenHeight(height) {
         uiShader = new Shader("../assets/shaders/ui.vert", "../assets/shaders/ui.frag");
         SetupQuad();
+        damageTex = std::make_shared<Texture>();
+        damageTex->Load("assets/textures/damage_vignette.png");
     }
 
     ~HUD() {
@@ -68,6 +72,20 @@ public:
         // 6. 恢復狀態
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
+    }
+
+    void DrawOverlay(float hpPercent) {
+
+        // 1. 命中標記 (紅色 X)
+        if (hitMarkerTimer > 0.0f) {
+            DrawHitMarkerImGui();
+        }
+
+        // 2. 受傷濾鏡
+        // 只有血量不滿時才顯示
+        if (hpPercent < 1.0f) {
+            DrawDamageVignette(hpPercent);
+        }
     }
 
     void ConsumeInk(float amount) {
@@ -144,6 +162,32 @@ private:
             ImVec2(center.x - size, center.y + size),
             IM_COL32(255, 50, 50, 255),
             3.0f
+        );
+
+        ImGui::End();
+    }
+
+    void DrawDamageVignette(float hpPercent) {
+        // 設定全螢幕視窗
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(screenWidth, screenHeight));
+        ImGui::Begin("DamageOverlay", nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing);
+
+        // 計算透明度：血越少，Alpha 越高
+        float alpha = (1.0f - hpPercent) * 0.9f;
+
+        // 如果血量 > 90%，可能不想顯示，讓它全透明
+        if (hpPercent > 0.9f) alpha = 0.0f;
+
+        // 繪製圖片
+        ImGui::GetWindowDrawList()->AddImage(
+            (intptr_t)damageTex->ID,
+            ImVec2(0, 0),
+            ImVec2(screenWidth, screenHeight),
+            ImVec2(0, 0), ImVec2(1, 1),
+            IM_COL32(255, 255, 255, (int)(alpha * 255)) // 控制 Alpha
         );
 
         ImGui::End();

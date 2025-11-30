@@ -49,6 +49,10 @@ public:
     HUD* hudRef = nullptr;
     Camera* camera = nullptr;
 
+    float healRateSlow = 10.0f;      // 站立回血 (漫長)
+    float healRateFast = 20.0f;      // 潛水回血 (快速)
+    float regenDelay = 2.0f;         // 受傷後要等 2 秒才能開始回血
+    float currentRegenDelay = 0.0f;  // 計時器
     float mapLimit = 39.5f;
     float floorSize = 80.0f;
 
@@ -84,6 +88,40 @@ public:
         switch (state) {
         case PlayerState::ALIVE:
             HandleInput(dt);
+
+            // 墨水環境互動 
+            if (splatMapRef) {
+                // 計算 UV 座標 (假設 floorSize 是地圖總寬度，中心在 0,0)
+                // 注意：這裡的 UV 計算需跟 Shader/SplatPhysics 一致
+                float u = (transform->position.x / floorSize) + 0.5f;
+                float v = (transform->position.z / floorSize) + 0.5f;
+
+                // 檢查是否踩在敵方墨水上
+                // 假設：我方 teamID=1, 敵方=2; 我方=2, 敵方=1
+                int enemyTeam = (teamID == 1) ? 2 : 1;
+                bool onEnemyInk = splatMapRef->IsColorInArea(u, v, enemyTeam, 1);
+
+                auto healthComp = GetComponent<Health>();
+                if (healthComp) {
+                    if (!onEnemyInk) {
+                        // B. 安全地帶：倒數回血
+                        if (currentRegenDelay > 0.0f) {
+                            currentRegenDelay -= dt;
+                        }
+                        else {
+                            // 時間到，開始回血
+                            if (isSwimming) {
+                                // 潛水：快速回血
+                                healthComp->Heal(healRateFast * dt);
+                            }
+                            else {
+                                // 站立：慢速回血
+                                healthComp->Heal(healRateSlow * dt);
+                            }
+                        }
+                    }
+                }
+            }
             ApplyPhysics(dt);
             break;
 
