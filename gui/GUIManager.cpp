@@ -209,7 +209,7 @@ bool GUIManager::DrawWeaponSelector(WeaponType& currentSelection) {
 
     DrawWeaponBtn("Shooter", WeaponType::SHOOTER);
     ImGui::SameLine();
-    DrawWeaponBtn("Shotgun", WeaponType::SHOTGUN);
+    DrawWeaponBtn("Brush", WeaponType::BRUSH);
     ImGui::SameLine();
     DrawWeaponBtn("Slosher", WeaponType::SLOSHER);
 
@@ -223,8 +223,8 @@ bool GUIManager::DrawWeaponSelector(WeaponType& currentSelection) {
     case WeaponType::SHOOTER:
         statsText = "Type: Automatic\nFire Rate: Fast\nInk Cost: Low\nRange: Medium";
         break;
-    case WeaponType::SHOTGUN:
-        statsText = "Type: Spread\nFire Rate: Slow\nInk Cost: High\nRange: Short";
+    case WeaponType::BRUSH:
+        statsText = "Type: Spread\nFire Rate: Medium\nInk Cost: Medium\nRange: Short";
         break;
     case WeaponType::SLOSHER:
         statsText = "Type: Projectile\nFire Rate: Slow\nInk Cost: Very High\nRange: Long";

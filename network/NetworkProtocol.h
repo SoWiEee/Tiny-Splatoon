@@ -33,7 +33,7 @@ struct PacketHeader {
 // 武器類型定義
 enum class WeaponType : uint8_t {
     SHOOTER = 0,
-    SHOTGUN = 1,
+    BRUSH   = 1,
     SLOSHER = 2
 };
 

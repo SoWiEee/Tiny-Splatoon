@@ -8,7 +8,7 @@
 #include "../components/Camera.h"
 #include "Weapon.h"
 #include "ShooterWeapon.h"
-#include "ShotgunWeapon.h"
+#include "BrushWeapon.h"
 #include "SlosherWeapon.h"
 #include "../splat/SplatMap.h"
 
@@ -48,7 +48,7 @@ public:
 
         transform->position = startPos;
         camera = cam->GetComponent<Camera>();
-        weapon = new ShotgunWeapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0));
+        weapon = new BrushWeapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0));
         AddComponent<Health>(team, startPos);
         visualBody = new GameObject("PlayerBody");
         visualBody->AddComponent<MeshRenderer>("Cube", weapon->inkColor);

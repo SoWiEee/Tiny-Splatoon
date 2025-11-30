@@ -2,7 +2,7 @@
 #include "../scene/Entity.h"
 #include "Weapon.h"
 #include "ShooterWeapon.h"
-#include "ShotgunWeapon.h"
+#include "BrushWeapon.h"
 #include "SlosherWeapon.h"
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
