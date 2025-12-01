@@ -23,7 +23,7 @@ public:
     // parameter
     float moveSpeed = 5.0f;
     float swimSpeed = 12.0f;
-    float jumpHeight = 2.0f;
+    float jumpHeight = 1.5f;
     float gravity = -20.0f;
 
     // state
@@ -33,6 +33,8 @@ public:
     PlayerState state = PlayerState::ALIVE;
     float respawnTimer = 0.0f;
     float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
+    float specialCharge = 0.0f;       // 當前能量
+    float const MAX_SPECIAL = 100.0f; // 能量上限
 
     // super jump
     glm::vec3 jumpStartPos;
@@ -132,6 +134,27 @@ public:
             break;
         }
         UpdateVisuals(dt);
+    }
+
+    void AddSpecialCharge(float amount) {
+        // 只有活著的時候能集氣
+        if (state != PlayerState::ALIVE) return;
+
+        if (specialCharge < MAX_SPECIAL) {
+            specialCharge += amount;
+            if (specialCharge >= MAX_SPECIAL) {
+                specialCharge = MAX_SPECIAL;
+                AudioManager::Instance().PlayOneShot("special_ready", 0.8f);
+            }
+        }
+    }
+    bool IsSpecialReady() const {
+        return specialCharge >= MAX_SPECIAL;
+    }
+
+    // 消耗大招
+    void ResetSpecialCharge() {
+        specialCharge = 0.0f;
     }
 
     GameObject* GetVisualBody() { return visualBody; }
