@@ -63,7 +63,14 @@ public:
         }
 
         WeaponType myWeaponType = NetworkManager::Instance().GetMyWeaponType();
-        localPlayer = std::make_unique<Player>(glm::vec3(-5, 0, -5), myTeam, splatMap.get(), mainCamera, hud);
+        localPlayer = std::make_unique<Player>(
+            glm::vec3(-5, 0, -5),
+            myTeam,
+            splatMap.get(),
+            mainCamera,
+            hud,
+            level.get()
+        );
         glm::vec3 color = (myTeam == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);  // replace weapon
         switch (myWeaponType) {
         case WeaponType::SHOOTER:
@@ -116,6 +123,12 @@ public:
         if (enemyAI) {
             enemyAI->UpdateLogic(dt);
             if (enemyAI->weapon) CollectProjectiles(*(enemyAI->weapon));
+        }
+
+        // 檢查玩家是否發動了超級著地
+        if (localPlayer && localPlayer->requestSplashdown) {
+            TriggerSplashdown(localPlayer->transform->position, localPlayer->teamID);
+            localPlayer->requestSplashdown = false;
         }
 
         // --- 2. 網路同步 (發送本機狀態) ---
@@ -592,6 +605,13 @@ private:
                     float rot = (float)(rand() % 360);
                     float paintSize = p->transform->scale.x * 0.7f;
                     painter->Paint(splatMap.get(), result.uv, paintSize, p->inkColor, rot, p->ownerTeam);
+                    // 大招集氣邏輯
+                    // 只有本機玩家射出的子彈才算分
+                    if (localPlayer && p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {
+                        // 每塗一塊地增加 0.5 能量 (集滿 100 需要塗 200 次)
+                        // 可以根據武器調整 (例如筆刷加多一點)
+                        localPlayer->AddSpecialCharge(0.5f);
+                    }
                 }
                 it = projectiles.erase(it);
             }
@@ -631,6 +651,44 @@ private:
 
             // 播放音效
             AudioManager::Instance().PlayOneShot("splat_die", 0.5f);
+        }
+    }
+
+    // 執行超級著地效果
+    void TriggerSplashdown(glm::vec3 center, int teamID) {
+        // 1. 視覺特效：超大墨跡
+        glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+        auto result = SplatPhysics::WorldToUV(center, glm::vec3(0), level->mapSize, level->mapSize);
+
+        // 半徑超大 (例如 8.0f)
+        float mapSize = level->mapSize;
+        float uvSize = 40.0f / mapSize;
+
+        painter->Paint(splatMap.get(), result.uv, uvSize, color, 0, teamID);
+
+        // 音效
+        AudioManager::Instance().PlayOneShot("explode", 1.0f); // 借用爆炸聲
+
+        // 2. 範圍傷害 (AoE)
+        std::vector<Entity*> targets;
+        if (enemyAI) targets.push_back(enemyAI.get());
+        for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
+
+        float radius = 50.0f; // 殺傷半徑
+
+        for (Entity* t : targets) {
+            float dist = glm::distance(t->transform->position, center);
+            if (dist < radius) {
+                Health* hp = t->GetComponent<Health>();
+                if (hp && hp->teamID != teamID) {
+                    // 秒殺傷害
+                    hp->TakeDamage(999.0f);
+
+                    // 擊殺回饋 (如果是 Server 可直接廣播，如果是 Client 則只是本地預測)
+                    // 正式做法應該是發送封包通知 Server "我炸到人了"
+                    // 但簡單起見，直接扣血
+                }
+            }
         }
     }
 };

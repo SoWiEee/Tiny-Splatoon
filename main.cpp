@@ -55,6 +55,7 @@ int main() {
     AudioManager::Instance().LoadSound("superjump", "assets/superjump.wav");
     AudioManager::Instance().LoadSound("splat_die", "assets/die.mp3");
     AudioManager::Instance().LoadSound("special_ready", "assets/special_ready.mp3");
+    AudioManager::Instance().LoadSound("explode", "assets/explode.wav");
 
     // Game Loop
     while (!window.ShouldClose()) {

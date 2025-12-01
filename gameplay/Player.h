@@ -6,6 +6,7 @@
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
 #include "../components/Camera.h"
+#include "../scene/Level.h"
 #include "Weapon.h"
 #include "ShooterWeapon.h"
 #include "BrushWeapon.h"
@@ -15,7 +16,8 @@
 enum class PlayerState {
     ALIVE,
     DEAD,
-    LAUNCHING
+    LAUNCHING,
+    SPECIAL_ATTACK
 };
 
 class Player : public Entity {
@@ -33,8 +35,14 @@ public:
     PlayerState state = PlayerState::ALIVE;
     float respawnTimer = 0.0f;
     float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
+
+    // 大招參數
     float specialCharge = 0.0f;       // 當前能量
     float const MAX_SPECIAL = 100.0f; // 能量上限
+    bool requestSplashdown = false; // 告訴 GameWorld 我砸地了
+    int specialPhase = 0; // 0=升空, 1=滯空, 2=下砸
+    float specialTimer = 0.0f;
+    glm::vec3 specialStartPos;
 
     // super jump
     glm::vec3 jumpStartPos;
@@ -50,6 +58,7 @@ public:
     GameObject* visualBody;
     HUD* hudRef = nullptr;
     Camera* camera = nullptr;
+    Level* levelRef = nullptr;
 
     float healRateSlow = 10.0f;      // 站立回血 (漫長)
     float healRateFast = 20.0f;      // 潛水回血 (快速)
@@ -58,8 +67,8 @@ public:
     float mapLimit = 39.5f;
     float floorSize = 80.0f;
 
-    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
-        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud)
+    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud, Level* level)
+        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud), levelRef(level)
     {
         this->teamID = team;
         shadow = new GameObject("ShadowBlob");
@@ -90,6 +99,10 @@ public:
         switch (state) {
         case PlayerState::ALIVE:
             HandleInput(dt);
+            // 施放大招
+            if (Input::GetKey(GLFW_KEY_Q) && IsSpecialReady()) {
+                StartSpecialAttack();
+            }
 
             // 墨水環境互動 
             if (splatMapRef) {
@@ -132,6 +145,10 @@ public:
         case PlayerState::LAUNCHING:
             UpdateSuperJump(dt);
             break;
+
+        case PlayerState::SPECIAL_ATTACK:
+            UpdateSpecialAttack(dt);
+            break;
         }
         UpdateVisuals(dt);
     }
@@ -148,6 +165,22 @@ public:
             }
         }
     }
+
+    void StartSpecialAttack() {
+        if (state != PlayerState::ALIVE) return;
+
+        state = PlayerState::SPECIAL_ATTACK;
+        specialPhase = 0; // 升空
+        specialStartPos = transform->position;
+        specialTimer = 0.0f;
+
+        // 瞬間補滿墨水
+        if (hudRef) hudRef->RefillInk(100.0f);
+
+        // 播放音效 (集氣聲)
+        // AudioManager::Instance().PlayOneShot("special_start", 1.0f);
+    }
+
     bool IsSpecialReady() const {
         return specialCharge >= MAX_SPECIAL;
     }
@@ -236,6 +269,66 @@ private:
         transform->position = currentPos;
         transform->rotation.y += 720.0f * dt;
         transform->rotation.x = -90.0f * (1.0f - t);
+    }
+
+    // 大招動作邏輯
+    void UpdateSpecialAttack(float dt) {
+        // Phase 0: 快速升空 (Rise)
+        if (specialPhase == 0) {
+            // 強制向上移動
+            float riseSpeed = 15.0f;
+            transform->position.y += riseSpeed * dt;
+
+            // 旋轉特效
+            transform->rotation.y += 720.0f * dt;
+
+            // 升空高度限制 (例如 6米)
+            if (transform->position.y >= specialStartPos.y + 6.0f) {
+                specialPhase = 1; // 進入滯空
+                specialTimer = 0.0f;
+            }
+        }
+        // Phase 1: 滯空 (Hover)
+        else if (specialPhase == 1) {
+            specialTimer += dt;
+
+            // 微微上下浮動
+            transform->position.y += sin(specialTimer * 10.0f) * 0.05f;
+
+            // 滯空 0.6 秒後下砸
+            if (specialTimer > 0.6f) {
+                specialPhase = 2; // 進入下砸
+                // 播放下砸音效預備
+                AudioManager::Instance().PlayOneShot("special_fall", 1.0f);
+            }
+        }
+        // Phase 2: 急速下砸 (Slam)
+        else if (specialPhase == 2) {
+            float slamSpeed = 40.0f; // 超快
+            transform->position.y -= slamSpeed * dt;
+
+            // 著地檢查
+            float groundH = 0.0f;
+            if (levelRef) groundH = levelRef->GetHeightAt(transform->position.x, transform->position.z);
+
+            if (transform->position.y <= groundH) {
+                // 1. 修正位置
+                transform->position.y = groundH;
+
+                // 2. [關鍵] 舉旗通知 GameWorld 造成傷害
+                requestSplashdown = true;
+
+                // 3. 扣除能量
+                specialCharge = 0.0f;
+
+                // 4. 恢復狀態
+                state = PlayerState::ALIVE;
+                velocity = glm::vec3(0); // 重置速度，避免慣性
+
+                // 5. 震動
+                if (camera) camera->TriggerShake(0.5f, 0.5f); // 強力震動
+            }
+        }
     }
 
     void HandleInput(float dt) {
