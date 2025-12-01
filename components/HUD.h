@@ -92,20 +92,12 @@ public:
         glEnable(GL_DEPTH_TEST);
     }
 
-    void DrawOverlay(float hpPercent) {
+    void DrawOverlay(float hpPercent, float specialPercent) {
 
-        // 1. 命中標記 (紅色 X)
-        if (hitMarkerTimer > 0.0f) {
-            DrawHitMarkerImGui();
-        }
-
-        // 2. 受傷濾鏡
-        // 只有血量不滿時才顯示
-        if (hpPercent < 1.0f) {
-            DrawDamageVignette(hpPercent);
-        }
-
+        if (hitMarkerTimer > 0.0f) DrawHitMarkerImGui();     // 命中標記
+        if (hpPercent < 1.0f) DrawDamageVignette(hpPercent); // 受傷濾鏡
         DrawKillFeed();
+        DrawSpecialGauge(specialPercent);
     }
 
     void ConsumeInk(float amount) {
@@ -247,6 +239,68 @@ private:
             color.w = alpha;
 
             ImGui::TextColored(color, "%s", log.text.c_str());
+        }
+
+        ImGui::End();
+    }
+
+    // [新增] 繪製右上角圓形儀表板
+    void DrawSpecialGauge(float percent) {
+        // 設定視窗位置 (螢幕右上角)
+        ImGui::SetNextWindowPos(ImVec2(screenWidth - 120, 20));
+        ImGui::SetNextWindowSize(ImVec2(100, 100));
+
+        // 透明、無邊框、無輸入互動
+        ImGui::Begin("SpecialGauge", nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing);
+
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        // 計算圓心 (視窗中心)
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        ImVec2 center = ImVec2(p.x + 50.0f, p.y + 50.0f);
+        float radius = 35.0f;
+        float thickness = 8.0f;
+
+        // 1. 背景底圓 (半透明深灰)
+        drawList->AddCircle(center, radius, IM_COL32(50, 50, 50, 150), 0, thickness);
+
+        // 2. 進度圓弧
+        // 0% 對應 -90度 (上方)，100% 對應 270度 (轉一圈)
+        float startAngle = -3.14159f / 2.0f;
+        float endAngle = startAngle + (percent * 3.14159f * 2.0f);
+
+        // 決定顏色：集滿時閃爍金色，未滿時青色
+        ImU32 barColor;
+        if (percent >= 1.0f) {
+            // 閃爍效果 (Pulsing)
+            float time = (float)ImGui::GetTime();
+            float flash = (sin(time * 10.0f) + 1.0f) * 0.5f; // 0.0 ~ 1.0
+
+            // 金黃色閃爍
+            int r = 255;
+            int g = 215 + (int)(40 * flash);
+            int b = 0 + (int)(255 * flash);
+            barColor = IM_COL32(r, g, b, 255);
+        }
+        else {
+            barColor = IM_COL32(0, 255, 255, 200); // 一般青色
+        }
+
+        // 畫圓弧 (ImGui 內建函式)
+        if (percent > 0.01f) {
+            drawList->PathArcTo(center, radius, startAngle, endAngle);
+            drawList->PathStroke(barColor, 0, thickness);
+        }
+
+        // 3. 文字提示 "PRESS Q"
+        if (percent >= 1.0f) {
+            const char* text = "PRESS Q";
+            ImVec2 textSize = ImGui::CalcTextSize(text);
+            // 文字置中
+            drawList->AddText(ImVec2(center.x - textSize.x / 2, center.y - textSize.y / 2),
+                IM_COL32(255, 255, 255, 255), text);
         }
 
         ImGui::End();
