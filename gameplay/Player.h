@@ -13,9 +13,9 @@
 #include "../splat/SplatMap.h"
 
 enum class PlayerState {
-    ALIVE,      // 正常遊玩
-    DEAD,       // 死亡 (等待重生)
-    LAUNCHING   // 超級跳躍進場中
+    ALIVE,
+    DEAD,
+    LAUNCHING
 };
 
 class Player : public Entity {
@@ -34,11 +34,11 @@ public:
     float respawnTimer = 0.0f;
     float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
 
-    // 超級跳躍參數
+    // super jump
     glm::vec3 jumpStartPos;
     glm::vec3 jumpTargetPos;
     float jumpTimer = 0.0f;
-    float const JUMP_DURATION = 1.5f; // 跳躍飛行時間
+    float const JUMP_DURATION = 1.5f;
 
     // reference
     Weapon* weapon = nullptr;
@@ -91,8 +91,6 @@ public:
 
             // 墨水環境互動 
             if (splatMapRef) {
-                // 計算 UV 座標 (假設 floorSize 是地圖總寬度，中心在 0,0)
-                // 注意：這裡的 UV 計算需跟 Shader/SplatPhysics 一致
                 float u = (transform->position.x / floorSize) + 0.5f;
                 float v = (transform->position.z / floorSize) + 0.5f;
 
@@ -147,8 +145,7 @@ public:
 
         if (visualBody) visualBody->transform->scale = glm::vec3(0.0f);
 
-        // 2. 播放音效
-        // AudioManager::Instance().PlayOneShot("die", 1.0f);
+        AudioManager::Instance().PlayOneShot("die", 1.0f);
 
         if (cameraRef) {
             glm::vec3 spawnPos = GetSpawnPosition();
@@ -157,12 +154,10 @@ public:
         }
     }
 
-    // 開始超級跳躍
     void StartSuperJump() {
         state = PlayerState::LAUNCHING;
         jumpTimer = 0.0f;
 
-        // 顯示模型
         if (visualBody) visualBody->active = true;
 
         // 設定起點與終點 (根據隊伍)
@@ -171,11 +166,10 @@ public:
         float zDir = (teamID == 1) ? -1.0f : 1.0f;
         jumpTargetPos = glm::vec3(0, 0.0f, 30.0f * zDir); // 落地點
 
-        // 重置血量與墨水
+        // reset health, ink
         GetComponent<Health>()->Reset();
         if (hudRef) hudRef->RefillInk(100.0f);
 
-        // 播放跳躍音效
         AudioManager::Instance().PlayOneShot("superjump", 1.0f);
     }
 
@@ -217,8 +211,6 @@ private:
         currentPos.y += heightOffset;
 
         transform->position = currentPos;
-
-        // 旋轉特效
         transform->rotation.y += 720.0f * dt;
         transform->rotation.x = -90.0f * (1.0f - t);
     }

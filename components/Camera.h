@@ -32,7 +32,6 @@ public:
             shakeTimer -= dt;
 
             // 產生隨機偏移 (-1.0 ~ 1.0 之間 * 幅度)
-            // 這裡簡單用 rand()，如果想要更平滑可以用 Perlin Noise，但在射擊遊戲中隨機抖動很有打擊感
             float offsetX = ((rand() % 100) / 50.0f - 1.0f) * shakeMagnitude;
             float offsetY = ((rand() % 100) / 50.0f - 1.0f) * shakeMagnitude;
             float offsetZ = ((rand() % 100) / 50.0f - 1.0f) * shakeMagnitude;
@@ -48,9 +47,6 @@ public:
         }
     }
 
-    // [新增] 外部呼叫此函式來觸發震動
-    // duration: 持續幾秒 (例如 0.1)
-    // magnitude: 震動多大 (例如 0.2)
     void TriggerShake(float duration, float magnitude) {
         shakeTimer = duration;
         shakeMagnitude = magnitude;
@@ -58,7 +54,6 @@ public:
 
     glm::mat4 GetViewMatrix() {
         // 算出 "震動後" 的位置
-        // 注意：這裡不改變 gameObject->transform->position，只改變回傳給 Shader 的矩陣
         glm::vec3 finalPos = gameObject->transform->position + shakeOffset;
 
         return glm::lookAt(finalPos,
