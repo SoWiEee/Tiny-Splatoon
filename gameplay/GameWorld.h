@@ -127,7 +127,17 @@ public:
 
         // 檢查玩家是否發動了超級著地
         if (localPlayer && localPlayer->requestSplashdown) {
-            TriggerSplashdown(localPlayer->transform->position, localPlayer->teamID);
+            int myID = NetworkManager::Instance().GetMyPlayerID();
+            TriggerSplashdown(localPlayer->transform->position, myID, localPlayer->teamID);
+            if (NetworkManager::Instance().IsConnected()) {
+                PacketSpecialAttack pkt;
+                pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
+                pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
+                pkt.teamID = localPlayer->teamID;
+                pkt.position = localPlayer->transform->position;
+
+                NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+            }
             localPlayer->requestSplashdown = false;
         }
 
@@ -319,9 +329,7 @@ public:
     void HandlePacket(const ReceivedPacket& received) {
         auto& net = NetworkManager::Instance();
 
-        // =================================================
         // A. Server 專用邏輯：負責轉發 (Relay) Client 的請求
-        // =================================================
         if (net.IsServer()) {
             // 1. 收到 Client 的位置更新 -> 轉發為 WORLD_STATE
             if (received.type == PacketType::C2S_PLAYER_STATE) {
@@ -354,10 +362,34 @@ public:
             else if (received.type == PacketType::S2C_KILL_EVENT) {
                 auto* pkt = (PacketKillEvent*)received.data.data();
 
-                // 顯示在 UI
+                // 顯示擊殺訊息
                 if (hudRef) {
                     hudRef->AddKillLog(pkt->killerID, pkt->victimID, pkt->killerTeam, pkt->victimTeam);
                 }
+                int myID = NetworkManager::Instance().GetMyPlayerID();
+                if (pkt->victimID == myID) {
+                    // 我被殺了！執行本地死亡邏輯
+                    std::cout << "I was killed by Player " << pkt->killerID << "!" << std::endl;
+
+                    if (localPlayer) {
+                        localPlayer->Die(); // 這會觸發變身靈魂、倒數、重生
+
+                        // 也可以播放特別的音效
+                        AudioManager::Instance().PlayOneShot("splatted_by", 1.0f);
+                    }
+                }
+            }
+            if (received.type == PacketType::C2S_SPECIAL_ATTACK) {
+                auto* inPkt = (PacketSpecialAttack*)received.data.data();
+
+                // 1. Server 端執行傷害判定 (權威判定)
+                // 這會觸發 Server 端的 TriggerSplashdown -> 扣血 -> 發送 KillEvent
+                TriggerSplashdown(inPkt->position, inPkt->playerID, inPkt->teamID);
+
+                // 2. 廣播給其他人 (讓其他人看到特效)
+                PacketSpecialAttack outPkt = *inPkt;
+                outPkt.header.type = PacketType::S2C_SPECIAL_ATTACK;
+                net.Broadcast(&outPkt, sizeof(outPkt), true, received.fromConnection);
             }
         }
 
@@ -397,6 +429,14 @@ public:
             localPlayer->weapon->teamID = pkt->yourTeamID;
             if (localPlayer->GetVisualBody())
                 localPlayer->GetVisualBody()->GetComponent<MeshRenderer>()->SetColor(c);
+        }
+        if (received.type == PacketType::S2C_SPECIAL_ATTACK) {
+            auto* pkt = (PacketSpecialAttack*)received.data.data();
+
+            // 畫大墨跡
+            if (level) {
+                TriggerSplashdown(pkt->position, pkt->playerID, pkt->teamID);
+            }
         }
     }
 
@@ -655,19 +695,21 @@ private:
     }
 
     // 執行超級著地效果
-    void TriggerSplashdown(glm::vec3 center, int teamID) {
+    void TriggerSplashdown(glm::vec3 center, int attackerID, int attackerTeam) {
         // 1. 視覺特效：超大墨跡
-        glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+        glm::vec3 color = (attackerTeam == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
         auto result = SplatPhysics::WorldToUV(center, glm::vec3(0), level->mapSize, level->mapSize);
 
         // 半徑超大 (例如 8.0f)
         float mapSize = level->mapSize;
         float uvSize = 40.0f / mapSize;
 
-        painter->Paint(splatMap.get(), result.uv, uvSize, color, 0, teamID);
+        painter->Paint(splatMap.get(), result.uv, uvSize, color, 0, attackerTeam);
 
         // 音效
-        AudioManager::Instance().PlayOneShot("explode", 1.0f); // 借用爆炸聲
+        AudioManager::Instance().PlayOneShot("explode", 1.0f); // 爆炸聲
+
+        if (!NetworkManager::Instance().IsServer()) return;
 
         // 2. 範圍傷害 (AoE)
         std::vector<Entity*> targets;
@@ -682,39 +724,83 @@ private:
                 Health* hp = t->GetComponent<Health>();
                 if (hp) {
                     // [Debug] 檢查隊伍
-                    std::cout << "   -> Hit! HP Team: " << hp->teamID << " vs My Team: " << teamID << std::endl;
+                    std::cout << "   -> Hit! HP Team: " << hp->teamID << " vs My Team: " << attackerTeam << std::endl;
 
-                    if (hp->teamID != teamID) {
+                    if (hp->teamID != attackerTeam) {
                         hp->TakeDamage(999.0f);
+
+                        // [新增] 死亡處理與廣播
                         if (hp->isDead) {
 
-                            // A. 視覺：生成死亡墨跡 (用攻擊者的顏色)
-                            // 取得攻擊者顏色 (Team 1=紅, Team 2=綠)
-                            glm::vec3 splatColor = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
-                            SpawnDeathSplat(t->transform->position, splatColor);
-
-                            // B. 邏輯：如果是 AI，強制重生
-                            if (t == enemyAI.get()) {
-                                std::cout << "   -> AI Killed by Splashdown! Respawning..." << std::endl;
-                                hp->Reset(); // 補滿血、isDead = false
-
-                                // 強制回到出生點
-                                // 假設 Health 裡有存 spawnPoint，或是寫死位置
-                                if (hp->spawnPoint != glm::vec3(0)) {
-                                    t->transform->position = hp->spawnPoint;
-                                }
-                                else {
-                                    t->transform->position = glm::vec3(5, 0, 5); // 預設 AI 重生點
+                            // A. 找出受害者 ID
+                            int victimID = -99;
+                            if (t == localPlayer.get()) {
+                                victimID = NetworkManager::Instance().GetMyPlayerID(); // 通常是 0
+                            }
+                            else if (t == enemyAI.get()) {
+                                victimID = 100;
+                            }
+                            else {
+                                for (auto& p : remotePlayers) {
+                                    if (p.second.get() == t) {
+                                        victimID = p.first;
+                                        break;
+                                    }
                                 }
                             }
 
-                            // C. 如果是遠端玩家 (RemotePlayer)
-                            // 通常不需要在這裡處理位置，因為 Server 會同步它的狀態
-                            // 但我們可以先在本地播放個死亡音效或特效
+                            // B. 發送擊殺封包 (通知所有人：victimID 被 attackerID 殺了)
+                            PacketKillEvent pkt;
+                            pkt.header.type = PacketType::S2C_KILL_EVENT;
+                            pkt.killerID = attackerID;
+                            pkt.victimID = victimID;
+                            pkt.killerTeam = attackerTeam;
+                            pkt.victimTeam = hp->teamID;
+
+                            NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+
+                            // C. Server 本地 UI 更新
+                            if (hudRef) hudRef->AddKillLog(attackerID, victimID, attackerTeam, hp->teamID);
+
+                            // D. 特殊處理：如果是 AI，Server 負責讓它重生
+                            if (victimID == 100) {
+                                hp->Reset();
+                                if (auto enemy = dynamic_cast<Enemy*>(t)) {
+                                    enemy->transform->position = glm::vec3(5, 0, 5); // 簡單重置位置
+                                }
+                            }
+
+                            // E. 特殊處理：如果是 Server 自己 (Host) 被殺了
+                            if (victimID == NetworkManager::Instance().GetMyPlayerID()) {
+                                if (localPlayer) localPlayer->Die();
+                            }
+
+                            // F. 生成死亡大墨跡
+                            SpawnDeathSplat(t->transform->position, color);
                         }
                     }
                 }
             }
+        }
+    }
+    void TriggerSplashdownVisualsOnly(glm::vec3 center, int teamID) {
+        glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+
+        // 算出 UV
+        // 假設 splatMap 已經 setup 好
+        auto result = SplatPhysics::WorldToUV(center, glm::vec3(0), level->mapSize, level->mapSize);
+        if (result.hit) {
+            float uvSize = 8.0f / level->mapSize;
+            painter->Paint(splatMap.get(), result.uv, uvSize, color, 0, teamID);
+        }
+
+        // 播放音效
+        AudioManager::Instance().PlayOneShot("explode", 1.0f);
+
+        // 震動 (如果離我夠近)
+        float dist = glm::distance(localPlayer->transform->position, center);
+        if (dist < 20.0f) {
+            if (localPlayer->camera) localPlayer->camera->TriggerShake(0.3f, 0.3f);
         }
     }
 };

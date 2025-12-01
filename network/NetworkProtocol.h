@@ -25,7 +25,9 @@ enum class PacketType : uint8_t {
     S2C_SPLAT_UPDATE,    // Server -> Client: 地板這裡髒了 (大家畫圖)
     S2C_LOBBY_UPDATE,    // Server -> Client: 更新大廳 8 個格子的狀態
     S2C_GAME_START,      // Server -> Client: 遊戲開始！
-    S2C_KILL_EVENT       // 擊殺通知
+    S2C_KILL_EVENT,      // 擊殺通知
+    C2S_SPECIAL_ATTACK,  // Client -> Server: 我要開大
+    S2C_SPECIAL_ATTACK   // Server -> Clients: 有人開大
 };
 
 // 所有封包的共通標頭
@@ -133,6 +135,13 @@ struct PacketKillEvent {
     int victimID; // 死者 ID
     int killerTeam; // 兇手隊伍 (用來顯示顏色)
     int victimTeam; // 死者隊伍
+};
+
+struct PacketSpecialAttack {
+    PacketHeader header;
+    int playerID;       // 誰開大
+    int teamID;         // 哪一隊 (決定墨水顏色)
+    glm::vec3 position; // 爆炸中心點
 };
 
 #pragma pack(pop)
