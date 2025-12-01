@@ -674,19 +674,45 @@ private:
         if (enemyAI) targets.push_back(enemyAI.get());
         for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
 
-        float radius = 50.0f; // 殺傷半徑
+        float radius = 10.0f; // 殺傷半徑
 
         for (Entity* t : targets) {
             float dist = glm::distance(t->transform->position, center);
             if (dist < radius) {
                 Health* hp = t->GetComponent<Health>();
-                if (hp && hp->teamID != teamID) {
-                    // 秒殺傷害
-                    hp->TakeDamage(999.0f);
+                if (hp) {
+                    // [Debug] 檢查隊伍
+                    std::cout << "   -> Hit! HP Team: " << hp->teamID << " vs My Team: " << teamID << std::endl;
 
-                    // 擊殺回饋 (如果是 Server 可直接廣播，如果是 Client 則只是本地預測)
-                    // 正式做法應該是發送封包通知 Server "我炸到人了"
-                    // 但簡單起見，直接扣血
+                    if (hp->teamID != teamID) {
+                        hp->TakeDamage(999.0f);
+                        if (hp->isDead) {
+
+                            // A. 視覺：生成死亡墨跡 (用攻擊者的顏色)
+                            // 取得攻擊者顏色 (Team 1=紅, Team 2=綠)
+                            glm::vec3 splatColor = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+                            SpawnDeathSplat(t->transform->position, splatColor);
+
+                            // B. 邏輯：如果是 AI，強制重生
+                            if (t == enemyAI.get()) {
+                                std::cout << "   -> AI Killed by Splashdown! Respawning..." << std::endl;
+                                hp->Reset(); // 補滿血、isDead = false
+
+                                // 強制回到出生點
+                                // 假設 Health 裡有存 spawnPoint，或是寫死位置
+                                if (hp->spawnPoint != glm::vec3(0)) {
+                                    t->transform->position = hp->spawnPoint;
+                                }
+                                else {
+                                    t->transform->position = glm::vec3(5, 0, 5); // 預設 AI 重生點
+                                }
+                            }
+
+                            // C. 如果是遠端玩家 (RemotePlayer)
+                            // 通常不需要在這裡處理位置，因為 Server 會同步它的狀態
+                            // 但我們可以先在本地播放個死亡音效或特效
+                        }
+                    }
                 }
             }
         }
