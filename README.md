@@ -1,5 +1,7 @@
 # Tiny-Splatoon
 
+![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SoWiEee/Tiny-Splatoon)
+
 ## Project Structure
 
 - 本專案以 C++ / OpenGL 為主，實作一個類似「斯普拉頓塗地模式」的技術展示。
