@@ -1,6 +1,6 @@
 # Tiny-Splatoon
 
-![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SoWiEee/Tiny-Splatoon)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SoWiEee/Tiny-Splatoon)
 
 ## Project Structure
 
