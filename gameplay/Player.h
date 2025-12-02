@@ -34,6 +34,10 @@ public:
     float respawnTimer = 0.0f;
     float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
 
+    bool requestLaser = false;
+    float currentCharge = 0.0f;       // 當前能量
+    float const MAX_SPECIAL = 100.0f; // 能量上限
+
     // 超級跳躍參數
     glm::vec3 jumpStartPos;
     glm::vec3 jumpTargetPos;
@@ -89,33 +93,29 @@ public:
         case PlayerState::ALIVE:
             HandleInput(dt);
 
+            if (Input::GetKey(GLFW_KEY_Q) && IsSpecialReady()) {
+                StartSpecialLaser();
+            }
+
             // 墨水環境互動 
             if (splatMapRef) {
-                // 計算 UV 座標 (假設 floorSize 是地圖總寬度，中心在 0,0)
-                // 注意：這裡的 UV 計算需跟 Shader/SplatPhysics 一致
                 float u = (transform->position.x / floorSize) + 0.5f;
                 float v = (transform->position.z / floorSize) + 0.5f;
 
-                // 檢查是否踩在敵方墨水上
-                // 假設：我方 teamID=1, 敵方=2; 我方=2, 敵方=1
                 int enemyTeam = (teamID == 1) ? 2 : 1;
                 bool onEnemyInk = splatMapRef->IsColorInArea(u, v, enemyTeam, 1);
 
                 auto healthComp = GetComponent<Health>();
                 if (healthComp) {
                     if (!onEnemyInk) {
-                        // B. 安全地帶：倒數回血
                         if (currentRegenDelay > 0.0f) {
                             currentRegenDelay -= dt;
                         }
                         else {
-                            // 時間到，開始回血
                             if (isSwimming) {
-                                // 潛水：快速回血
                                 healthComp->Heal(healRateFast * dt);
                             }
                             else {
-                                // 站立：慢速回血
                                 healthComp->Heal(healRateSlow * dt);
                             }
                         }
@@ -137,6 +137,25 @@ public:
     }
 
     GameObject* GetVisualBody() { return visualBody; }
+
+    void AddSpecialCharge(float amount) {
+         if (state != PlayerState::ALIVE) return; 
+
+        if (currentCharge < MAX_SPECIAL) {
+            currentCharge += amount;
+            if (currentCharge >= MAX_SPECIAL) {
+                currentCharge = MAX_SPECIAL;
+                AudioManager::Instance().PlayOneShot("special_ready");
+            }
+        }
+    }
+
+    bool IsSpecialReady() const {
+        return currentCharge >= MAX_SPECIAL;
+    }
+    void ResetSpecialCharge() {
+        currentCharge = 0.0f;
+    }
 
     void Die() {
         // 防止重複死亡
@@ -221,6 +240,13 @@ private:
         // 旋轉特效
         transform->rotation.y += 720.0f * dt;
         transform->rotation.x = -90.0f * (1.0f - t);
+    }
+
+    void StartSpecialLaser() {
+        currentCharge = 0.0f;
+        requestLaser = true;
+        AudioManager::Instance().PlayOneShot("laser_fire", 1.0f);
+        if (camera) camera->TriggerShake(0.4f, 0.2f);
     }
 
     void HandleInput(float dt) {

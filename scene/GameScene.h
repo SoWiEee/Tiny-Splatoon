@@ -128,15 +128,19 @@ public:
     // --- 5. ImGui UI (遊戲中通常只有簡單的 Debug UI 或 ESC 選單) ---
     void DrawUI() override {
         if (hud && world && world->localPlayer) {
-            // 取得玩家血量百分比
+            // 1. 計算血量百分比
             float hpPercent = 1.0f;
             auto hpComp = world->localPlayer->GetComponent<Health>();
-            if (hpComp) {
-                hpPercent = hpComp->currentHP / hpComp->maxHP;
+            if (hpComp) hpPercent = hpComp->currentHP / hpComp->maxHP;
+
+            // 2. 計算大招百分比
+            float spPercent = 0.0f;
+            if (world->localPlayer->MAX_SPECIAL > 0) {
+                spPercent = world->localPlayer->currentCharge / world->localPlayer->MAX_SPECIAL;
             }
 
-            // 呼叫 HUD 繪製覆蓋層 (包含 命中標記 和 受傷濾鏡)
-            hud->DrawOverlay(hpPercent);
+            // 3. 呼叫 HUD 繪製
+            hud->DrawOverlay(hpPercent, spPercent);
         }
     }
 
