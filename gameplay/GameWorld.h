@@ -118,6 +118,20 @@ public:
             if (enemyAI->weapon) CollectProjectiles(*(enemyAI->weapon));
         }
 
+        // 檢查雷射請求
+        if (localPlayer && localPlayer->requestLaser) {
+            // 參數：發射位置 (稍微高一點，從槍口或眼睛)、發射方向、隊伍
+            glm::vec3 startPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0);
+            glm::vec3 dir = localPlayer->transform->GetForward(); // 瞄準方向
+
+            TriggerLaserBeam(startPos, dir, localPlayer->teamID);
+
+            // 如果有網路，這裡要發送封包 (PacketSpecialLaser) 通知 Server
+            // ... (省略網路部分，邏輯同之前的 Splashdown) ...
+
+            localPlayer->requestLaser = false;
+        }
+
         // --- 2. 網路同步 (發送本機狀態) ---
         if (NetworkManager::Instance().IsConnected()) {
             syncTimer += dt;
@@ -546,7 +560,6 @@ private:
 
                                 NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
 
-                                // Server 自己也要顯示 UI
                                 if (hudRef) hudRef->AddKillLog(p->ownerID, victimID, p->ownerTeam, hp->teamID);
                             }
 
@@ -592,6 +605,11 @@ private:
                     float rot = (float)(rand() % 360);
                     float paintSize = p->transform->scale.x * 0.7f;
                     painter->Paint(splatMap.get(), result.uv, paintSize, p->inkColor, rot, p->ownerTeam);
+
+                    // charge ultimate
+                    if (localPlayer && p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {
+                        localPlayer->AddSpecialCharge(0.5f);
+                    }
                 }
                 it = projectiles.erase(it);
             }
@@ -604,14 +622,155 @@ private:
         }
     }
 
+    // 處理擊殺事件：識別身分 -> 發送封包 -> 更新本地 UI
+    void ProcessKillEvent(int killerID, Entity* victim, int killerTeam) {
+        // 1. 找出受害者 ID
+        int victimID = -99;
+
+        // 檢查是否是本機玩家 (Host)
+        if (victim == localPlayer.get()) {
+            victimID = NetworkManager::Instance().GetMyPlayerID();
+        }
+        // 檢查是否是 AI
+        else if (enemyAI && victim == enemyAI.get()) {
+            victimID = 100;
+        }
+        // 檢查是否是遠端玩家
+        else {
+            for (auto& rp : remotePlayers) {
+                if (rp.second.get() == victim) {
+                    victimID = rp.first;
+                    break;
+                }
+            }
+        }
+
+        // 2. 建構封包
+        PacketKillEvent pkt;
+        pkt.header.type = PacketType::S2C_KILL_EVENT;
+        pkt.killerID = killerID;
+        pkt.victimID = victimID;
+        pkt.killerTeam = killerTeam;
+        pkt.victimTeam = victim->teamID;
+
+        // 3. 廣播給所有 Client (Reliable = true)
+        NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+
+        // 4. 更新 Server 本地的擊殺提示 (UI)
+        if (hudRef) {
+            hudRef->AddKillLog(killerID, victimID, killerTeam, victim->teamID);
+        }
+    }
+
+    // 雷射核心邏輯
+    void TriggerLaserBeam(glm::vec3 start, glm::vec3 dir, int teamID) {
+        float maxDist = 60.0f; // 最大射程
+        float stepSize = 1.0f; // 步長 (檢測精度)
+
+        glm::vec3 currentPos = start;
+        glm::vec3 endPos = start + (dir * maxDist); // 預設終點
+
+        // 1. 尋找撞牆點 (Raycast 模擬)
+        // 我們沿著方向每隔 1米檢查一次高度
+        for (float d = 0; d < maxDist; d += stepSize) {
+            currentPos += dir * stepSize;
+
+            // 檢查地形高度
+            float terrainH = level->GetHeightAt(currentPos.x, currentPos.z);
+
+            // 如果地形高度 > 雷射高度，代表撞牆了
+            // (注意：這裡假設牆壁很高，如果是矮箱子可能會穿過去，視需求調整判定)
+            if (terrainH > currentPos.y) {
+                endPos = currentPos; // 更新終點為撞擊點
+                break;
+            }
+        }
+
+        // 2. 畫墨水 (Linear Painting)
+        // 從起點到終點，每隔一段距離畫一個墨跡
+        float dist = glm::distance(start, endPos);
+        float inkSpacing = 1.5f; // 墨水間隔 (越小越密，但也越耗效能)
+        int paintSteps = (int)(dist / inkSpacing);
+
+        // 設定雷射寬度 (很粗!)
+        float beamWidth = 4.0f;
+        float uvSize = beamWidth / level->mapSize;
+        glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+
+        // 沿線繪製
+        for (int i = 0; i <= paintSteps; i++) {
+            float t = (float)i / (float)paintSteps;
+            glm::vec3 paintPos = glm::mix(start, endPos, t);
+
+            // 我們只在地面上畫圖，所以要把 Y 壓到地面
+            // 使用 WorldToUV 會自動忽略 Y，但為了準確，我們可以用 GetHeightAt 修正 Y
+            // 不過 WorldToUV 已經夠用了
+
+            auto result = SplatPhysics::WorldToUV(paintPos, glm::vec3(0), level->mapSize, level->mapSize);
+            if (result.hit) {
+                painter->Paint(splatMap.get(), result.uv, uvSize, color, 0, teamID);
+            }
+        }
+
+        // 3. 視覺特效 (Beam Model)
+        // 這裡可以生成一個長條狀的圓柱體 GameObject，存活 0.5 秒後消失
+        // 為了簡單，我們先只播放音效和畫墨水
+        AudioManager::Instance().PlayOneShot("laser_fire", 1.0f);
+
+        // 4. 傷害判定 (Line Segment Intersection)
+        // 檢查敵人是否在雷射路徑上
+        if (!NetworkManager::Instance().IsServer()) return; // 傷害由 Server 判定
+
+        std::vector<Entity*> targets;
+        if (enemyAI) targets.push_back(enemyAI.get());
+        for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
+
+        // 雷射判定寬度 (比墨水寬度小一點，要求精準)
+        float hitWidth = 3.0f;
+
+        for (Entity* t : targets) {
+            // 計算 點(Enemy) 到 線段(Start-End) 的最短距離
+            float d = PointToLineSegmentDistance(t->transform->position, start, endPos);
+
+            if (d < hitWidth) {
+                Health* hp = t->GetComponent<Health>();
+                if (hp && hp->teamID != teamID) {
+                    hp->TakeDamage(999.0f); // 秒殺
+
+                    // 死亡處理
+                    if (hp->isDead) {
+                        ProcessKillEvent(NetworkManager::Instance().GetMyPlayerID(), t, teamID);
+                        if (t == enemyAI.get()) {
+                            hp->Reset();
+                            enemyAI->transform->position = hp->spawnPoint;
+                        }
+                        // 視覺
+                        SpawnDeathSplat(t->transform->position, color);
+                    }
+                }
+            }
+        }
+    }
+
+    // 計算點到線段的最短距離
+    float PointToLineSegmentDistance(glm::vec3 p, glm::vec3 a, glm::vec3 b) {
+        glm::vec3 ab = b - a;
+        float t = glm::dot(p - a, ab) / glm::dot(ab, ab);
+
+        // 限制 t 在 0~1 之間 (線段內)
+        if (t < 0.0f) t = 0.0f;
+        if (t > 1.0f) t = 1.0f;
+
+        glm::vec3 closest = a + ab * t;
+        return glm::distance(p, closest);
+    }
+
     void SpawnDeathSplat(glm::vec3 pos, glm::vec3 color) {
         // 1. 準備參數
         // 假設地板中心在 (0,0,0)，如果你的地板有位移，請填入 level->floor->transform->position
         glm::vec3 floorPos = glm::vec3(0.0f, 0.0f, 0.0f);
 
-        // 取得地圖大小
-        // 確保這跟 Player.h 或 Level.h 裡的設定一致
-        float mapSize = 100.0f;
+        float mapSize = 80.0f;
         if (level) mapSize = level->mapSize;
 
         // 2. 呼叫 SplatPhysics 計算 UV
@@ -621,10 +780,6 @@ private:
         if (result.hit) {
             // 隨機旋轉
             float rot = (float)(rand() % 360);
-
-            // 死亡墨跡通常很大 (例如 3.0f ~ 4.0f)
-            // 這裡的 size 是相對於 UV 空間的比例，需要換算
-            // 如果 painter->Paint 接受的是 UV 比例:
             float uvSize = 4.0f / mapSize;
 
             painter->Paint(splatMap.get(), result.uv, uvSize, color, rot, 0);
