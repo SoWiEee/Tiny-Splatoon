@@ -112,13 +112,20 @@ struct PacketSplatUpdate {
     int teamID;
 };
 
-struct PacketSpawnBomb {
+struct PacketSpecialLaser {
     PacketHeader header;
-    int ownerID;        // 是誰丟的 (避免炸到自己，或判斷隊伍)
+    int playerID;       // 誰射的 (attackerID)
     int teamID;         // 隊伍顏色
-    glm::vec3 startPos; // 起始位置
-    glm::vec3 startVel; // 起始速度向量 (包含方向與力道)
-    glm::vec3 color;    // 墨水顏色
+    glm::vec3 origin;   // 發射位置
+    glm::vec3 direction;// 發射方向
+};
+
+// 大招攻擊封包
+struct PacketSpecialAttack {
+    PacketHeader header;
+    int playerID;
+    int teamID;
+    glm::vec3 position;
 };
 
 // 分數與遊戲狀態封包

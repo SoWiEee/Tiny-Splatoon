@@ -305,7 +305,7 @@ private:
                 AudioManager::Instance().PlayOneShot("shoot", 0.5f);
                 
                 // 大招集氣
-                float chargeAmount = 1.0f;
+                float chargeAmount = 5.0f;
                 // 根據不同武器設定不同的量
                 // chargeAmount = weapon->specialGain;
                 AddSpecialCharge(chargeAmount);

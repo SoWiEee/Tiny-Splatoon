@@ -120,14 +120,23 @@ public:
 
         // 檢查雷射請求
         if (localPlayer && localPlayer->requestLaser) {
-            // 參數：發射位置 (稍微高一點，從槍口或眼睛)、發射方向、隊伍
+            int myID = NetworkManager::Instance().GetMyPlayerID();
             glm::vec3 startPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0);
             glm::vec3 dir = localPlayer->transform->GetForward(); // 瞄準方向
+            int myTeam = localPlayer->teamID;
 
-            TriggerLaserBeam(startPos, dir, localPlayer->teamID);
+            TriggerLaserBeam(startPos, dir, myTeam, myID);
 
-            // 如果有網路，這裡要發送封包 (PacketSpecialLaser) 通知 Server
-            // ... (省略網路部分，邏輯同之前的 Splashdown) ...
+            if (NetworkManager::Instance().IsConnected()) {
+                PacketSpecialLaser pkt; // 使用新的雷射封包
+                pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
+                pkt.playerID = myID;
+                pkt.teamID = myTeam;
+                pkt.origin = startPos;
+                pkt.direction = dir;
+
+                NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+            }
 
             localPlayer->requestLaser = false;
         }
@@ -320,9 +329,7 @@ public:
     void HandlePacket(const ReceivedPacket& received) {
         auto& net = NetworkManager::Instance();
 
-        // =================================================
-        // A. Server 專用邏輯：負責轉發 (Relay) Client 的請求
-        // =================================================
+        // A. Server Logic
         if (net.IsServer()) {
             // 1. 收到 Client 的位置更新 -> 轉發為 WORLD_STATE
             if (received.type == PacketType::C2S_PLAYER_STATE) {
@@ -342,9 +349,8 @@ public:
                 auto* inPkt = (PacketShoot*)received.data.data();
 
                 PacketShoot outPkt = *inPkt;
-                outPkt.header.type = PacketType::S2C_SHOOT_EVENT; // 改頭換面
+                outPkt.header.type = PacketType::S2C_SHOOT_EVENT;
 
-                // 廣播給所有人 (TCP-like Reliable)
                 net.Broadcast(&outPkt, sizeof(outPkt), true);
 
                 // Server 本地生成子彈 (除非是 Server 自己發的，那就重複了，需過濾)
@@ -352,20 +358,19 @@ public:
                     SpawnRemoteProjectile(outPkt);
                 }
             }
-            else if (received.type == PacketType::S2C_KILL_EVENT) {
-                auto* pkt = (PacketKillEvent*)received.data.data();
+            else if (received.type == PacketType::C2S_SPECIAL_ATTACK) {
+                auto* inPkt = (PacketSpecialLaser*)received.data.data();
 
-                // 顯示在 UI
-                if (hudRef) {
-                    hudRef->AddKillLog(pkt->killerID, pkt->victimID, pkt->killerTeam, pkt->victimTeam);
-                }
+                TriggerLaserBeam(inPkt->origin, inPkt->direction, inPkt->teamID, inPkt->playerID);
+
+				// broadcast
+                PacketSpecialLaser outPkt = *inPkt;
+                outPkt.header.type = PacketType::S2C_SPECIAL_ATTACK;
+                net.Broadcast(&outPkt, sizeof(outPkt), true, received.fromConnection);
             }
         }
 
-        // =================================================
-        // B. 通用邏輯 (Client 與 Server 都需要處理的接收邏輯)
-        // =================================================
-
+		// B. Common Client & Server Logic
         // 1. 收到世界狀態 (別人移動了)
         if (received.type == PacketType::S2C_WORLD_STATE) {
             HandleWorldState((PacketPlayerState*)received.data.data());
@@ -398,6 +403,27 @@ public:
             localPlayer->weapon->teamID = pkt->yourTeamID;
             if (localPlayer->GetVisualBody())
                 localPlayer->GetVisualBody()->GetComponent<MeshRenderer>()->SetColor(c);
+        }
+        else if (received.type == PacketType::S2C_SPECIAL_ATTACK) {
+            auto* pkt = (PacketSpecialLaser*)received.data.data();
+            TriggerLaserBeam(pkt->origin, pkt->direction, pkt->teamID, pkt->playerID);
+        }
+        else if (received.type == PacketType::S2C_KILL_EVENT) {
+            auto* pkt = (PacketKillEvent*)received.data.data();
+
+            // A. 顯示擊殺訊息 (UI)
+            if (hudRef) {
+                hudRef->AddKillLog(pkt->killerID, pkt->victimID, pkt->killerTeam, pkt->victimTeam);
+            }
+
+            // B. 檢查我是不是受害者
+            int myID = NetworkManager::Instance().GetMyPlayerID();
+            if (pkt->victimID == myID) {
+                if (localPlayer) {
+                    localPlayer->Die();
+                    AudioManager::Instance().PlayOneShot("splatted_by", 1.0f);
+                }
+            }
         }
     }
 
@@ -656,6 +682,8 @@ private:
         // 3. 廣播給所有 Client (Reliable = true)
         NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
 
+        std::cout << "[Server] Sent Kill Event: " << killerID << " -> " << victimID << std::endl;
+
         // 4. 更新 Server 本地的擊殺提示 (UI)
         if (hudRef) {
             hudRef->AddKillLog(killerID, victimID, killerTeam, victim->teamID);
@@ -663,7 +691,7 @@ private:
     }
 
     // 雷射核心邏輯
-    void TriggerLaserBeam(glm::vec3 start, glm::vec3 dir, int teamID) {
+    void TriggerLaserBeam(glm::vec3 start, glm::vec3 dir, int teamID, int attackerID) {
         float maxDist = 60.0f; // 最大射程
         float stepSize = 1.0f; // 步長 (檢測精度)
 
@@ -686,7 +714,7 @@ private:
             }
         }
 
-        // 2. 畫墨水 (Linear Painting)
+        // 2. 畫墨水
         // 從起點到終點，每隔一段距離畫一個墨跡
         float dist = glm::distance(start, endPos);
         float inkSpacing = 1.5f; // 墨水間隔 (越小越密，但也越耗效能)
@@ -722,6 +750,7 @@ private:
         if (!NetworkManager::Instance().IsServer()) return; // 傷害由 Server 判定
 
         std::vector<Entity*> targets;
+        if (localPlayer) targets.push_back(localPlayer.get());
         if (enemyAI) targets.push_back(enemyAI.get());
         for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
 
@@ -739,12 +768,14 @@ private:
 
                     // 死亡處理
                     if (hp->isDead) {
-                        ProcessKillEvent(NetworkManager::Instance().GetMyPlayerID(), t, teamID);
+                        ProcessKillEvent(attackerID, t, teamID);
                         if (t == enemyAI.get()) {
                             hp->Reset();
                             enemyAI->transform->position = hp->spawnPoint;
                         }
-                        // 視覺
+                        if (t == localPlayer.get()) {
+                            localPlayer->Die();
+                        }
                         SpawnDeathSplat(t->transform->position, color);
                     }
                 }
