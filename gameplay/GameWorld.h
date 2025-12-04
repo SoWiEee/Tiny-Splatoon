@@ -608,7 +608,7 @@ private:
 
                     // charge ultimate
                     if (localPlayer && p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {
-                        localPlayer->AddSpecialCharge(0.5f);
+                        // localPlayer->AddSpecialCharge(0.5f);
                     }
                 }
                 it = projectiles.erase(it);

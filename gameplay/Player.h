@@ -303,6 +303,12 @@ private:
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
                 camera->TriggerShake(0.1f, 0.05f);
                 AudioManager::Instance().PlayOneShot("shoot", 0.5f);
+                
+                // 大招集氣
+                float chargeAmount = 1.0f;
+                // 根據不同武器設定不同的量
+                // chargeAmount = weapon->specialGain;
+                AddSpecialCharge(chargeAmount);
             }
         }
     }
