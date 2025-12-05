@@ -865,8 +865,8 @@ private:
 
         // 計算最終分數
         auto scores = splatMap->CalculatePercentages();
-        finalScoreTeam1 = scores.first;
-        finalScoreTeam2 = scores.second;
+        finalScoreTeam1 = scores.first * 100;
+        finalScoreTeam2 = scores.second * 100;
 
         if (finalScoreTeam1 > finalScoreTeam2) winningTeam = 1;
         else if (finalScoreTeam2 > finalScoreTeam1) winningTeam = 2;

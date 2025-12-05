@@ -164,13 +164,11 @@ public:
             float fullWidth = screenWidth - 100;
             float height = 40.0f;
 
-            // Team 1 (紅)
+            // Team 1
             float w1 = fullWidth * displayS1;
             dl->AddRectFilled(p, ImVec2(p.x + w1, p.y + height), IM_COL32(255, 50, 50, 255));
 
-            // Team 2 (綠) - 從右邊長出來? 或者接在紅色後面?
-            // 斯普拉頓是紅綠各佔一邊。
-            // 我們簡單做：紅色從左，綠色從右
+            // Team 2
             float w2 = fullWidth * displayS2;
             dl->AddRectFilled(ImVec2(p.x + fullWidth - w2, p.y), ImVec2(p.x + fullWidth, p.y + height), IM_COL32(50, 255, 50, 255));
 

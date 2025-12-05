@@ -61,7 +61,7 @@ public:
         }
     }
 
-    // 原本的長條圖繪製 (OpenGL)
+    // 原本的長條圖繪製
     void Draw(Shader& sceneShader) override {
 
         if (!m_ShowScoreBar) return;
@@ -226,14 +226,6 @@ private:
             float s = radius * 0.6f;
             dl->AddLine(ImVec2(center.x - s, center.y - s), ImVec2(center.x + s, center.y + s), IM_COL32(200, 200, 200, 255), 3.0f);
             dl->AddLine(ImVec2(center.x + s, center.y - s), ImVec2(center.x - s, center.y + s), IM_COL32(200, 200, 200, 255), 3.0f);
-        }
-
-        // 5. 大招亮燈 (選用)
-        if (p.hasSpecial && !p.isDead) {
-            // 畫一個發光的圈
-            float flash = (sin(ImGui::GetTime() * 10.0f) + 1.0f) * 0.5f;
-            ImU32 glowCol = IM_COL32(255, 255, 255, (int)(150 * flash));
-            dl->AddCircle(center, radius + 5.0f, glowCol, 0, 2.0f);
         }
     }
 

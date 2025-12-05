@@ -180,9 +180,6 @@ void GameScene::DrawUI() {
             auto hp = rp->GetComponent<Health>();
             bool isDead = (hp && hp->isDead);
 
-            // 這裡假設 RemotePlayer 目前沒有同步 special 狀態，暫時設為 false
-            // 如果你有同步 PacketPlayerState 裡的 hasSpecial，可以在這裡讀取
-
             playerStatuses.push_back({
                 id,
                 rp->teamID,
