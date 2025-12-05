@@ -48,7 +48,8 @@ public:
 
     // reference
     Weapon* weapon = nullptr;
-    SplatMap* splatMapRef;
+    SplatMap* mapFloor = nullptr;
+    SplatMap* mapObstacle = nullptr;
     GameObject* cameraRef;
     GameObject* shadow;
     GameObject* visualBody;
@@ -62,8 +63,8 @@ public:
     float mapLimit = 39.5f;
     float floorSize = 80.0f;
 
-    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud, Level* mapLevel)
-        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud), level(mapLevel)
+    Player(glm::vec3 startPos, int team, SplatMap* floor, SplatMap* obstacle, GameObject* cam, HUD* hud, Level* mapLevel)
+        : Entity("Player"), mapFloor(floor), mapObstacle(obstacle), cameraRef(cam), hudRef(hud), level(mapLevel)
     {
         this->teamID = team;
         shadow = new GameObject("ShadowBlob");
@@ -99,28 +100,42 @@ public:
                 StartSpecialLaser();
             }
 
-            // 墨水環境互動 
-            if (splatMapRef) {
+            if (level && mapFloor && mapObstacle) {
+
+                // 1. 計算 UV 座標
                 float u = (transform->position.x / floorSize) + 0.5f;
                 float v = (transform->position.z / floorSize) + 0.5f;
 
-                int enemyTeam = (teamID == 1) ? 2 : 1;
-                bool onEnemyInk = splatMapRef->IsColorInArea(u, v, enemyTeam, 1);
+                // 2. 判斷腳下高度，決定要查哪張地圖
+                float currentHeight = level->GetHeightAt(transform->position.x, transform->position.z);
 
+                // 預設查地板
+                SplatMap* targetMap = mapFloor;
+
+                // 如果高度大於 0.5 (代表站在箱子或高台上)，改查障礙物地圖
+                if (currentHeight > 0.5f) {
+                    targetMap = mapObstacle;
+                }
+
+                // 3. 執行墨水判定 (使用 targetMap)
+                int enemyTeam = (teamID == 1) ? 2 : 1;
+
+                // 檢查敵方墨水 (受傷)
+                bool onEnemyInk = targetMap->IsColorInArea(u, v, enemyTeam, 1);
+
+                // 檢查己方墨水 (回血/潛水判定也會用到)
+                bool onMyInk = targetMap->IsColorInArea(u, v, teamID, 1);
+
+                // --- 傷害與回血邏輯 ---
                 auto healthComp = GetComponent<Health>();
                 if (healthComp) {
-                    if (!onEnemyInk) {
-                        if (currentRegenDelay > 0.0f) {
-                            currentRegenDelay -= dt;
-                        }
-                        else {
-                            if (isSwimming) {
-                                healthComp->Heal(healRateFast * dt);
-                            }
-                            else {
-                                healthComp->Heal(healRateSlow * dt);
-                            }
-                        }
+                    if (!onEnemyInk && currentRegenDelay > 0.0f) {
+                        currentRegenDelay -= dt;
+                    }
+                    else {
+                        // 根據是否潛水決定回血速度
+                        if (isSwimming) healthComp->Heal(healRateFast * dt);
+                        else healthComp->Heal(healRateSlow * dt);
                     }
                 }
             }
@@ -255,10 +270,20 @@ private:
         if (!cameraRef) return;
 
         bool onMyInk = false;
-        if (splatMapRef) {
+        float mapSize = 80.0f;
+        if (level) mapSize = level->mapSize;
+
+        if(mapFloor && mapObstacle && level) {
             float u = (transform->position.x + floorSize / 2.0f) / floorSize;
             float v = 1.0f - ((transform->position.z + floorSize / 2.0f) / floorSize);
-            onMyInk = splatMapRef->IsColorInArea(u, v, teamID, 1);
+            float h = level->GetHeightAt(transform->position.x, transform->position.z);
+
+            if (h > 0.5f) {
+                onMyInk = mapObstacle->IsColorInArea(u, v, teamID, 1);
+            }
+            else {
+                onMyInk = mapFloor->IsColorInArea(u, v, teamID, 1);
+            }
         }
 
         bool wantSwim = Input::GetKey(GLFW_KEY_LEFT_SHIFT);

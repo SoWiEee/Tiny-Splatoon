@@ -32,7 +32,8 @@ class GameWorld {
 public:
     // --- 系統物件 ---
     std::unique_ptr<Level> level;
-    std::unique_ptr<SplatMap> splatMap;
+    std::unique_ptr<SplatMap> mapFloor;
+    std::unique_ptr<SplatMap> mapObstacle;
     std::unique_ptr<SplatPainter> painter;
     std::unique_ptr<ParticleSystem> particleSystem;
     Scoreboard* scoreboardRef = nullptr;
@@ -62,7 +63,8 @@ public:
     void Init(GameObject* mainCamera, HUD* hud, Scoreboard* scoreboard) {
         level = std::make_unique<Level>();
         level->Load();
-        splatMap = std::make_unique<SplatMap>(1024, 1024);
+        mapFloor = std::make_unique<SplatMap>(1024, 1024);
+        mapObstacle = std::make_unique<SplatMap>(1024, 1024);
         painter = std::make_unique<SplatPainter>();
         particleSystem = std::make_unique<ParticleSystem>();
         scoreboardRef = scoreboard;
@@ -81,7 +83,7 @@ public:
         }
 
         WeaponType myWeaponType = NetworkManager::Instance().GetMyWeaponType();
-        localPlayer = std::make_unique<Player>(glm::vec3(-5, 0, -5), myTeam, splatMap.get(), mainCamera, hud, level.get());
+        localPlayer = std::make_unique<Player>(glm::vec3(-5, 0, -5), myTeam, mapFloor.get(), mapObstacle.get(), mainCamera, hud, level.get());
         glm::vec3 color = (myTeam == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);  // replace weapon
         switch (myWeaponType) {
         case WeaponType::SHOOTER:
@@ -213,7 +215,7 @@ public:
                     // 只有 Server 有權力廣播分數
                     if (NetworkManager::Instance().IsServer()) {
                         // 計算分數
-                        glm::vec2 scores = splatMap->CalculateScore();
+                        glm::vec2 scores = mapFloor->CalculateScore();
 
                         // 發送分數封包
                         PacketGameState scorePkt;
@@ -252,20 +254,37 @@ public:
     }
 
     void Render(Shader& shader, Camera* cam) {
-        SplatRenderer::RenderFloor(shader, level->floor, splatMap.get());
+        // 設定共用參數
+        shader.SetFloat("mapSize", level->mapSize);
+        shader.SetInt("useInk", 1);
+        shader.SetInt("inkMap", 1); // 對應 GL_TEXTURE1
+
+        // ==========================================
+        // 1. [地板層] 綁定 mapFloor -> 畫地板
+        // ==========================================
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, mapFloor->textureID);
+
+        // 畫地板
+        if (level->floor) {
+            level->floor->Draw(shader);
+        }
+
+        // ==========================================
+        // 2. [障礙物層] 綁定 mapObstacle -> 畫箱子
+        // ==========================================
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, mapObstacle->textureID);
 
         // 畫障礙物
-        shader.SetInt("useInk", 1);
-        shader.SetFloat("mapSize", level->mapSize);
-
         for (auto obj : level->obstacles) {
             if (obj) obj->Draw(shader);
         }
 
-        // 畫牆壁
+        // ==========================================
+        // 3. [牆壁層] 關閉墨水 -> 畫牆壁
+        // ==========================================
         shader.SetInt("useInk", 0);
-        shader.SetFloat("alpha", 1.0f);
-
         for (auto wall : level->walls) {
             wall->Draw(shader);
         }
@@ -591,6 +610,9 @@ private:
 
     // 子彈物理更新迴圈
     void UpdateProjectiles(float dt) {
+        float mapSize = level->mapSize;
+        float inkMultiplier = 40.0f;
+
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
             Projectile* p = it->get();
             p->UpdatePhysics(dt);
@@ -669,6 +691,26 @@ private:
                 }
             }
 
+            for (auto& box : level->colliders) {
+                // 簡單判定：檢查子彈是否在 Box 內部 (或是很接近)
+                glm::vec3 pos = p->transform->position;
+                if (pos.x >= box.min.x && pos.x <= box.max.x &&
+                    pos.y >= box.min.y && pos.y <= box.max.y &&
+                    pos.z >= box.min.z && pos.z <= box.max.z) {
+
+                    // 擊中障礙物
+                    auto result = SplatPhysics::WorldToUV(pos, glm::vec3(0), mapSize, mapSize);
+                    if (result.hit) {
+                        float uvSize = (p->transform->scale.x * inkMultiplier) / mapSize;
+                        float rot = (float)(rand() % 360);
+                        painter->Paint(mapObstacle.get(), result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
+                        particleSystem->Emit(pos, p->inkColor, 5, 5.0f);
+                    }
+                    hitSomething = true;
+                    break;
+                }
+            }
+
             if (hitSomething) {
                 it = projectiles.erase(it);
                 continue;
@@ -682,17 +724,13 @@ private:
                 );
 
                 if (result.hit) {
+                    float uvSize = (p->transform->scale.x * inkMultiplier) / mapSize;
                     float rot = (float)(rand() % 360);
                     float paintSize = p->transform->scale.x * 0.7f;
-                    painter->Paint(splatMap.get(), result.uv, paintSize, p->inkColor, rot, p->ownerTeam);
-                    // [新增] 擊中地板噴墨水
+                    painter->Paint(mapFloor.get(), result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
+                    // 擊中地板噴墨水
                     // 產生 10 顆粒子，速度 5.0f
                     particleSystem->Emit(p->hitPosition + glm::vec3(0, 0.2f, 0), p->inkColor, 10, 5.0f);
-
-                    // charge ultimate
-                    if (localPlayer && p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {
-                        // localPlayer->AddSpecialCharge(0.5f);
-                    }
                 }
                 it = projectiles.erase(it);
             }
@@ -773,8 +811,6 @@ private:
         float dist = glm::distance(start, endPos);
         float inkSpacing = 1.5f;
         int paintSteps = (int)(dist / inkSpacing);
-
-        // laser width
         float beamWidth = 4.0f;
         float uvSize = beamWidth / level->mapSize;
         glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
@@ -786,7 +822,11 @@ private:
 
             auto result = SplatPhysics::WorldToUV(paintPos, glm::vec3(0), level->mapSize, level->mapSize);
             if (result.hit) {
-                painter->Paint(splatMap.get(), result.uv, uvSize, color, 0, teamID);
+                // 雷射經過的地方，如果是高處就畫 ObstacleMap，低處就畫 FloorMap
+                float h = level->GetHeightAt(paintPos.x, paintPos.z);
+                SplatMap* targetMap = (h > 0.5f) ? mapObstacle.get() : mapFloor.get();
+
+                painter->Paint(targetMap, result.uv, uvSize, color, 0, teamID);
             }
         }
 
@@ -842,25 +882,18 @@ private:
     }
 
     void SpawnDeathSplat(glm::vec3 pos, glm::vec3 color) {
-        // 1. 準備參數
-        // 假設地板中心在 (0,0,0)，如果你的地板有位移，請填入 level->floor->transform->position
-        glm::vec3 floorPos = glm::vec3(0.0f, 0.0f, 0.0f);
+        float mapSize = level->mapSize;
+        auto result = SplatPhysics::WorldToUV(pos, glm::vec3(0), mapSize, mapSize);
 
-        float mapSize = 80.0f;
-        if (level) mapSize = level->mapSize;
-
-        // 2. 呼叫 SplatPhysics 計算 UV
-        auto result = SplatPhysics::WorldToUV(pos, floorPos, mapSize, mapSize);
-
-        // 3. 如果在範圍內，畫圖
         if (result.hit) {
-            // 隨機旋轉
             float rot = (float)(rand() % 360);
-            float uvSize = 4.0f / mapSize;
+            float uvSize = 25.0f / mapSize;
 
-            painter->Paint(splatMap.get(), result.uv, uvSize, color, rot, 0);
+            // 判斷死在哪裡，就畫在哪裡
+            float h = level->GetHeightAt(pos.x, pos.z);
+            SplatMap* targetMap = (h > 0.5f) ? mapObstacle.get() : mapFloor.get();
 
-            // 播放音效
+            painter->Paint(targetMap, result.uv, uvSize, color, rot, 0);
             AudioManager::Instance().PlayOneShot("splat_die", 0.5f);
         }
     }
@@ -873,7 +906,7 @@ private:
         gameTimeRemaining = 0.0f;
 
         // 計算最終分數
-        auto scores = splatMap->CalculatePercentages();
+        auto scores = mapFloor->CalculatePercentages();
         finalScoreTeam1 = scores.first * 100;
         finalScoreTeam2 = scores.second * 100;
 

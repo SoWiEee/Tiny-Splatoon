@@ -24,7 +24,7 @@ void GameScene::OnEnter() {
     world->Init(cameraObj.get(), hud, nullptr);
 
     // create scoreboard 
-    scoreboard = uiObj->AddComponent<Scoreboard>(1280, 720, world->splatMap.get());
+    scoreboard = uiObj->AddComponent<Scoreboard>(1280, 720, world->mapFloor.get());
     world->scoreboardRef = scoreboard;
 
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
