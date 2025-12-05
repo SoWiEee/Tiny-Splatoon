@@ -81,7 +81,7 @@ public:
         }
 
         WeaponType myWeaponType = NetworkManager::Instance().GetMyWeaponType();
-        localPlayer = std::make_unique<Player>(glm::vec3(-5, 0, -5), myTeam, splatMap.get(), mainCamera, hud);
+        localPlayer = std::make_unique<Player>(glm::vec3(-5, 0, -5), myTeam, splatMap.get(), mainCamera, hud, level.get());
         glm::vec3 color = (myTeam == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);  // replace weapon
         switch (myWeaponType) {
         case WeaponType::SHOOTER:
@@ -252,15 +252,24 @@ public:
     }
 
     void Render(Shader& shader, Camera* cam) {
-        // 1. 畫地板 (SplatMap)
         SplatRenderer::RenderFloor(shader, level->floor, splatMap.get());
 
-        // 2. 畫牆壁與障礙物 (不透明)
+        // 畫障礙物
+        shader.SetInt("useInk", 1);
+        shader.SetFloat("mapSize", level->mapSize);
+
+        for (auto obj : level->obstacles) {
+            if (obj) obj->Draw(shader);
+        }
+
+        // 畫牆壁
         shader.SetInt("useInk", 0);
         shader.SetFloat("alpha", 1.0f);
-        for (auto wall : level->walls) wall->Draw(shader);
 
-        // 3. 畫實體
+        for (auto wall : level->walls) {
+            wall->Draw(shader);
+        }
+
         for (const auto& p : projectiles) {
             if (p) p->Draw(shader);
         }

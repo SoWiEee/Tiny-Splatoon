@@ -6,6 +6,7 @@
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
 #include "../components/Camera.h"
+#include "../scene/Level.h"
 #include "Weapon.h"
 #include "ShooterWeapon.h"
 #include "BrushWeapon.h"
@@ -21,10 +22,11 @@ enum class PlayerState {
 class Player : public Entity {
 public:
     // parameter
-    float moveSpeed = 5.0f;
-    float swimSpeed = 12.0f;
+    float moveSpeed = 3.0f;
+    float swimSpeed = 9.0f;
     float jumpHeight = 2.0f;
-    float gravity = -20.0f;
+    float gravity = -30.0f;
+    Level* level = nullptr;
 
     // state
     glm::vec3 velocity = glm::vec3(0.0f);
@@ -60,8 +62,8 @@ public:
     float mapLimit = 39.5f;
     float floorSize = 80.0f;
 
-    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
-        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud)
+    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud, Level* mapLevel)
+        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud), level(mapLevel)
     {
         this->teamID = team;
         shadow = new GameObject("ShadowBlob");
@@ -326,16 +328,50 @@ private:
     }
 
     void ApplyPhysics(float dt) {
+        glm::vec3 nextPos = transform->position;
+        nextPos.x += velocity.x * dt;
+        nextPos.z += velocity.z * dt;
+        float currentH = 0.0f;
+        float nextH = 0.0f;
+
+        if (level) {
+            currentH = level->GetHeightAt(transform->position.x, transform->position.z);
+            nextH = level->GetHeightAt(nextPos.x, nextPos.z);
+        }
+
+        // 高低差檢查
+        float stepHeight = 0.5f;
+        if (nextH > currentH + stepHeight) {
+            velocity.x = 0;
+            velocity.z = 0;
+        }
+        else {
+            transform->position.x = nextPos.x;
+            transform->position.z = nextPos.z;
+        }
+
+        // 垂直移動
         velocity.y += gravity * dt;
         transform->position += velocity * dt;
 
-        if (transform->position.y < 0.0f) {
-            transform->position.y = 0.0f;
+        float groundHeight = 0.0f;
+        if (level) {
+            groundHeight = level->GetHeightAt(transform->position.x, transform->position.z);
+        }
+        if (transform->position.y < groundHeight) {
+            transform->position.y = groundHeight; // 拉回地板
             velocity.y = 0;
             isGrounded = true;
         }
         else {
-            isGrounded = false;
+            // 如果離地很近也算著地 (避免斜坡抖動)
+            if (transform->position.y - groundHeight < 0.1f && velocity.y <= 0) {
+                transform->position.y = groundHeight;
+                isGrounded = true;
+            }
+            else {
+                isGrounded = false;
+            }
         }
 
         if (transform->position.x > mapLimit) transform->position.x = mapLimit;
