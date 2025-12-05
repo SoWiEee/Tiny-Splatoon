@@ -137,7 +137,7 @@ public:
             ImGui::SetNextWindowSize(ImVec2(400, 200));
             ImGui::Begin("FinishText", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
 
-            ImGui::SetWindowFontScale(3.0f); // 超大字體
+            ImGui::SetWindowFontScale(5.0f); // 超大字體
             // 讓文字閃爍或震動
             float shake = sin(animTime * 50.0f) * 5.0f * std::max(0.0f, 1.0f - animTime); // 剛開始震動
             ImGui::SetCursorPos(ImVec2(50 + shake, 50));

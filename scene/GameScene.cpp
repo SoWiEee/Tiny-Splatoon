@@ -128,7 +128,7 @@ void GameScene::Render() {
 
 // ImGui UI
 void GameScene::DrawUI() {
-    if (!world || !hud) return;
+    if (!world || !hud || !scoreboard) return;
 
     if (world->state == WorldState::PLAYING) {
         if (world->localPlayer) {
@@ -142,6 +142,8 @@ void GameScene::DrawUI() {
 
             hud->DrawOverlay(hpPercent, spPercent);
         }
+        float timeLeft = world->gameTimeRemaining;
+        scoreboard->DrawUITimer(timeLeft);
     }
     else if (world->state == WorldState::FINISHED) {
         float animTime = 5.0f - world->finishTimer;
