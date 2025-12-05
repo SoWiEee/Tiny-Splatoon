@@ -119,7 +119,7 @@ void GameScene::Render() {
     shader->SetVec3("viewPos", cameraObj->transform->position);
 
     // draw world
-    world->Render(*shader);
+    world->Render(*shader, CurrentCamera);
 
     // draw UI
     if (hud) hud->Draw(*shader);
@@ -128,9 +128,11 @@ void GameScene::Render() {
 
 // ImGui UI
 void GameScene::DrawUI() {
-    if (!world || !hud) return;
+    if (!world || !hud || !scoreboard) return;
 
     if (world->state == WorldState::PLAYING) {
+        scoreboard->SetShowScoreBar(false);
+
         if (world->localPlayer) {
             float hpPercent = 1.0f;
             auto hpComp = world->localPlayer->GetComponent<Health>();
@@ -142,8 +144,56 @@ void GameScene::DrawUI() {
 
             hud->DrawOverlay(hpPercent, spPercent);
         }
+
+        // 收集所有玩家狀態
+        std::vector<UIPlayerStatus> playerStatuses;
+
+        if (world->localPlayer) {
+            bool isDead = (world->localPlayer->state == PlayerState::DEAD);
+            bool hasSpecial = world->localPlayer->IsSpecialReady();
+            playerStatuses.push_back({
+                NetworkManager::Instance().GetMyPlayerID(),
+                world->localPlayer->teamID,
+                isDead,
+                true, // isSelf
+                hasSpecial
+                });
+        }
+
+        // AI
+        if (world->enemyAI) {
+            auto hp = world->enemyAI->GetComponent<Health>();
+            bool isDead = (hp && hp->isDead);
+            playerStatuses.push_back({
+                100, // AI ID
+                world->enemyAI->teamID,
+                isDead,
+                false,
+                false // AI 暫無大招
+                });
+        }
+
+        // 遠端玩家
+        for (auto& pair : world->remotePlayers) {
+            int id = pair.first;
+            RemotePlayer* rp = pair.second.get();
+            auto hp = rp->GetComponent<Health>();
+            bool isDead = (hp && hp->isDead);
+
+            playerStatuses.push_back({
+                id,
+                rp->teamID,
+                isDead,
+                false,
+                false
+                });
+        }
+
+        scoreboard->DrawPlayerIcons(playerStatuses);
+        scoreboard->DrawUITimer(world->gameTimeRemaining);
     }
     else if (world->state == WorldState::FINISHED) {
+        scoreboard->SetShowScoreBar(true);
         float animTime = 5.0f - world->finishTimer;
 
         int myTeam = 1;
