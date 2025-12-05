@@ -728,12 +728,9 @@ private:
         glm::vec3 currentPos = start;
         glm::vec3 endPos = start + (dir * maxDist); // 預設終點
 
-        // 1. 尋找撞牆點 (Raycast 模擬)
-        // 我們沿著方向每隔 1米檢查一次高度
+        // 1. 尋找撞牆點 (raycast)
         for (float d = 0; d < maxDist; d += stepSize) {
             currentPos += dir * stepSize;
-
-            // 檢查地形高度
             float terrainH = level->GetHeightAt(currentPos.x, currentPos.z);
 
             // 如果地形高度 > 雷射高度，代表撞牆了
@@ -747,10 +744,10 @@ private:
         // 2. 畫墨水
         // 從起點到終點，每隔一段距離畫一個墨跡
         float dist = glm::distance(start, endPos);
-        float inkSpacing = 1.5f; // 墨水間隔 (越小越密，但也越耗效能)
+        float inkSpacing = 1.5f;
         int paintSteps = (int)(dist / inkSpacing);
 
-        // 設定雷射寬度 (很粗!)
+        // laser width
         float beamWidth = 4.0f;
         float uvSize = beamWidth / level->mapSize;
         glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
@@ -760,23 +757,14 @@ private:
             float t = (float)i / (float)paintSteps;
             glm::vec3 paintPos = glm::mix(start, endPos, t);
 
-            // 我們只在地面上畫圖，所以要把 Y 壓到地面
-            // 使用 WorldToUV 會自動忽略 Y，但為了準確，我們可以用 GetHeightAt 修正 Y
-            // 不過 WorldToUV 已經夠用了
-
             auto result = SplatPhysics::WorldToUV(paintPos, glm::vec3(0), level->mapSize, level->mapSize);
             if (result.hit) {
                 painter->Paint(splatMap.get(), result.uv, uvSize, color, 0, teamID);
             }
         }
 
-        // 3. 視覺特效 (Beam Model)
-        // 這裡可以生成一個長條狀的圓柱體 GameObject，存活 0.5 秒後消失
-        // 為了簡單，我們先只播放音效和畫墨水
         AudioManager::Instance().PlayOneShot("laser_fire", 1.0f);
 
-        // 4. 傷害判定 (Line Segment Intersection)
-        // 檢查敵人是否在雷射路徑上
         if (!NetworkManager::Instance().IsServer()) return; // 傷害由 Server 判定
 
         std::vector<Entity*> targets;

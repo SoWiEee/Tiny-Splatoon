@@ -158,7 +158,6 @@ void GameScene::DrawUI() {
     }
 }
 
-// --- 6. 網路封包處理 ---
 void GameScene::OnPacket(const ReceivedPacket& pkt) {
     if (world) {
         world->HandlePacket(pkt);
