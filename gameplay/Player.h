@@ -260,7 +260,19 @@ private:
         }
 
         bool wantSwim = Input::GetKey(GLFW_KEY_LEFT_SHIFT);
-        isSwimming = (wantSwim && onMyInk);
+        bool nextIsSwimming = (wantSwim && onMyInk);
+
+        // ª¬ºA¤Á´«°»´ú
+        if (nextIsSwimming != isSwimming) {
+            if (nextIsSwimming) {
+                AudioManager::Instance().PlayOneShot("swim", 0.3f);
+            }
+            else {
+                AudioManager::Instance().PlayOneShot("swim", 0.3f);
+            }
+        }
+
+        isSwimming = nextIsSwimming;
 
         float currentSpeed = isSwimming ? swimSpeed : moveSpeed;
 
