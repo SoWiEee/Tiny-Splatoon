@@ -7,23 +7,23 @@ void GameScene::OnEnter() {
     isExited = false;
     std::cout << "[Scene] Enter GameScene" << std::endl;
 
-    // A. 載入 Shader
+    // load shader
     shader = std::make_unique<Shader>("assets/shaders/default.vert", "assets/shaders/default.frag");
 
-    // B. 建立相機
+    // camera
     cameraObj = std::make_unique<GameObject>("MainCamera");
     auto camComp = cameraObj->AddComponent<Camera>();
     CurrentCamera = camComp;
 
-    // C. 建立 UI 容器
+    // create UI
     uiObj = std::make_unique<GameObject>("UI");
     hud = uiObj->AddComponent<HUD>(1280, 720);
 
-    // D. 初始化遊戲世界
+    // game world init
     world = std::make_unique<GameWorld>();
     world->Init(cameraObj.get(), hud, nullptr);
 
-    // E. 建立 Scoreboard 
+    // create scoreboard 
     scoreboard = uiObj->AddComponent<Scoreboard>(1280, 720, world->splatMap.get());
     world->scoreboardRef = scoreboard;
 
@@ -31,10 +31,9 @@ void GameScene::OnEnter() {
     AudioManager::Instance().PlayBGM("assets/game.mp3", 0.1f);
 }
 
-// --- 2. 離開場景 (清理) ---
 void GameScene::OnExit() {
     if (isExited) return;
-    isExited = true; // 標記為已執行
+    isExited = true;
 
     std::cout << "[Scene] Exit GameScene" << std::endl;
 
@@ -42,7 +41,7 @@ void GameScene::OnExit() {
 
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-    // [新增] 離開遊戲場景時，斷開網路連線是一個好習慣
+    // 離開遊戲場景時，斷開網路連線是一個好習慣
     // 這樣回到 LoginScene 才能重新連線或當 Host
     if (NetworkManager::Instance().IsConnected()) {
         NetworkManager::Instance().Disconnect();
@@ -66,7 +65,7 @@ void GameScene::Update(float dt) {
         return;
     }
 
-    // 相機跟隨邏輯
+	// camera follow player
     if (world->state == WorldState::PLAYING) {
         if (world->localPlayer && cameraObj) {
             auto playerState = world->localPlayer->state;
