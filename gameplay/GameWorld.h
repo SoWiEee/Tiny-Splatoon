@@ -22,6 +22,11 @@
 #include "../network/NetworkManager.h"
 #include "../network/NetworkProtocol.h"
 
+enum class WorldState {
+    PLAYING,
+    FINISHED
+};
+
 class GameWorld {
 public:
     // --- 系統物件 ---
@@ -41,6 +46,16 @@ public:
 
     // 同步計時器
     float syncTimer = 0.0f;
+
+    // 遊戲狀態變數
+    WorldState state = WorldState::PLAYING;
+    float gameTimeRemaining = 180.0f; // 3分鐘
+    float finishTimer = 0.0f;         // 結束後的 5秒倒數
+
+    // 最終結果緩存
+    float finalScoreTeam1 = 0.0f;
+    float finalScoreTeam2 = 0.0f;
+    int winningTeam = 0; // 0=平手, 1=紅, 2=綠
 
     void Init(GameObject* mainCamera, HUD* hud, Scoreboard* scoreboard) {
         level = std::make_unique<Level>();
@@ -108,109 +123,124 @@ public:
     }
 
     void Update(float dt) {
-        // --- 1. 更新本機實體 ---
-        if (localPlayer) {
-            localPlayer->UpdateLogic(dt);
-            if (localPlayer->weapon) CollectProjectiles(*(localPlayer->weapon));
-        }
-        if (enemyAI) {
-            enemyAI->UpdateLogic(dt);
-            if (enemyAI->weapon) CollectProjectiles(*(enemyAI->weapon));
-        }
 
-        // 檢查雷射請求
-        if (localPlayer && localPlayer->requestLaser) {
-            int myID = NetworkManager::Instance().GetMyPlayerID();
-            glm::vec3 startPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0);
-            glm::vec3 dir = localPlayer->transform->GetForward(); // 瞄準方向
-            int myTeam = localPlayer->teamID;
+        // --- 遊戲進行中 ---
+        if (state == WorldState::PLAYING) {
+            gameTimeRemaining -= dt;
 
-            TriggerLaserBeam(startPos, dir, myTeam, myID);
+            // --- 1. 更新本機實體 ---
+            if (localPlayer) {
+                localPlayer->UpdateLogic(dt);
+                if (localPlayer->weapon) CollectProjectiles(*(localPlayer->weapon));
+            }
+            if (enemyAI) {
+                enemyAI->UpdateLogic(dt);
+                if (enemyAI->weapon) CollectProjectiles(*(enemyAI->weapon));
+            }
 
+            // 檢查雷射請求
+            if (localPlayer && localPlayer->requestLaser) {
+                int myID = NetworkManager::Instance().GetMyPlayerID();
+                glm::vec3 startPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0);
+                glm::vec3 dir = localPlayer->transform->GetForward(); // 瞄準方向
+                int myTeam = localPlayer->teamID;
+
+                TriggerLaserBeam(startPos, dir, myTeam, myID);
+
+                if (NetworkManager::Instance().IsConnected()) {
+                    PacketSpecialLaser pkt; // 使用新的雷射封包
+                    pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
+                    pkt.playerID = myID;
+                    pkt.teamID = myTeam;
+                    pkt.origin = startPos;
+                    pkt.direction = dir;
+
+                    NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+                }
+
+                localPlayer->requestLaser = false;
+            }
+
+            // --- 2. 網路同步 (發送本機狀態) ---
             if (NetworkManager::Instance().IsConnected()) {
-                PacketSpecialLaser pkt; // 使用新的雷射封包
-                pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
-                pkt.playerID = myID;
-                pkt.teamID = myTeam;
-                pkt.origin = startPos;
-                pkt.direction = dir;
+                syncTimer += dt;
+                if (syncTimer > 0.05f) {
+                    // 1. 發送玩家自己的狀態
+                    PacketPlayerState pkt;
+                    pkt.header.type = PacketType::C2S_PLAYER_STATE;
+                    pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
+                    pkt.position = localPlayer->transform->position;
+                    pkt.rotationY = localPlayer->transform->rotation.y;
+                    pkt.isSwimming = localPlayer->isSwimming;
 
-                NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
-            }
+                    // Server or Client
+                    if (NetworkManager::Instance().IsServer()) {
+                        // Server: 廣播自己 (ID 0)
+                        PacketPlayerState worldStatePkt = pkt;
+                        worldStatePkt.header.type = PacketType::S2C_WORLD_STATE;
+                        NetworkManager::Instance().Broadcast(&worldStatePkt, sizeof(worldStatePkt), false);
 
-            localPlayer->requestLaser = false;
-        }
-
-        // --- 2. 網路同步 (發送本機狀態) ---
-        if (NetworkManager::Instance().IsConnected()) {
-            syncTimer += dt;
-            if (syncTimer > 0.05f) {
-                // 1. 發送玩家自己的狀態
-                PacketPlayerState pkt;
-                pkt.header.type = PacketType::C2S_PLAYER_STATE;
-                pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
-                pkt.position = localPlayer->transform->position;
-                pkt.rotationY = localPlayer->transform->rotation.y;
-                pkt.isSwimming = localPlayer->isSwimming;
-
-                // Server or Client
-                if (NetworkManager::Instance().IsServer()) {
-                    // Server: 廣播自己 (ID 0)
-                    PacketPlayerState worldStatePkt = pkt;
-                    worldStatePkt.header.type = PacketType::S2C_WORLD_STATE;
-                    NetworkManager::Instance().Broadcast(&worldStatePkt, sizeof(worldStatePkt), false);
-
-                    // Server: 廣播 AI (ID 100)
-                    if (enemyAI) {
-                        PacketPlayerState aiPkt;
-                        aiPkt.header.type = PacketType::S2C_WORLD_STATE;
-                        aiPkt.playerID = 100;
-                        aiPkt.position = enemyAI->transform->position;
-                        aiPkt.rotationY = enemyAI->transform->rotation.y;
-                        aiPkt.isSwimming = false;
-                        NetworkManager::Instance().Broadcast(&aiPkt, sizeof(aiPkt), false);
+                        // Server: 廣播 AI (ID 100)
+                        if (enemyAI) {
+                            PacketPlayerState aiPkt;
+                            aiPkt.header.type = PacketType::S2C_WORLD_STATE;
+                            aiPkt.playerID = 100;
+                            aiPkt.position = enemyAI->transform->position;
+                            aiPkt.rotationY = enemyAI->transform->rotation.y;
+                            aiPkt.isSwimming = false;
+                            NetworkManager::Instance().Broadcast(&aiPkt, sizeof(aiPkt), false);
+                        }
                     }
+                    else {
+                        // Client: 傳送給 Server
+                        NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false);
+                    }
+                    syncTimer = 0.0f;
                 }
-                else {
-                    // Client: 傳送給 Server
-                    NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false);
+
+                // B. 分數與遊戲狀態同步 (低頻率: 0.5s = 2Hz)
+                static float scoreTimer = 0.0f;
+                scoreTimer += dt;
+
+                if (scoreTimer > 0.5f) {
+                    // 只有 Server 有權力廣播分數
+                    if (NetworkManager::Instance().IsServer()) {
+                        // 計算分數
+                        glm::vec2 scores = splatMap->CalculateScore();
+
+                        // 發送分數封包
+                        PacketGameState scorePkt;
+                        scorePkt.header.type = PacketType::S2C_GAME_STATE;
+                        scorePkt.scoreTeam1 = scores.x;
+                        scorePkt.scoreTeam2 = scores.y;
+                        scorePkt.timeRemaining = 180.0f; // 範例時間
+
+                        NetworkManager::Instance().Broadcast(&scorePkt, sizeof(scorePkt), true);
+
+                        // Server 本地 Scoreboard 更新
+                        if (scoreboardRef) scoreboardRef->SetScores(scores.x, scores.y);
+                    }
+                    scoreTimer = 0.0f;
                 }
-                syncTimer = 0.0f;
             }
 
-            // B. 分數與遊戲狀態同步 (低頻率: 0.5s = 2Hz)
-            static float scoreTimer = 0.0f;
-            scoreTimer += dt;
+            // --- 3. 更新遠端玩家 (插值) ---
+            for (auto& pair : remotePlayers) {
+                pair.second->UpdateInterp(dt);
+            }
 
-            if (scoreTimer > 0.5f) {
-                // 只有 Server 有權力廣播分數
-                if (NetworkManager::Instance().IsServer()) {
-                    // 計算分數
-                    glm::vec2 scores = splatMap->CalculateScore();
+            // --- 4. 更新子彈物理與碰撞 ---
+            UpdateProjectiles(dt);
 
-                    // 發送分數封包
-                    PacketGameState scorePkt;
-                    scorePkt.header.type = PacketType::S2C_GAME_STATE;
-                    scorePkt.scoreTeam1 = scores.x;
-                    scorePkt.scoreTeam2 = scores.y;
-                    scorePkt.timeRemaining = 180.0f; // 範例時間
-
-                    NetworkManager::Instance().Broadcast(&scorePkt, sizeof(scorePkt), true);
-
-                    // Server 本地 Scoreboard 更新
-                    if (scoreboardRef) scoreboardRef->SetScores(scores.x, scores.y);
-                }
-                scoreTimer = 0.0f;
+            if (gameTimeRemaining <= 0.0f) {
+                EndGame();
             }
         }
-
-        // --- 3. 更新遠端玩家 (插值) ---
-        for (auto& pair : remotePlayers) {
-            pair.second->UpdateInterp(dt);
+        // --- 遊戲結束 ---
+        else if (state == WorldState::FINISHED) {
+            finishTimer -= dt;
+            if (localPlayer) localPlayer->velocity = glm::vec3(0);
         }
-
-        // --- 4. 更新子彈物理與碰撞 ---
-        UpdateProjectiles(dt);
     }
 
     void Render(Shader& shader) {
@@ -818,5 +848,25 @@ private:
             // 播放音效
             AudioManager::Instance().PlayOneShot("splat_die", 0.5f);
         }
+    }
+
+    void EndGame() {
+        if (state == WorldState::FINISHED) return;
+
+        state = WorldState::FINISHED;
+        finishTimer = 5.0f; // 停留 5 秒
+        gameTimeRemaining = 0.0f;
+
+        // 計算最終分數
+        auto scores = splatMap->CalculatePercentages();
+        finalScoreTeam1 = scores.first;
+        finalScoreTeam2 = scores.second;
+
+        if (finalScoreTeam1 > finalScoreTeam2) winningTeam = 1;
+        else if (finalScoreTeam2 > finalScoreTeam1) winningTeam = 2;
+        else winningTeam = 0;
+
+        std::cout << "GAME FINISHED! T1: " << finalScoreTeam1 << " T2: " << finalScoreTeam2 << std::endl;
+        AudioManager::Instance().PlayOneShot("whistle", 1.0f);
     }
 };
