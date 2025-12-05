@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include "../engine/fx/ParticleSystem.h"
 #include "../scene/Level.h"
 #include "../splat/SplatMap.h"
 #include "../splat/SplatPainter.h"
@@ -33,6 +34,7 @@ public:
     std::unique_ptr<Level> level;
     std::unique_ptr<SplatMap> splatMap;
     std::unique_ptr<SplatPainter> painter;
+    std::unique_ptr<ParticleSystem> particleSystem;
     Scoreboard* scoreboardRef = nullptr;
     HUD* hudRef = nullptr;
 
@@ -62,6 +64,7 @@ public:
         level->Load();
         splatMap = std::make_unique<SplatMap>(1024, 1024);
         painter = std::make_unique<SplatPainter>();
+        particleSystem = std::make_unique<ParticleSystem>();
         scoreboardRef = scoreboard;
         hudRef = hud;
 
@@ -172,6 +175,8 @@ public:
                     pkt.position = localPlayer->transform->position;
                     pkt.rotationY = localPlayer->transform->rotation.y;
                     pkt.isSwimming = localPlayer->isSwimming;
+                    auto myHP = localPlayer->GetComponent<Health>();
+                    pkt.isDead = (myHP && myHP->isDead);
 
                     // Server or Client
                     if (NetworkManager::Instance().IsServer()) {
@@ -188,6 +193,8 @@ public:
                             aiPkt.position = enemyAI->transform->position;
                             aiPkt.rotationY = enemyAI->transform->rotation.y;
                             aiPkt.isSwimming = false;
+                            auto aiHP = enemyAI->GetComponent<Health>();
+                            aiPkt.isDead = (aiHP && aiHP->isDead);
                             NetworkManager::Instance().Broadcast(&aiPkt, sizeof(aiPkt), false);
                         }
                     }
@@ -230,6 +237,7 @@ public:
             }
 
             // --- 4. 更新子彈物理與碰撞 ---
+            if (particleSystem) particleSystem->Update(dt);
             UpdateProjectiles(dt);
 
             if (gameTimeRemaining <= 0.0f) {
@@ -243,7 +251,7 @@ public:
         }
     }
 
-    void Render(Shader& shader) {
+    void Render(Shader& shader, Camera* cam) {
         // 1. 畫地板 (SplatMap)
         SplatRenderer::RenderFloor(shader, level->floor, splatMap.get());
 
@@ -296,6 +304,10 @@ public:
                 s->Draw(shader);
             }
             };
+
+        if (particleSystem && cam) {
+            particleSystem->Draw(cam->GetViewMatrix(), cam->GetProjectionMatrix());
+        }
 
         DrawShadow(localPlayer.get());
         if (enemyAI) DrawShadow(enemyAI.get());
@@ -555,18 +567,14 @@ private:
         if (id == -1) return;
 
         if (remotePlayers.find(id) != remotePlayers.end()) {
-            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY);
+            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead);
         }
         else {
 
-            int guessedTeam = 1; // 預設紅隊
-            if (id == 100) {
-                guessedTeam = 2; // AI (ID 100) 固定是綠隊
-            }
-            else {
-                guessedTeam = (id % 2 == 0) ? 1 : 2;
-            }
+            int guessedTeam = (id == 100) ? 2 : ((id % 2 == 0) ? 1 : 2);
+
             auto newGuy = std::make_unique<RemotePlayer>(id, guessedTeam, pkt->position);
+            newGuy->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead);
             remotePlayers[id] = std::move(newGuy);
             std::cout << "Spawned Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
         }
@@ -595,6 +603,9 @@ private:
                     if (hp) {
                         bool wasAlive = !hp->isDead;
                         hp->TakeDamage(10.0f);
+                        // 擊中敵人噴墨水
+                        // 產生 15 顆粒子，速度 8.0f，顏色跟子彈一樣
+                        particleSystem->Emit(p->transform->position, p->inkColor, 15, 8.0f);
 
                         if (wasAlive && hp->isDead) {
                             if (NetworkManager::Instance().IsServer()) {
@@ -665,6 +676,9 @@ private:
                     float rot = (float)(rand() % 360);
                     float paintSize = p->transform->scale.x * 0.7f;
                     painter->Paint(splatMap.get(), result.uv, paintSize, p->inkColor, rot, p->ownerTeam);
+                    // [新增] 擊中地板噴墨水
+                    // 產生 10 顆粒子，速度 5.0f
+                    particleSystem->Emit(p->hitPosition + glm::vec3(0, 0.2f, 0), p->inkColor, 10, 5.0f);
 
                     // charge ultimate
                     if (localPlayer && p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {
@@ -684,7 +698,6 @@ private:
 
     // 處理擊殺事件：識別身分 -> 發送封包 -> 更新本地 UI
     void ProcessKillEvent(int killerID, Entity* victim, int killerTeam) {
-        // 1. 找出受害者 ID
         int victimID = -99;
 
         // 檢查是否是本機玩家 (Host)
@@ -700,6 +713,9 @@ private:
             for (auto& rp : remotePlayers) {
                 if (rp.second.get() == victim) {
                     victimID = rp.first;
+                    if (NetworkManager::Instance().IsServer()) {
+                        rp.second->ForceDeadByServer(2.0f); // 鎖定 2 秒
+                    }
                     break;
                 }
             }
@@ -849,8 +865,8 @@ private:
 
         // 計算最終分數
         auto scores = splatMap->CalculatePercentages();
-        finalScoreTeam1 = scores.first;
-        finalScoreTeam2 = scores.second;
+        finalScoreTeam1 = scores.first * 100;
+        finalScoreTeam2 = scores.second * 100;
 
         if (finalScoreTeam1 > finalScoreTeam2) winningTeam = 1;
         else if (finalScoreTeam2 > finalScoreTeam1) winningTeam = 2;
