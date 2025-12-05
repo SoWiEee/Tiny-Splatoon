@@ -12,7 +12,7 @@ public:
     int width, height;
 
     // CPU 端邏輯地圖 (用於潛水判定與快速顏色查詢)
-    static const int GRID_SIZE = 100; // 100x100 的邏輯網格
+    static const int GRID_SIZE = 100;
     int gridData[GRID_SIZE][GRID_SIZE]; // 0:無, 1:紅隊, 2:綠隊
 
     SplatMap(int w, int h) : width(w), height(h) {
@@ -25,13 +25,11 @@ public:
         glDeleteTextures(1, &textureID);
     }
 
-    // 綁定貼圖供 Shader 讀取
     void BindTexture(int slot) const {
         glActiveTexture(GL_TEXTURE0 + slot);
         glBindTexture(GL_TEXTURE_2D, textureID);
     }
 
-    // 更新 CPU 端的邏輯網格 (當塗地發生時呼叫)
     void UpdateCPUData(float u, float v, int teamID, int radius = 2) {
         int cx = (int)(u * GRID_SIZE);
         int cy = (int)(v * GRID_SIZE);
@@ -60,7 +58,7 @@ public:
         return false;
     }
 
-    // 計算分數 (使用 GPU Mipmap 加速)
+    // 計算分數
     glm::vec2 CalculateScore() {
         glBindTexture(GL_TEXTURE_2D, textureID);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -74,6 +72,24 @@ public:
         // pixelData[0] 是紅色通道總和 (Team 1)
         // pixelData[1] 是綠色通道總和 (Team 2)
         return glm::vec2(pixelData[0], pixelData[1]);
+    }
+
+    std::pair<float, float> CalculatePercentages() {
+        int count1 = 0;
+        int count2 = 0;
+        int totalPixels = width * height;
+
+        for (int i = 0; i < GRID_SIZE; i++) {
+            for (int j = 0; j < GRID_SIZE; j++) {
+                if (gridData[i][j] == 1) count1++;
+                else if (gridData[i][j] == 2) count2++;
+			}
+        }
+
+        // 避免除以零
+        if (totalPixels == 0) return { 0.0f, 0.0f };
+
+        return { (float)count1 / totalPixels, (float)count2 / totalPixels };
     }
 
 private:
@@ -93,7 +109,6 @@ private:
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
 
-        // 清空為黑色
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 

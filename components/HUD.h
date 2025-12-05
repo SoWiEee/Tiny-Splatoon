@@ -127,6 +127,83 @@ public:
         if (killLogs.size() > 5) killLogs.pop_front(); // 最多顯示 5 條
     }
 
+    // 繪製結算畫面
+    void DrawResultScreen(float score1, float score2, int myTeam, float animTime) {
+
+        // 1. "FINISH!" 字樣 (類似封條)
+        // 只有前 2 秒顯示，或者一直顯示但變小
+        if (animTime < 5.0f) { // 一直顯示
+            ImGui::SetNextWindowPos(ImVec2(screenWidth / 2 - 200, screenHeight / 2 - 100));
+            ImGui::SetNextWindowSize(ImVec2(400, 200));
+            ImGui::Begin("FinishText", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
+
+            ImGui::SetWindowFontScale(3.0f); // 超大字體
+            // 讓文字閃爍或震動
+            float shake = sin(animTime * 50.0f) * 5.0f * std::max(0.0f, 1.0f - animTime); // 剛開始震動
+            ImGui::SetCursorPos(ImVec2(50 + shake, 50));
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "FINISH!"); // 黃色
+
+            ImGui::End();
+        }
+
+        // 2. 計分條動畫 (1秒後開始跑)
+        if (animTime > 1.0f) {
+            float barAnim = std::min(1.0f, (animTime - 1.0f) / 2.0f); // 2秒內跑完
+
+            // 計算顯示的分數 (Lerp)
+            float displayS1 = score1 * barAnim;
+            float displayS2 = score2 * barAnim;
+
+            // 繪製背景條
+            ImGui::SetNextWindowPos(ImVec2(50, screenHeight - 150));
+            ImGui::SetNextWindowSize(ImVec2(screenWidth - 100, 100));
+            ImGui::Begin("ScoreBar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
+
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 p = ImGui::GetCursorScreenPos();
+            float fullWidth = screenWidth - 100;
+            float height = 40.0f;
+
+            // Team 1 (紅)
+            float w1 = fullWidth * displayS1;
+            dl->AddRectFilled(p, ImVec2(p.x + w1, p.y + height), IM_COL32(255, 50, 50, 255));
+
+            // Team 2 (綠) - 從右邊長出來? 或者接在紅色後面?
+            // 斯普拉頓是紅綠各佔一邊。
+            // 我們簡單做：紅色從左，綠色從右
+            float w2 = fullWidth * displayS2;
+            dl->AddRectFilled(ImVec2(p.x + fullWidth - w2, p.y), ImVec2(p.x + fullWidth, p.y + height), IM_COL32(50, 255, 50, 255));
+
+            // 顯示百分比文字
+            char buf[32];
+            sprintf(buf, "%.1f%%", displayS1 * 100.0f);
+            dl->AddText(ImVec2(p.x + 10, p.y + 5), IM_COL32(255, 255, 255, 255), buf);
+
+            sprintf(buf, "%.1f%%", displayS2 * 100.0f);
+            // 綠色文字靠右
+            dl->AddText(ImVec2(p.x + fullWidth - 80, p.y + 5), IM_COL32(255, 255, 255, 255), buf);
+
+            ImGui::End();
+        }
+
+        // 3. WIN / LOSE
+        if (animTime > 3.0f) {
+            bool iWon = false;
+            if (myTeam == 1 && score1 > score2) iWon = true;
+            if (myTeam == 2 && score2 > score1) iWon = true;
+
+            ImGui::SetNextWindowPos(ImVec2(screenWidth / 2 - 100, screenHeight / 2 + 50));
+            ImGui::SetNextWindowSize(ImVec2(200, 100));
+            ImGui::Begin("WinLose", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
+            ImGui::SetWindowFontScale(2.0f);
+
+            if (iWon) ImGui::TextColored(ImVec4(0, 1, 0, 1), "YOU WIN!");
+            else ImGui::TextColored(ImVec4(1, 0, 0, 1), "YOU LOSE...");
+
+            ImGui::End();
+        }
+    }
+
     void ShowHitMarker() {
         hitMarkerTimer = 0.2f; // 顯示 0.2 秒
     }

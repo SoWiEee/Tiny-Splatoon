@@ -9,7 +9,9 @@ class LoginScene : public Scene {
     GUIManager* gui;
 
 public:
+    LoginScene() {}
     LoginScene(GUIManager* guiManager) : gui(guiManager) {}
+    virtual ~LoginScene() { OnExit(); }
 
     void OnEnter() override {
         glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
