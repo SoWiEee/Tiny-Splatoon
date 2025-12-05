@@ -77,11 +77,11 @@ public:
             }
 
             // 重力
-            it->velocity.y -= 9.8f * dt;
+            it->velocity.y -= 19.6f * dt;
             it->position += it->velocity * dt;
 
             // 隨時間變小
-            // it->size = 0.15f * (it->life / it->startLife);
+            it->size = 0.15f * (it->life / it->startLife);
 
             ++it;
         }
