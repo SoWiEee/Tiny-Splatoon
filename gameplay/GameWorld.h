@@ -563,17 +563,11 @@ private:
         if (id == -1) return;
 
         if (remotePlayers.find(id) != remotePlayers.end()) {
-            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY);
+            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming);
         }
         else {
 
-            int guessedTeam = 1; // 預設紅隊
-            if (id == 100) {
-                guessedTeam = 2; // AI (ID 100) 固定是綠隊
-            }
-            else {
-                guessedTeam = (id % 2 == 0) ? 1 : 2;
-            }
+            int guessedTeam = (id == 100) ? 2 : ((id % 2 == 0) ? 1 : 2);
             auto newGuy = std::make_unique<RemotePlayer>(id, guessedTeam, pkt->position);
             remotePlayers[id] = std::move(newGuy);
             std::cout << "Spawned Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
