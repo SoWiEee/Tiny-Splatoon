@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include "../engine/fx/ParticleSystem.h"
 #include "../scene/Level.h"
 #include "../splat/SplatMap.h"
 #include "../splat/SplatPainter.h"
@@ -33,6 +34,7 @@ public:
     std::unique_ptr<Level> level;
     std::unique_ptr<SplatMap> splatMap;
     std::unique_ptr<SplatPainter> painter;
+    std::unique_ptr<ParticleSystem> particleSystem;
     Scoreboard* scoreboardRef = nullptr;
     HUD* hudRef = nullptr;
 
@@ -62,6 +64,7 @@ public:
         level->Load();
         splatMap = std::make_unique<SplatMap>(1024, 1024);
         painter = std::make_unique<SplatPainter>();
+        particleSystem = std::make_unique<ParticleSystem>();
         scoreboardRef = scoreboard;
         hudRef = hud;
 
@@ -230,6 +233,7 @@ public:
             }
 
             // --- 4. 更新子彈物理與碰撞 ---
+            if (particleSystem) particleSystem->Update(dt);
             UpdateProjectiles(dt);
 
             if (gameTimeRemaining <= 0.0f) {
@@ -243,7 +247,7 @@ public:
         }
     }
 
-    void Render(Shader& shader) {
+    void Render(Shader& shader, Camera* cam) {
         // 1. 畫地板 (SplatMap)
         SplatRenderer::RenderFloor(shader, level->floor, splatMap.get());
 
@@ -296,6 +300,10 @@ public:
                 s->Draw(shader);
             }
             };
+
+        if (particleSystem && cam) {
+            particleSystem->Draw(cam->GetViewMatrix(), cam->GetProjectionMatrix());
+        }
 
         DrawShadow(localPlayer.get());
         if (enemyAI) DrawShadow(enemyAI.get());
@@ -595,6 +603,9 @@ private:
                     if (hp) {
                         bool wasAlive = !hp->isDead;
                         hp->TakeDamage(10.0f);
+                        // 擊中敵人噴墨水
+                        // 產生 15 顆粒子，速度 8.0f，顏色跟子彈一樣
+                        particleSystem->Emit(p->transform->position, p->inkColor, 15, 8.0f);
 
                         if (wasAlive && hp->isDead) {
                             if (NetworkManager::Instance().IsServer()) {
@@ -665,6 +676,9 @@ private:
                     float rot = (float)(rand() % 360);
                     float paintSize = p->transform->scale.x * 0.7f;
                     painter->Paint(splatMap.get(), result.uv, paintSize, p->inkColor, rot, p->ownerTeam);
+                    // [新增] 擊中地板噴墨水
+                    // 產生 10 顆粒子，速度 5.0f
+                    particleSystem->Emit(p->hitPosition + glm::vec3(0, 0.2f, 0), p->inkColor, 10, 5.0f);
 
                     // charge ultimate
                     if (localPlayer && p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {

@@ -119,7 +119,7 @@ void GameScene::Render() {
     shader->SetVec3("viewPos", cameraObj->transform->position);
 
     // draw world
-    world->Render(*shader);
+    world->Render(*shader, CurrentCamera);
 
     // draw UI
     if (hud) hud->Draw(*shader);
