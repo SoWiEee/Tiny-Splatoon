@@ -270,9 +270,18 @@ public:
         glDepthMask(GL_FALSE); // 關閉深度寫入
         shader.SetFloat("alpha", 0.5f); // 設定半透明
 
-        // Helper Lambda: 繪製單個陰影
         auto DrawShadow = [&](GameObject* owner) {
             if (!owner) return;
+
+            // 1. 檢查本機玩家
+            if (owner == localPlayer.get()) {
+                if (localPlayer->isSwimming) return;
+            }
+            // 2. 檢查遠端玩家 (RemotePlayer?)
+
+            Health* hp = owner->GetComponent<Health>();
+            if (hp && hp->isDead) return;
+
             glm::vec3 shadowPos = owner->transform->position;
             shadowPos.y = 0.02f; // 貼地
 
@@ -280,8 +289,6 @@ public:
             float scale = 1.5f - (height * 0.3f);
             if (scale < 0) scale = 0;
 
-            // 借用 localPlayer 的 shadow 物件來繪製 (省去每個物件都 new 一個 shadow 的開銷)
-            // 前提是 localPlayer 必須存在且有 shadow
             if (localPlayer && localPlayer->shadow) {
                 GameObject* s = localPlayer->shadow;
                 s->transform->position = shadowPos;
@@ -290,12 +297,11 @@ public:
             }
             };
 
-        // 繪製所有人的陰影
         DrawShadow(localPlayer.get());
         if (enemyAI) DrawShadow(enemyAI.get());
         for (auto& pair : remotePlayers) DrawShadow(pair.second.get());
 
-        // 復原 Render State
+        // restore Render State
         shader.SetFloat("alpha", 1.0f);
         glDepthMask(GL_TRUE);
         glDisable(GL_BLEND);
@@ -592,7 +598,6 @@ private:
 
                         if (wasAlive && hp->isDead) {
                             if (NetworkManager::Instance().IsServer()) {
-                                // 獲取受害者 ID
                                 int victimID = -99;
                                 if (target == localPlayer.get()) victimID = NetworkManager::Instance().GetMyPlayerID();
                                 else if (target == enemyAI.get()) victimID = 100;
@@ -606,13 +611,13 @@ private:
                                     }
                                 }
 
-                                // 發送擊殺封包
+                                // sned kill packet
                                 PacketKillEvent pkt;
                                 pkt.header.type = PacketType::S2C_KILL_EVENT;
                                 pkt.killerID = p->ownerID;
                                 pkt.victimID = victimID;
                                 pkt.killerTeam = p->ownerTeam;
-                                pkt.victimTeam = hp->teamID; // 受害者隊伍
+                                pkt.victimTeam = hp->teamID;
 
                                 NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
 
@@ -626,7 +631,6 @@ private:
                             }
                             // B. 如果是 AI
                             else if (target == enemyAI.get()) {
-                                // AI 可能直接重生，或者也寫一個 Die 邏輯
                                 SpawnDeathSplat(enemyAI->transform->position, p->inkColor);
                                 hp->Reset();
                                 enemyAI->transform->position = hp->spawnPoint;
@@ -720,13 +724,12 @@ private:
         }
     }
 
-    // 雷射核心邏輯
     void TriggerLaserBeam(glm::vec3 start, glm::vec3 dir, int teamID, int attackerID) {
         float maxDist = 60.0f; // 最大射程
-        float stepSize = 1.0f; // 步長 (檢測精度)
+        float stepSize = 1.0f;
 
         glm::vec3 currentPos = start;
-        glm::vec3 endPos = start + (dir * maxDist); // 預設終點
+        glm::vec3 endPos = start + (dir * maxDist);
 
         // 1. 尋找撞牆點 (raycast)
         for (float d = 0; d < maxDist; d += stepSize) {
@@ -734,7 +737,6 @@ private:
             float terrainH = level->GetHeightAt(currentPos.x, currentPos.z);
 
             // 如果地形高度 > 雷射高度，代表撞牆了
-            // (注意：這裡假設牆壁很高，如果是矮箱子可能會穿過去，視需求調整判定)
             if (terrainH > currentPos.y) {
                 endPos = currentPos; // 更新終點為撞擊點
                 break;
