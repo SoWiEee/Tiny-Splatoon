@@ -11,6 +11,14 @@
 #include <cmath> 
 #include <algorithm>
 
+struct UIPlayerStatus {
+    int id;
+    int team;      // 1 or 2
+    bool isDead;   // 是否死亡
+    bool isSelf;   // 是否為自己 (可以畫個黃色外框特別標示)
+    bool hasSpecial; // 是否大招集滿 (選用，讓圖示發光)
+};
+
 class Scoreboard : public Component {
     std::unique_ptr<Mesh> m_Mesh;
     std::unique_ptr<Shader> m_Shader;
@@ -21,9 +29,10 @@ class Scoreboard : public Component {
     bool useExternalScore = false;
     glm::vec2 m_CurrentScores = glm::vec2(0.0f);
 
+    bool m_ShowScoreBar = false;
+
 public:
     Scoreboard(float w, float h, SplatMap* map) : m_ScreenW(w), m_ScreenH(h), m_SplatMap(map) {
-        // 修改 Shader 路徑以符合你的專案結構 (如果路徑沒變就不需要改)
         m_Shader = std::make_unique<Shader>("assets/shaders/ui.vert", "assets/shaders/scoreboard.frag");
         SetupMesh();
     }
@@ -34,18 +43,29 @@ public:
         useExternalScore = true; // 開啟外部模式，停止自己計算
     }
 
+    // 設定是否顯示分數條
+    void SetShowScoreBar(bool show) {
+        m_ShowScoreBar = show;
+    }
+
     void Update(float dt) override {
-        m_Timer += dt;
-        if (!useExternalScore && m_Timer > 0.5f) {
-            if (m_SplatMap) {
-                m_CurrentScores = m_SplatMap->CalculateScore();
+        if (m_ShowScoreBar) {
+            m_Timer += dt;
+            if (!useExternalScore && m_Timer > 0.5f) {
+                if (m_SplatMap) {
+                    std::pair<float, float> result = m_SplatMap->CalculatePercentages();
+                    m_CurrentScores = glm::vec2(result.first, result.second);
+                }
+                m_Timer = 0.0f;
             }
-            m_Timer = 0.0f;
         }
     }
 
     // 原本的長條圖繪製 (OpenGL)
     void Draw(Shader& sceneShader) override {
+
+        if (!m_ShowScoreBar) return;
+
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -59,9 +79,6 @@ public:
         float barWidth = m_ScreenW * 0.6f;
         float barHeight = 30.0f;
         float xPos = (m_ScreenW - barWidth) / 2.0f;
-
-        // OpenGL 座標 (0,0) 在左下角，所以 Top 是 ScreenH
-        // 這裡設定在上方往下 50 pixel 的位置
         float yPos = m_ScreenH - 50.0f;
 
         glm::mat4 model = glm::mat4(1.0f);
@@ -86,8 +103,54 @@ public:
         glDisable(GL_BLEND);
     }
 
-    // [新增] 繪製倒數計時器 (ImGui)
-    // 請在 GameScene::DrawUI() 裡面呼叫這個函式
+    // 繪製隊伍狀態圖示 (Squid Icons)
+    void DrawPlayerIcons(const std::vector<UIPlayerStatus>& players) {
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(m_ScreenW, 100)); // 頂部區域
+
+        ImGui::Begin("PlayerIcons", nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing);
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+
+        // UI 配置參數
+        float iconSize = 25.0f; // 圖示半徑
+        float spacing = 60.0f;  // 圖示間距
+        float topMargin = 40.0f;
+
+        // 中心點 (計時器在中間)
+        float centerX = m_ScreenW / 2.0f;
+        float timerGap = 120.0f; // 中間留白給計時器
+
+        // 分類隊伍
+        std::vector<UIPlayerStatus> team1;
+        std::vector<UIPlayerStatus> team2;
+        for (const auto& p : players) {
+            if (p.team == 1) team1.push_back(p);
+            else team2.push_back(p);
+        }
+
+        // 繪製 Team 1 (紅色，在左邊，往左延伸)
+        for (int i = 0; i < team1.size(); i++) {
+            // 從中間往左排
+            float x = centerX - (timerGap / 2) - (i * spacing) - 30.0f;
+            float y = topMargin;
+            DrawSingleIcon(dl, team1[i], ImVec2(x, y), iconSize, IM_COL32(255, 50, 50, 255));
+        }
+
+        // 繪製 Team 2 (綠色，在右邊，往右延伸)
+        for (int i = 0; i < team2.size(); i++) {
+            // 從中間往右排
+            float x = centerX + (timerGap / 2) + (i * spacing) + 30.0f;
+            float y = topMargin;
+            DrawSingleIcon(dl, team2[i], ImVec2(x, y), iconSize, IM_COL32(50, 255, 50, 255));
+        }
+
+        ImGui::End();
+    }
+
+    // 繪製倒數計時器
     void DrawUITimer(float timeRemaining) {
         // 1. 格式化時間
         if (timeRemaining < 0) timeRemaining = 0;
@@ -97,11 +160,6 @@ public:
         char timeStr[16];
         sprintf(timeStr, "%d:%02d", minutes, seconds);
 
-        // 2. 計算位置
-        // ImGui 座標 (0,0) 在左上角
-        // 你的計分條在 OpenGL 是 m_ScreenH - 50 (也就是離頂部 50px)
-        // 計分條高 30px，所以大約佔據頂部 20~50px 的位置
-        // 我們把計時器放在計分條正下方 (ImGui Y 座標約 60~70)
         float imguiY = 60.0f;
 
         ImGui::SetNextWindowPos(ImVec2(m_ScreenW / 2 - 60, imguiY));
@@ -141,6 +199,44 @@ public:
     }
 
 private:
+    void DrawSingleIcon(ImDrawList* dl, const UIPlayerStatus& p, ImVec2 center, float radius, ImU32 teamColor) {
+        // 1. 決定顏色
+        ImU32 color = teamColor;
+
+        if (p.isDead) {
+            // 死亡變灰/暗
+            color = IM_COL32(80, 80, 80, 200);
+        }
+
+        // 2. 畫圓 (代表魷魚)
+        dl->AddCircleFilled(center, radius, color);
+
+        // 3. 畫外框
+        if (p.isSelf) {
+            // 自己有黃色外框
+            dl->AddCircle(center, radius + 2.0f, IM_COL32(255, 255, 0, 255), 0, 3.0f);
+        }
+        else {
+            // 別人有黑色外框
+            dl->AddCircle(center, radius, IM_COL32(0, 0, 0, 255), 0, 2.0f);
+        }
+
+        // 4. 死亡顯示 X
+        if (p.isDead) {
+            float s = radius * 0.6f;
+            dl->AddLine(ImVec2(center.x - s, center.y - s), ImVec2(center.x + s, center.y + s), IM_COL32(200, 200, 200, 255), 3.0f);
+            dl->AddLine(ImVec2(center.x + s, center.y - s), ImVec2(center.x - s, center.y + s), IM_COL32(200, 200, 200, 255), 3.0f);
+        }
+
+        // 5. 大招亮燈 (選用)
+        if (p.hasSpecial && !p.isDead) {
+            // 畫一個發光的圈
+            float flash = (sin(ImGui::GetTime() * 10.0f) + 1.0f) * 0.5f;
+            ImU32 glowCol = IM_COL32(255, 255, 255, (int)(150 * flash));
+            dl->AddCircle(center, radius + 5.0f, glowCol, 0, 2.0f);
+        }
+    }
+
     void SetupMesh() {
         std::vector<Vertex> vertices = {
             // Pos              // UV       // Normal

@@ -175,6 +175,8 @@ public:
                     pkt.position = localPlayer->transform->position;
                     pkt.rotationY = localPlayer->transform->rotation.y;
                     pkt.isSwimming = localPlayer->isSwimming;
+                    auto myHP = localPlayer->GetComponent<Health>();
+                    pkt.isDead = (myHP && myHP->isDead);
 
                     // Server or Client
                     if (NetworkManager::Instance().IsServer()) {
@@ -191,6 +193,8 @@ public:
                             aiPkt.position = enemyAI->transform->position;
                             aiPkt.rotationY = enemyAI->transform->rotation.y;
                             aiPkt.isSwimming = false;
+                            auto aiHP = enemyAI->GetComponent<Health>();
+                            aiPkt.isDead = (aiHP && aiHP->isDead);
                             NetworkManager::Instance().Broadcast(&aiPkt, sizeof(aiPkt), false);
                         }
                     }
@@ -563,12 +567,14 @@ private:
         if (id == -1) return;
 
         if (remotePlayers.find(id) != remotePlayers.end()) {
-            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming);
+            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead);
         }
         else {
 
             int guessedTeam = (id == 100) ? 2 : ((id % 2 == 0) ? 1 : 2);
+
             auto newGuy = std::make_unique<RemotePlayer>(id, guessedTeam, pkt->position);
+            newGuy->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead);
             remotePlayers[id] = std::move(newGuy);
             std::cout << "Spawned Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
         }
@@ -692,7 +698,6 @@ private:
 
     // 處理擊殺事件：識別身分 -> 發送封包 -> 更新本地 UI
     void ProcessKillEvent(int killerID, Entity* victim, int killerTeam) {
-        // 1. 找出受害者 ID
         int victimID = -99;
 
         // 檢查是否是本機玩家 (Host)
@@ -708,6 +713,9 @@ private:
             for (auto& rp : remotePlayers) {
                 if (rp.second.get() == victim) {
                     victimID = rp.first;
+                    if (NetworkManager::Instance().IsServer()) {
+                        rp.second->ForceDeadByServer(2.0f); // 鎖定 2 秒
+                    }
                     break;
                 }
             }

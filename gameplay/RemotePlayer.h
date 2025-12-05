@@ -9,6 +9,7 @@ public:
     glm::vec3 targetPos;
     float targetRot;
     bool isSwimming = false;
+    float serverForceDeadTimer = 0.0f;
 
     GameObject* visualBody;
     GameObject* shadow = nullptr;
@@ -39,15 +40,37 @@ public:
 
     GameObject* GetVisualBody() { return visualBody; }
 
-    // 接收狀態更新 (加入 isSwimming 參數)
-    void SetTargetState(glm::vec3 pos, float rotY, bool swimming) {
+    // 接收狀態更新
+    void SetTargetState(glm::vec3 pos, float rotY, bool swimming, bool dead) {
         targetPos = pos;
         targetRot = rotY;
-        isSwimming = swimming; // 直接同步狀態
+        isSwimming = swimming;
+
+        Health* hp = GetComponent<Health>();
+        if (hp) {
+            bool finalDeadState = dead;
+            if (serverForceDeadTimer > 0.0f) {
+                finalDeadState = true;
+            }
+            if (hp->isDead != finalDeadState) {
+                hp->isDead = finalDeadState;
+
+                if (!finalDeadState) {
+                    hp->currentHP = hp->maxHP;
+                }
+                else {
+                    hp->currentHP = 0.0f;
+                }
+            }
+        }
     }
 
     // 插值更新
     void UpdateInterp(float dt) {
+        if (serverForceDeadTimer > 0.0f) {
+            serverForceDeadTimer -= dt;
+        }
+
         transform->position = glm::mix(transform->position, targetPos, dt * 10.0f);
         float angleDiff = targetRot - transform->rotation.y;
         transform->rotation.y += angleDiff * dt * 10.0f;
@@ -74,5 +97,14 @@ public:
     void SetTargetState(glm::vec3 pos, float rot) {
         targetPos = pos;
         targetRot = rot;
+    }
+
+    void ForceDeadByServer(float duration = 2.0f) {
+        serverForceDeadTimer = duration;
+        Health* hp = GetComponent<Health>();
+        if (hp) {
+            hp->isDead = true;
+            hp->currentHP = 0.0f;
+        }
     }
 };

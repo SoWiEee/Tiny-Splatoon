@@ -89,6 +89,7 @@ struct PacketPlayerState {
     glm::vec3 velocity; // 用於預測插值
     float rotationY;
     bool isSwimming;
+    bool isDead;
 };
 
 // 4. 射擊請求
