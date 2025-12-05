@@ -92,6 +92,11 @@ struct PacketPlayerState {
     bool isDead;
 };
 
+enum class ProjectileType : uint8_t {
+    BULLET = 0,
+    BOMB = 1
+};
+
 // 4. 射擊請求
 struct PacketShoot {
     PacketHeader header;
@@ -102,6 +107,7 @@ struct PacketShoot {
     float speed;
     float scale;
     glm::vec3 color;
+    ProjectileType type = ProjectileType::BULLET;
 };
 
 // 5. 塗地同步 (最精簡的資料)
