@@ -10,6 +10,7 @@ public:
     float targetRot;
     bool isSwimming = false;
     float serverForceDeadTimer = 0.0f;
+    bool isSharking = false;
 
     GameObject* visualBody;
     GameObject* shadow = nullptr;
@@ -41,10 +42,17 @@ public:
     GameObject* GetVisualBody() { return visualBody; }
 
     // 接收狀態更新
-    void SetTargetState(glm::vec3 pos, float rotY, bool swimming, bool dead) {
+    void SetTargetState(glm::vec3 pos, float rotY, bool swimming, bool dead, bool sharking) {
         targetPos = pos;
         targetRot = rotY;
         isSwimming = swimming;
+        isSharking = sharking;
+
+        if (isSharking) {
+            // [視覺效果] 如果在騎鯊魚，可以把模型縮放改一下，或者加個特效
+            // 例如：稍微浮起來
+            if (visualBody) visualBody->transform->position.y += 0.5f;
+        }
 
         Health* hp = GetComponent<Health>();
         if (hp) {

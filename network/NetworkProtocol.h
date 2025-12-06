@@ -90,6 +90,7 @@ struct PacketPlayerState {
     float rotationY;
     bool isSwimming;
     bool isDead;
+    bool isSharking;
 };
 
 enum class ProjectileType : uint8_t {

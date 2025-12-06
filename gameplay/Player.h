@@ -16,7 +16,8 @@
 enum class PlayerState {
     ALIVE,      // 正常遊玩
     DEAD,       // 死亡 (等待重生)
-    LAUNCHING   // 超級跳躍進場中
+    LAUNCHING,  // 超級跳躍進場中
+    SHARKING    // 鯊魚坐騎狀態
 };
 
 class Player : public Entity {
@@ -38,6 +39,14 @@ public:
     // 是否持有炸彈
     bool hasBomb = false;
     bool requestBombThrow = false;
+
+    // 鯊魚坐騎參數
+    float sharkTimer = 0.0f;        // 衝刺剩餘時間
+    float sharkDuration = 2.0f;     // 總衝刺時間
+    float sharkSpeed = 25.0f;       // 衝刺速度
+    float sharkInkTimer = 0.0f;     // 用來計時噴墨水的頻率
+    bool requestSharkSpray = false;
+    bool requestSharkExplode = false;
 
     bool requestLaser = false;
     float currentCharge = 0.0f;       // 當前能量
@@ -100,12 +109,13 @@ public:
             Die();
             return;
         }
+
         switch (state) {
         case PlayerState::ALIVE:
             HandleInput(dt);
 
             if (Input::GetKey(GLFW_KEY_Q) && IsSpecialReady()) {
-                StartSpecialLaser();
+                StartSpecialShark();
             }
 
             if (level && mapFloor && mapObstacle) {
@@ -148,6 +158,10 @@ public:
                 }
             }
             ApplyPhysics(dt);
+            break;
+
+        case PlayerState::SHARKING:
+            UpdateShark(dt);
             break;
 
         case PlayerState::DEAD:
@@ -224,6 +238,60 @@ public:
             std::cout << "[Player] Picked up a Bomb! Press R to throw." << std::endl;
             // 這裡可以播放音效 "item_get"
         }
+    }
+
+    void StartSpecialShark() {
+        if (state != PlayerState::ALIVE) return;
+
+        state = PlayerState::SHARKING;
+        sharkTimer = sharkDuration;
+        sharkInkTimer = 0.0f;
+
+        // 重置垂直速度，給一點跳躍感
+        velocity.y = 5.0f;
+
+        // 播放音效
+        AudioManager::Instance().PlayOneShot("shark_start", 1.0f);
+        std::cout << "Riding Shark!" << std::endl;
+    }
+    void UpdateShark(float dt) {
+        sharkTimer -= dt;
+
+        // 2. 自動向前衝刺 (忽略摩擦力)
+        glm::vec3 forward = transform->GetForward();
+        velocity.x = forward.x * sharkSpeed;
+        velocity.z = forward.z * sharkSpeed;
+
+        // 仍然受重力影響 (這樣才可以衝下斜坡或掉下懸崖)
+        velocity.y += gravity * dt;
+
+        // 3. 物理移動
+        ApplyPhysics(dt);
+
+        // 4. 自動噴射墨水子彈 (每 0.05 秒噴一次)
+        sharkInkTimer += dt;
+        if (sharkInkTimer > 0.05f) {
+            sharkInkTimer = 0.0f;
+            // 通知 GameWorld 生成兩側子彈
+            requestSharkSpray = true;
+        }
+
+        // 5. 結束判定 (時間到 或 撞牆速度驟降)
+        // 簡單判定：如果速度變很慢(撞牆)，就提早爆炸
+        bool hitWall = (glm::length(glm::vec2(velocity.x, velocity.z)) < 2.0f);
+
+        if (sharkTimer <= 0.0f || hitWall) {
+            EndShark();
+        }
+    }
+
+    void EndShark() {
+        state = PlayerState::ALIVE;
+        velocity = glm::vec3(0);
+
+        // 通知 GameWorld 產生終結大爆炸
+        requestSharkExplode = true;
+        currentCharge = 0.0f;
     }
 
 private:

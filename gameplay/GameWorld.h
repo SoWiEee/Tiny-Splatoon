@@ -145,6 +145,19 @@ public:
                 if (enemyAI->weapon) CollectProjectiles(*(enemyAI->weapon));
             }
 
+            // 處理鯊魚噴墨
+            if (localPlayer && localPlayer->requestSharkSpray) {
+                SpawnSharkBullets(); // 生成兩側子彈
+                localPlayer->requestSharkSpray = false;
+            }
+
+            // 處理鯊魚終結爆炸
+            if (localPlayer && localPlayer->requestSharkExplode) {
+                // 直接生成一顆 "已經爆炸" 的隱形炸彈來觸發範圍傷害與塗地
+                SpawnSharkExplosion();
+                localPlayer->requestSharkExplode = false;
+            }
+
             // 檢查雷射請求
             if (localPlayer && localPlayer->requestLaser) {
                 int myID = NetworkManager::Instance().GetMyPlayerID();
@@ -206,7 +219,7 @@ public:
                 ++it;
             }
 
-            // --- 2. 網路同步 (發送本機狀態) ---
+			// Network Sync - send player states
             if (NetworkManager::Instance().IsConnected()) {
                 syncTimer += dt;
                 if (syncTimer > 0.05f) {
@@ -219,6 +232,7 @@ public:
                     pkt.isSwimming = localPlayer->isSwimming;
                     auto myHP = localPlayer->GetComponent<Health>();
                     pkt.isDead = (myHP && myHP->isDead);
+                    pkt.isSharking = (localPlayer->state == PlayerState::SHARKING);
 
                     // Server or Client
                     if (NetworkManager::Instance().IsServer()) {
@@ -264,8 +278,6 @@ public:
                         scorePkt.timeRemaining = 180.0f;
 
                         NetworkManager::Instance().Broadcast(&scorePkt, sizeof(scorePkt), false);
-
-                        // if (scoreboardRef) scoreboardRef->SetScores(scores.x, scores.y);
                     }
                     scoreTimer = 0.0f;
                 }
@@ -647,14 +659,14 @@ private:
         if (id == -1) return;
 
         if (remotePlayers.find(id) != remotePlayers.end()) {
-            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead);
+            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead, pkt->isSharking);
         }
         else {
 
             int guessedTeam = (id == 100) ? 2 : ((id % 2 == 0) ? 1 : 2);
 
             auto newGuy = std::make_unique<RemotePlayer>(id, guessedTeam, pkt->position);
-            newGuy->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead);
+            newGuy->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead, pkt->isSharking);
             remotePlayers[id] = std::move(newGuy);
             std::cout << "Spawned Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
         }
@@ -685,23 +697,61 @@ private:
                 }
 
                 if (p->hasExploded) {
-                    // 1. 產生超大墨水 (半徑 5.0 UV)
-                    // inkMultiplier 設超大
-                    float uvSize = (5.0f * 10.0f) / mapSize;
+                    glm::vec3 bombPos = p->transform->position;
+                    float mapSize = level->mapSize;
 
-                    // 雙地圖塗色 (爆炸通常會炸到所有東西)
-                    auto result = SplatPhysics::WorldToUV(p->transform->position, glm::vec3(0), mapSize, mapSize);
-                    if (result.hit) {
-                        painter->Paint(mapFloor.get(), result.uv, uvSize, p->inkColor, 0, p->ownerTeam);
-                        painter->Paint(mapObstacle.get(), result.uv, uvSize, p->inkColor, 0, p->ownerTeam);
+                    // =========================================================
+                    // 1. [集束炸彈邏輯] 模擬 60+ 發子彈同時落地
+                    // =========================================================
+
+                    // 設定參數
+                    float maxRadius = 15.0f; // 最大爆炸半徑 (公尺)
+                    int layers = 5;          // 分 5 層擴散 (同心圓)
+
+                    // Loop 1: 每一層 (從中心往外)
+                    for (int l = 0; l <= layers; l++) {
+                        float currentRadius = (maxRadius / layers) * l;
+
+                        // 越外圈，墨水數量越多
+                        int countInLayer = (l == 0) ? 1 : (l * 8);
+
+                        // Loop 2: 每一滴墨水
+                        for (int i = 0; i < countInLayer; i++) {
+                            // 計算角度
+                            float angle = (360.0f / countInLayer) * i;
+                            // 加入一點隨機偏移，讓形狀不要太圓，比較自然
+                            float randOffset = ((rand() % 100) / 100.0f) * 2.0f;
+                            float finalRadius = currentRadius + randOffset;
+
+                            // 計算位置
+                            float rad = glm::radians(angle);
+                            glm::vec3 offset(cos(rad) * finalRadius, 0, sin(rad) * finalRadius);
+                            glm::vec3 splatPos = bombPos + offset;
+
+                            // 計算墨水大小 (中間大，旁邊小)
+                            // 內圈大小約 4.0，外圈遞減到 1.5
+                            float scale = 4.0f - (2.5f * (float)l / layers);
+                            float uvSize = (scale * 2.0f) / mapSize;
+                            float rot = (float)(rand() % 360);
+
+                            // 執行塗地 (Paint)
+                            auto result = SplatPhysics::WorldToUV(splatPos, glm::vec3(0), mapSize, mapSize);
+                            if (result.hit) {
+                                // 判斷高度 (地板 vs 障礙物)
+                                float h = level->GetHeightAt(splatPos.x, splatPos.z);
+                                SplatMap* target = (h > 0.5f) ? mapObstacle.get() : mapFloor.get();
+
+                                // 每一滴都執行一次 UpdateCPUData，確保網格被填滿
+                                painter->Paint(target, result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
+                            }
+                        }
                     }
-
                     AudioManager::Instance().PlayOneShot("explode", 1.0f);
-                    if (particleSystem) particleSystem->Emit(p->transform->position, p->inkColor, 50, 15.0f);
+                    if (particleSystem) particleSystem->Emit(bombPos, p->inkColor, 50, 25.0f);
 
                     // --- B. 傷害判定 (只有 Server 執行) ---
                     if (NetworkManager::Instance().IsServer()) {
-                        float blastRadius = 8.0f;
+                        float blastRadius = 10.0f;
                         float damage = 999.0f;
 
                         // 1. 檢查本機玩家 (Server 自己)
@@ -942,6 +992,88 @@ private:
         // update local kill log
         if (hudRef) {
             hudRef->AddKillLog(killerID, victimID, killerTeam, victimTeam);
+        }
+    }
+
+    void SpawnSharkBullets() {
+        Player* p = localPlayer.get();
+        glm::vec3 center = p->transform->position + glm::vec3(0, 0.5f, 0);
+        glm::vec3 fwd = p->transform->GetForward();
+        glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
+
+        // 左邊一發，右邊一發
+        for (int i = -1; i <= 1; i += 2) {
+            glm::vec3 dir = right * (float)i; // 左或右
+            dir.y = 0.5f; // 稍微往上拋
+            dir = glm::normalize(dir);
+
+            // 使用既有的 Projectile
+            // 速度 10，小顆一點，不是炸彈
+            auto bullet = std::make_unique<Projectile>(
+                center,
+                dir * 12.0f,
+                p->weapon->inkColor,
+                p->teamID,
+                0.5f, // scale
+                NetworkManager::Instance().GetMyPlayerID(),
+                false // isBomb = false
+            );
+
+            // 加入列表
+            projectiles.push_back(std::move(bullet));
+
+            // 發送封包 (讓別人也能看到子彈)
+            if (NetworkManager::Instance().IsConnected()) {
+                PacketShoot pkt;
+                pkt.header.type = PacketType::C2S_SHOOT;
+                pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
+                pkt.origin = center;
+                pkt.direction = dir;
+                pkt.speed = 12.0f;
+                pkt.scale = 0.5f;
+                pkt.color = p->weapon->inkColor;
+                pkt.type = ProjectileType::BULLET;
+                NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false);
+            }
+        }
+    }
+
+    // 生成終結爆炸
+    void SpawnSharkExplosion() {
+        Player* p = localPlayer.get();
+
+        // 我們偷懶一下：生成一顆 "壽命為 0" 的炸彈，讓它下一幀立刻爆炸
+        // 這樣就能直接復用 UpdateProjectiles 裡寫好的 "集束炸彈" 邏輯！
+
+        auto bomb = std::make_unique<Projectile>(
+            p->transform->position,
+            glm::vec3(0), // 沒速度
+            p->weapon->inkColor,
+            p->teamID,
+            1.0f,
+            NetworkManager::Instance().GetMyPlayerID(),
+            true // isBomb = true
+        );
+
+        bomb->fuseTimer = 0.0f; // <--- 關鍵：立刻爆炸
+
+        projectiles.push_back(std::move(bomb));
+
+        // 這裡不需要發送 SHOOT 封包，因為爆炸是 Server 權威判定的
+        // 但為了視覺同步，我們可以發送一個 SHOOT 封包帶有 BOMB 屬性且速度為 0
+        // 或者依靠 Server 廣播爆炸事件
+        // 最簡單的方法：發送一個 BOMB SHOOT，但 fuseTimer 極短
+        if (NetworkManager::Instance().IsConnected()) {
+            PacketShoot pkt;
+            pkt.header.type = PacketType::C2S_SHOOT;
+            pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
+            pkt.origin = p->transform->position;
+            pkt.direction = glm::vec3(0, 1, 0);
+            pkt.speed = 0.0f;
+            pkt.scale = 1.0f;
+            pkt.color = p->weapon->inkColor;
+            pkt.type = ProjectileType::BOMB;
+            NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
         }
     }
 
