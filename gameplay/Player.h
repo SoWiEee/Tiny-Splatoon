@@ -35,6 +35,9 @@ public:
     PlayerState state = PlayerState::ALIVE;
     float respawnTimer = 0.0f;
     float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
+    // 是否持有炸彈
+    bool hasBomb = false;
+    bool requestBombThrow = false;
 
     bool requestLaser = false;
     float currentCharge = 0.0f;       // 當前能量
@@ -193,12 +196,10 @@ public:
         }
     }
 
-    // 開始超級跳躍
     void StartSuperJump() {
         state = PlayerState::LAUNCHING;
         jumpTimer = 0.0f;
 
-        // 顯示模型
         if (visualBody) visualBody->active = true;
 
         // 設定起點與終點 (根據隊伍)
@@ -207,12 +208,17 @@ public:
         float zDir = (teamID == 1) ? -1.0f : 1.0f;
         jumpTargetPos = glm::vec3(0, 0.0f, 30.0f * zDir); // 落地點
 
-        // 重置血量與墨水
         GetComponent<Health>()->Reset();
         if (hudRef) hudRef->RefillInk(100.0f);
-
-        // 播放跳躍音效
         AudioManager::Instance().PlayOneShot("superjump", 1.0f);
+    }
+
+    void PickupBomb() {
+        if (!hasBomb) {
+            hasBomb = true;
+            std::cout << "[Player] Picked up a Bomb! Press R to throw." << std::endl;
+            // 這裡可以播放音效 "item_get"
+        }
     }
 
 private:
@@ -349,6 +355,12 @@ private:
                 // chargeAmount = weapon->specialGain;
                 AddSpecialCharge(chargeAmount);
             }
+        }
+
+        if (hasBomb && Input::GetKey(GLFW_KEY_R)) {
+            hasBomb = false;
+            requestBombThrow = true;
+            std::cout << "[Player] Throwing Bomb!" << std::endl;
         }
     }
 

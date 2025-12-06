@@ -18,6 +18,7 @@
 #include "Enemy.h"
 #include "RemotePlayer.h"
 #include "Projectile.h"
+#include "Item.hpp"
 #include "../components/Scoreboard.h"
 #include "../components/Health.h"
 #include "../network/NetworkManager.h"
@@ -43,9 +44,12 @@ public:
     std::unique_ptr<Player> localPlayer;
     std::unique_ptr<Enemy> enemyAI;
     std::vector<std::unique_ptr<Projectile>> projectiles;
+    std::vector<std::unique_ptr<Item>> items;
+    float itemRespawnTimer = 0.0f;
 
     // 遠端玩家列表
     std::map<int, std::unique_ptr<RemotePlayer>> remotePlayers;
+
 
     // 同步計時器
     float syncTimer = 0.0f;
@@ -129,11 +133,9 @@ public:
 
     void Update(float dt) {
 
-        // --- 遊戲進行中 ---
         if (state == WorldState::PLAYING) {
             gameTimeRemaining -= dt;
 
-            // --- 1. 更新本機實體 ---
             if (localPlayer) {
                 localPlayer->UpdateLogic(dt);
                 if (localPlayer->weapon) CollectProjectiles(*(localPlayer->weapon));
@@ -164,6 +166,37 @@ public:
                 }
 
                 localPlayer->requestLaser = false;
+            }
+
+            if (localPlayer && localPlayer->requestBombThrow) {
+                SpawnBombProjectile();
+                localPlayer->requestBombThrow = false;
+            }
+
+            // B. 道具生成 (維持場上最多 3 個)
+            if (items.size() < 3) {
+                itemRespawnTimer += dt;
+                if (itemRespawnTimer > 5.0f) {
+                    SpawnRandomItem();
+                    itemRespawnTimer = 0.0f;
+                }
+            }
+
+            // C. 更新與拾取判定
+            for (auto it = items.begin(); it != items.end(); ) {
+                (*it)->Update(dt);
+
+                // 拾取距離判定
+                if (localPlayer && !localPlayer->hasBomb) {
+                    float dist = glm::distance(localPlayer->transform->position, (*it)->transform->position);
+                    if (dist < 1.5f) {
+                        localPlayer->PickupBomb();
+                        AudioManager::Instance().PlayOneShot("reload", 1.0f);
+                        it = items.erase(it);
+                        continue;
+                    }
+                }
+                ++it;
             }
 
             // --- 2. 網路同步 (發送本機狀態) ---
@@ -246,7 +279,6 @@ public:
                 EndGame();
             }
         }
-        // --- 遊戲結束 ---
         else if (state == WorldState::FINISHED) {
             finishTimer -= dt;
             if (localPlayer) localPlayer->velocity = glm::vec3(0);
@@ -345,6 +377,12 @@ public:
         shader.SetFloat("alpha", 1.0f);
         glDepthMask(GL_TRUE);
         glDisable(GL_BLEND);
+
+        // 畫道具 (用普通的 Shader 設定，不需墨水)
+        shader.SetInt("useInk", 0);
+        for (auto& item : items) {
+            item->Draw(shader);
+        }
     }
 
     // 統一收集並生成子彈 (包含網路發送)
@@ -355,7 +393,8 @@ public:
             velocity.y += 2.0f;
 
             int myID = NetworkManager::Instance().GetMyPlayerID();
-            auto p = std::make_unique<Projectile>(velocity, info.color, info.team, info.scale, myID);
+            glm::vec3 gunPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0) + localPlayer->transform->GetForward() * 0.5f;
+            auto p = std::make_unique<Projectile>(gunPos, velocity, info.color, info.team, info.scale, myID, false);
             p->transform->position = info.pos;
             projectiles.push_back(std::move(p));
 
@@ -376,7 +415,7 @@ public:
                 }
 
                 pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
-                pkt.origin = info.pos;
+                pkt.origin = info.pos;  // need gunPos?
                 pkt.direction = info.dir;
                 pkt.speed = info.speed;
                 pkt.scale = info.scale;
@@ -579,10 +618,11 @@ private:
     void SpawnRemoteProjectile(const PacketShoot& pkt) {
         glm::vec3 velocity = pkt.direction * pkt.speed;
         velocity.y += 2.0f;
+        bool isBomb = (pkt.type == ProjectileType::BOMB);
 
         int team = (pkt.color.x > 0.5f) ? 1 : 2;    // red=1, green=2
 
-        auto p = std::make_unique<Projectile>(velocity, pkt.color, team, pkt.scale, pkt.playerID);
+        auto p = std::make_unique<Projectile>(pkt.origin, velocity, pkt.color, team, pkt.scale, pkt.playerID, isBomb);
         p->transform->position = pkt.origin;
         projectiles.push_back(std::move(p));
     }
@@ -611,11 +651,58 @@ private:
     // 子彈物理更新迴圈
     void UpdateProjectiles(float dt) {
         float mapSize = level->mapSize;
-        float inkMultiplier = 40.0f;
+        float inkMultiplier = 50.0f;
 
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
             Projectile* p = it->get();
             p->UpdatePhysics(dt);
+
+            // --- 炸彈專用邏輯 ---
+            if (p->isBomb) {
+                // A. 爆炸 (時間到)
+                if (p->hasExploded) {
+                    // 1. 產生超大墨水 (半徑 5.0 UV)
+                    // inkMultiplier 設超大
+                    float uvSize = (5.0f * 10.0f) / mapSize;
+
+                    // 雙地圖塗色 (爆炸通常會炸到所有東西)
+                    auto result = SplatPhysics::WorldToUV(p->transform->position, glm::vec3(0), mapSize, mapSize);
+                    if (result.hit) {
+                        painter->Paint(mapFloor.get(), result.uv, uvSize, p->inkColor, 0, p->ownerTeam);
+                        painter->Paint(mapObstacle.get(), result.uv, uvSize, p->inkColor, 0, p->ownerTeam);
+                    }
+
+                    // 2. 傷害判定 (半徑 5米)
+                    // TODO: 遍歷 enemies 做距離判定 TakeDamage(999)
+
+                    // 3. 音效與特效
+                    AudioManager::Instance().PlayOneShot("explode", 1.0f);
+                    if (particleSystem) particleSystem->Emit(p->transform->position, p->inkColor, 50, 15.0f);
+
+                    it = projectiles.erase(it);
+                    continue;
+                }
+
+                // B. 撞地反彈 (Bouncing)
+                if (p->hasHitFloor) {
+                    // 簡單反彈：Y 軸速度反轉並衰減
+                    p->velocity.y = -p->velocity.y * 0.6f; // 0.6 是彈性係數
+                    p->velocity.x *= 0.8f; // 摩擦力
+                    p->velocity.z *= 0.8f;
+
+                    // 如果彈跳太小就停止
+                    if (abs(p->velocity.y) < 1.0f) p->velocity.y = 0;
+
+                    // 修正位置
+                    p->transform->position = p->hitPosition + glm::vec3(0, 0.1f, 0);
+                    p->hasHitFloor = false; // 重置碰撞旗標
+                }
+
+                // 炸彈繼續存在，不刪除
+                ++it;
+                continue;
+            }
+
             bool hitSomething = false;
 
             // 檢查碰撞 (本機 + AI + 遠端玩家)
@@ -866,6 +953,54 @@ private:
                 }
             }
         }
+    }
+
+    // 生成隨機道具
+    void SpawnRandomItem() {
+        if (level->itemSpawnPoints.empty()) return;
+        int idx = rand() % level->itemSpawnPoints.size();
+        glm::vec3 pos = level->itemSpawnPoints[idx];
+
+        // 避免重疊生成
+        for (auto& item : items) if (glm::distance(item->transform->position, pos) < 1.0f) return;
+
+        items.push_back(std::make_unique<Item>(pos, ItemType::BOMB));
+    }
+
+    // 生成炸彈實體
+    void SpawnBombProjectile() {
+        if (!localPlayer) return;
+        Player* pl = localPlayer.get();
+        int myID = NetworkManager::Instance().GetMyPlayerID();
+        glm::vec3 spawnPos = pl->transform->position + glm::vec3(0, 2.5f, 0) + pl->transform->GetForward() * 0.5f;
+
+        // 往上看一點
+        glm::vec3 dir = pl->transform->GetForward();
+        dir.y += 0.4f;
+        glm::vec3 velocity = glm::normalize(dir) * 15.0f;
+
+        // 建立炸彈
+        auto bomb = std::make_unique<Projectile>(
+            spawnPos, velocity, pl->weapon->inkColor, pl->teamID, 1.0f,
+            NetworkManager::Instance().GetMyPlayerID(), true
+        );
+        projectiles.push_back(std::move(bomb));
+
+        if (NetworkManager::Instance().IsConnected()) {
+            PacketShoot pkt;
+            pkt.header.type = PacketType::C2S_SHOOT;
+            pkt.playerID = myID;
+            pkt.origin = spawnPos;
+            pkt.direction = dir;
+            pkt.speed = pl->swimSpeed;
+            pkt.scale = 1.0f;
+            pkt.color = pl->weapon->inkColor;
+            pkt.type = ProjectileType::BOMB;
+
+            NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+        }
+
+        AudioManager::Instance().PlayOneShot("shoot", 0.8f);
     }
 
     // 計算點到線段的最短距離
