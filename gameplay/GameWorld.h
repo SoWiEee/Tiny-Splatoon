@@ -155,7 +155,7 @@ public:
                 TriggerLaserBeam(startPos, dir, myTeam, myID);
 
                 if (NetworkManager::Instance().IsConnected()) {
-                    PacketSpecialLaser pkt; // 使用新的雷射封包
+                    PacketSpecialLaser pkt;
                     pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
                     pkt.playerID = myID;
                     pkt.teamID = myTeam;
@@ -173,8 +173,8 @@ public:
                 localPlayer->requestBombThrow = false;
             }
 
-            // B. 道具生成 (維持場上最多 3 個)
-            if (items.size() < 3) {
+            // B. 道具生成 (維持場上最多 2 個)
+            if (items.size() < 2) {
                 itemRespawnTimer += dt;
                 if (itemRespawnTimer > 5.0f) {
                     SpawnRandomItem();
@@ -657,13 +657,25 @@ private:
             Projectile* p = it->get();
             p->UpdatePhysics(dt);
 
-            // --- 炸彈專用邏輯 ---
+            // bomb
             if (p->isBomb) {
-                // A. 爆炸 (時間到)
+                // 1. 倒數警示音效 (剩 1.0 秒時)
+                if (!p->warningPlayed && p->fuseTimer <= 1.0f && p->fuseTimer > 0.0f) {
+                    p->warningPlayed = true;
+
+                    // 簡單的 3D 音效模擬：只有離炸彈夠近的人才聽得到
+                    if (localPlayer) {
+                        float dist = glm::distance(p->transform->position, localPlayer->transform->position);
+                        if (dist < 15.0f) { // 15米內聽得到
+                            AudioManager::Instance().PlayOneShot("bomb_beep", 1.0f);
+                        }
+                    }
+                }
+
                 if (p->hasExploded) {
                     // 1. 產生超大墨水 (半徑 5.0 UV)
                     // inkMultiplier 設超大
-                    float uvSize = (5.0f * 10.0f) / mapSize;
+                    float uvSize = (4.0f * 10.0f) / mapSize;
 
                     // 雙地圖塗色 (爆炸通常會炸到所有東西)
                     auto result = SplatPhysics::WorldToUV(p->transform->position, glm::vec3(0), mapSize, mapSize);
@@ -672,12 +684,58 @@ private:
                         painter->Paint(mapObstacle.get(), result.uv, uvSize, p->inkColor, 0, p->ownerTeam);
                     }
 
-                    // 2. 傷害判定 (半徑 5米)
-                    // TODO: 遍歷 enemies 做距離判定 TakeDamage(999)
-
-                    // 3. 音效與特效
                     AudioManager::Instance().PlayOneShot("explode", 1.0f);
                     if (particleSystem) particleSystem->Emit(p->transform->position, p->inkColor, 50, 15.0f);
+
+                    // --- B. 傷害判定 (只有 Server 執行) ---
+                    if (NetworkManager::Instance().IsServer()) {
+                        float blastRadius = 6.0f; // 爆炸半徑
+                        float damage = 999.0f;    // 秒殺傷害
+
+                        // 1. 檢查本機玩家 (Server 自己)
+                        if (localPlayer) {
+                            float dist = glm::distance(p->transform->position, localPlayer->transform->position);
+                            if (dist < blastRadius) {
+                                // 規則：會炸死敵人，也會炸死自己(自殺)，但不會炸死隊友
+                                if (localPlayer->teamID != p->ownerTeam || p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {
+                                    auto hp = localPlayer->GetComponent<Health>();
+                                    if (hp) {
+                                        hp->TakeDamage(damage);
+                                        if (hp->isDead) {
+                                            ProcessKillEvent(p->ownerID, localPlayer.get(), p->ownerTeam);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2. 檢查 AI
+                        if (enemyAI) {
+                            float dist = glm::distance(p->transform->position, enemyAI->transform->position);
+                            if (dist < blastRadius) {
+                                if (enemyAI->teamID != p->ownerTeam) {
+                                    auto hp = enemyAI->GetComponent<Health>();
+                                    if (hp) {
+                                        hp->TakeDamage(damage);
+                                        if (hp->isDead) ProcessKillEvent(p->ownerID, enemyAI.get(), p->ownerTeam);
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. 檢查遠端玩家 (Clients)
+                        for (auto& pair : remotePlayers) {
+                            RemotePlayer* rp = pair.second.get();
+                            float dist = glm::distance(p->transform->position, rp->transform->position);
+
+                            if (dist < blastRadius) {
+                                // 判斷敵我 (或自殺)
+                                if (rp->teamID != p->ownerTeam || pair.first == p->ownerID) {
+                                    ProcessKillEvent(p->ownerID, rp, p->ownerTeam);
+                                }
+                            }
+                        }
+                    }
 
                     it = projectiles.erase(it);
                     continue;
