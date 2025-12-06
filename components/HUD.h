@@ -151,8 +151,8 @@ public:
             float barAnim = std::min(1.0f, (animTime - 1.0f) / 2.0f); // 2秒內跑完
 
             // 計算顯示的分數 (Lerp)
-            float displayS1 = score1 * barAnim;
-            float displayS2 = score2 * barAnim;
+            float displayS1 = score1 * barAnim * 100.0f;
+            float displayS2 = score2 * barAnim * 100.0f;
 
             // 繪製背景條
             ImGui::SetNextWindowPos(ImVec2(50, screenHeight - 150));
