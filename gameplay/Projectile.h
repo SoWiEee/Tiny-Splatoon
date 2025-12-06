@@ -21,6 +21,7 @@ public:
     bool isBomb = false;
     float fuseTimer = 0.0f;     // 引信倒數
     bool hasExploded = false;   // 標記是否觸發爆炸
+    bool warningPlayed = false;
 
     // --- [新增] 壽命限制 (防止子彈飛到天荒地老) ---
     float lifeTime = 5.0f;
@@ -57,7 +58,7 @@ public:
             fuseTimer -= dt;
             if (fuseTimer <= 0.0f) {
                 isDead = true;
-                hasExploded = true; // 觸發 GameWorld 的爆炸邏輯
+                hasExploded = true;
                 return;
             }
         }
@@ -94,7 +95,7 @@ public:
                 if (isBomb) {
                     // --- 炸彈：反彈邏輯 (Bounce) ---
                     // Y 軸速度反轉並衰減
-                    velocity.y = -velocity.y * 0.5f; // 0.5 彈性係數
+                    velocity.y = -velocity.y * 1.0f; // 彈性係數
 
                     // 水平摩擦力 (讓它滾一滾停下來)
                     velocity.x *= 0.8f;
