@@ -95,6 +95,11 @@ public:
 
     // ¥DÅÞ¿è§ó·s
     void UpdateLogic(float dt) {
+        auto hpComp = GetComponent<Health>();
+        if (state == PlayerState::ALIVE && hpComp && hpComp->isDead) {
+            Die();
+            return;
+        }
         switch (state) {
         case PlayerState::ALIVE:
             HandleInput(dt);
