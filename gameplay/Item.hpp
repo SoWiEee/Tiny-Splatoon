@@ -22,7 +22,7 @@ public:
 
         // 使用黑色小方塊代表炸彈
         AddComponent<MeshRenderer>("Cube", glm::vec3(0.1f, 0.1f, 0.1f));
-        transform->scale = glm::vec3(0.5f); // 大小
+        transform->scale = glm::vec3(1.0f); // 大小
     }
 
     void Update(float dt) {
