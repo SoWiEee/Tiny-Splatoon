@@ -162,7 +162,14 @@ public:
                     pkt.origin = startPos;
                     pkt.direction = dir;
 
-                    NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+                    if (NetworkManager::Instance().IsServer()) {
+                        pkt.header.type = PacketType::S2C_SPECIAL_ATTACK;
+                        NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+                    }
+                    else {
+                        pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
+                        NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+                    }
                 }
 
                 localPlayer->requestLaser = false;
@@ -240,27 +247,25 @@ public:
                     syncTimer = 0.0f;
                 }
 
-                // B. 分數與遊戲狀態同步 (低頻率: 0.5s = 2Hz)
+				// B. 分數與遊戲狀態同步 (0.5s) - server only
                 static float scoreTimer = 0.0f;
                 scoreTimer += dt;
 
                 if (scoreTimer > 0.5f) {
-                    // 只有 Server 有權力廣播分數
                     if (NetworkManager::Instance().IsServer()) {
-                        // 計算分數
-                        glm::vec2 scores = mapFloor->CalculateScore();
+                        std::pair<float, float> scores = mapFloor->CalculatePercentages();
+                        finalScoreTeam1 = scores.first;
+                        finalScoreTeam2 = scores.second;
 
-                        // 發送分數封包
                         PacketGameState scorePkt;
                         scorePkt.header.type = PacketType::S2C_GAME_STATE;
-                        scorePkt.scoreTeam1 = scores.x;
-                        scorePkt.scoreTeam2 = scores.y;
-                        scorePkt.timeRemaining = 180.0f; // 範例時間
+                        scorePkt.scoreTeam1 = scores.first;
+                        scorePkt.scoreTeam2 = scores.second;
+                        scorePkt.timeRemaining = 180.0f;
 
-                        NetworkManager::Instance().Broadcast(&scorePkt, sizeof(scorePkt), true);
+                        NetworkManager::Instance().Broadcast(&scorePkt, sizeof(scorePkt), false);
 
-                        // Server 本地 Scoreboard 更新
-                        if (scoreboardRef) scoreboardRef->SetScores(scores.x, scores.y);
+                        // if (scoreboardRef) scoreboardRef->SetScores(scores.x, scores.y);
                     }
                     scoreTimer = 0.0f;
                 }
@@ -486,24 +491,28 @@ public:
         }
 
 		// B. Common Client & Server Logic
-        // 1. 收到世界狀態 (別人移動了)
+        // move event
         if (received.type == PacketType::S2C_WORLD_STATE) {
             HandleWorldState((PacketPlayerState*)received.data.data());
         }
-        // 2. 收到射擊事件 (別人開槍了)
+        // shoot event
         else if (received.type == PacketType::S2C_SHOOT_EVENT) {
             auto* pkt = (PacketShoot*)received.data.data();
-            // 關鍵：忽略自己發出的射擊 (因為 CollectProjectiles 已經在本地生成過了)
+			// ignore self shoot
             if (pkt->playerID != net.GetMyPlayerID()) {
                 SpawnRemoteProjectile(*pkt);
             }
         }
-        // 3. 收到分數與遊戲狀態更新 (計分板)
+        // update game state
         else if (received.type == PacketType::S2C_GAME_STATE) {
             auto* pkt = (PacketGameState*)received.data.data();
-            // 更新計分板
+            finalScoreTeam1 = pkt->scoreTeam1;
+            finalScoreTeam2 = pkt->scoreTeam2;
             if (scoreboardRef) {
                 scoreboardRef->SetScores(pkt->scoreTeam1, pkt->scoreTeam2);
+            }
+            if (pkt->timeRemaining==0.0f && state != WorldState::FINISHED) {
+                EndGame();
             }
         }
         // 4. (選用) 收到 Join Accept
@@ -522,66 +531,64 @@ public:
         else if (received.type == PacketType::S2C_SPECIAL_ATTACK) {
             auto* pkt = (PacketSpecialLaser*)received.data.data();
             TriggerLaserBeam(pkt->origin, pkt->direction, pkt->teamID, pkt->playerID);
+            AudioManager::Instance().PlayOneShot("laser_fire", 1.0f);
         }
         else if (received.type == PacketType::S2C_KILL_EVENT) {
             auto* pkt = (PacketKillEvent*)received.data.data();
-
-            // A. 顯示擊殺訊息 (UI)
+            // kill log
             if (hudRef) {
                 hudRef->AddKillLog(pkt->killerID, pkt->victimID, pkt->killerTeam, pkt->victimTeam);
             }
-
-            // B. 檢查我是不是受害者
+			// victim die effect
             int myID = NetworkManager::Instance().GetMyPlayerID();
             if (pkt->victimID == myID) {
                 if (localPlayer) {
                     localPlayer->Die();
-                    AudioManager::Instance().PlayOneShot("splatted_by", 1.0f);
+                    AudioManager::Instance().PlayOneShot("splat_die", 1.0f);
                 }
             }
         }
     }
 
 private:
-    // 處理網路封包
+    // packet handler
     void ProcessNetworkPackets() {
         auto& net = NetworkManager::Instance();
         while (net.HasPackets()) {
             auto received = net.PopPacket();
 
-            // --- Server 邏輯 (轉發 Relay) ---
+            // Server Logic
             if (net.IsServer()) {
                 if (received.type == PacketType::C2S_PLAYER_STATE) {
-                    // 轉發玩家移動
+                    // reply player move
                     auto* inPkt = (PacketPlayerState*)received.data.data();
                     PacketPlayerState outPkt = *inPkt;
                     outPkt.header.type = PacketType::S2C_WORLD_STATE;
-                    net.Broadcast(&outPkt, sizeof(outPkt), false); // UDP
+                    net.Broadcast(&outPkt, sizeof(outPkt), false);
 
                     // Server 本地也更新顯示
                     HandleWorldState(&outPkt);
                 }
                 else if (received.type == PacketType::C2S_SHOOT) {
-                    // 轉發射擊事件
+                    // reply shoot event
                     auto* inPkt = (PacketShoot*)received.data.data();
                     PacketShoot outPkt = *inPkt;
                     outPkt.header.type = PacketType::S2C_SHOOT_EVENT;
-                    net.Broadcast(&outPkt, sizeof(outPkt), true); // TCP-like
+                    net.Broadcast(&outPkt, sizeof(outPkt), true);
 
-                    // Server 本地生成子彈 (除非發送者是 Server 自己，那就重複了，需要過濾)
                     if (inPkt->playerID != net.GetMyPlayerID()) {
                         SpawnRemoteProjectile(outPkt);
                     }
                 }
             }
 
-            // --- Client & Server 通用邏輯 ---
+			// Common Client & Server Logic
             if (received.type == PacketType::S2C_WORLD_STATE) {
                 HandleWorldState((PacketPlayerState*)received.data.data());
             }
             else if (received.type == PacketType::S2C_SHOOT_EVENT) {
                 auto* pkt = (PacketShoot*)received.data.data();
-                // 關鍵：忽略自己發出的射擊 (因為 CollectProjectiles 已經在本地生成過了)
+				// ignore self shoot
                 if (pkt->playerID != net.GetMyPlayerID()) {
                     SpawnRemoteProjectile(*pkt);
                 }
@@ -601,29 +608,34 @@ private:
                 }
                 std::cout << "Joined Game! ID: " << pkt->yourPlayerID << " Team: " << pkt->yourTeamID << std::endl;
             }
-
-            // 處理分數同步
-            if (received.type == PacketType::S2C_GAME_STATE) {
+            else if (received.type == PacketType::S2C_GAME_STATE) {
+                // score sync
                 auto* pkt = (PacketGameState*)received.data.data();
-
-                // 更新 Client 端的記分板
+                // update client scoreboard
                 if (scoreboardRef) {
                     scoreboardRef->SetScores(pkt->scoreTeam1, pkt->scoreTeam2);
                 }
+            }
+            else if (received.type == PacketType::S2C_SPECIAL_ATTACK) {
+                auto* pkt = (PacketSpecialLaser*)received.data.data();
+                TriggerLaserBeam(pkt->origin, pkt->direction, pkt->teamID, pkt->playerID);
             }
         }
     }
 
     // 生成網路傳來的子彈
     void SpawnRemoteProjectile(const PacketShoot& pkt) {
+        int team = (pkt.playerID % 2 == 0) ? 1 : 2;
+        if (remotePlayers.find(pkt.playerID) != remotePlayers.end()) {
+            team = remotePlayers[pkt.playerID]->teamID;
+        }
+
         glm::vec3 velocity = pkt.direction * pkt.speed;
         velocity.y += 2.0f;
         bool isBomb = (pkt.type == ProjectileType::BOMB);
 
-        int team = (pkt.color.x > 0.5f) ? 1 : 2;    // red=1, green=2
-
         auto p = std::make_unique<Projectile>(pkt.origin, velocity, pkt.color, team, pkt.scale, pkt.playerID, isBomb);
-        p->transform->position = pkt.origin;
+        // p->transform->position = pkt.origin;
         projectiles.push_back(std::move(p));
     }
 
@@ -675,7 +687,7 @@ private:
                 if (p->hasExploded) {
                     // 1. 產生超大墨水 (半徑 5.0 UV)
                     // inkMultiplier 設超大
-                    float uvSize = (4.0f * 10.0f) / mapSize;
+                    float uvSize = (5.0f * 10.0f) / mapSize;
 
                     // 雙地圖塗色 (爆炸通常會炸到所有東西)
                     auto result = SplatPhysics::WorldToUV(p->transform->position, glm::vec3(0), mapSize, mapSize);
@@ -689,8 +701,8 @@ private:
 
                     // --- B. 傷害判定 (只有 Server 執行) ---
                     if (NetworkManager::Instance().IsServer()) {
-                        float blastRadius = 6.0f; // 爆炸半徑
-                        float damage = 999.0f;    // 秒殺傷害
+                        float blastRadius = 8.0f;
+                        float damage = 999.0f;
 
                         // 1. 檢查本機玩家 (Server 自己)
                         if (localPlayer) {
@@ -744,9 +756,9 @@ private:
                 // B. 撞地反彈 (Bouncing)
                 if (p->hasHitFloor) {
                     // 簡單反彈：Y 軸速度反轉並衰減
-                    p->velocity.y = -p->velocity.y * 0.6f; // 0.6 是彈性係數
-                    p->velocity.x *= 0.8f; // 摩擦力
-                    p->velocity.z *= 0.8f;
+                    p->velocity.y = -p->velocity.y * 0.8f; // 彈性係數
+                    p->velocity.x *= 0.9f; // 摩擦力
+                    p->velocity.z *= 0.9f;
 
                     // 如果彈跳太小就停止
                     if (abs(p->velocity.y) < 1.0f) p->velocity.y = 0;
@@ -755,8 +767,6 @@ private:
                     p->transform->position = p->hitPosition + glm::vec3(0, 0.1f, 0);
                     p->hasHitFloor = false; // 重置碰撞旗標
                 }
-
-                // 炸彈繼續存在，不刪除
                 ++it;
                 continue;
             }
@@ -891,49 +901,52 @@ private:
     // 處理擊殺事件：識別身分 -> 發送封包 -> 更新本地 UI
     void ProcessKillEvent(int killerID, Entity* victim, int killerTeam) {
         int victimID = -99;
+        int victimTeam = victim->teamID;
 
-        // 檢查是否是本機玩家 (Host)
-        if (victim == localPlayer.get()) {
+        if (localPlayer && victim == localPlayer.get()) {
             victimID = NetworkManager::Instance().GetMyPlayerID();
+            localPlayer->Die();
+            std::cout << "[Server] I was killed by Player " << killerID << std::endl;
         }
-        // 檢查是否是 AI
         else if (enemyAI && victim == enemyAI.get()) {
             victimID = 100;
+            auto hp = enemyAI->GetComponent<Health>();
+            if (hp) {
+                hp->Reset();
+                enemyAI->transform->position = hp->spawnPoint;
+            }
         }
-        // 檢查是否是遠端玩家
         else {
             for (auto& rp : remotePlayers) {
                 if (rp.second.get() == victim) {
                     victimID = rp.first;
                     if (NetworkManager::Instance().IsServer()) {
-                        rp.second->ForceDeadByServer(2.0f); // 鎖定 2 秒
+                        rp.second->ForceDeadByServer(2.0f);
                     }
                     break;
                 }
             }
         }
 
-        // 2. 建構封包
+        // send packet
         PacketKillEvent pkt;
         pkt.header.type = PacketType::S2C_KILL_EVENT;
         pkt.killerID = killerID;
         pkt.victimID = victimID;
         pkt.killerTeam = killerTeam;
-        pkt.victimTeam = victim->teamID;
-
-        // 3. 廣播給所有 Client (Reliable = true)
+        pkt.victimTeam = victimTeam;
         NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
 
         std::cout << "[Server] Sent Kill Event: " << killerID << " -> " << victimID << std::endl;
 
-        // 4. 更新 Server 本地的擊殺提示 (UI)
+        // update local kill log
         if (hudRef) {
-            hudRef->AddKillLog(killerID, victimID, killerTeam, victim->teamID);
+            hudRef->AddKillLog(killerID, victimID, killerTeam, victimTeam);
         }
     }
 
     void TriggerLaserBeam(glm::vec3 start, glm::vec3 dir, int teamID, int attackerID) {
-        float maxDist = 60.0f; // 最大射程
+        float maxDist = 60.0f;
         float stepSize = 1.0f;
 
         glm::vec3 currentPos = start;
@@ -1098,16 +1111,25 @@ private:
         finishTimer = 5.0f; // 停留 5 秒
         gameTimeRemaining = 0.0f;
 
-        // 計算最終分數
-        auto scores = mapFloor->CalculatePercentages();
-        finalScoreTeam1 = scores.first * 100;
-        finalScoreTeam2 = scores.second * 100;
+        if (NetworkManager::Instance().IsServer()) {
+            auto scores = mapFloor->CalculatePercentages();
+
+            // 0.0~1.0
+            finalScoreTeam1 = scores.first;
+            finalScoreTeam2 = scores.second;
+
+            PacketGameState pkt;
+            pkt.header.type = PacketType::S2C_GAME_STATE;
+            pkt.scoreTeam1 = finalScoreTeam1;
+            pkt.scoreTeam2 = finalScoreTeam2;
+            NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+        }
 
         if (finalScoreTeam1 > finalScoreTeam2) winningTeam = 1;
         else if (finalScoreTeam2 > finalScoreTeam1) winningTeam = 2;
         else winningTeam = 0;
 
-        std::cout << "GAME FINISHED! T1: " << finalScoreTeam1 << " T2: " << finalScoreTeam2 << std::endl;
+        std::cout << "GAME FINISHED! T1: " << finalScoreTeam1 * 100.0f << " T2: " << finalScoreTeam2 * 100.0f << std::endl;
         AudioManager::Instance().PlayOneShot("whistle", 1.0f);
     }
 };
