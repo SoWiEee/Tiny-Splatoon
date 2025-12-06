@@ -63,7 +63,7 @@ struct PacketLobbyState {
     LobbySlotInfo slots[8]; // 固定 8 個位置
 };
 
-// 開始遊戲封包 (內容空的沒關係，只是訊號)
+// 開始遊戲封包
 struct PacketGameStart {
     PacketHeader header;
 };
@@ -138,7 +138,7 @@ struct PacketSpecialAttack {
 // 分數與遊戲狀態封包
 struct PacketGameState {
     PacketHeader header;
-    float scoreTeam1;   // 紅隊分數 (0.0 ~ 1.0 或 像素總數)
+    float scoreTeam1;   // 紅隊分數
     float scoreTeam2;   // 綠隊分數
     float timeRemaining; // 剩餘時間 (秒)
 };
