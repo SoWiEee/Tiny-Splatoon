@@ -321,6 +321,12 @@ public:
             wall->Draw(shader);
         }
 
+        // 畫道具
+        shader.SetInt("useInk", 0);
+        for (auto& item : items) {
+            item->Draw(shader);
+        }
+
         for (const auto& p : projectiles) {
             if (p) p->Draw(shader);
         }
@@ -377,12 +383,6 @@ public:
         shader.SetFloat("alpha", 1.0f);
         glDepthMask(GL_TRUE);
         glDisable(GL_BLEND);
-
-        // 畫道具 (用普通的 Shader 設定，不需墨水)
-        shader.SetInt("useInk", 0);
-        for (auto& item : items) {
-            item->Draw(shader);
-        }
     }
 
     // 統一收集並生成子彈 (包含網路發送)

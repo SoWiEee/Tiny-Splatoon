@@ -189,6 +189,11 @@ void GameScene::DrawUI() {
                 });
         }
 
+        if (world->localPlayer) {
+            bool hasBomb = world->localPlayer->hasBomb;
+            hud->DrawBombIndicator(hasBomb);
+        }
+
         scoreboard->DrawPlayerIcons(playerStatuses);
         scoreboard->DrawUITimer(world->gameTimeRemaining);
     }
