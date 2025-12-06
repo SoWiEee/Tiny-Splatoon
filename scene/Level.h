@@ -17,6 +17,7 @@ class Level {
 public:
     FloorMesh* floor = nullptr;
     std::vector<Entity*> walls;
+    std::vector<glm::vec3> itemSpawnPoints;
 
     // 障礙物列表
     std::vector<Entity*> obstacles; // 視覺物件
@@ -96,9 +97,18 @@ public:
         CreateBox(glm::vec3(-5, 0.5f, 0), glm::vec3(4, 1.0f, 4)); // 第一階
         // 右側階梯
         CreateBox(glm::vec3(5, 0.5f, 0), glm::vec3(4, 1.0f, 4));
+
+        // 炸彈生成點
+        // 1. 中央高台正上方
+        itemSpawnPoints.push_back(glm::vec3(0, 2.5f, 0));
+
+        // 2. 四個角落掩體附近
+        itemSpawnPoints.push_back(glm::vec3(12, 1.5f, 12));
+        itemSpawnPoints.push_back(glm::vec3(-12, 1.5f, -12));
+        itemSpawnPoints.push_back(glm::vec3(12, 1.5f, -12));
+        itemSpawnPoints.push_back(glm::vec3(-12, 1.5f, 12));
     }
 
-    // [修改] 渲染函式
     void Render(Shader& shader) {
         // 設定地圖大小參數 (給墨水 Shader 用，確保投影正確)
         shader.SetFloat("mapSize", mapSize);
