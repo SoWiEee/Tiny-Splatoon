@@ -46,10 +46,11 @@ public:
     float sharkStateTimer = 0.0f;   // 共用計時器 (衝刺倒數 或 停頓倒數)
 
     // 參數設定
-    float sharkDashDuration = 1.5f;
+    float sharkDashDuration = 1.0f;
     float sharkPauseDuration = 1.0f;
     float sharkSpeed = 10.0f;        // 衝刺速度 (要快一點才爽)
     float sharkInkTimer = 0.0f;      // 噴墨計時器
+    glm::vec3 sharkDashDirection = glm::vec3(0, 0, 1);
     bool requestSharkSpray = false;
     bool requestSharkExplode = false;
 
@@ -263,7 +264,25 @@ public:
         isSharkDashing = true;
         sharkStateTimer = sharkDashDuration;
         sharkInkTimer = 0.0f;
+
+        glm::vec3 camFwd = glm::vec3(0, 0, 1);
+        if (cameraRef) {
+            camFwd = cameraRef->transform->GetForward();
+        }
+        // 2. 壓平 Y 軸
+        camFwd.y = 0.0f;
+        if (glm::length(camFwd) > 0.01f) {
+            camFwd = glm::normalize(camFwd);
+        }
+        sharkDashDirection = camFwd;
+
+        // 3. 設定速度 (這保證了你的位移一定會往準心指的方向跑)
+        velocity.x = sharkDashDirection.x * sharkSpeed;
+        velocity.z = sharkDashDirection.z * sharkSpeed;
         velocity.y = 2.0f;
+
+        transform->LookAt(transform->position + sharkDashDirection);
+
         AudioManager::Instance().PlayOneShot("shark", 0.6f);
     }
 
@@ -275,9 +294,9 @@ public:
         }
 
         if (isSharkDashing) {
-            glm::vec3 forward = transform->GetForward();
-            velocity.x = forward.x * sharkSpeed;
-            velocity.z = forward.z * sharkSpeed;
+            // glm::vec3 forward = transform->GetForward();
+            velocity.x = sharkDashDirection.x * sharkSpeed;
+            velocity.z = sharkDashDirection.z * sharkSpeed;
             velocity.y += gravity * dt;
 
             // 2. 噴墨水
@@ -302,35 +321,14 @@ public:
             }
         }
         else {
-            if (cameraRef) {
-                glm::vec3 aimDir = cameraRef->transform->GetForward();
-                RotateTowards(aimDir, 20.0f, dt); // 靈敏轉向
-            }
-
             velocity = glm::vec3(0);
             velocity.y += gravity * dt;
 
-            // 1. 允許玩家旋轉 (瞄準)
+            // [視覺回饋] 讓鯊魚跟著鏡頭轉 (預覽下一次衝刺方向)
             if (cameraRef) {
-                // 1. 取得相機的水平前方 (忽略 Y 軸，避免朝地板衝)
-                glm::vec3 camDir = cameraRef->transform->GetForward();
-                camDir.y = 0;
-                if (glm::length(camDir) > 0.01f) {
-                    camDir = glm::normalize(camDir);
-
-                    // 2. 計算目標旋轉角度 (Atan2 回傳的是弧度)
-                    float targetRotY = glm::degrees(atan2(camDir.x, camDir.z));
-
-                    // 3. 使用插值 (Lerp) 讓轉向有點平滑但又靈敏 (Speed = 20)
-                    float currentRotY = transform->rotation.y;
-
-                    // 處理 0/360 度交界問題的簡單 Lerp
-                    float diff = targetRotY - currentRotY;
-                    while (diff < -180.0f) diff += 360.0f;
-                    while (diff > 180.0f) diff -= 360.0f;
-
-                    transform->rotation.y += diff * 20.0f * dt;
-                }
+                glm::vec3 camFwd = cameraRef->transform->GetForward();
+                camFwd.y = 0;
+                RotateTowards(camFwd, 20.0f, dt);
             }
             if (sharkStateTimer <= 0.0f) {
                 StartNextDash();
@@ -351,11 +349,14 @@ public:
         if (glm::length(dir) < 0.01f) return;
         dir = glm::normalize(dir);
 
+        // 算出目標向量對應的角度
         float targetAngle = glm::degrees(atan2(dir.x, dir.z));
         float currentAngle = transform->rotation.y;
-        float diff = targetAngle - currentAngle;
 
-        // 處理 0/360 度交界
+        // 修正：有些系統 Forward 是 -Z，如果發現轉向反了，把下面這行取消註解
+        // targetAngle += 180.0f; 
+
+        float diff = targetAngle - currentAngle;
         while (diff < -180.0f) diff += 360.0f;
         while (diff > 180.0f) diff -= 360.0f;
 
@@ -503,7 +504,7 @@ private:
             if (weapon->Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
                 camera->TriggerShake(0.1f, 0.05f);
-                AudioManager::Instance().PlayOneShot("shoot", 0.5f);
+                AudioManager::Instance().PlayOneShot("shoot", 0.3f);
                 
                 // 大招集氣
                 float chargeAmount = 5.0f;

@@ -69,24 +69,34 @@ void GameScene::Update(float dt) {
     if (world->state == WorldState::PLAYING) {
         if (world->localPlayer && cameraObj) {
             auto playerState = world->localPlayer->state;
-            if (playerState == PlayerState::ALIVE || playerState == PlayerState::LAUNCHING) {
 
+            if (playerState == PlayerState::ALIVE ||
+                playerState == PlayerState::LAUNCHING ||
+                playerState == PlayerState::SHARKING)
+            {
                 glm::vec3 targetPos = world->localPlayer->transform->position;
 
-                // 參數設定
                 float camDist = 5.0f;
                 float camHeight = 2.5f;
+                float targetFOV = 60.0f; // 預設視野
 
-                // 如果正在超級跳躍，相機可以拉遠一點，視野更好
+                // [新增] 狀態特化參數
                 if (playerState == PlayerState::LAUNCHING) {
                     camDist = 8.0f;
                     camHeight = 4.0f;
                 }
+                else if (playerState == PlayerState::SHARKING) {
+                    // [鯊魚模式] 拉遠一點製造速度感，稍微高一點方便看路
+                    camDist = 6.5f;
+                    camHeight = 3.0f;
+                    targetFOV = 75.0f; // 廣角效果 (Speed Effect)
+                }
 
                 if (cameraObj) {
                     glm::vec3 camDir = cameraObj->transform->GetForward();
-                    // 設定位置
-                    cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+                    // 設定位置 (TPS 跟隨)
+                    glm::vec3 desiredPos = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+                    cameraObj->transform->position = desiredPos;
                 }
             }
         }
@@ -94,8 +104,8 @@ void GameScene::Update(float dt) {
     else if (world->state == WorldState::FINISHED) {
         // Top-Down view
         if (cameraObj) {
-            // 目標位置：地圖中心高空 (例如 80米高)
-            glm::vec3 targetPos = glm::vec3(0, 80.0f, 0);
+            // 目標位置：地圖中心高空
+            glm::vec3 targetPos = glm::vec3(0, 40.0f, 0);
             glm::vec3 currentPos = cameraObj->transform->position;
 
             // 平滑移動 (Lerp) 讓鏡頭慢慢拉上去
