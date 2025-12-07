@@ -1166,7 +1166,11 @@ private:
         glm::vec3 spawnPos = pl->transform->position + glm::vec3(0, 2.5f, 0) + pl->transform->GetForward() * 0.5f;
 
         // 往上看一點
-        glm::vec3 dir = pl->transform->GetForward();
+        glm::vec3 dir = glm::vec3(0, 0, -1);
+        // glm::vec3 dir = pl->transform->GetForward();
+        if (pl->cameraRef) {
+            dir = pl->cameraRef->transform->GetForward();
+        }
         dir.y += 0.4f;
         glm::vec3 velocity = glm::normalize(dir) * 15.0f;
 
