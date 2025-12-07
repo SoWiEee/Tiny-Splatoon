@@ -270,6 +270,10 @@ public:
     void UpdateShark(float dt) {
         sharkStateTimer -= dt;
 
+        if (glm::length(velocity) > 0.1f) {
+            RotateTowards(velocity, 20.0f, dt); // 轉向速度極快
+        }
+
         if (isSharkDashing) {
             glm::vec3 forward = transform->GetForward();
             velocity.x = forward.x * sharkSpeed;
@@ -298,6 +302,11 @@ public:
             }
         }
         else {
+            if (cameraRef) {
+                glm::vec3 aimDir = cameraRef->transform->GetForward();
+                RotateTowards(aimDir, 20.0f, dt); // 靈敏轉向
+            }
+
             velocity = glm::vec3(0);
             velocity.y += gravity * dt;
 
@@ -335,6 +344,22 @@ public:
         state = PlayerState::ALIVE;
         velocity = glm::vec3(0);
         currentCharge = 0.0f;
+    }
+
+    void RotateTowards(glm::vec3 dir, float turnSpeed, float dt) {
+        dir.y = 0;
+        if (glm::length(dir) < 0.01f) return;
+        dir = glm::normalize(dir);
+
+        float targetAngle = glm::degrees(atan2(dir.x, dir.z));
+        float currentAngle = transform->rotation.y;
+        float diff = targetAngle - currentAngle;
+
+        // 處理 0/360 度交界
+        while (diff < -180.0f) diff += 360.0f;
+        while (diff > 180.0f) diff -= 360.0f;
+
+        transform->rotation.y += diff * turnSpeed * dt;
     }
 
 private:
@@ -436,14 +461,29 @@ private:
         if (Input::GetKey(GLFW_KEY_A)) targetVel -= right;
         if (Input::GetKey(GLFW_KEY_D)) targetVel += right;
 
-        if (glm::length(targetVel) > 0.1f) {
+        if (glm::length(targetVel) > 0.0f) {
             targetVel = glm::normalize(targetVel) * currentSpeed;
-            transform->rotation.y = cameraRef->transform->rotation.y;
         }
 
-        velocity.x = targetVel.x;
-        velocity.z = targetVel.z;
+        if (isSwimming) {
+            // A. 魷魚狀態：面向 "移動方向"
+            // 只有在移動時才轉向，這樣游起來比較自然
+            if (glm::length(targetVel) > 0.0f) {
+                RotateTowards(targetVel, 10.0f, dt);
+            }
+        }
+        else {
+            // B. 人型態：始終面向 "鏡頭準心" (TPS 標準操作)
+            // 這樣你的準心指哪，人就朝哪，方便隨時射擊
+            // 即使沒在移動，也要跟著鏡頭轉
+            RotateTowards(camFwd, 15.0f, dt);
+        }
 
+        float friction = 10.0f; // 數值越大越靈敏，越小越滑
+        velocity.x = glm::mix(velocity.x, targetVel.x, friction * dt);
+        velocity.z = glm::mix(velocity.z, targetVel.z, friction * dt);
+
+        // 4. 跳躍
         if (Input::GetKey(GLFW_KEY_SPACE) && isGrounded && !isSwimming) {
             velocity.y = sqrt(2.0f * jumpHeight * abs(gravity));
             isGrounded = false;
