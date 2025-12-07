@@ -151,13 +151,6 @@ public:
                 localPlayer->requestSharkSpray = false;
             }
 
-            // 處理鯊魚終結爆炸
-            if (localPlayer && localPlayer->requestSharkExplode) {
-                // 直接生成一顆 "已經爆炸" 的隱形炸彈來觸發範圍傷害與塗地
-                SpawnSharkExplosion();
-                localPlayer->requestSharkExplode = false;
-            }
-
             // 檢查雷射請求
             if (localPlayer && localPlayer->requestLaser) {
                 int myID = NetworkManager::Instance().GetMyPlayerID();
@@ -193,7 +186,7 @@ public:
                 localPlayer->requestBombThrow = false;
             }
 
-            // B. 道具生成 (維持場上最多 2 個)
+            // generate items
             if (items.size() < 2) {
                 itemRespawnTimer += dt;
                 if (itemRespawnTimer > 5.0f) {
@@ -211,7 +204,7 @@ public:
                     float dist = glm::distance(localPlayer->transform->position, (*it)->transform->position);
                     if (dist < 1.5f) {
                         localPlayer->PickupBomb();
-                        AudioManager::Instance().PlayOneShot("reload", 1.0f);
+                        AudioManager::Instance().PlayOneShot("pick_bomb", 0.5f);
                         it = items.erase(it);
                         continue;
                     }
@@ -1014,12 +1007,11 @@ private:
                 dir * 12.0f,
                 p->weapon->inkColor,
                 p->teamID,
-                0.5f, // scale
+                1.0f, // scale
                 NetworkManager::Instance().GetMyPlayerID(),
-                false // isBomb = false
+                false
             );
 
-            // 加入列表
             projectiles.push_back(std::move(bullet));
 
             // 發送封包 (讓別人也能看到子彈)
@@ -1041,10 +1033,6 @@ private:
     // 生成終結爆炸
     void SpawnSharkExplosion() {
         Player* p = localPlayer.get();
-
-        // 我們偷懶一下：生成一顆 "壽命為 0" 的炸彈，讓它下一幀立刻爆炸
-        // 這樣就能直接復用 UpdateProjectiles 裡寫好的 "集束炸彈" 邏輯！
-
         auto bomb = std::make_unique<Projectile>(
             p->transform->position,
             glm::vec3(0), // 沒速度
@@ -1052,10 +1040,10 @@ private:
             p->teamID,
             1.0f,
             NetworkManager::Instance().GetMyPlayerID(),
-            true // isBomb = true
+            true
         );
 
-        bomb->fuseTimer = 0.0f; // <--- 關鍵：立刻爆炸
+        bomb->fuseTimer = 0.0f;
 
         projectiles.push_back(std::move(bomb));
 

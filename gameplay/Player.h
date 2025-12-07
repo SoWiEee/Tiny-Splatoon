@@ -41,10 +41,15 @@ public:
     bool requestBombThrow = false;
 
     // 鯊魚坐騎參數
-    float sharkTimer = 0.0f;        // 衝刺剩餘時間
-    float sharkDuration = 2.0f;     // 總衝刺時間
-    float sharkSpeed = 25.0f;       // 衝刺速度
-    float sharkInkTimer = 0.0f;     // 用來計時噴墨水的頻率
+    int sharkDashCount = 0;         // 剩餘衝刺次數 (總共 3 次)
+    bool isSharkDashing = false;    // 目前是在「衝刺中」還是「停頓瞄準中」
+    float sharkStateTimer = 0.0f;   // 共用計時器 (衝刺倒數 或 停頓倒數)
+
+    // 參數設定
+    float sharkDashDuration = 1.5f;
+    float sharkPauseDuration = 1.0f;
+    float sharkSpeed = 10.0f;        // 衝刺速度 (要快一點才爽)
+    float sharkInkTimer = 0.0f;      // 噴墨計時器
     bool requestSharkSpray = false;
     bool requestSharkExplode = false;
 
@@ -206,7 +211,7 @@ public:
         if (visualBody) visualBody->transform->scale = glm::vec3(0.0f);
 
         // 2. 播放音效
-        // AudioManager::Instance().PlayOneShot("die", 1.0f);
+        AudioManager::Instance().PlayOneShot("die", 1.0f);
 
         if (cameraRef) {
             glm::vec3 spawnPos = GetSpawnPosition();
@@ -244,53 +249,91 @@ public:
         if (state != PlayerState::ALIVE) return;
 
         state = PlayerState::SHARKING;
-        sharkTimer = sharkDuration;
-        sharkInkTimer = 0.0f;
 
-        // 重置垂直速度，給一點跳躍感
-        velocity.y = 5.0f;
+        // 初始化：準備開始第一次衝刺
+        sharkDashCount = 3;
+        StartNextDash();
 
-        // 播放音效
+        // 播放啟動音效
         AudioManager::Instance().PlayOneShot("shark_start", 1.0f);
-        std::cout << "Riding Shark!" << std::endl;
+        std::cout << "Shark Triple Dash Start!" << std::endl;
     }
+
+    void StartNextDash() {
+        isSharkDashing = true;
+        sharkStateTimer = sharkDashDuration;
+        sharkInkTimer = 0.0f;
+        velocity.y = 2.0f;
+        AudioManager::Instance().PlayOneShot("shark", 0.6f);
+    }
+
     void UpdateShark(float dt) {
-        sharkTimer -= dt;
+        sharkStateTimer -= dt;
 
-        // 2. 自動向前衝刺 (忽略摩擦力)
-        glm::vec3 forward = transform->GetForward();
-        velocity.x = forward.x * sharkSpeed;
-        velocity.z = forward.z * sharkSpeed;
+        if (isSharkDashing) {
+            glm::vec3 forward = transform->GetForward();
+            velocity.x = forward.x * sharkSpeed;
+            velocity.z = forward.z * sharkSpeed;
+            velocity.y += gravity * dt;
 
-        // 仍然受重力影響 (這樣才可以衝下斜坡或掉下懸崖)
-        velocity.y += gravity * dt;
+            // 2. 噴墨水
+            sharkInkTimer += dt;
+            if (sharkInkTimer > 0.05f) {
+                sharkInkTimer = 0.0f;
+                requestSharkSpray = true;
+            }
 
-        // 3. 物理移動
+            // 3. 衝刺結束判定
+            if (sharkStateTimer <= 0.0f) {
+                sharkDashCount--;
+                velocity = glm::vec3(0);
+
+                if (sharkDashCount > 0) {
+                    isSharkDashing = false;
+                    sharkStateTimer = sharkPauseDuration;
+                }
+                else {
+                    EndShark();
+                }
+            }
+        }
+        else {
+            velocity = glm::vec3(0);
+            velocity.y += gravity * dt;
+
+            // 1. 允許玩家旋轉 (瞄準)
+            if (cameraRef) {
+                // 1. 取得相機的水平前方 (忽略 Y 軸，避免朝地板衝)
+                glm::vec3 camDir = cameraRef->transform->GetForward();
+                camDir.y = 0;
+                if (glm::length(camDir) > 0.01f) {
+                    camDir = glm::normalize(camDir);
+
+                    // 2. 計算目標旋轉角度 (Atan2 回傳的是弧度)
+                    float targetRotY = glm::degrees(atan2(camDir.x, camDir.z));
+
+                    // 3. 使用插值 (Lerp) 讓轉向有點平滑但又靈敏 (Speed = 20)
+                    float currentRotY = transform->rotation.y;
+
+                    // 處理 0/360 度交界問題的簡單 Lerp
+                    float diff = targetRotY - currentRotY;
+                    while (diff < -180.0f) diff += 360.0f;
+                    while (diff > 180.0f) diff -= 360.0f;
+
+                    transform->rotation.y += diff * 20.0f * dt;
+                }
+            }
+            if (sharkStateTimer <= 0.0f) {
+                StartNextDash();
+            }
+        }
+
         ApplyPhysics(dt);
-
-        // 4. 自動噴射墨水子彈 (每 0.05 秒噴一次)
-        sharkInkTimer += dt;
-        if (sharkInkTimer > 0.05f) {
-            sharkInkTimer = 0.0f;
-            // 通知 GameWorld 生成兩側子彈
-            requestSharkSpray = true;
-        }
-
-        // 5. 結束判定 (時間到 或 撞牆速度驟降)
-        // 簡單判定：如果速度變很慢(撞牆)，就提早爆炸
-        bool hitWall = (glm::length(glm::vec2(velocity.x, velocity.z)) < 2.0f);
-
-        if (sharkTimer <= 0.0f || hitWall) {
-            EndShark();
-        }
     }
 
     void EndShark() {
         state = PlayerState::ALIVE;
         velocity = glm::vec3(0);
-
-        // 通知 GameWorld 產生終結大爆炸
-        requestSharkExplode = true;
         currentCharge = 0.0f;
     }
 
