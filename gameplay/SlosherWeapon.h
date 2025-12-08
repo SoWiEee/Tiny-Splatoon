@@ -7,7 +7,7 @@ class SlosherWeapon : public Weapon {
 public:
     // ®g³tºC (0.45s)¡A¯Ó¾¥°ª (7.0f)
     SlosherWeapon(int team, glm::vec3 color)
-        : Weapon(team, color, 1.0f, 0.25f) {
+        : Weapon(team, color, 0.8f, 0.2f) {
     }
 
 protected:
