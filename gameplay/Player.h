@@ -47,8 +47,8 @@ public:
 
     // 參數設定
     float sharkDashDuration = 1.0f;
-    float sharkPauseDuration = 1.0f;
-    float sharkSpeed = 10.0f;        // 衝刺速度 (要快一點才爽)
+    float sharkPauseDuration = 0.7f;
+    float sharkSpeed = 13.0f;        // 衝刺速度 (要快一點才爽)
     float sharkInkTimer = 0.0f;      // 噴墨計時器
     glm::vec3 sharkDashDirection = glm::vec3(0, 0, 1);
     bool requestSharkSpray = false;
@@ -250,13 +250,11 @@ public:
         if (state != PlayerState::ALIVE) return;
 
         state = PlayerState::SHARKING;
-
-        // 初始化：準備開始第一次衝刺
         sharkDashCount = 3;
         StartNextDash();
 
         // 播放啟動音效
-        AudioManager::Instance().PlayOneShot("shark_start", 1.0f);
+        AudioManager::Instance().PlayOneShot("shark", 1.0f);
         std::cout << "Shark Triple Dash Start!" << std::endl;
     }
 
@@ -276,7 +274,7 @@ public:
         }
         sharkDashDirection = camFwd;
 
-        // 3. 設定速度 (這保證了你的位移一定會往準心指的方向跑)
+        // 3. 設定速度
         velocity.x = sharkDashDirection.x * sharkSpeed;
         velocity.z = sharkDashDirection.z * sharkSpeed;
         velocity.y = 2.0f;
@@ -290,23 +288,22 @@ public:
         sharkStateTimer -= dt;
 
         if (glm::length(velocity) > 0.1f) {
-            RotateTowards(velocity, 20.0f, dt); // 轉向速度極快
+            RotateTowards(velocity, 20.0f, dt);
         }
 
         if (isSharkDashing) {
-            // glm::vec3 forward = transform->GetForward();
             velocity.x = sharkDashDirection.x * sharkSpeed;
             velocity.z = sharkDashDirection.z * sharkSpeed;
             velocity.y += gravity * dt;
 
-            // 2. 噴墨水
+            // shoot ink
             sharkInkTimer += dt;
-            if (sharkInkTimer > 0.05f) {
+            if (sharkInkTimer > 0.08f) {
                 sharkInkTimer = 0.0f;
                 requestSharkSpray = true;
             }
 
-            // 3. 衝刺結束判定
+            // dash end
             if (sharkStateTimer <= 0.0f) {
                 sharkDashCount--;
                 velocity = glm::vec3(0);
@@ -324,7 +321,7 @@ public:
             velocity = glm::vec3(0);
             velocity.y += gravity * dt;
 
-            // [視覺回饋] 讓鯊魚跟著鏡頭轉 (預覽下一次衝刺方向)
+			// follow camera
             if (cameraRef) {
                 glm::vec3 camFwd = cameraRef->transform->GetForward();
                 camFwd.y = 0;
@@ -349,12 +346,8 @@ public:
         if (glm::length(dir) < 0.01f) return;
         dir = glm::normalize(dir);
 
-        // 算出目標向量對應的角度
         float targetAngle = glm::degrees(atan2(dir.x, dir.z));
         float currentAngle = transform->rotation.y;
-
-        // 修正：有些系統 Forward 是 -Z，如果發現轉向反了，把下面這行取消註解
-        // targetAngle += 180.0f; 
 
         float diff = targetAngle - currentAngle;
         while (diff < -180.0f) diff += 360.0f;
