@@ -989,42 +989,54 @@ private:
     }
 
     void SpawnSharkBullets() {
+        if (!localPlayer) return;
         Player* p = localPlayer.get();
+
         glm::vec3 center = p->transform->position + glm::vec3(0, 0.5f, 0);
         glm::vec3 fwd = p->transform->GetForward();
         glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
 
-        // 左邊一發，右邊一發
-        for (int i = -1; i <= 1; i += 2) {
-            glm::vec3 dir = right * (float)i; // 左或右
-            dir.y = 0.5f; // 稍微往上拋
-            dir = glm::normalize(dir);
+        int bulletCount = 6;
+        float baseSpeed = 6.0f;
 
-            // 使用既有的 Projectile
-            // 速度 10，小顆一點，不是炸彈
+        for (int i = 0; i < bulletCount; i++) {
+            float side = (rand() % 2 == 0) ? 1.0f : -1.0f;
+            glm::vec3 dir = right * side;
+            float randX = ((rand() % 100) / 100.0f - 0.5f) * 0.6f;
+            dir.x += randX;
+            dir.z += randX;
+            float randY = 0.2f + ((rand() % 100) / 100.0f) * 0.6f;
+            dir.y = randY;
+            dir = glm::normalize(dir);
+            float randSpeed = baseSpeed + ((rand() % 100) / 100.0f * 5.0f); // 12 ~ 17
+            float randScale = 0.3f + ((rand() % 100) / 100.0f * 0.4f); // 0.3 ~ 0.7
+
             auto bullet = std::make_unique<Projectile>(
                 center,
-                dir * 12.0f,
+                dir * randSpeed,
                 p->weapon->inkColor,
                 p->teamID,
-                1.0f, // scale
+                randScale,
                 NetworkManager::Instance().GetMyPlayerID(),
                 false
             );
 
+            bullet->lifeTime = 1.0f + ((rand() % 100) / 100.0f);
+
             projectiles.push_back(std::move(bullet));
 
-            // 發送封包 (讓別人也能看到子彈)
+            // 發送封包
             if (NetworkManager::Instance().IsConnected()) {
                 PacketShoot pkt;
                 pkt.header.type = PacketType::C2S_SHOOT;
                 pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
                 pkt.origin = center;
                 pkt.direction = dir;
-                pkt.speed = 12.0f;
-                pkt.scale = 0.5f;
+                pkt.speed = randSpeed;
+                pkt.scale = randScale;
                 pkt.color = p->weapon->inkColor;
                 pkt.type = ProjectileType::BULLET;
+
                 NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false);
             }
         }
@@ -1110,7 +1122,7 @@ private:
 
         AudioManager::Instance().PlayOneShot("laser_fire", 1.0f);
 
-        if (!NetworkManager::Instance().IsServer()) return; // 傷害由 Server 判定
+        if (!NetworkManager::Instance().IsServer()) return;
 
         std::vector<Entity*> targets;
         if (localPlayer) targets.push_back(localPlayer.get());
@@ -1167,7 +1179,6 @@ private:
 
         // 往上看一點
         glm::vec3 dir = glm::vec3(0, 0, -1);
-        // glm::vec3 dir = pl->transform->GetForward();
         if (pl->cameraRef) {
             dir = pl->cameraRef->transform->GetForward();
         }
