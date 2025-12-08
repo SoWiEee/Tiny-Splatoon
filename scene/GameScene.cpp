@@ -78,23 +78,20 @@ void GameScene::Update(float dt) {
 
                 float camDist = 5.0f;
                 float camHeight = 2.5f;
-                float targetFOV = 60.0f; // 預設視野
+                float targetFOV = 60.0f;
 
-                // [新增] 狀態特化參數
                 if (playerState == PlayerState::LAUNCHING) {
                     camDist = 8.0f;
                     camHeight = 4.0f;
                 }
                 else if (playerState == PlayerState::SHARKING) {
-                    // [鯊魚模式] 拉遠一點製造速度感，稍微高一點方便看路
                     camDist = 6.5f;
                     camHeight = 3.0f;
-                    targetFOV = 75.0f; // 廣角效果 (Speed Effect)
+                    targetFOV = 75.0f;
                 }
 
                 if (cameraObj) {
                     glm::vec3 camDir = cameraObj->transform->GetForward();
-                    // 設定位置 (TPS 跟隨)
                     glm::vec3 desiredPos = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
                     cameraObj->transform->position = desiredPos;
                 }
@@ -108,7 +105,6 @@ void GameScene::Update(float dt) {
             glm::vec3 targetPos = glm::vec3(0, 40.0f, 0);
             glm::vec3 currentPos = cameraObj->transform->position;
 
-            // 平滑移動 (Lerp) 讓鏡頭慢慢拉上去
             cameraObj->transform->position = glm::mix(currentPos, targetPos, 5.0f * dt);
             cameraObj->transform->LookAt(glm::vec3(0, 0, 0));
         }
