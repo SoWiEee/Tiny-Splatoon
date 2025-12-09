@@ -73,6 +73,8 @@ public:
     GameObject* visualBody;
     HUD* hudRef = nullptr;
     Camera* camera = nullptr;
+    GameObject* visualHuman = nullptr;
+    GameObject* visualSquid = nullptr;
 
     float healRateSlow = 10.0f;      // 站立回血 (漫長)
     float healRateFast = 20.0f;      // 潛水回血 (快速)
@@ -85,17 +87,25 @@ public:
         : Entity("Player"), mapFloor(floor), mapObstacle(obstacle), cameraRef(cam), hudRef(hud), level(mapLevel)
     {
         this->teamID = team;
-        shadow = new GameObject("ShadowBlob");
-        shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f));
-        shadow->transform->position = transform->position + glm::vec3(0, 0.02f, 0);
-        shadow->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f);
-
         transform->position = startPos;
-        camera = cam->GetComponent<Camera>();
-        weapon = new BrushWeapon(team, (team == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0));
+
+        // 1. 取得相機組件
+        if (cam) camera = cam->GetComponent<Camera>();
+
+        // 2. [修正] 武器初始化為 nullptr
+        // 不要這這裡 new Weapon，因為 GameWorld::CreatePlayer 會根據選擇的武器類型來 new
+        // 這樣才不會導致所有人都強制變成拿筆刷
+        weapon = nullptr;
+
+        // 3. 加上血量組件
         AddComponent<Health>(team, startPos);
-        visualBody = new GameObject("PlayerBody");
-        visualBody->AddComponent<MeshRenderer>("Cube", weapon->inkColor);
+
+        // 4. [修正] 移除 visualBody 與 shadow 的建立代碼
+        // 這些現在都移到 GameWorld::Init 或 CreatePlayer 裡面去處理了
+        // 這樣才不會出現 "方塊重疊" 的問題
+        visualBody = nullptr;
+        shadow = nullptr; // 影子建議也移到 GameWorld 統一建立
+
         StartSuperJump();
     }
 
@@ -130,24 +140,14 @@ public:
                 float u = (transform->position.x / floorSize) + 0.5f;
                 float v = (transform->position.z / floorSize) + 0.5f;
 
-                // 2. 判斷腳下高度，決定要查哪張地圖
                 float currentHeight = level->GetHeightAt(transform->position.x, transform->position.z);
-
-                // 預設查地板
                 SplatMap* targetMap = mapFloor;
-
-                // 如果高度大於 0.5 (代表站在箱子或高台上)，改查障礙物地圖
                 if (currentHeight > 0.5f) {
                     targetMap = mapObstacle;
                 }
 
-                // 3. 執行墨水判定 (使用 targetMap)
                 int enemyTeam = (teamID == 1) ? 2 : 1;
-
-                // 檢查敵方墨水 (受傷)
                 bool onEnemyInk = targetMap->IsColorInArea(u, v, enemyTeam, 1);
-
-                // 檢查己方墨水 (回血/潛水判定也會用到)
                 bool onMyInk = targetMap->IsColorInArea(u, v, teamID, 1);
 
                 // --- 傷害與回血邏輯 ---
@@ -178,7 +178,8 @@ public:
             UpdateSuperJump(dt);
             break;
         }
-        UpdateVisuals(dt);
+        UpdateInk(dt);
+        UpdateVisualState();
     }
 
     GameObject* GetVisualBody() { return visualBody; }
@@ -354,6 +355,29 @@ public:
         while (diff > 180.0f) diff -= 360.0f;
 
         transform->rotation.y += diff * turnSpeed * dt;
+    }
+
+    void SetupVisuals(GameObject* human, GameObject* squid) {
+        visualHuman = human;
+        visualSquid = squid;
+        UpdateVisualState();
+    }
+
+    void UpdateVisualState() {
+        if (!visualHuman || !visualSquid) return;
+
+        bool isSquidForm = isSwimming || state == PlayerState::SHARKING;
+
+        if (isSquidForm) {
+            // 變魷魚：隱藏人，顯示魷魚
+            visualHuman->active = false;
+            visualSquid->active = true;
+        }
+        else {
+            // 變人：顯示人，隱藏魷魚
+            visualHuman->active = true;
+            visualSquid->active = false;
+        }
     }
 
 private:
@@ -565,6 +589,24 @@ private:
         if (transform->position.x < -mapLimit) transform->position.x = -mapLimit;
         if (transform->position.z > mapLimit) transform->position.z = mapLimit;
         if (transform->position.z < -mapLimit) transform->position.z = -mapLimit;
+    }
+
+    void UpdateInk(float dt) {
+        if (!hudRef) return;
+
+        // 判斷是否正在射擊 (按住左鍵 且 沒有潛水 且 墨水足夠)
+        // 這裡假設你有變數 currentInk，或者直接操作 HUD
+        // 如果你的架構是 HUD 只有顯示功能，那你應該在 Player 裡記錄 currentInk
+        // 但根據你的程式碼，看來是 HUD 在管墨水數值，我們先照舊
+
+        bool isShooting = Input::GetMouseButton(0) && !isSwimming;
+
+        // 只有 "沒有在射擊" 的時候才回充
+        if (!isShooting) {
+            // 潛水回充快 (0.5)，站立回充慢 (0.1)
+            float refillRate = isSwimming ? 0.5f : 0.1f;
+            hudRef->RefillInk(refillRate * dt);
+        }
     }
 
     void UpdateVisuals(float dt) {

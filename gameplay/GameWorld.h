@@ -6,6 +6,7 @@
 #include <memory>
 #include <algorithm>
 #include "../engine/fx/ParticleSystem.h"
+#include "../engine/rendering/ModelLoader.h"
 #include "../scene/Level.h"
 #include "../splat/SplatMap.h"
 #include "../splat/SplatPainter.h"
@@ -43,6 +44,7 @@ public:
     // --- 實體物件 ---
     std::unique_ptr<Player> localPlayer;
     std::unique_ptr<Enemy> enemyAI;
+    std::vector<std::unique_ptr<GameObject>> visualEntities;
     std::vector<std::unique_ptr<Projectile>> projectiles;
     std::vector<std::unique_ptr<Item>> items;
     float itemRespawnTimer = 0.0f;
@@ -104,6 +106,55 @@ public:
             break;
         }
 
+        // 1. 建立視覺物件
+        // ==========================================================
+        // 2. 建立 [人型態] 視覺 (Human Visual)
+        // ==========================================================
+        auto humanObj = std::make_unique<GameObject>("Visual_Human");
+        humanObj->SetParent(localPlayer.get()); // 綁定到 Player
+
+        // 載入模型
+        auto mesh = ModelLoader::LoadOBJ("assets/models/character-b.obj");
+        if (mesh) {
+            humanObj->AddComponent<MeshRenderer>(mesh, color);
+            // 根據模型調整 Transform (人型態專用設定)
+            humanObj->transform->scale = glm::vec3(0.6f);
+            humanObj->transform->rotation = glm::vec3(0, 180, 0); // 轉身
+            humanObj->transform->position = glm::vec3(0, 0.0f, 0); // 調整腳底高度 (因為 Player 中心在腰部)
+        }
+        else {
+            // 沒載入成功就用長方體代替
+            humanObj->AddComponent<MeshRenderer>("Cube", color);
+            humanObj->transform->scale = glm::vec3(0.5f, 1.0f, 0.5f);
+        }
+
+        // ==========================================================
+        // 3. 建立 [魷魚型態] 視覺 (Squid Visual)
+        // ==========================================================
+        auto squidObj = std::make_unique<GameObject>("Visual_Squid");
+        squidObj->SetParent(localPlayer.get()); // 綁定到 Player
+        squidObj->active = false; // 預設隱藏
+
+        // 這裡暫時用一個扁方塊代替魷魚
+        squidObj->AddComponent<MeshRenderer>("Cube", color);
+        // 設定魷魚專屬的 Transform (不用去壓扁 Player 本身)
+        squidObj->transform->scale = glm::vec3(0.4f, 0.2f, 0.6f); // 扁長型
+        squidObj->transform->position = glm::vec3(0, -0.8f, 0);   // 貼地
+
+        // ==========================================================
+        // 4. 綁定與註冊
+        // ==========================================================
+
+        // 告訴 Player 哪一個是人，哪一個是魷魚
+        localPlayer->SetupVisuals(humanObj.get(), squidObj.get());
+
+        // 將視覺物件加入 World 管理列表 (渲染用)
+        // 記得：GameWorld 需要有一個 visualEntities 列表來存這些東西
+        visualEntities.clear();
+        visualEntities.push_back(std::move(humanObj));
+        visualEntities.push_back(std::move(squidObj));
+
+        // create AI
         if (NetworkManager::Instance().IsServer()) {
             NetworkManager::Instance().SetMyPlayerID(0); // 強制設為 0
             localPlayer->teamID = 1;
@@ -143,6 +194,10 @@ public:
             if (enemyAI) {
                 enemyAI->UpdateLogic(dt);
                 if (enemyAI->weapon) CollectProjectiles(*(enemyAI->weapon));
+            }
+
+            for (auto& obj : visualEntities) {
+                if (obj->active) obj->Update(dt);
             }
 
             // 處理鯊魚噴墨
@@ -335,6 +390,11 @@ public:
         shader.SetInt("useInk", 0);
         for (auto& item : items) {
             item->Draw(shader);
+        }
+
+        shader.SetInt("useInk", 0);
+        for (auto& obj : visualEntities) {
+            if (obj->active) obj->Draw(shader);
         }
 
         for (const auto& p : projectiles) {
