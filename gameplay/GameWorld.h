@@ -24,6 +24,7 @@
 #include "../components/Health.h"
 #include "../network/NetworkManager.h"
 #include "../network/NetworkProtocol.h"
+#include "../engine/rendering/Texture.h"
 
 enum class WorldState {
     PLAYING,
@@ -114,13 +115,17 @@ public:
         humanObj->SetParent(localPlayer.get()); // 綁定到 Player
 
         // 載入模型
-        auto mesh = ModelLoader::LoadOBJ("assets/models/character-b.obj");
+        std::string path = (myTeam == 1) ? "assets/models/character-b.obj" : "assets/models/character-f.obj";
+        auto mesh = ModelLoader::LoadOBJ(path);
+        auto texture = std::make_shared<Texture>();
+        path = (myTeam == 1) ? "assets/textures/texture-b.png" : "assets/textures/texture-f.png";
+        texture->Load(path);
         if (mesh) {
-            humanObj->AddComponent<MeshRenderer>(mesh, color);
-            // 根據模型調整 Transform (人型態專用設定)
+			auto mr = humanObj->AddComponent<MeshRenderer>(mesh, glm::vec3(1.0f));  // 先用白色建立
+            mr->SetTexture(texture);
             humanObj->transform->scale = glm::vec3(0.6f);
-            humanObj->transform->rotation = glm::vec3(0, 180, 0); // 轉身
-            humanObj->transform->position = glm::vec3(0, 0.0f, 0); // 調整腳底高度 (因為 Player 中心在腰部)
+            humanObj->transform->rotation = glm::vec3(0, 0, 0);
+            humanObj->transform->position = glm::vec3(0, 0.0f, 0);
         }
         else {
             // 沒載入成功就用長方體代替

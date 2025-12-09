@@ -89,15 +89,9 @@ public:
         this->teamID = team;
         transform->position = startPos;
 
-        // 1. 取得相機組件
         if (cam) camera = cam->GetComponent<Camera>();
-
-        // 2. [修正] 武器初始化為 nullptr
-        // 不要這這裡 new Weapon，因為 GameWorld::CreatePlayer 會根據選擇的武器類型來 new
-        // 這樣才不會導致所有人都強制變成拿筆刷
         weapon = nullptr;
 
-        // 3. 加上血量組件
         AddComponent<Health>(team, startPos);
 
         // 4. [修正] 移除 visualBody 與 shadow 的建立代碼
