@@ -45,11 +45,16 @@ public:
     // --- 實體物件 ---
     std::unique_ptr<Player> localPlayer;
     std::unique_ptr<Enemy> enemyAI;
-    std::vector<std::unique_ptr<GameObject>> visualEntities;
     std::vector<std::unique_ptr<Projectile>> projectiles;
     std::vector<std::unique_ptr<Item>> items;
-    float itemRespawnTimer = 0.0f;
 
+    std::vector<std::unique_ptr<GameObject>> visualEntities;
+    std::shared_ptr<Mesh> meshRedTeam;
+    std::shared_ptr<Texture> texRedTeam;
+    std::shared_ptr<Mesh> meshGreenTeam;
+    std::shared_ptr<Texture> texGreenTeam;
+    
+    float itemRespawnTimer = 0.0f;
     // 遠端玩家列表
     std::map<int, std::unique_ptr<RemotePlayer>> remotePlayers;
 
@@ -77,94 +82,131 @@ public:
         scoreboardRef = scoreboard;
         hudRef = hud;
 
+        visualEntities.clear();
+
         int myTeam = NetworkManager::Instance().GetMyTeamID();
-        // 如果是單機測試(沒連線)，預設給 1，否則用存好的 ID
+
+        // local test
         if (!NetworkManager::Instance().IsConnected()) {
             myTeam = 1;
         }
-        // Server 強制為 0 號 ID, 1 號隊伍 (雖然在 Lobby 邏輯應該已經設好了，這裡保險起見)
+        // Server 強制設定
         if (NetworkManager::Instance().IsServer()) {
             NetworkManager::Instance().SetMyPlayerID(0);
             NetworkManager::Instance().SetMyTeamID(1);
             myTeam = 1;
         }
 
+        // create player instance
         WeaponType myWeaponType = NetworkManager::Instance().GetMyWeaponType();
         localPlayer = std::make_unique<Player>(glm::vec3(-5, 0, -5), myTeam, mapFloor.get(), mapObstacle.get(), mainCamera, hud, level.get());
-        glm::vec3 color = (myTeam == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);  // replace weapon
+
+        glm::vec3 teamColor = (myTeam == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+
         switch (myWeaponType) {
         case WeaponType::SHOOTER:
-            localPlayer->weapon = new ShooterWeapon(myTeam, color);
+            localPlayer->weapon = new ShooterWeapon(myTeam, teamColor);
             break;
         case WeaponType::BRUSH:
-            localPlayer->weapon = new BrushWeapon(myTeam, color);
+            localPlayer->weapon = new BrushWeapon(myTeam, teamColor);
             break;
         case WeaponType::SLOSHER:
-            localPlayer->weapon = new SlosherWeapon(myTeam, color);
+            localPlayer->weapon = new SlosherWeapon(myTeam, teamColor);
             break;
         default:
-            localPlayer->weapon = new ShooterWeapon(myTeam, color);
+            localPlayer->weapon = new ShooterWeapon(myTeam, teamColor);
             break;
         }
 
-        // 1. 建立視覺物件
         // ==========================================================
-        // 2. 建立 [人型態] 視覺 (Human Visual)
+        // 4. 預先載入資源 (Pre-load Assets)
+        // ==========================================================
+
+        // --- Red Team Resources ---
+        meshRedTeam = ModelLoader::LoadOBJ("assets/models/character-b.obj");
+        texRedTeam = std::make_shared<Texture>();
+        texRedTeam->Load("assets/textures/texture-b.png");
+
+        // --- Green Team Resources ---
+        meshGreenTeam = ModelLoader::LoadOBJ("assets/models/character-f.obj");
+        texGreenTeam = std::make_shared<Texture>();
+        texGreenTeam->Load("assets/textures/texture-f.png");
+
+        // 防呆：如果載入失敗，互相指派，避免空指標 crash
+        if (!meshRedTeam) meshRedTeam = MeshFactory::GetCube();
+        if (!meshGreenTeam) meshGreenTeam = meshRedTeam;
+
+        // [關鍵修正] 根據我的隊伍，選擇要使用的資源
+        std::shared_ptr<Mesh> myMesh = (myTeam == 1) ? meshRedTeam : meshGreenTeam;
+        std::shared_ptr<Texture> myTex = (myTeam == 1) ? texRedTeam : texGreenTeam;
+
+
+        // ==========================================================
+        // 5. 建立 [人型態] 視覺 (Human Visual)
         // ==========================================================
         auto humanObj = std::make_unique<GameObject>("Visual_Human");
         humanObj->SetParent(localPlayer.get()); // 綁定到 Player
 
-        // 載入模型
-        std::string path = (myTeam == 1) ? "assets/models/character-b.obj" : "assets/models/character-f.obj";
-        auto mesh = ModelLoader::LoadOBJ(path);
-        auto texture = std::make_shared<Texture>();
-        path = (myTeam == 1) ? "assets/textures/texture-b.png" : "assets/textures/texture-f.png";
-        texture->Load(path);
-        if (mesh) {
-			auto mr = humanObj->AddComponent<MeshRenderer>(mesh, glm::vec3(1.0f));  // 先用白色建立
-            mr->SetTexture(texture);
+        if (myMesh) {
+            // 使用白色 (1.0f) 才能顯示貼圖原色
+            auto mr = humanObj->AddComponent<MeshRenderer>(myMesh, glm::vec3(1.0f));
+
+            if (myTex) {
+                mr->SetTexture(myTex);
+            }
+            else {
+                // 如果沒貼圖，就用隊伍顏色頂替
+                mr->SetColor(teamColor);
+            }
+
             humanObj->transform->scale = glm::vec3(0.6f);
             humanObj->transform->rotation = glm::vec3(0, 0, 0);
             humanObj->transform->position = glm::vec3(0, 0.0f, 0);
         }
         else {
-            // 沒載入成功就用長方體代替
-            humanObj->AddComponent<MeshRenderer>("Cube", color);
+            humanObj->AddComponent<MeshRenderer>("Cube", teamColor);
             humanObj->transform->scale = glm::vec3(0.5f, 1.0f, 0.5f);
         }
 
         // ==========================================================
-        // 3. 建立 [魷魚型態] 視覺 (Squid Visual)
+        // 6. 建立 [魷魚型態] 視覺 (Squid Visual)
         // ==========================================================
         auto squidObj = std::make_unique<GameObject>("Visual_Squid");
-        squidObj->SetParent(localPlayer.get()); // 綁定到 Player
+        squidObj->SetParent(localPlayer.get());
         squidObj->active = false; // 預設隱藏
 
-        // 這裡暫時用一個扁方塊代替魷魚
-        squidObj->AddComponent<MeshRenderer>("Cube", color);
-        // 設定魷魚專屬的 Transform (不用去壓扁 Player 本身)
+        // 暫時用扁方塊代替魷魚
+        squidObj->AddComponent<MeshRenderer>("Cube", teamColor);
         squidObj->transform->scale = glm::vec3(0.4f, 0.2f, 0.6f); // 扁長型
         squidObj->transform->position = glm::vec3(0, -0.8f, 0);   // 貼地
 
         // ==========================================================
-        // 4. 綁定與註冊
+        // 7. [新增] 建立影子 (Shadow) - 之前移除建構子後要補回來
+        // ==========================================================
+        auto shadowObj = std::make_unique<GameObject>("Shadow");
+        shadowObj->SetParent(localPlayer.get());
+        shadowObj->AddComponent<MeshRenderer>("Plane", glm::vec3(0, 0, 0));
+        shadowObj->transform->position = glm::vec3(0, 0.05f, 0); // 稍微浮起
+        shadowObj->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f);
+
+
+        // ==========================================================
+        // 8. 綁定與註冊
         // ==========================================================
 
-        // 告訴 Player 哪一個是人，哪一個是魷魚
+        // 告訴 Player 視覺物件在哪 (用於變身切換)
         localPlayer->SetupVisuals(humanObj.get(), squidObj.get());
 
-        // 將視覺物件加入 World 管理列表 (渲染用)
-        // 記得：GameWorld 需要有一個 visualEntities 列表來存這些東西
-        visualEntities.clear();
+        // 加入 World 管理列表 (渲染用)
         visualEntities.push_back(std::move(humanObj));
         visualEntities.push_back(std::move(squidObj));
+        visualEntities.push_back(std::move(shadowObj)); // 記得加影子
 
-        // create AI
+        // Create AI (Server Only)
         if (NetworkManager::Instance().IsServer()) {
-            NetworkManager::Instance().SetMyPlayerID(0); // 強制設為 0
+            NetworkManager::Instance().SetMyPlayerID(0);
             localPlayer->teamID = 1;
             localPlayer->weapon->inkColor = glm::vec3(1, 0, 0);
-            // 只有 Server 建立 AI (具備邏輯的實體)
             enemyAI = std::make_unique<Enemy>(glm::vec3(5, 0, 5), 2);
         }
         else {
@@ -712,21 +754,18 @@ private:
     // 更新或建立遠端玩家
     void HandleWorldState(PacketPlayerState* pkt) {
         int id = pkt->playerID;
-
         if (id == NetworkManager::Instance().GetMyPlayerID()) return;
         if (id == -1) return;
+        auto it = remotePlayers.find(id);
+        int guessedTeam = (id == 100) ? 2 : ((id % 2 == 0) ? 1 : 2);
 
-        if (remotePlayers.find(id) != remotePlayers.end()) {
-            remotePlayers[id]->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead, pkt->isSharking);
+        if (it == remotePlayers.end()) {
+            // [關鍵] 如果不存在，就創建他！並且傳入封包裡的 teamID
+            CreateRemotePlayer(id, guessedTeam, pkt->position);
         }
         else {
-
-            int guessedTeam = (id == 100) ? 2 : ((id % 2 == 0) ? 1 : 2);
-
-            auto newGuy = std::make_unique<RemotePlayer>(id, guessedTeam, pkt->position);
-            newGuy->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead, pkt->isSharking);
-            remotePlayers[id] = std::move(newGuy);
-            std::cout << "Spawned Remote Player: " << id << " (Team " << guessedTeam << ")" << std::endl;
+            it->second->teamID = guessedTeam;
+            it->second->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead, pkt->isSharking);
         }
     }
 
@@ -1051,6 +1090,53 @@ private:
         if (hudRef) {
             hudRef->AddKillLog(killerID, victimID, killerTeam, victimTeam);
         }
+    }
+
+    void CreateRemotePlayer(int playerID, int teamID, glm::vec3 startPos) {
+        if (remotePlayers.find(playerID) != remotePlayers.end()) return;
+
+        auto remoteP = std::make_unique<RemotePlayer>(playerID, teamID, startPos);
+        remoteP->transform->position = startPos;
+
+        // ==========================================
+        // 3. 根據隊伍選擇資源
+        // ==========================================
+        std::shared_ptr<Mesh> targetMesh;
+        std::shared_ptr<Texture> targetTex;
+        glm::vec3 tintColor = glm::vec3(1.0f); // 預設白色
+
+        if (teamID == 1) { // 紅隊
+            targetMesh = meshRedTeam;
+            targetTex = texRedTeam;
+            // 如果沒貼圖，可以用顏色區分
+            if (!targetTex) tintColor = glm::vec3(1.0f, 0.2f, 0.2f);
+        }
+        else { // 綠隊
+            targetMesh = meshGreenTeam;
+            targetTex = texGreenTeam;
+            if (!targetTex) tintColor = glm::vec3(0.2f, 1.0f, 0.2f);
+        }
+
+        // ==========================================
+        // 4. 建立視覺物件 (Visual Object)
+        // ==========================================
+        auto visualObj = std::make_unique<GameObject>("RemoteVisual");
+        visualObj->SetParent(remoteP.get()); // 綁定
+
+        if (targetMesh) {
+            auto mr = visualObj->AddComponent<MeshRenderer>(targetMesh, tintColor);
+            if (targetTex) mr->SetTexture(targetTex);
+            visualObj->transform->scale = glm::vec3(0.6f);
+            visualObj->transform->rotation = glm::vec3(0, 0, 0); // 轉身
+            visualObj->transform->position = glm::vec3(0, 0.0f, 0);
+        }
+        else {
+            visualObj->AddComponent<MeshRenderer>("Cube", tintColor);
+        }
+
+        visualEntities.push_back(std::move(visualObj));
+        remotePlayers[playerID] = std::move(remoteP);
+        std::cout << "Spawned Remote Player " << playerID << " (Team " << teamID << ")" << std::endl;
     }
 
     void SpawnSharkBullets() {
