@@ -38,9 +38,6 @@ public:
             float offsetZ = ((rand() % 100) / 50.0f - 1.0f) * shakeMagnitude;
 
             shakeOffset = glm::vec3(offsetX, offsetY, offsetZ);
-
-            // (選用) 讓震動隨著時間慢慢變弱，感覺比較自然
-            // shakeMagnitude = glm::max(0.0f, shakeMagnitude - (dt * shakeMagnitude * 5.0f)); 
         }
         else {
             shakeTimer = 0.0f;
@@ -48,9 +45,6 @@ public:
         }
     }
 
-    // [新增] 外部呼叫此函式來觸發震動
-    // duration: 持續幾秒 (例如 0.1)
-    // magnitude: 震動多大 (例如 0.2)
     void TriggerShake(float duration, float magnitude) {
         shakeTimer = duration;
         shakeMagnitude = magnitude;
@@ -58,7 +52,6 @@ public:
 
     glm::mat4 GetViewMatrix() {
         // 算出 "震動後" 的位置
-        // 注意：這裡不改變 gameObject->transform->position，只改變回傳給 Shader 的矩陣
         glm::vec3 finalPos = gameObject->transform->position + shakeOffset;
 
         return glm::lookAt(finalPos,

@@ -11,9 +11,8 @@ public:
     unsigned int textureID;
     int width, height;
 
-    // CPU 端邏輯地圖 (用於潛水判定與快速顏色查詢)
     static const int GRID_SIZE = 100;
-    int gridData[GRID_SIZE][GRID_SIZE]; // 0:無, 1:紅隊, 2:綠隊
+    int gridData[GRID_SIZE][GRID_SIZE];
 
     SplatMap(int w, int h) : width(w), height(h) {
         InitFBO();
@@ -30,7 +29,7 @@ public:
         glBindTexture(GL_TEXTURE_2D, textureID);
     }
 
-    void UpdateCPUData(float u, float v, int teamID, int radius = 2) {
+    void UpdateCPUData(float u, float v, float radius, int teamID) {
         int cx = (int)(u * GRID_SIZE);
         int cy = (int)(v * GRID_SIZE);
 
@@ -43,8 +42,7 @@ public:
         }
     }
 
-    // 寬容判定：檢查某個位置周圍是否有特定隊伍的顏色
-    bool IsColorInArea(float u, float v, int teamID, int radius = 1) {
+    bool IsColorInArea(float u, float v, int teamID, int radius = 2) {
         int cx = (int)(u * GRID_SIZE);
         int cy = (int)(v * GRID_SIZE);
 
@@ -58,19 +56,15 @@ public:
         return false;
     }
 
-    // 計算分數
     glm::vec2 CalculateScore() {
         glBindTexture(GL_TEXTURE_2D, textureID);
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        // 算出最高層級 (1x1 像素)
         int maxLevel = (int)std::floor(std::log2(std::max(width, height)));
 
         float pixelData[4];
         glGetTexImage(GL_TEXTURE_2D, maxLevel, GL_RGBA, GL_FLOAT, pixelData);
 
-        // pixelData[0] 是紅色通道總和 (Team 1)
-        // pixelData[1] 是綠色通道總和 (Team 2)
         return glm::vec2(pixelData[0], pixelData[1]);
     }
 
@@ -83,10 +77,9 @@ public:
             for (int j = 0; j < GRID_SIZE; j++) {
                 if (gridData[i][j] == 1) count1++;
                 else if (gridData[i][j] == 2) count2++;
-			}
+            }
         }
 
-        // 避免除以零
         if (totalPixels == 0) return { 0.0f, 0.0f };
 
         return { (float)count1 / totalPixels, (float)count2 / totalPixels };

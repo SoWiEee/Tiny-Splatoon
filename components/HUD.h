@@ -151,8 +151,8 @@ public:
             float barAnim = std::min(1.0f, (animTime - 1.0f) / 2.0f); // 2秒內跑完
 
             // 計算顯示的分數 (Lerp)
-            float displayS1 = score1 * barAnim;
-            float displayS2 = score2 * barAnim;
+            float displayS1 = score1 * barAnim * 100.0f;
+            float displayS2 = score2 * barAnim * 100.0f;
 
             // 繪製背景條
             ImGui::SetNextWindowPos(ImVec2(50, screenHeight - 150));
@@ -200,6 +200,47 @@ public:
 
             ImGui::End();
         }
+    }
+
+    // 繪製炸彈持有狀態
+    void DrawBombIndicator(bool hasBomb) {
+        if (!hasBomb) return; // 沒炸彈就不畫
+
+        // 設定位置：螢幕右下角，在大招量表旁邊
+        float iconSize = 60.0f;
+        ImGui::SetNextWindowPos(ImVec2(screenWidth - 100, screenHeight - 100));
+        ImGui::SetNextWindowSize(ImVec2(iconSize + 20, iconSize + 40));
+
+        ImGui::Begin("BombIcon", nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings);
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        ImVec2 center = ImVec2(p.x + iconSize / 2, p.y + iconSize / 2);
+
+        // 1. 畫一個黑色圓形背景 (代表炸彈本體)
+        dl->AddCircleFilled(center, iconSize / 2, IM_COL32(20, 20, 20, 255));
+
+        // 2. 畫引信 (Fuse) - 頭頂一條紅線
+        dl->AddLine(
+            ImVec2(center.x, center.y - iconSize / 2),
+            ImVec2(center.x + 10, center.y - iconSize / 2 - 10),
+            IM_COL32(255, 50, 50, 255), 4.0f
+        );
+
+        // 3. 畫閃爍的火花 (Spark)
+        float time = ImGui::GetTime();
+        if ((int)(time * 10) % 2 == 0) { // 快速閃爍
+            dl->AddCircleFilled(ImVec2(center.x + 10, center.y - iconSize / 2 - 10), 5.0f, IM_COL32(255, 200, 0, 255));
+        }
+
+        // 4. 文字提示 "R"
+        const char* text = "KEY [R]";
+        float textW = ImGui::CalcTextSize(text).x;
+        dl->AddText(ImVec2(center.x - textW / 2, center.y + iconSize / 2 + 5), IM_COL32(255, 255, 255, 255), text);
+
+        ImGui::End();
     }
 
     void ShowHitMarker() {
@@ -319,7 +360,7 @@ private:
         ImGui::End();
     }
 
-    // [新增] 繪製右上角圓形儀表板
+    // 繪製右上角圓形儀表板
     void DrawSpecialGauge(float percent) {
         // 設定視窗位置 (螢幕右上角)
         ImGui::SetNextWindowPos(ImVec2(screenWidth - 120, 20));

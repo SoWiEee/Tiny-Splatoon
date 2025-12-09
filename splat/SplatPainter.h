@@ -58,9 +58,6 @@ public:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         splatShader->Bind();
-        // --- 計算 Model Matrix ---
-        // 我們的 Quad 原始座標是 -1 到 1 (寬度 2)
-        // 目標：縮小到 size，移動到 uv 位置，並旋轉
 
         glm::mat4 model = glm::mat4(1.0f);
 
@@ -93,7 +90,7 @@ public:
         glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        map->UpdateCPUData(uv.x, uv.y, teamID);
+        map->UpdateCPUData(uv.x, uv.y, size, teamID);
     }
 
 private:

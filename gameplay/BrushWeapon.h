@@ -9,7 +9,7 @@ private:
 public:
     // 筆刷特色：射速極快 (0.12s)，單發耗墨中等 (3.0f)，但因為要一直按，總耗墨大
     BrushWeapon(int team, glm::vec3 color)
-        : Weapon(team, color, 0.2f, 0.15f) {
+        : Weapon(team, color, 0.2f, 0.1f) {
     }
 
 protected:

@@ -14,8 +14,8 @@
 struct UIPlayerStatus {
     int id;
     int team;      // 1 or 2
-    bool isDead;   // 是否死亡
-    bool isSelf;   // 是否為自己 (可以畫個黃色外框特別標示)
+    bool isDead;
+    bool isSelf;
     bool hasSpecial; // 是否大招集滿 (選用，讓圖示發光)
 };
 
@@ -37,10 +37,10 @@ public:
         SetupMesh();
     }
 
-    // 設定分數 (給網路連線用)
+    // 設定分數
     void SetScores(float scoreA, float scoreB) {
         m_CurrentScores = glm::vec2(scoreA, scoreB);
-        useExternalScore = true; // 開啟外部模式，停止自己計算
+        useExternalScore = true;
     }
 
     // 設定是否顯示分數條
@@ -49,11 +49,11 @@ public:
     }
 
     void Update(float dt) override {
-        if (m_ShowScoreBar) {
+        if (!useExternalScore && m_ShowScoreBar) {
             m_Timer += dt;
             if (!useExternalScore && m_Timer > 0.5f) {
                 if (m_SplatMap) {
-                    std::pair<float, float> result = m_SplatMap->CalculatePercentages();
+                    auto result = m_SplatMap->CalculatePercentages();
                     m_CurrentScores = glm::vec2(result.first, result.second);
                 }
                 m_Timer = 0.0f;
@@ -86,8 +86,8 @@ public:
         model = glm::scale(model, glm::vec3(barWidth, barHeight, 1.0f));
         m_Shader->SetMat4("model", model);
 
-        m_Shader->SetFloat("scoreA", m_CurrentScores.x);
-        m_Shader->SetFloat("scoreB", m_CurrentScores.y);
+        m_Shader->SetFloat("scoreA", m_CurrentScores.x * 100.0f);
+        m_Shader->SetFloat("scoreB", m_CurrentScores.y * 100.0f);
         m_Shader->SetVec3("colorA", glm::vec3(1.0, 0.2, 0.2)); // 紅隊
         m_Shader->SetVec3("colorB", glm::vec3(0.2, 1.0, 0.2)); // 綠隊
 

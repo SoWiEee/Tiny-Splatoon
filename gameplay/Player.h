@@ -6,6 +6,7 @@
 #include "../components/MeshRenderer.h"
 #include "../components/Health.h"
 #include "../components/Camera.h"
+#include "../scene/Level.h"
 #include "Weapon.h"
 #include "ShooterWeapon.h"
 #include "BrushWeapon.h"
@@ -15,16 +16,18 @@
 enum class PlayerState {
     ALIVE,      // 正常遊玩
     DEAD,       // 死亡 (等待重生)
-    LAUNCHING   // 超級跳躍進場中
+    LAUNCHING,  // 超級跳躍進場中
+    SHARKING    // 鯊魚坐騎狀態
 };
 
 class Player : public Entity {
 public:
     // parameter
-    float moveSpeed = 5.0f;
-    float swimSpeed = 12.0f;
+    float moveSpeed = 3.0f;
+    float swimSpeed = 9.0f;
     float jumpHeight = 2.0f;
-    float gravity = -20.0f;
+    float gravity = -30.0f;
+    Level* level = nullptr;
 
     // state
     glm::vec3 velocity = glm::vec3(0.0f);
@@ -33,6 +36,23 @@ public:
     PlayerState state = PlayerState::ALIVE;
     float respawnTimer = 0.0f;
     float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
+    // 是否持有炸彈
+    bool hasBomb = false;
+    bool requestBombThrow = false;
+
+    // 鯊魚坐騎參數
+    int sharkDashCount = 0;         // 剩餘衝刺次數 (總共 3 次)
+    bool isSharkDashing = false;    // 目前是在「衝刺中」還是「停頓瞄準中」
+    float sharkStateTimer = 0.0f;   // 共用計時器 (衝刺倒數 或 停頓倒數)
+
+    // 參數設定
+    float sharkDashDuration = 1.0f;
+    float sharkPauseDuration = 0.7f;
+    float sharkSpeed = 13.0f;        // 衝刺速度 (要快一點才爽)
+    float sharkInkTimer = 0.0f;      // 噴墨計時器
+    glm::vec3 sharkDashDirection = glm::vec3(0, 0, 1);
+    bool requestSharkSpray = false;
+    bool requestSharkExplode = false;
 
     bool requestLaser = false;
     float currentCharge = 0.0f;       // 當前能量
@@ -46,7 +66,8 @@ public:
 
     // reference
     Weapon* weapon = nullptr;
-    SplatMap* splatMapRef;
+    SplatMap* mapFloor = nullptr;
+    SplatMap* mapObstacle = nullptr;
     GameObject* cameraRef;
     GameObject* shadow;
     GameObject* visualBody;
@@ -60,8 +81,8 @@ public:
     float mapLimit = 39.5f;
     float floorSize = 80.0f;
 
-    Player(glm::vec3 startPos, int team, SplatMap* map, GameObject* cam, HUD* hud)
-        : Entity("Player"), splatMapRef(map), cameraRef(cam), hudRef(hud)
+    Player(glm::vec3 startPos, int team, SplatMap* floor, SplatMap* obstacle, GameObject* cam, HUD* hud, Level* mapLevel)
+        : Entity("Player"), mapFloor(floor), mapObstacle(obstacle), cameraRef(cam), hudRef(hud), level(mapLevel)
     {
         this->teamID = team;
         shadow = new GameObject("ShadowBlob");
@@ -89,40 +110,64 @@ public:
 
     // 主邏輯更新
     void UpdateLogic(float dt) {
+        auto hpComp = GetComponent<Health>();
+        if (state == PlayerState::ALIVE && hpComp && hpComp->isDead) {
+            Die();
+            return;
+        }
+
         switch (state) {
         case PlayerState::ALIVE:
             HandleInput(dt);
 
             if (Input::GetKey(GLFW_KEY_Q) && IsSpecialReady()) {
-                StartSpecialLaser();
+                StartSpecialShark();
             }
 
-            // 墨水環境互動 
-            if (splatMapRef) {
+            if (level && mapFloor && mapObstacle) {
+
+                // 1. 計算 UV 座標
                 float u = (transform->position.x / floorSize) + 0.5f;
                 float v = (transform->position.z / floorSize) + 0.5f;
 
-                int enemyTeam = (teamID == 1) ? 2 : 1;
-                bool onEnemyInk = splatMapRef->IsColorInArea(u, v, enemyTeam, 1);
+                // 2. 判斷腳下高度，決定要查哪張地圖
+                float currentHeight = level->GetHeightAt(transform->position.x, transform->position.z);
 
+                // 預設查地板
+                SplatMap* targetMap = mapFloor;
+
+                // 如果高度大於 0.5 (代表站在箱子或高台上)，改查障礙物地圖
+                if (currentHeight > 0.5f) {
+                    targetMap = mapObstacle;
+                }
+
+                // 3. 執行墨水判定 (使用 targetMap)
+                int enemyTeam = (teamID == 1) ? 2 : 1;
+
+                // 檢查敵方墨水 (受傷)
+                bool onEnemyInk = targetMap->IsColorInArea(u, v, enemyTeam, 1);
+
+                // 檢查己方墨水 (回血/潛水判定也會用到)
+                bool onMyInk = targetMap->IsColorInArea(u, v, teamID, 1);
+
+                // --- 傷害與回血邏輯 ---
                 auto healthComp = GetComponent<Health>();
                 if (healthComp) {
-                    if (!onEnemyInk) {
-                        if (currentRegenDelay > 0.0f) {
-                            currentRegenDelay -= dt;
-                        }
-                        else {
-                            if (isSwimming) {
-                                healthComp->Heal(healRateFast * dt);
-                            }
-                            else {
-                                healthComp->Heal(healRateSlow * dt);
-                            }
-                        }
+                    if (!onEnemyInk && currentRegenDelay > 0.0f) {
+                        currentRegenDelay -= dt;
+                    }
+                    else {
+                        // 根據是否潛水決定回血速度
+                        if (isSwimming) healthComp->Heal(healRateFast * dt);
+                        else healthComp->Heal(healRateSlow * dt);
                     }
                 }
             }
             ApplyPhysics(dt);
+            break;
+
+        case PlayerState::SHARKING:
+            UpdateShark(dt);
             break;
 
         case PlayerState::DEAD:
@@ -167,7 +212,7 @@ public:
         if (visualBody) visualBody->transform->scale = glm::vec3(0.0f);
 
         // 2. 播放音效
-        // AudioManager::Instance().PlayOneShot("die", 1.0f);
+        AudioManager::Instance().PlayOneShot("die", 1.0f);
 
         if (cameraRef) {
             glm::vec3 spawnPos = GetSpawnPosition();
@@ -176,12 +221,10 @@ public:
         }
     }
 
-    // 開始超級跳躍
     void StartSuperJump() {
         state = PlayerState::LAUNCHING;
         jumpTimer = 0.0f;
 
-        // 顯示模型
         if (visualBody) visualBody->active = true;
 
         // 設定起點與終點 (根據隊伍)
@@ -190,12 +233,127 @@ public:
         float zDir = (teamID == 1) ? -1.0f : 1.0f;
         jumpTargetPos = glm::vec3(0, 0.0f, 30.0f * zDir); // 落地點
 
-        // 重置血量與墨水
         GetComponent<Health>()->Reset();
         if (hudRef) hudRef->RefillInk(100.0f);
-
-        // 播放跳躍音效
         AudioManager::Instance().PlayOneShot("superjump", 1.0f);
+    }
+
+    void PickupBomb() {
+        if (!hasBomb) {
+            hasBomb = true;
+            std::cout << "[Player] Picked up a Bomb! Press R to throw." << std::endl;
+            // 這裡可以播放音效 "item_get"
+        }
+    }
+
+    void StartSpecialShark() {
+        if (state != PlayerState::ALIVE) return;
+
+        state = PlayerState::SHARKING;
+        sharkDashCount = 3;
+        StartNextDash();
+
+        // 播放啟動音效
+        AudioManager::Instance().PlayOneShot("shark", 1.0f);
+        std::cout << "Shark Triple Dash Start!" << std::endl;
+    }
+
+    void StartNextDash() {
+        isSharkDashing = true;
+        sharkStateTimer = sharkDashDuration;
+        sharkInkTimer = 0.0f;
+
+        glm::vec3 camFwd = glm::vec3(0, 0, 1);
+        if (cameraRef) {
+            camFwd = cameraRef->transform->GetForward();
+        }
+        // 2. 壓平 Y 軸
+        camFwd.y = 0.0f;
+        if (glm::length(camFwd) > 0.01f) {
+            camFwd = glm::normalize(camFwd);
+        }
+        sharkDashDirection = camFwd;
+
+        // 3. 設定速度
+        velocity.x = sharkDashDirection.x * sharkSpeed;
+        velocity.z = sharkDashDirection.z * sharkSpeed;
+        velocity.y = 2.0f;
+
+        transform->LookAt(transform->position + sharkDashDirection);
+
+        AudioManager::Instance().PlayOneShot("shark", 0.6f);
+    }
+
+    void UpdateShark(float dt) {
+        sharkStateTimer -= dt;
+
+        if (glm::length(velocity) > 0.1f) {
+            RotateTowards(velocity, 20.0f, dt);
+        }
+
+        if (isSharkDashing) {
+            velocity.x = sharkDashDirection.x * sharkSpeed;
+            velocity.z = sharkDashDirection.z * sharkSpeed;
+            velocity.y += gravity * dt;
+
+            // shoot ink
+            sharkInkTimer += dt;
+            if (sharkInkTimer > 0.08f) {
+                sharkInkTimer = 0.0f;
+                requestSharkSpray = true;
+            }
+
+            // dash end
+            if (sharkStateTimer <= 0.0f) {
+                sharkDashCount--;
+                velocity = glm::vec3(0);
+
+                if (sharkDashCount > 0) {
+                    isSharkDashing = false;
+                    sharkStateTimer = sharkPauseDuration;
+                }
+                else {
+                    EndShark();
+                }
+            }
+        }
+        else {
+            velocity = glm::vec3(0);
+            velocity.y += gravity * dt;
+
+			// follow camera
+            if (cameraRef) {
+                glm::vec3 camFwd = cameraRef->transform->GetForward();
+                camFwd.y = 0;
+                RotateTowards(camFwd, 20.0f, dt);
+            }
+            if (sharkStateTimer <= 0.0f) {
+                StartNextDash();
+            }
+        }
+
+        ApplyPhysics(dt);
+    }
+
+    void EndShark() {
+        state = PlayerState::ALIVE;
+        velocity = glm::vec3(0);
+        currentCharge = 0.0f;
+    }
+
+    void RotateTowards(glm::vec3 dir, float turnSpeed, float dt) {
+        dir.y = 0;
+        if (glm::length(dir) < 0.01f) return;
+        dir = glm::normalize(dir);
+
+        float targetAngle = glm::degrees(atan2(dir.x, dir.z));
+        float currentAngle = transform->rotation.y;
+
+        float diff = targetAngle - currentAngle;
+        while (diff < -180.0f) diff += 360.0f;
+        while (diff > 180.0f) diff -= 360.0f;
+
+        transform->rotation.y += diff * turnSpeed * dt;
     }
 
 private:
@@ -253,10 +411,20 @@ private:
         if (!cameraRef) return;
 
         bool onMyInk = false;
-        if (splatMapRef) {
+        float mapSize = 80.0f;
+        if (level) mapSize = level->mapSize;
+
+        if(mapFloor && mapObstacle && level) {
             float u = (transform->position.x + floorSize / 2.0f) / floorSize;
             float v = 1.0f - ((transform->position.z + floorSize / 2.0f) / floorSize);
-            onMyInk = splatMapRef->IsColorInArea(u, v, teamID, 1);
+            float h = level->GetHeightAt(transform->position.x, transform->position.z);
+
+            if (h > 0.5f) {
+                onMyInk = mapObstacle->IsColorInArea(u, v, teamID, 1);
+            }
+            else {
+                onMyInk = mapFloor->IsColorInArea(u, v, teamID, 1);
+            }
         }
 
         bool wantSwim = Input::GetKey(GLFW_KEY_LEFT_SHIFT);
@@ -287,14 +455,29 @@ private:
         if (Input::GetKey(GLFW_KEY_A)) targetVel -= right;
         if (Input::GetKey(GLFW_KEY_D)) targetVel += right;
 
-        if (glm::length(targetVel) > 0.1f) {
+        if (glm::length(targetVel) > 0.0f) {
             targetVel = glm::normalize(targetVel) * currentSpeed;
-            transform->rotation.y = cameraRef->transform->rotation.y;
         }
 
-        velocity.x = targetVel.x;
-        velocity.z = targetVel.z;
+        if (isSwimming) {
+            // A. 魷魚狀態：面向 "移動方向"
+            // 只有在移動時才轉向，這樣游起來比較自然
+            if (glm::length(targetVel) > 0.0f) {
+                RotateTowards(targetVel, 10.0f, dt);
+            }
+        }
+        else {
+            // B. 人型態：始終面向 "鏡頭準心" (TPS 標準操作)
+            // 這樣你的準心指哪，人就朝哪，方便隨時射擊
+            // 即使沒在移動，也要跟著鏡頭轉
+            RotateTowards(camFwd, 15.0f, dt);
+        }
 
+        float friction = 10.0f; // 數值越大越靈敏，越小越滑
+        velocity.x = glm::mix(velocity.x, targetVel.x, friction * dt);
+        velocity.z = glm::mix(velocity.z, targetVel.z, friction * dt);
+
+        // 4. 跳躍
         if (Input::GetKey(GLFW_KEY_SPACE) && isGrounded && !isSwimming) {
             velocity.y = sqrt(2.0f * jumpHeight * abs(gravity));
             isGrounded = false;
@@ -314,7 +497,7 @@ private:
             if (weapon->Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
                 camera->TriggerShake(0.1f, 0.05f);
-                AudioManager::Instance().PlayOneShot("shoot", 0.5f);
+                AudioManager::Instance().PlayOneShot("shoot", 0.3f);
                 
                 // 大招集氣
                 float chargeAmount = 5.0f;
@@ -323,19 +506,59 @@ private:
                 AddSpecialCharge(chargeAmount);
             }
         }
+
+        if (hasBomb && Input::GetKey(GLFW_KEY_R)) {
+            hasBomb = false;
+            requestBombThrow = true;
+            std::cout << "[Player] Throwing Bomb!" << std::endl;
+        }
     }
 
     void ApplyPhysics(float dt) {
+        glm::vec3 nextPos = transform->position;
+        nextPos.x += velocity.x * dt;
+        nextPos.z += velocity.z * dt;
+        float currentH = 0.0f;
+        float nextH = 0.0f;
+
+        if (level) {
+            currentH = level->GetHeightAt(transform->position.x, transform->position.z);
+            nextH = level->GetHeightAt(nextPos.x, nextPos.z);
+        }
+
+        // 高低差檢查
+        float stepHeight = 0.5f;
+        if (nextH > currentH + stepHeight) {
+            velocity.x = 0;
+            velocity.z = 0;
+        }
+        else {
+            transform->position.x = nextPos.x;
+            transform->position.z = nextPos.z;
+        }
+
+        // 垂直移動
         velocity.y += gravity * dt;
         transform->position += velocity * dt;
 
-        if (transform->position.y < 0.0f) {
-            transform->position.y = 0.0f;
+        float groundHeight = 0.0f;
+        if (level) {
+            groundHeight = level->GetHeightAt(transform->position.x, transform->position.z);
+        }
+        if (transform->position.y < groundHeight) {
+            transform->position.y = groundHeight; // 拉回地板
             velocity.y = 0;
             isGrounded = true;
         }
         else {
-            isGrounded = false;
+            // 如果離地很近也算著地 (避免斜坡抖動)
+            if (transform->position.y - groundHeight < 0.1f && velocity.y <= 0) {
+                transform->position.y = groundHeight;
+                isGrounded = true;
+            }
+            else {
+                isGrounded = false;
+            }
         }
 
         if (transform->position.x > mapLimit) transform->position.x = mapLimit;
