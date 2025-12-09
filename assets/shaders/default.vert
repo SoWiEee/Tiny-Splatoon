@@ -1,9 +1,8 @@
 #version 450 core
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec2 aTexCoord;
-layout (location = 2) in vec3 aNormal; // [新增] 接收頂點法線
+layout (location = 2) in vec3 aNormal;
 
-// [新增] 輸出給 Fragment Shader 的變數
 out vec2 TexCoord;
 out vec3 FragPos; 
 out vec3 Normal;
