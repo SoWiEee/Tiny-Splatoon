@@ -57,7 +57,11 @@ int main() {
     AudioManager::Instance().LoadSound("laser_fire", "assets/laser.wav");
     AudioManager::Instance().LoadSound("whistle", "assets/whistle.wav");
     AudioManager::Instance().LoadSound("swim", "assets/swim.mp3");
-
+    AudioManager::Instance().LoadSound("explode", "assets/explode.wav");
+    AudioManager::Instance().LoadSound("bomb_beep", "assets/bomb_beep.mp3"); 
+    AudioManager::Instance().LoadSound("bomb_pick", "assets/bomb_pick.mp3");
+    AudioManager::Instance().LoadSound("shark", "assets/laser.wav");
+    
     // Game Loop
     while (!window.ShouldClose()) {
         timer.Tick();

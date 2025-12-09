@@ -24,7 +24,7 @@ void GameScene::OnEnter() {
     world->Init(cameraObj.get(), hud, nullptr);
 
     // create scoreboard 
-    scoreboard = uiObj->AddComponent<Scoreboard>(1280, 720, world->splatMap.get());
+    scoreboard = uiObj->AddComponent<Scoreboard>(1280, 720, world->mapFloor.get());
     world->scoreboardRef = scoreboard;
 
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -69,24 +69,31 @@ void GameScene::Update(float dt) {
     if (world->state == WorldState::PLAYING) {
         if (world->localPlayer && cameraObj) {
             auto playerState = world->localPlayer->state;
-            if (playerState == PlayerState::ALIVE || playerState == PlayerState::LAUNCHING) {
 
+            if (playerState == PlayerState::ALIVE ||
+                playerState == PlayerState::LAUNCHING ||
+                playerState == PlayerState::SHARKING)
+            {
                 glm::vec3 targetPos = world->localPlayer->transform->position;
 
-                // 參數設定
                 float camDist = 5.0f;
                 float camHeight = 2.5f;
+                float targetFOV = 60.0f;
 
-                // 如果正在超級跳躍，相機可以拉遠一點，視野更好
                 if (playerState == PlayerState::LAUNCHING) {
                     camDist = 8.0f;
                     camHeight = 4.0f;
                 }
+                else if (playerState == PlayerState::SHARKING) {
+                    camDist = 6.5f;
+                    camHeight = 3.0f;
+                    targetFOV = 75.0f;
+                }
 
                 if (cameraObj) {
                     glm::vec3 camDir = cameraObj->transform->GetForward();
-                    // 設定位置
-                    cameraObj->transform->position = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+                    glm::vec3 desiredPos = targetPos - (camDir * camDist) + glm::vec3(0, camHeight, 0);
+                    cameraObj->transform->position = desiredPos;
                 }
             }
         }
@@ -94,11 +101,10 @@ void GameScene::Update(float dt) {
     else if (world->state == WorldState::FINISHED) {
         // Top-Down view
         if (cameraObj) {
-            // 目標位置：地圖中心高空 (例如 80米高)
-            glm::vec3 targetPos = glm::vec3(0, 80.0f, 0);
+            // 目標位置：地圖中心高空
+            glm::vec3 targetPos = glm::vec3(0, 40.0f, 0);
             glm::vec3 currentPos = cameraObj->transform->position;
 
-            // 平滑移動 (Lerp) 讓鏡頭慢慢拉上去
             cameraObj->transform->position = glm::mix(currentPos, targetPos, 5.0f * dt);
             cameraObj->transform->LookAt(glm::vec3(0, 0, 0));
         }
@@ -187,6 +193,11 @@ void GameScene::DrawUI() {
                 false,
                 false
                 });
+        }
+
+        if (world->localPlayer) {
+            bool hasBomb = world->localPlayer->hasBomb;
+            hud->DrawBombIndicator(hasBomb);
         }
 
         scoreboard->DrawPlayerIcons(playerStatuses);

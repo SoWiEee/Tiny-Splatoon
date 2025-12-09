@@ -63,7 +63,7 @@ struct PacketLobbyState {
     LobbySlotInfo slots[8]; // 固定 8 個位置
 };
 
-// 開始遊戲封包 (內容空的沒關係，只是訊號)
+// 開始遊戲封包
 struct PacketGameStart {
     PacketHeader header;
 };
@@ -90,6 +90,12 @@ struct PacketPlayerState {
     float rotationY;
     bool isSwimming;
     bool isDead;
+    bool isSharking;
+};
+
+enum class ProjectileType : uint8_t {
+    BULLET = 0,
+    BOMB = 1
 };
 
 // 4. 射擊請求
@@ -102,6 +108,7 @@ struct PacketShoot {
     float speed;
     float scale;
     glm::vec3 color;
+    ProjectileType type = ProjectileType::BULLET;
 };
 
 // 5. 塗地同步 (最精簡的資料)
@@ -132,7 +139,7 @@ struct PacketSpecialAttack {
 // 分數與遊戲狀態封包
 struct PacketGameState {
     PacketHeader header;
-    float scoreTeam1;   // 紅隊分數 (0.0 ~ 1.0 或 像素總數)
+    float scoreTeam1;   // 紅隊分數
     float scoreTeam2;   // 綠隊分數
     float timeRemaining; // 剩餘時間 (秒)
 };
