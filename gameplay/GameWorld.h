@@ -1098,9 +1098,8 @@ private:
         auto remoteP = std::make_unique<RemotePlayer>(playerID, teamID, startPos);
         remoteP->transform->position = startPos;
 
-        // ==========================================
-        // 3. 根據隊伍選擇資源
-        // ==========================================
+
+		// fetch resource via teamID
         std::shared_ptr<Mesh> targetMesh;
         std::shared_ptr<Texture> targetTex;
         glm::vec3 tintColor = glm::vec3(1.0f); // 預設白色
@@ -1117,17 +1116,15 @@ private:
             if (!targetTex) tintColor = glm::vec3(0.2f, 1.0f, 0.2f);
         }
 
-        // ==========================================
-        // 4. 建立視覺物件 (Visual Object)
-        // ==========================================
+        // create visual object
         auto visualObj = std::make_unique<GameObject>("RemoteVisual");
-        visualObj->SetParent(remoteP.get()); // 綁定
+		visualObj->SetParent(remoteP.get()); // bind to remote player
 
         if (targetMesh) {
             auto mr = visualObj->AddComponent<MeshRenderer>(targetMesh, tintColor);
             if (targetTex) mr->SetTexture(targetTex);
             visualObj->transform->scale = glm::vec3(0.6f);
-            visualObj->transform->rotation = glm::vec3(0, 0, 0); // 轉身
+            visualObj->transform->rotation = glm::vec3(0, 0, 0);
             visualObj->transform->position = glm::vec3(0, 0.0f, 0);
         }
         else {
