@@ -451,10 +451,6 @@ public:
         if (localPlayer->GetVisualBody()) localPlayer->GetVisualBody()->Draw(shader);
         if (enemyAI && enemyAI->GetVisualBody()) enemyAI->GetVisualBody()->Draw(shader);
 
-        for (auto& pair : remotePlayers) {
-            if (pair.second->GetVisualBody()) pair.second->GetVisualBody()->Draw(shader);
-        }
-
         // 4. 畫陰影 (開啟半透明混合)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1098,7 +1094,6 @@ private:
         auto remoteP = std::make_unique<RemotePlayer>(playerID, teamID, startPos);
         remoteP->transform->position = startPos;
 
-
 		// fetch resource via teamID
         std::shared_ptr<Mesh> targetMesh;
         std::shared_ptr<Texture> targetTex;
@@ -1107,7 +1102,6 @@ private:
         if (teamID == 1) { // 紅隊
             targetMesh = meshRedTeam;
             targetTex = texRedTeam;
-            // 如果沒貼圖，可以用顏色區分
             if (!targetTex) tintColor = glm::vec3(1.0f, 0.2f, 0.2f);
         }
         else { // 綠隊

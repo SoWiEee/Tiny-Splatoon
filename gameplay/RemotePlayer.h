@@ -1,59 +1,80 @@
 #pragma once
 #include "../scene/Entity.h"
-#include "../components/MeshRenderer.h"
 #include <glm/glm.hpp>
 
 class RemotePlayer : public Entity {
 public:
     int playerID;
+
     glm::vec3 targetPos;
     float targetRot;
     bool isSwimming = false;
-    float serverForceDeadTimer = 0.0f;
     bool isSharking = false;
+    bool isDead = false;
 
-    GameObject* visualBody;
-    GameObject* shadow = nullptr;
+    float serverForceDeadTimer = 0.0f;
+
+    GameObject* visualHuman = nullptr;
+    GameObject* visualSquid = nullptr;
 
     RemotePlayer(int id, int team, glm::vec3 startPos)
         : Entity("RemotePlayer"), playerID(id)
     {
-        // 初始化位置
         this->teamID = team;
         transform->position = startPos;
         targetPos = startPos;
         targetRot = 0.0f;
+
         AddComponent<Health>(team, startPos);
 
-        visualBody = new GameObject("RemoteBody");
-
-        // 1=red, 1=green
-        glm::vec3 color = (team == 1) ? glm::vec3(1, 0, 0) :
-            (team == 2) ? glm::vec3(0, 1, 0) : glm::vec3(0, 0, 1);
-
-        visualBody->AddComponent<MeshRenderer>("Cube", color);
+        // 這裡不需要建立 visualBody，讓 GameWorld::CreateRemotePlayer 負責
     }
 
     ~RemotePlayer() {
-        if (visualBody) delete visualBody;
-        if (shadow) delete shadow;
+        // visualHuman 和 visualSquid 生命週期由 GameWorld 管理，不需要在這裡 delete
     }
 
-    GameObject* GetVisualBody() { return visualBody; }
+    void SetupVisuals(GameObject* human, GameObject* squid) {
+        visualHuman = human;
+        visualSquid = squid;
+        UpdateVisualState(); // 初始化狀態
+    }
+
+    // 根據狀態切換模型 (人/魷魚)
+    void UpdateVisualState() {
+        if (!visualHuman || !visualSquid) return;
+
+        bool showSquid = isSwimming || isSharking;
+
+        // 如果死了，全部隱藏
+        if (isDead) {
+            visualHuman->active = false;
+            visualSquid->active = false;
+            return;
+        }
+
+        if (showSquid) {
+            visualHuman->active = false;
+            visualSquid->active = true;
+
+            // 如果在騎鯊魚，可以微調魷魚的位置 (浮起來一點)
+            // if (isSharking) visualSquid->transform->position.y += 0.5f; 
+        }
+        else {
+            visualHuman->active = true;
+            visualSquid->active = false;
+        }
+    }
 
     // 接收狀態更新
     void SetTargetState(glm::vec3 pos, float rotY, bool swimming, bool dead, bool sharking) {
         targetPos = pos;
         targetRot = rotY;
         isSwimming = swimming;
+        isDead = dead;
         isSharking = sharking;
 
-        if (isSharking) {
-            // [視覺效果] 如果在騎鯊魚，可以把模型縮放改一下，或者加個特效
-            // 例如：稍微浮起來
-            if (visualBody) visualBody->transform->position.y += 0.5f;
-        }
-
+        // 處理血量狀態同步
         Health* hp = GetComponent<Health>();
         if (hp) {
             bool finalDeadState = dead;
@@ -62,15 +83,12 @@ public:
             }
             if (hp->isDead != finalDeadState) {
                 hp->isDead = finalDeadState;
-
-                if (!finalDeadState) {
-                    hp->currentHP = hp->maxHP;
-                }
-                else {
-                    hp->currentHP = 0.0f;
-                }
+                hp->currentHP = finalDeadState ? 0.0f : hp->maxHP;
             }
         }
+
+        // 更新視覺顯示
+        UpdateVisualState();
     }
 
     // 插值更新
@@ -79,32 +97,17 @@ public:
             serverForceDeadTimer -= dt;
         }
 
+        // 位置插值
         transform->position = glm::mix(transform->position, targetPos, dt * 10.0f);
-        float angleDiff = targetRot - transform->rotation.y;
-        transform->rotation.y += angleDiff * dt * 10.0f;
 
-        // 同步視覺物件位置
-        if (visualBody) {
-            if (isSwimming) {
-                // 變扁 (魷魚狀態)
-                visualBody->transform->scale = glm::vec3(0.6f, 0.1f, 0.6f);
-                visualBody->transform->position = transform->position + glm::vec3(0, 0.05f, 0);
-            }
-            else {
-                // 站立狀態
-                visualBody->transform->scale = glm::vec3(0.5f, 1.8f, 0.5f);
-                // 修正中心點高度
-                visualBody->transform->position = transform->position + glm::vec3(0, 0.9f, 0);
-            }
-            // 同步旋轉
-            visualBody->transform->rotation = transform->rotation;
-        }
-    }
+        // 旋轉插值 (處理角度迴圈)
+        float currentY = transform->rotation.y;
+        float diff = targetRot - currentY;
+        while (diff < -180.0f) diff += 360.0f;
+        while (diff > 180.0f) diff -= 360.0f;
+        transform->rotation.y += diff * dt * 10.0f;
 
-    // 當收到網路封包時呼叫此函式
-    void SetTargetState(glm::vec3 pos, float rot) {
-        targetPos = pos;
-        targetRot = rot;
+        UpdateVisualState();
     }
 
     void ForceDeadByServer(float duration = 2.0f) {
