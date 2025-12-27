@@ -26,8 +26,6 @@ public:
         targetRot = 0.0f;
 
         AddComponent<Health>(team, startPos);
-
-        // 這裡不需要建立 visualBody，讓 GameWorld::CreateRemotePlayer 負責
     }
 
     ~RemotePlayer() {
@@ -37,7 +35,7 @@ public:
     void SetupVisuals(GameObject* human, GameObject* squid) {
         visualHuman = human;
         visualSquid = squid;
-        UpdateVisualState(); // 初始化狀態
+        UpdateVisualState();
     }
 
     // 根據狀態切換模型 (人/魷魚)
@@ -86,8 +84,6 @@ public:
                 hp->currentHP = finalDeadState ? 0.0f : hp->maxHP;
             }
         }
-
-        // 更新視覺顯示
         UpdateVisualState();
     }
 
@@ -97,10 +93,9 @@ public:
             serverForceDeadTimer -= dt;
         }
 
-        // 位置插值
         transform->position = glm::mix(transform->position, targetPos, dt * 10.0f);
 
-        // 旋轉插值 (處理角度迴圈)
+        // 旋轉插值
         float currentY = transform->rotation.y;
         float diff = targetRot - currentY;
         while (diff < -180.0f) diff += 360.0f;

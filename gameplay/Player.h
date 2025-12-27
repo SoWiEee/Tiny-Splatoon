@@ -94,11 +94,8 @@ public:
 
         AddComponent<Health>(team, startPos);
 
-        // 4. [修正] 移除 visualBody 與 shadow 的建立代碼
-        // 這些現在都移到 GameWorld::Init 或 CreatePlayer 裡面去處理了
-        // 這樣才不會出現 "方塊重疊" 的問題
         visualBody = nullptr;
-        shadow = nullptr; // 影子建議也移到 GameWorld 統一建立
+        shadow = nullptr;
 
         StartSuperJump();
     }
