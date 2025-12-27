@@ -429,16 +429,13 @@ private:
         float mapSize = 80.0f;
         if (level) mapSize = level->mapSize;
 
-        if(mapFloor && mapObstacle && level) {
-            float u = (transform->position.x + floorSize / 2.0f) / floorSize;
-            float v = 1.0f - ((transform->position.z + floorSize / 2.0f) / floorSize);
+        if (mapFloor && mapObstacle && level) {
             float h = level->GetHeightAt(transform->position.x, transform->position.z);
+            SplatMap* target = (h > 0.5f) ? mapObstacle : mapFloor;
 
-            if (h > 0.5f) {
-                onMyInk = mapObstacle->IsColorInArea(u, v, teamID, 1);
-            }
-            else {
-                onMyInk = mapFloor->IsColorInArea(u, v, teamID, 1);
+            auto uvRes = SplatPhysics::WorldToUV(transform->position, glm::vec3(0), floorSize, floorSize);
+            if (uvRes.hit) {
+                onMyInk = target->IsColorInArea(uvRes.uv.x, uvRes.uv.y, teamID, 1);
             }
         }
 

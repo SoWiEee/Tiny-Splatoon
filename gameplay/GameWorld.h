@@ -1098,6 +1098,7 @@ private:
         std::shared_ptr<Mesh> targetMesh;
         std::shared_ptr<Texture> targetTex;
         glm::vec3 tintColor = glm::vec3(1.0f); // 預設白色
+        glm::vec3 teamColor = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
 
         if (teamID == 1) { // 紅隊
             targetMesh = meshRedTeam;
@@ -1110,22 +1111,28 @@ private:
             if (!targetTex) tintColor = glm::vec3(0.2f, 1.0f, 0.2f);
         }
 
-        // create visual object
-        auto visualObj = std::make_unique<GameObject>("RemoteVisual");
-		visualObj->SetParent(remoteP.get()); // bind to remote player
-
-        if (targetMesh) {
-            auto mr = visualObj->AddComponent<MeshRenderer>(targetMesh, tintColor);
+        auto humanObj = std::make_unique<GameObject>("RemoteHuman");
+        humanObj->SetParent(remoteP.get());
+        {
+            auto mr = humanObj->AddComponent<MeshRenderer>(targetMesh ? targetMesh : MeshFactory::GetCube(), glm::vec3(1.0f));
             if (targetTex) mr->SetTexture(targetTex);
-            visualObj->transform->scale = glm::vec3(0.6f);
-            visualObj->transform->rotation = glm::vec3(0, 0, 0);
-            visualObj->transform->position = glm::vec3(0, 0.0f, 0);
-        }
-        else {
-            visualObj->AddComponent<MeshRenderer>("Cube", tintColor);
+            else mr->SetColor(teamColor);
+
+            humanObj->transform->scale = glm::vec3(0.6f);
+            humanObj->transform->position = glm::vec3(0, 0.0f, 0);
         }
 
-        visualEntities.push_back(std::move(visualObj));
+        // 2) 魷魚
+        auto squidObj = std::make_unique<GameObject>("RemoteSquid");
+        squidObj->SetParent(remoteP.get());
+        squidObj->active = false;
+        squidObj->AddComponent<MeshRenderer>("Cube", teamColor);
+        squidObj->transform->scale = glm::vec3(0.4f, 0.2f, 0.6f);
+        squidObj->transform->position = glm::vec3(0, -0.8f, 0);
+
+        remoteP->SetupVisuals(humanObj.get(), squidObj.get());
+        visualEntities.push_back(std::move(humanObj));
+        visualEntities.push_back(std::move(squidObj));
         remotePlayers[playerID] = std::move(remoteP);
         std::cout << "Spawned Remote Player " << playerID << " (Team " << teamID << ")" << std::endl;
     }
