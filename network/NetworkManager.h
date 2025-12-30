@@ -28,7 +28,7 @@ public:
 
 	// connect/disconnect
     bool StartServer(int port = 7777);
-    bool Connect(const std::string& ip, int port = 7777);
+    bool Connect(const std::string& hostOrIp, int port = 7777);
     void Disconnect();
 
     // --- 主迴圈 ---
@@ -84,6 +84,11 @@ private:
     int m_MyTeamID = 1;
     int m_NextClientID = 1;
     std::queue<ReceivedPacket> m_PacketQueue;
+
+    bool m_WsaInited = false;
+
+    // Resolve IPv4/IPv6 or hostname (DNS) to a SteamNetworkingIPAddr
+    bool ResolveHostToAddr(const std::string& hostOrIp, int port, SteamNetworkingIPAddr& outAddr);
 
     // --- GNS 回呼函式 (處理連線狀態改變) ---
     // 必須是 static 才能傳給 GNS
