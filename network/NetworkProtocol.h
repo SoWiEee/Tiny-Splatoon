@@ -95,23 +95,24 @@ struct PacketPlayerState {
 
 enum class ProjectileType : uint8_t {
     BULLET = 0,
-    BOMB = 1
+    BOMB = 1,
+    ROCKET = 2
 };
 
 // 4. 射擊請求
 struct PacketShoot {
     PacketHeader header;
-    int playerID;       // 誰射的
+    int playerID;
     glm::vec3 origin;
     glm::vec3 direction;
-    int weaponType;     // 武器類型
+    int weaponType;
     float speed;
     float scale;
     glm::vec3 color;
     ProjectileType type = ProjectileType::BULLET;
 };
 
-// 5. 塗地同步 (最精簡的資料)
+// 5. 塗地同步
 struct PacketSplatUpdate {
     PacketHeader header;
     float u;
