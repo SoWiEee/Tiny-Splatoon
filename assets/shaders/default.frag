@@ -7,6 +7,7 @@ in vec3 Normal;
 
 // texture
 uniform vec3 objectColor;
+
 uniform sampler2D mainTexture;
 uniform int useTexture;
 uniform float tiling;

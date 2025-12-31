@@ -8,6 +8,12 @@ public:
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 rotation = glm::vec3(0.0f); // Euler Angles (Degrees)
     glm::vec3 scale = glm::vec3(1.0f);
+    Transform* parent = nullptr;
+
+    // 設定父節點
+    void SetParent(Transform* p) {
+        parent = p;
+    }
 
     // Model Matrix
     glm::mat4 GetModelMatrix() {
@@ -18,6 +24,11 @@ public:
         model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1, 0, 0));
         model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0, 0, 1));
         model = glm::scale(model, scale);
+
+        if (parent != nullptr) {
+            return parent->GetModelMatrix() * model;
+        }
+
         return model;
     }
 

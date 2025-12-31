@@ -2,6 +2,15 @@
 #include <iostream>
 #include <cassert>
 
+#include <cstring>
+#include <string>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "Ws2_32.lib")
+#endif
+
 // ¹ê§@ Singleton
 NetworkManager& NetworkManager::Instance() {
     static NetworkManager instance;
@@ -14,6 +23,17 @@ void NetworkManager::OnConnectionStatusChanged(SteamNetConnectionStatusChangedCa
 }
 
 bool NetworkManager::Initialize() {
+#ifdef _WIN32
+    if (!m_WsaInited) {
+        WSADATA wsaData{};
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            std::cerr << "WSAStartup failed" << std::endl;
+            return false;
+        }
+        m_WsaInited = true;
+    }
+#endif
+
     SteamDatagramErrMsg errMsg;
     if (!GameNetworkingSockets_Init(nullptr, errMsg)) {
         std::cerr << "GameNetworkingSockets init failed: " << errMsg << std::endl;
@@ -35,6 +55,13 @@ void NetworkManager::Shutdown() {
     }
 
     GameNetworkingSockets_Kill();
+
+#ifdef _WIN32
+    if (m_WsaInited) {
+        WSACleanup();
+        m_WsaInited = false;
+    }
+#endif
 }
 
 bool NetworkManager::StartServer(int port) {
@@ -43,7 +70,7 @@ bool NetworkManager::StartServer(int port) {
 
     SteamNetworkingIPAddr serverAddr;
     serverAddr.Clear();
-	serverAddr.m_port = (uint16_t)port; // listen on all interfaces
+    serverAddr.m_port = (uint16_t)port; // listen on all interfaces
 
     SteamNetworkingConfigValue_t opt;
     opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)OnConnectionStatusChanged);
@@ -62,13 +89,64 @@ bool NetworkManager::StartServer(int port) {
     return true;
 }
 
-bool NetworkManager::Connect(const std::string& ip, int port) {
+bool NetworkManager::ResolveHostToAddr(const std::string& hostOrIp, int port, SteamNetworkingIPAddr& outAddr) {
+    outAddr.Clear();
+
+    // 1) Try direct parse first (IPv4/IPv6 in string form)
+    if (outAddr.ParseString(hostOrIp.c_str())) {
+        outAddr.m_port = (uint16_t)port;
+        return true;
+    }
+
+    // 2) DNS resolve via getaddrinfo
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM; // any is fine for address resolution
+
+    addrinfo* result = nullptr;
+    std::string service = std::to_string(port);
+    int rc = getaddrinfo(hostOrIp.c_str(), service.c_str(), &hints, &result);
+    if (rc != 0 || !result) {
+#ifdef _WIN32
+        std::cerr << "DNS resolve failed for host '" << hostOrIp << "': " << rc << std::endl;
+#else
+        std::cerr << "DNS resolve failed for host '" << hostOrIp << "': " << gai_strerror(rc) << std::endl;
+#endif
+        return false;
+    }
+
+    // Prefer IPv4 first for compatibility, then IPv6
+    const addrinfo* chosen = nullptr;
+    for (const addrinfo* ai = result; ai; ai = ai->ai_next) {
+        if (ai->ai_family == AF_INET) { chosen = ai; break; }
+        if (!chosen && ai->ai_family == AF_INET6) chosen = ai;
+    }
+
+    bool ok = false;
+    if (chosen && chosen->ai_family == AF_INET) {
+        const sockaddr_in* sa = (const sockaddr_in*)chosen->ai_addr;
+        uint32_t ipHostOrder = ntohl(sa->sin_addr.s_addr);
+        outAddr.SetIPv4(ipHostOrder, (uint16_t)port);
+        ok = true;
+    }
+    else if (chosen && chosen->ai_family == AF_INET6) {
+        const sockaddr_in6* sa6 = (const sockaddr_in6*)chosen->ai_addr;
+        outAddr.SetIPv6(sa6->sin6_addr.s6_addr, (uint16_t)port);
+        ok = true;
+    }
+
+    freeaddrinfo(result);
+    return ok;
+}
+
+bool NetworkManager::Connect(const std::string& hostOrIp, int port) {
     m_IsServer = false;
 
     SteamNetworkingIPAddr serverAddr;
-    serverAddr.Clear();
-    serverAddr.ParseString(ip.c_str());
-    serverAddr.m_port = (uint16_t)port;
+    if (!ResolveHostToAddr(hostOrIp, port, serverAddr)) {
+        std::cerr << "Failed to resolve server address: " << hostOrIp << ":" << port << std::endl;
+        return false;
+    }
 
     SteamNetworkingConfigValue_t opt;
     opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)OnConnectionStatusChanged);
