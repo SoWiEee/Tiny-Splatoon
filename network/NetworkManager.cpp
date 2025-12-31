@@ -236,17 +236,21 @@ void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusCha
         if (m_IsServer) {
             std::cout << "Incoming connection request..." << std::endl;
             if (m_pInterface->AcceptConnection(pInfo->m_hConn) != k_EResultOK) {
-                std::cout << "Accepted connection " << pInfo->m_hConn << std::endl;
-
-                // S2C_JOIN_ACCEPT
-                PacketJoinAccept pkt;
-                pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
-                // Connection Handle as Player ID
-                pkt.yourPlayerID = (int)pInfo->m_hConn;
-                pkt.yourTeamID = (pkt.yourPlayerID % 2) + 1; // team 1/2
-
-                Send(pInfo->m_hConn, &pkt, sizeof(pkt), true);
+                std::cerr << "Failed to accept connection!" << std::endl;
+                m_pInterface->CloseConnection(pInfo->m_hConn, 0, "Accept Failed", false);
+                return;
             }
+
+            std::cout << "Accepted connection " << pInfo->m_hConn << std::endl;
+
+            // S2C_JOIN_ACCEPT
+            PacketJoinAccept pkt;
+            pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
+            // Connection Handle as Player ID
+            pkt.yourPlayerID = (int)pInfo->m_hConn;
+            pkt.yourTeamID = (pkt.yourPlayerID % 2 == 0) ? 1 : 2;
+
+            Send(pInfo->m_hConn, &pkt, sizeof(pkt), true);
         }
         break;
 

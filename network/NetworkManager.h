@@ -28,7 +28,7 @@ public:
 
 	// connect/disconnect
     bool StartServer(int port = 7777);
-    bool Connect(const std::string& hostOrIp, int port = 7777);
+    bool Connect(const std::string& hostOrIp, int port);
     void Disconnect();
 
     // --- ¥D°j°é ---
