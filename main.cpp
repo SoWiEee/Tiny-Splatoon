@@ -61,6 +61,7 @@ int main() {
     AudioManager::Instance().LoadSound("bomb_beep", "assets/bomb_beep.mp3"); 
     AudioManager::Instance().LoadSound("bomb_pick", "assets/bomb_pick.mp3");
     AudioManager::Instance().LoadSound("shark", "assets/laser.wav");
+    AudioManager::Instance().LoadSound("rocket_shoot", "assets/rocket-launch.mp3");
     
     // Game Loop
     while (!window.ShouldClose()) {
