@@ -17,14 +17,14 @@ void GameScene::OnEnter() {
 
     // create UI
     uiObj = std::make_unique<GameObject>("UI");
-    hud = uiObj->AddComponent<HUD>(1280, 720);
+    hud = uiObj->AddComponent<HUD>(1280.0f, 720.0f);
 
     // game world init
     world = std::make_unique<GameWorld>();
     world->Init(cameraObj.get(), hud, nullptr);
 
     // create scoreboard 
-    scoreboard = uiObj->AddComponent<Scoreboard>(1280, 720, world->mapFloor.get());
+    scoreboard = uiObj->AddComponent<Scoreboard>(1280.0f, 720.0f, world->mapFloor.get());
     world->scoreboardRef = scoreboard;
 
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
