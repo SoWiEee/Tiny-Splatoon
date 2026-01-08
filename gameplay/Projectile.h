@@ -49,7 +49,7 @@ public:
             AddComponent<MeshRenderer>("Cube", color);
 
             // 比普通子彈大
-            transform->scale = glm::vec3(1.2f, 1.2f, 1.8f);
+            transform->scale = glm::vec3(1.0f, 1.0f, 1.6f);
         }
         else {
             // --- 普通子彈設定 ---
