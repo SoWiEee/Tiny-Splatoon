@@ -35,13 +35,13 @@ public:
     bool isSwimming = false;
     PlayerState state = PlayerState::ALIVE;
     float respawnTimer = 0.0f;
-    float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
+    float const RESPAWN_TIME = 4.0f; // 死亡後 4 秒重生
 
     // --- 道具狀態 ---
     bool hasBomb = false;
     bool requestBombThrow = false;
 
-    // --- [新增] 火箭大招 (Tri-zooka) 狀態 ---
+    // --- 火箭大招 (Tri-zooka) 狀態 ---
     bool isRocketActive = false;    // 是否正在大招模式
     int rocketAmmo = 0;             // 剩餘發射次數 (3次)
     float rocketCooldownTimer = 0.0f; // 射擊間隔
@@ -540,9 +540,9 @@ private:
             if (weapon->Trigger(dt, gunPos, cameraRef->transform->GetForward(), isFiring)) {
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
                 camera->TriggerShake(0.1f, 0.05f);
-                AudioManager::Instance().PlayOneShot("shoot", 0.3f);
+                AudioManager::Instance().PlayOneShot("shoot", 0.2f);
 
-                AddSpecialCharge(5.0f); // 集氣
+                AddSpecialCharge(2.0f); // 集氣
             }
         }
 
