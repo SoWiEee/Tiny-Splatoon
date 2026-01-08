@@ -39,6 +39,9 @@ public:
             gravity = 20.0f;
             fuseTimer = 2.0f;
             AddComponent<MeshRenderer>("Cube", glm::vec3(0.1f, 0.1f, 0.1f));
+
+            // 比普通子彈大
+            transform->scale = glm::vec3(1.0f, 1.0f, 1.0f);
         }
         else if (pType == ProjectileType::ROCKET) {
             gravity = 8.0f;   // 重力很小，飛比較直
