@@ -47,7 +47,7 @@ public:
 
         // A. 啟動伺服器
         if (startServer) {
-            if (NetworkManager::Instance().StartServer(7777)) {
+            if (NetworkManager::Instance().StartServer(gui->hostPort)) {
                 // Server 自己佔據第 1 個位置 (紅色)
                 gui->lobbySlots[0].playerID = 0;
                 gui->lobbySlots[0].teamID = 1;
@@ -59,7 +59,12 @@ public:
 
         // B. 連線客戶端
         if (connectClient) {
-            if (NetworkManager::Instance().Connect(gui->ipBuffer, 7777)) {
+            std::string host;
+            int port = gui->joinPort;
+            if (!NetworkManager::ParseHostPort(gui->ipBuffer, host, port, gui->joinPort)) {
+                return;
+            }
+            if (NetworkManager::Instance().Connect(host, port)) {
                 // 切換到大廳場景 (Client 模式)
                 SceneManager::Instance().SwitchTo(std::make_unique<LobbyScene>(gui, false));
             }

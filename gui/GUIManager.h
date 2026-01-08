@@ -22,8 +22,15 @@ public:
     // 大廳格子資料
     LobbySlotInfo lobbySlots[8];
 
-    // 輸入緩衝區
+    // --- Login / Networking inputs ---
+    // Join: allow hostname/IP, and optionally "host:port" (useful for playit.gg)
     char ipBuffer[128] = "127.0.0.1";
+
+    // If ipBuffer doesn't include a port, this is used.
+    int joinPort = 7777;
+
+    // Host: local UDP port to listen on.
+    int hostPort = 7777;
 
     // 建構與解構
     GUIManager(GLFWwindow* window);

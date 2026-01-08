@@ -50,7 +50,7 @@ void GUIManager::DrawLogin(bool& outStartServer, bool& outConnectClient) {
     glfwGetWindowSize(m_Window, &w, &h);
 
     ImGui::SetNextWindowPos(ImVec2(w * 0.5f, h * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(400, 300));
+    ImGui::SetNextWindowSize(ImVec2(500, 400));
 
     if (ImGui::Begin("Tiny Splatoon Login", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize)) {
 
@@ -58,8 +58,13 @@ void GUIManager::DrawLogin(bool& outStartServer, bool& outConnectClient) {
         ImGui::Separator();
         ImGui::Spacing();
 
-        // Server «ö¶s
-        if (ImGui::Button("Host Server", ImVec2(380, 50))) {
+        // Host (listen server)
+        ImGui::Text("Host (Listen Server):");
+        ImGui::InputInt("Host Port (UDP)", &hostPort);
+        if (hostPort < 1) hostPort = 1;
+        if (hostPort > 65535) hostPort = 65535;
+
+        if (ImGui::Button("Host Server", ImVec2(480, 50))) {
             outStartServer = true;
         }
 
@@ -67,11 +72,15 @@ void GUIManager::DrawLogin(bool& outStartServer, bool& outConnectClient) {
         ImGui::Separator();
         ImGui::Spacing();
 
-        // Client IP ¿é¤J»P«ö¶s
+        // Join
         ImGui::Text("Join Existing Game:");
-        ImGui::InputText("Server IP", ipBuffer, IM_ARRAYSIZE(ipBuffer));
+        ImGui::InputText("Server Address", ipBuffer, IM_ARRAYSIZE(ipBuffer));
+        ImGui::InputInt("Server Port", &joinPort);
+        if (joinPort < 1) joinPort = 1;
+        if (joinPort > 65535) joinPort = 65535;
+        ImGui::TextWrapped("Tip: for playit.gg, paste the allocation as domain:port (e.g. example.ply.gg:12345).");
 
-        if (ImGui::Button("Connect Client", ImVec2(380, 50))) {
+        if (ImGui::Button("Connect Client", ImVec2(480, 50))) {
             outConnectClient = true;
         }
 
