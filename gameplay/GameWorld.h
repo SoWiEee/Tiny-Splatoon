@@ -64,8 +64,8 @@ public:
 
     // 遊戲狀態變數
     WorldState state = WorldState::PLAYING;
-    float gameTimeRemaining = 180.0f; // 3分鐘
-    float finishTimer = 0.0f;         // 結束後的 5秒倒數
+    float gameTimeRemaining = 180.0f; // 3 分鐘
+    float finishTimer = 0.0f;         // 結束後的 5 秒倒數
 
     // 最終結果緩存
     float finalScoreTeam1 = 0.0f;
@@ -203,7 +203,7 @@ public:
         visualEntities.push_back(std::move(shadowObj)); // 記得加影子
 
         // Create AI (Server Only)
-        if (NetworkManager::Instance().IsServer()) {
+        /*if (NetworkManager::Instance().IsServer()) {
             NetworkManager::Instance().SetMyPlayerID(0);
             localPlayer->teamID = 1;
             localPlayer->weapon->inkColor = glm::vec3(1, 0, 0);
@@ -211,7 +211,7 @@ public:
         }
         else {
             enemyAI = nullptr;
-        }
+        }*/
     }
 
     // 統一投射物生成函數 (Rocket / Bomb / Normal)
@@ -232,7 +232,6 @@ public:
         glm::vec3 velocity = dir * speed;
 
         // 如果不是火箭也不是炸彈，一般子彈會加一點上拋
-        // 火箭是直飛，炸彈由 Physics 處理重力
         if (type != ProjectileType::ROCKET && type != ProjectileType::BOMB) {
             velocity.y += 2.0f;
         }
