@@ -1,6 +1,8 @@
 #include "NetworkManager.h"
 #include <iostream>
 #include <cassert>
+#include <algorithm>
+#include <cctype>
 
 #include <cstring>
 #include <string>
@@ -86,6 +88,47 @@ bool NetworkManager::StartServer(int port) {
     m_MyID = 0;
     m_IsConnected = true;
     m_IsServer = true;
+    return true;
+}
+
+bool NetworkManager::ParseHostPort(const std::string& input, std::string& outHost, int& outPort, int defaultPort) {
+    outHost.clear();
+    outPort = defaultPort;
+
+    if (input.empty()) return false;
+
+    // [ipv6]:port
+    if (!input.empty() && input.front() == '[') {
+        const auto rb = input.find(']');
+        if (rb == std::string::npos) return false;
+        outHost = input.substr(1, rb - 1);
+        if (rb + 1 < input.size() && input[rb + 1] == ':') {
+            try {
+                outPort = std::stoi(input.substr(rb + 2));
+            } catch (...) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // host:port (use last ':' so we don't break on extra ':' in other contexts)
+    const auto pos = input.rfind(':');
+    if (pos != std::string::npos) {
+        const std::string maybePort = input.substr(pos + 1);
+        const bool allDigits = !maybePort.empty() && std::all_of(maybePort.begin(), maybePort.end(), [](unsigned char c) { return std::isdigit(c); });
+        if (allDigits) {
+            outHost = input.substr(0, pos);
+            try {
+                outPort = std::stoi(maybePort);
+            } catch (...) {
+                return false;
+            }
+            return true;
+        }
+    }
+
+    outHost = input;
     return true;
 }
 

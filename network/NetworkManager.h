@@ -19,6 +19,8 @@ struct ReceivedPacket {
 class NetworkManager {
 public:
     static NetworkManager& Instance();
+    // Utility: parse "host:port" or "[ipv6]:port"
+    static bool ParseHostPort(const std::string& input, std::string& outHost, int& outPort, int defaultPort = 7777);
     std::vector<int> connectedPlayerIDs;
     std::map<int, WeaponType> playerWeaponMap;
 
