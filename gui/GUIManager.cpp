@@ -152,7 +152,7 @@ void GUIManager::DrawLobby(bool& outStartGame) {
 void GUIManager::DrawLobbyCircles(int w, int h) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-    float startY = h * 0.5f;
+    float startY = h * 0.4f;
     float radius = 40.0f;
     float spacing = 120.0f;
     // 算出起始 X，讓 8 個圓置中
