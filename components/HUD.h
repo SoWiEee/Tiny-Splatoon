@@ -28,7 +28,7 @@ public:
     float hitMarkerTimer = 0.0f;
 
     HUD(float width, float height) : screenWidth(width), screenHeight(height) {
-        uiShader = new Shader("../assets/shaders/ui.vert", "../assets/shaders/ui.frag");
+        uiShader = new Shader("assets/shaders/ui.vert", "assets/shaders/ui.frag");
         SetupQuad();
         damageTex = std::make_shared<Texture>();
         damageTex->Load("assets/textures/damage_vignette.png");
