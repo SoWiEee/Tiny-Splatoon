@@ -767,6 +767,122 @@ private:
             Projectile* p = it->get();
             p->UpdatePhysics(dt);
 
+            bool hitEntity = false; // 是否撞到實體
+            bool hitObstacle = false; // 是否撞到障礙物
+
+            // 準備碰撞目標清單
+            std::vector<Entity*> targets;
+            targets.push_back(localPlayer.get());
+            if (enemyAI) targets.push_back(enemyAI.get());
+            for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
+
+            for (Entity* target : targets) {
+                if (!target) continue;
+                int targetTeam = target->teamID;
+                if (targetTeam == p->ownerTeam) continue; // 不打隊友
+
+                if (CheckCollision(p, target)) {
+
+                    // --- [修改重點] 針對火箭的特殊處理 ---
+                    if (p->pType == ProjectileType::ROCKET) {
+                        p->isDead = true; // 標記為死亡，讓後面的 Rocket Logic 觸發爆炸
+                        hitEntity = true; // 標記撞到了，但"不要"在這裡 erase，也不要在這裡扣血
+                        break;            // 跳出碰撞迴圈
+                    }
+                    // ----------------------------------
+
+                    // 普通子彈邏輯 (維持原樣)
+                    Health* hp = target->GetComponent<Health>();
+                    if (hp) {
+                        bool wasAlive = !hp->isDead;
+                        hp->TakeDamage(10.0f); // 普通子彈傷害
+
+                        // 特效
+                        particleSystem->Emit(p->transform->position, p->inkColor, 15, 8.0f);
+
+                        // 擊殺判定 (Server)
+                        if (wasAlive && hp->isDead) {
+                            if (NetworkManager::Instance().IsServer()) {
+                                int victimID = -99;
+                                if (target == localPlayer.get()) victimID = NetworkManager::Instance().GetMyPlayerID();
+                                else if (target == enemyAI.get()) victimID = 100;
+                                else {
+                                    for (auto& rp : remotePlayers) {
+                                        if (rp.second.get() == target) {
+                                            victimID = rp.first;
+                                            break;
+                                        }
+                                    }
+                                }
+                                // Send Kill Packet
+                                PacketKillEvent pkt;
+                                pkt.header.type = PacketType::S2C_KILL_EVENT;
+                                pkt.killerID = p->ownerID;
+                                pkt.victimID = victimID;
+                                pkt.killerTeam = p->ownerTeam;
+                                pkt.victimTeam = hp->teamID;
+                                NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+                                if (hudRef) hudRef->AddKillLog(p->ownerID, victimID, p->ownerTeam, hp->teamID);
+                            }
+                            // 本地死亡處理
+                            if (target == localPlayer.get()) {
+                                localPlayer->Die();
+                                SpawnDeathSplat(localPlayer->transform->position, p->inkColor);
+                            }
+                            else if (target == enemyAI.get()) {
+                                SpawnDeathSplat(enemyAI->transform->position, p->inkColor);
+                                hp->Reset();
+                                enemyAI->transform->position = hp->spawnPoint;
+                            }
+                        }
+                    }
+
+                    // 擊中回饋
+                    if (localPlayer && p->ownerTeam == localPlayer->teamID) {
+                        AudioManager::Instance().PlayOneShot("hit", 0.8f);
+                        if (hudRef) hudRef->ShowHitMarker();
+                    }
+
+                    hitEntity = true; // 普通子彈撞到實體
+                    break;
+                }
+            }
+
+            // 2. 檢查障礙物碰撞 (Box) - 如果是火箭撞牆也要爆炸
+            if (!hitEntity) { // 如果還沒撞到人再檢查牆
+                for (auto& box : level->colliders) {
+                    glm::vec3 pos = p->transform->position;
+                    if (pos.x >= box.min.x && pos.x <= box.max.x &&
+                        pos.y >= box.min.y && pos.y <= box.max.y &&
+                        pos.z >= box.min.z && pos.z <= box.max.z) {
+
+                        if (p->pType == ProjectileType::ROCKET) {
+                            p->isDead = true; // 火箭撞牆 -> 觸發爆炸
+                        }
+                        else {
+                            // 普通子彈撞牆 -> 塗牆並消失
+                            auto result = SplatPhysics::WorldToUV(pos, glm::vec3(0), mapSize, mapSize);
+                            if (result.hit) {
+                                float uvSize = (p->transform->scale.x * inkMultiplier) / mapSize;
+                                float rot = (float)(rand() % 360);
+                                painter->Paint(mapObstacle.get(), result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
+                                particleSystem->Emit(pos, p->inkColor, 5, 5.0f);
+                            }
+                        }
+                        hitObstacle = true;
+                        break;
+                    }
+                }
+            }
+
+            // 處理刪除邏輯
+            // 如果是普通子彈撞到東西 -> 刪除
+            // 如果是火箭撞到東西 -> 不要刪除 (hitEntity/hitObstacle 為 true，但我們把 p->isDead 設為 true 了，讓它進入下方的 Rocket Logic)
+            if (p->pType != ProjectileType::ROCKET && (hitEntity || hitObstacle)) {
+                it = projectiles.erase(it);
+                continue;
+            }
+
             // --- Rocket Logic ---
             if (p->pType == ProjectileType::ROCKET) {
                 if (p->isDead) {
@@ -790,7 +906,7 @@ private:
 
                     // 3. 傷害判定 (Server Only)
                     if (NetworkManager::Instance().IsServer()) {
-                        float blastRadius = 6.0f;
+                        float blastRadius = 8.0f;
                         // 檢查本機
                         if (localPlayer && localPlayer->teamID != p->ownerTeam) {
                             if (glm::distance(localPlayer->transform->position, hitPos) < blastRadius) {
@@ -964,106 +1080,6 @@ private:
                     p->hasHitFloor = false; // 重置碰撞旗標
                 }
                 ++it;
-                continue;
-            }
-
-            bool hitSomething = false;
-
-            // 檢查碰撞 (本機 + AI + 遠端玩家)
-            std::vector<Entity*> targets;
-            targets.push_back(localPlayer.get());
-            if (enemyAI) targets.push_back(enemyAI.get());
-            for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
-
-            for (Entity* target : targets) {
-                if (!target) continue;
-                int targetTeam = target->teamID;
-                if (targetTeam == p->ownerTeam) continue;
-
-                if (CheckCollision(p, target)) {
-                    Health* hp = target->GetComponent<Health>();
-                    if (hp) {
-                        bool wasAlive = !hp->isDead;
-                        hp->TakeDamage(10.0f);
-                        // 擊中敵人噴墨水
-                        // 產生 15 顆粒子，速度 8.0f，顏色跟子彈一樣
-                        particleSystem->Emit(p->transform->position, p->inkColor, 15, 8.0f);
-
-                        if (wasAlive && hp->isDead) {
-                            if (NetworkManager::Instance().IsServer()) {
-                                int victimID = -99;
-                                if (target == localPlayer.get()) victimID = NetworkManager::Instance().GetMyPlayerID();
-                                else if (target == enemyAI.get()) victimID = 100;
-                                else {
-                                    // 找 RemotePlayer ID
-                                    for (auto& rp : remotePlayers) {
-                                        if (rp.second.get() == target) {
-                                            victimID = rp.first;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                // sned kill packet
-                                PacketKillEvent pkt;
-                                pkt.header.type = PacketType::S2C_KILL_EVENT;
-                                pkt.killerID = p->ownerID;
-                                pkt.victimID = victimID;
-                                pkt.killerTeam = p->ownerTeam;
-                                pkt.victimTeam = hp->teamID;
-
-                                NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
-
-                                if (hudRef) hudRef->AddKillLog(p->ownerID, victimID, p->ownerTeam, hp->teamID);
-                            }
-
-                            // A. 如果是本機玩家
-                            if (target == localPlayer.get()) {
-                                localPlayer->Die();
-                                SpawnDeathSplat(localPlayer->transform->position, p->inkColor);
-                            }
-                            // B. 如果是 AI
-                            else if (target == enemyAI.get()) {
-                                SpawnDeathSplat(enemyAI->transform->position, p->inkColor);
-                                hp->Reset();
-                                enemyAI->transform->position = hp->spawnPoint;
-                            }
-                        }
-                    }
-                    if (localPlayer && p->ownerTeam == localPlayer->teamID) {
-
-                        AudioManager::Instance().PlayOneShot("hit", 0.8f);
-                        if (hudRef) {
-                            hudRef->ShowHitMarker();
-                        }
-                    }
-                    hitSomething = true;
-                    break;
-                }
-            }
-
-            for (auto& box : level->colliders) {
-                // 簡單判定：檢查子彈是否在 Box 內部 (或是很接近)
-                glm::vec3 pos = p->transform->position;
-                if (pos.x >= box.min.x && pos.x <= box.max.x &&
-                    pos.y >= box.min.y && pos.y <= box.max.y &&
-                    pos.z >= box.min.z && pos.z <= box.max.z) {
-
-                    // 擊中障礙物
-                    auto result = SplatPhysics::WorldToUV(pos, glm::vec3(0), mapSize, mapSize);
-                    if (result.hit) {
-                        float uvSize = (p->transform->scale.x * inkMultiplier) / mapSize;
-                        float rot = (float)(rand() % 360);
-                        painter->Paint(mapObstacle.get(), result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
-                        particleSystem->Emit(pos, p->inkColor, 5, 5.0f);
-                    }
-                    hitSomething = true;
-                    break;
-                }
-            }
-
-            if (hitSomething) {
-                it = projectiles.erase(it);
                 continue;
             }
 
