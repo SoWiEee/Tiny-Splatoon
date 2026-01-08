@@ -44,15 +44,11 @@ public:
             transform->scale = glm::vec3(1.0f, 1.0f, 1.0f);
         }
         else if (pType == ProjectileType::ROCKET) {
-            gravity = 8.0f;   // 重力很小，飛比較直
+            gravity = 10.0f;   // 重力很小，飛比較直
             lifeTime = 4.0f;  // 飛久一點
 
-            // 視覺：用一個比較大的 Cube 代表火箭
-            // 這裡可以根據隊伍顏色
-            AddComponent<MeshRenderer>("Cube", color);
-
-            // 比普通子彈大
-            transform->scale = glm::vec3(1.0f, 1.0f, 1.6f);
+            AddComponent<MeshRenderer>("Sphere", color);
+            transform->scale = glm::vec3(1.0f, 1.0f, 1.0f);
         }
         else {
             // --- 普通子彈設定 ---
