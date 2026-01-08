@@ -1,67 +1,67 @@
 #pragma once
 #include "Weapon.h"
+#include <algorithm>
 
 // 潑桶 (Slosher)
 // 特色：中距離、高耗墨、拋物線軌跡、一次潑出一排
 class SlosherWeapon : public Weapon {
 public:
-    // 射速慢 (0.45s)，耗墨高 (7.0f)
+    // 射速慢，耗墨高
     SlosherWeapon(int team, glm::vec3 color)
-        : Weapon(team, color, 0.8f, 0.2f) {
+        : Weapon(team, color, 0.5f, 0.2f) {
     }
 
 protected:
     void FireLogic(glm::vec3 pos, glm::vec3 dir) override {
 
-        // 潑桶一次會潑出 "一排" 墨水 (例如 6 顆)
-        // 這 6 顆會在垂直方向上分佈：
-        // - 最上面的一顆飛最遠 (Top)
-        // - 最下面的一顆飛最近 (Bottom)
-        // 這樣可以形成一道落下的墨水牆
+        int blobCount = 10;
 
-        int blobCount = 6;
-
-        // 基礎拋射角度：潑桶預設會往上丟，所以我們把瞄準方向的 Y 軸強制拉高
-        // 這樣就算玩家看著地板，墨水也會先往上飛再掉下來
+        // 1. 基礎拋射角度：潑桶需要往上「甩」，所以 Y 軸抬升要明顯
         glm::vec3 baseDir = dir;
-        baseDir.y += 0.3f; // 強制上抬
+        baseDir.y += 0.25f; // 抬高角度，製造拋物線
         baseDir = glm::normalize(baseDir);
+
+        // 2. 左右隨機偏移的基礎向量 (用來讓墨水不要呈一直線，稍微有點寬度)
+        glm::vec3 right = glm::cross(baseDir, glm::vec3(0, 1, 0));
 
         for (int i = 0; i < blobCount; i++) {
             SpawnInfo info;
-            info.pos = pos;
             info.color = inkColor;
             info.team = teamID;
 
-            // 計算插值係數 (0.0 ~ 1.0)
-            // 0.0 是最底下那顆(近)，1.0 是最上面那顆(遠)
+            // t 代表從「尾端(腳邊)」到「頂端(最遠)」的進度 (0.0 ~ 1.0)
             float t = (float)i / (float)(blobCount - 1);
 
-            // --- 1. 速度變化 ---
-            // 飛得遠的要快 (22.0)，飛得近的慢 (12.0)
-            // 這樣會讓墨水在空中拉成一條線
-            info.speed = 12.0f + (t * 10.0f);
+            // --- A. 速度與位置 ---
+            // 尾端很慢(10.0)會直接落地，頂端很快(26.0)會飛很遠
+            info.speed = 10.0f + (t * 16.0f);
 
-            // --- 2. 角度變化 ---
-            // 每一顆的角度稍微不同，製造垂直擴散
-            // 越上面的顆粒，拋射角度越高
-            glm::vec3 throwDir = baseDir;
-            throwDir.y += t * 0.15f;
+            // --- B. 角度微調 ---
+            // 頂端的子彈飛得直一點，底端的子彈稍微往下壓一點
+            glm::vec3 finalDir = baseDir;
+            finalDir.y += (t * 0.1f) - 0.05f;
 
-            // 稍微加一點點水平隨機擴散 (不要完全是一條直線，太死板)
-            glm::vec3 spread = GetRandomSpread(0.02f);
-            info.dir = glm::normalize(throwDir + spread);
+            // 加入極微小的左右隨機 (潑桶還是比較準的，不要散太開)
+            float spreadAmount = 0.05f;
+            glm::vec3 spread = GetRandomSpread(spreadAmount);
+            info.dir = glm::normalize(finalDir + spread);
 
-            // --- 3. 大小變化 ---
-            // 中間的墨水最大，頭尾稍微小一點 (像一個紡錘形)
-            // 使用簡單的二次函數或是直接隨機
+            // --- C. 起始位置拉伸 ---
+            // 飛得快的子彈，生成位置稍微往前挪一點
+            float spawnOffset = t * 1.5f;
+            info.pos = pos + (info.dir * spawnOffset);
+
+            // --- D. 大小變化 ---
+            // 頂端(Head)最大，中間稍粗，尾端(Tail)最小
+            // 這樣最遠的那顆打人最痛、判定最大
             if (i == blobCount - 1) {
-                // 最頂端那顆最大 (攻擊判定核心)
-                info.scale = 0.5f;
+                info.scale = 0.85f; // 核心攻擊判定，最大
             }
             else {
-                // 其他顆粒稍微小一點
-                info.scale = 0.3f + (RandomFloat(0.0f, 0.1f));
+                // 漸變大小：0.35 -> 0.6
+                info.scale = 0.35f + (t * 0.25f);
+                // 加入一點隨機讓形狀自然
+                info.scale += RandomFloat(-0.05f, 0.05f);
             }
 
             pendingSpawns.push_back(info);
