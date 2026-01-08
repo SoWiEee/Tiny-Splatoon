@@ -50,18 +50,18 @@ int main() {
     SceneManager::Instance().SwitchTo(std::make_unique<LoginScene>(&gui));
     Timer timer;
     AudioManager::Instance().Initialize();
-    AudioManager::Instance().LoadSound("shoot", "assets/shoot.mp3");
-    AudioManager::Instance().LoadSound("hit", "assets/hit.wav");
-    AudioManager::Instance().LoadSound("superjump", "assets/superjump.wav");
-    AudioManager::Instance().LoadSound("splat_die", "assets/die.mp3");
-    AudioManager::Instance().LoadSound("laser_fire", "assets/laser.wav");
-    AudioManager::Instance().LoadSound("whistle", "assets/whistle.wav");
-    AudioManager::Instance().LoadSound("swim", "assets/swim.mp3");
-    AudioManager::Instance().LoadSound("explode", "assets/explode.wav");
-    AudioManager::Instance().LoadSound("bomb_beep", "assets/bomb_beep.mp3"); 
-    AudioManager::Instance().LoadSound("bomb_pick", "assets/bomb_pick.mp3");
-    AudioManager::Instance().LoadSound("shark", "assets/laser.wav");
-    AudioManager::Instance().LoadSound("rocket_shoot", "assets/rocket-launch.mp3");
+    AudioManager::Instance().LoadSound("shoot", "assets/audios/shoot.mp3");
+    AudioManager::Instance().LoadSound("hit", "assets/audios/hit.wav");
+    AudioManager::Instance().LoadSound("superjump", "assets/audios/superjump.wav");
+    AudioManager::Instance().LoadSound("splat_die", "assets/audios/die.mp3");
+    AudioManager::Instance().LoadSound("laser_fire", "assets/audios/laser.wav");
+    AudioManager::Instance().LoadSound("whistle", "assets/audios/whistle.wav");
+    AudioManager::Instance().LoadSound("swim", "assets/audios/swim.mp3");
+    AudioManager::Instance().LoadSound("explode", "assets/audios/explode.wav");
+    AudioManager::Instance().LoadSound("bomb_beep", "assets/audios/bomb_beep.mp3"); 
+    AudioManager::Instance().LoadSound("bomb_pick", "assets/audios/bomb_pick.mp3");
+    AudioManager::Instance().LoadSound("shark", "assets/audios/laser.wav");
+    AudioManager::Instance().LoadSound("rocket_shoot", "assets/audios/rocket-launch.mp3");
     
     // Game Loop
     while (!window.ShouldClose()) {
