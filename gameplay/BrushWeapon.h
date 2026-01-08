@@ -1,31 +1,25 @@
 #pragma once
 #include "Weapon.h"
-#include <glm/gtx/rotate_vector.hpp> // [新增] 用來旋轉向量
+#include <glm/gtx/rotate_vector.hpp> 
 
 class BrushWeapon : public Weapon {
 private:
-    bool swingRight = true; // 記錄當前揮動方向 (左/右)
+    bool swingRight = true; // 當前揮動方向
 
 public:
-    // 筆刷特色：射速極快 (0.12s)，單發耗墨中等 (3.0f)，但因為要一直按，總耗墨大
+    // 射速極快，單發耗墨中等
     BrushWeapon(int team, glm::vec3 color)
-        : Weapon(team, color, 0.2f, 0.1f) {
+        : Weapon(team, color, 0.2f, 0.15f) {
     }
 
 protected:
     void FireLogic(glm::vec3 pos, glm::vec3 dir) override {
 
-        // 切換揮動方向
-        swingRight = !swingRight;
+        swingRight = !swingRight;   // 切換揮動方向
+        float swingBias = swingRight ? -15.0f : 15.0f;  // 揮動的中心偏差
+        int blobCount = 12;     // 一次灑出多顆墨水
 
-        // 設定揮動的中心偏差
-        // 如果是右揮，中心向右偏 15 度；左揮則向左偏 15 度
-        float swingBias = swingRight ? -15.0f : 15.0f;
-
-        // 筆刷一次灑出多顆墨水 (例如 5~7 顆)，形成一個扇面
-        int blobCount = 7;
-
-        // 定義扇形的總寬度 (例如 60 度)
+        // 定義扇形的總寬度
         float fanWidth = 60.0f;
         float startAngle = -fanWidth / 2.0f; // -30度
         float stepAngle = fanWidth / (blobCount - 1); // 每顆間隔
