@@ -17,14 +17,14 @@ void GameScene::OnEnter() {
 
     // create UI
     uiObj = std::make_unique<GameObject>("UI");
-    hud = uiObj->AddComponent<HUD>(1280.0f, 720.0f);
+    hud = uiObj->AddComponent<HUD>(1600.0f, 900.0f);
 
     // game world init
     world = std::make_unique<GameWorld>();
     world->Init(cameraObj.get(), hud, nullptr);
 
     // create scoreboard 
-    scoreboard = uiObj->AddComponent<Scoreboard>(1280.0f, 720.0f, world->mapFloor.get());
+    scoreboard = uiObj->AddComponent<Scoreboard>(1600.0f, 900.0f, world->mapFloor.get());
     world->scoreboardRef = scoreboard;
 
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -115,7 +115,7 @@ void GameScene::Update(float dt) {
 void GameScene::Render() {
     if (!world || !shader || !CurrentCamera) return;
 
-    glViewport(0, 0, 1280, 720);
+    glViewport(0, 0, 1600, 900);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

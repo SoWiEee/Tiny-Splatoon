@@ -16,7 +16,7 @@ public:
     float lastX = 640, lastY = 360;
     bool firstMouse = true;
 
-    float aspectRatio = 1280.0f / 720.0f;
+    float aspectRatio = 1600.0f / 900.0f;
 
     // 震動相關變數
     float shakeTimer = 0.0f;       // 震動剩餘時間
