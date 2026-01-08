@@ -214,6 +214,61 @@ public:
         }
     }
 
+    // 統一投射物生成函數 (Rocket / Bomb / Normal)
+    void CreateProjectile(int ownerID, int teamID, glm::vec3 startPos, glm::vec3 dir, ProjectileType type) {
+        float speed = 25.0f;
+        float scale = 0.3f;
+        glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+
+        // 根據類型調整參數
+        if (type == ProjectileType::ROCKET) {
+            speed = 35.0f; // 火箭很快
+            scale = 0.8f;  // 火箭較大
+        }
+        else if (type == ProjectileType::BOMB) {
+            speed = 10.0f; // 炸彈拋物線
+        }
+
+        glm::vec3 velocity = dir * speed;
+
+        // 如果不是火箭也不是炸彈，一般子彈會加一點上拋
+        // 火箭是直飛，炸彈由 Physics 處理重力
+        if (type != ProjectileType::ROCKET && type != ProjectileType::BOMB) {
+            velocity.y += 2.0f;
+        }
+
+        auto proj = std::make_unique<Projectile>(startPos, velocity, color, teamID, scale, ownerID, type);
+
+        projectiles.push_back(std::move(proj));
+    }
+
+    // 發送射擊封包輔助函數
+    void SendShootPacket(glm::vec3 pos, glm::vec3 dir, ProjectileType type) {
+        if (!NetworkManager::Instance().IsConnected()) return;
+
+        PacketShoot pkt;
+        pkt.header.type = PacketType::C2S_SHOOT;
+        pkt.playerID = NetworkManager::Instance().GetMyPlayerID();;
+        pkt.origin = pos;
+        pkt.direction = dir;
+        pkt.type = type;
+
+        // 這些參數可以不用傳，讓接收端根據 Type 自己決定，但為了彈性先傳
+        pkt.speed = (type == ProjectileType::ROCKET) ? 35.0f : 25.0f;
+        pkt.scale = (type == ProjectileType::ROCKET) ? 0.8f : 0.3f;
+        pkt.color = localPlayer->weapon->inkColor;
+
+        if (NetworkManager::Instance().IsServer()) {
+            // 如果是 Server 自己射的，直接轉發給別人
+            pkt.header.type = PacketType::S2C_SHOOT_EVENT;
+            NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
+        }
+        else {
+            // Client 請求 Server
+            NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
+        }
+    }
+
     // AABB 碰撞檢測 (包含球體半徑判定)
     bool CheckCollision(GameObject* bullet, GameObject* target) {
         glm::vec3 posB = bullet->transform->position;
@@ -253,39 +308,28 @@ public:
                 localPlayer->requestSharkSpray = false;
             }
 
-            // 檢查雷射請求
-            if (localPlayer && localPlayer->requestLaser) {
-                int myID = NetworkManager::Instance().GetMyPlayerID();
-                glm::vec3 startPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0);
-                glm::vec3 dir = localPlayer->transform->GetForward(); // 瞄準方向
-                int myTeam = localPlayer->teamID;
+            if (localPlayer->requestBombThrow) {
+                localPlayer->requestBombThrow = false;
 
-                TriggerLaserBeam(startPos, dir, myTeam, myID);
+                glm::vec3 camFwd = localPlayer->cameraRef->transform->GetForward();
+                glm::vec3 spawnPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0) + camFwd * 1.0f;
 
-                if (NetworkManager::Instance().IsConnected()) {
-                    PacketSpecialLaser pkt;
-                    pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
-                    pkt.playerID = myID;
-                    pkt.teamID = myTeam;
-                    pkt.origin = startPos;
-                    pkt.direction = dir;
-
-                    if (NetworkManager::Instance().IsServer()) {
-                        pkt.header.type = PacketType::S2C_SPECIAL_ATTACK;
-                        NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
-                    }
-                    else {
-                        pkt.header.type = PacketType::C2S_SPECIAL_ATTACK;
-                        NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
-                    }
-                }
-
-                localPlayer->requestLaser = false;
+                CreateProjectile(NetworkManager::Instance().GetMyPlayerID(), localPlayer->teamID, spawnPos, camFwd, ProjectileType::BOMB);
+                SendShootPacket(spawnPos, camFwd, ProjectileType::BOMB);
             }
 
-            if (localPlayer && localPlayer->requestBombThrow) {
-                SpawnBombProjectile();
-                localPlayer->requestBombThrow = false;
+            // 火箭發射偵測
+            if (localPlayer->requestRocketFire) {
+                localPlayer->requestRocketFire = false;
+
+                glm::vec3 camFwd = localPlayer->cameraRef->transform->GetForward();
+                glm::vec3 spawnPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0) + camFwd * 1.5f;
+
+                // 1. 本地生成 (視覺)
+                CreateProjectile(NetworkManager::Instance().GetMyPlayerID(), localPlayer->teamID, spawnPos, camFwd, ProjectileType::ROCKET);
+
+                SendShootPacket(spawnPos, camFwd, ProjectileType::ROCKET);
+                AudioManager::Instance().PlayOneShot("rocket_launch", 1.0f);
             }
 
             // generate items
@@ -501,51 +545,9 @@ public:
     // 統一收集並生成子彈 (包含網路發送)
     void CollectProjectiles(Weapon& weapon) {
         for (const auto& info : weapon.pendingSpawns) {
-            // A. 本地生成 (視覺立即回饋)
-            glm::vec3 velocity = info.dir * info.speed;
-            velocity.y += 2.0f;
-
-            int myID = NetworkManager::Instance().GetMyPlayerID();
-            glm::vec3 gunPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0) + localPlayer->transform->GetForward() * 0.5f;
-            auto p = std::make_unique<Projectile>(gunPos, velocity, info.color, info.team, info.scale, myID, false);
-            p->transform->position = info.pos;
-            projectiles.push_back(std::move(p));
-
-            // B. 網路同步 (通知其他人)
-            if (NetworkManager::Instance().IsConnected()) {
-                PacketShoot pkt;
-                pkt.header.type = PacketType::C2S_SHOOT;
-
-                // 判斷這把武器是誰的
-                if (weapon.teamID == localPlayer->teamID) {
-                    pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
-                }
-                else if (enemyAI && weapon.teamID == enemyAI->teamID) {
-                    pkt.playerID = 100; // 如果是 AI 的武器，ID 填 100
-                }
-                else {
-                    pkt.playerID = -1; // 防呆
-                }
-
-                pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
-                pkt.origin = info.pos;  // need gunPos?
-                pkt.direction = info.dir;
-                pkt.speed = info.speed;
-                pkt.scale = info.scale;
-                pkt.color = info.color;
-
-                // 傳送邏輯
-                if (NetworkManager::Instance().IsServer()) {
-                    // 如果我是 Server，直接轉成 S2C 廣播給所有人 (除了自己)
-                    // 這裡為了簡化，廣播給全體，Client 端再濾掉自己 ID
-                    pkt.header.type = PacketType::S2C_SHOOT_EVENT;
-                    NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
-                }
-                else {
-                    // 如果我是 Client，請求 Server
-                    NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
-                }
-            }
+            // 一般子彈射擊也改用 Helper
+            CreateProjectile(NetworkManager::Instance().GetMyPlayerID(), info.team, info.pos, info.dir, ProjectileType::BULLET);
+            SendShootPacket(info.pos, info.dir, ProjectileType::BULLET);
         }
         weapon.pendingSpawns.clear();
     }
@@ -564,12 +566,9 @@ public:
                 auto* inPkt = (PacketPlayerState*)received.data.data();
 
                 PacketPlayerState outPkt = *inPkt;
-                outPkt.header.type = PacketType::S2C_WORLD_STATE; // 改頭換面
+                outPkt.header.type = PacketType::S2C_WORLD_STATE;
 
-                // 廣播給所有人 (UDP Unreliable)
                 net.Broadcast(&outPkt, sizeof(outPkt), false);
-
-                // Server 本地也需要更新這個遠端玩家的視覺位置
                 HandleWorldState(&outPkt);
             }
             // 2. 收到 Client 的射擊請求 -> 轉發為 SHOOT_EVENT
@@ -738,13 +737,7 @@ private:
             team = remotePlayers[pkt.playerID]->teamID;
         }
 
-        glm::vec3 velocity = pkt.direction * pkt.speed;
-        velocity.y += 2.0f;
-        bool isBomb = (pkt.type == ProjectileType::BOMB);
-
-        auto p = std::make_unique<Projectile>(pkt.origin, velocity, pkt.color, team, pkt.scale, pkt.playerID, isBomb);
-        // p->transform->position = pkt.origin;
-        projectiles.push_back(std::move(p));
+        CreateProjectile(pkt.playerID, team, pkt.origin, pkt.direction, pkt.type);
     }
 
     // 更新或建立遠端玩家
@@ -774,8 +767,68 @@ private:
             Projectile* p = it->get();
             p->UpdatePhysics(dt);
 
-            // bomb
-            if (p->isBomb) {
+            // --- Rocket Logic ---
+            if (p->pType == ProjectileType::ROCKET) {
+                if (p->isDead) {
+                    p->hasExploded = true;
+                    glm::vec3 hitPos = p->transform->position;
+
+                    // 1. 爆炸特效
+                    if (particleSystem) particleSystem->Emit(hitPos, p->inkColor, 80, 40.0f);
+                    AudioManager::Instance().PlayOneShot("explode", 1.0f);
+
+                    // 2. 塗地 (大範圍)
+                    // 塗一個大圓
+                    float rRadius = 4.0f;
+                    float uvSize = (rRadius * 2.0f) / mapSize;
+                    auto res = SplatPhysics::WorldToUV(hitPos, glm::vec3(0), mapSize, mapSize);
+                    if (res.hit) {
+                        float h = level->GetHeightAt(hitPos.x, hitPos.z);
+                        SplatMap* target = (h > 0.5f) ? mapObstacle.get() : mapFloor.get();
+                        painter->Paint(target, res.uv, uvSize, p->inkColor, 0, p->ownerTeam);
+                    }
+
+                    // 3. 傷害判定 (Server Only)
+                    if (NetworkManager::Instance().IsServer()) {
+                        float blastRadius = 6.0f;
+                        // 檢查本機
+                        if (localPlayer && localPlayer->teamID != p->ownerTeam) {
+                            if (glm::distance(localPlayer->transform->position, hitPos) < blastRadius) {
+                                // 傷害
+                                auto hp = localPlayer->GetComponent<Health>();
+                                if (hp && !hp->isDead) {
+                                    hp->TakeDamage(100.0f); // 直接秒殺
+                                    if (hp->isDead) {
+                                        // Send Kill Packet
+                                        PacketKillEvent kPkt;
+                                        kPkt.header.type = PacketType::S2C_KILL_EVENT;
+                                        kPkt.killerID = p->ownerID;
+                                        kPkt.victimID = NetworkManager::Instance().GetMyPlayerID();
+                                        kPkt.killerTeam = p->ownerTeam;
+                                        kPkt.victimTeam = localPlayer->teamID;
+                                        NetworkManager::Instance().Broadcast(&kPkt, sizeof(kPkt), true);
+                                    }
+                                }
+                            }
+                        }
+                        for (auto& pair : remotePlayers) {
+                            RemotePlayer* rp = pair.second.get();
+                            float dist = glm::distance(p->transform->position, rp->transform->position);
+
+                            if (dist < blastRadius) {
+                                // 判斷敵我 (或自殺)
+                                if (rp->teamID != p->ownerTeam || pair.first == p->ownerID) {
+                                    ProcessKillEvent(p->ownerID, rp, p->ownerTeam);
+                                }
+                            }
+                        }
+                    }
+
+                    it = projectiles.erase(it);
+                    continue;
+                }
+            }
+            else if (p->pType == ProjectileType::BOMB) {
                 // 1. 倒數警示音效 (剩 1.0 秒時)
                 if (!p->warningPlayed && p->fuseTimer <= 1.0f && p->fuseTimer > 0.0f) {
                     p->warningPlayed = true;
@@ -1167,7 +1220,7 @@ private:
                 p->teamID,
                 randScale,
                 NetworkManager::Instance().GetMyPlayerID(),
-                false
+                ProjectileType::BULLET
             );
 
             bullet->lifeTime = 1.0f + ((rand() % 100) / 100.0f);
@@ -1201,7 +1254,7 @@ private:
             p->teamID,
             1.0f,
             NetworkManager::Instance().GetMyPlayerID(),
-            true
+            ProjectileType::BULLET
         );
 
         bomb->fuseTimer = 0.0f;
@@ -1337,7 +1390,7 @@ private:
         // 建立炸彈
         auto bomb = std::make_unique<Projectile>(
             spawnPos, velocity, pl->weapon->inkColor, pl->teamID, 1.0f,
-            NetworkManager::Instance().GetMyPlayerID(), true
+            NetworkManager::Instance().GetMyPlayerID(), ProjectileType::BOMB
         );
         projectiles.push_back(std::move(bomb));
 

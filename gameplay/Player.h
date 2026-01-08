@@ -36,11 +36,19 @@ public:
     PlayerState state = PlayerState::ALIVE;
     float respawnTimer = 0.0f;
     float const RESPAWN_TIME = 3.0f; // 死亡後 3 秒重生
-    // 是否持有炸彈
+
+    // --- 道具狀態 ---
     bool hasBomb = false;
     bool requestBombThrow = false;
 
-    // 鯊魚坐騎參數
+    // --- [新增] 火箭大招 (Tri-zooka) 狀態 ---
+    bool isRocketActive = false;    // 是否正在大招模式
+    int rocketAmmo = 0;             // 剩餘發射次數 (3次)
+    float rocketCooldownTimer = 0.0f; // 射擊間隔
+    float rocketDurationTimer = 0.0f; // 大招持續時間
+    bool requestRocketFire = false;   // [請求] 發射火箭 (給 NetworkManager 看)
+
+    // --- 鯊魚坐騎參數 ---
     int sharkDashCount = 0;         // 剩餘衝刺次數 (總共 3 次)
     bool isSharkDashing = false;    // 目前是在「衝刺中」還是「停頓瞄準中」
     float sharkStateTimer = 0.0f;   // 共用計時器 (衝刺倒數 或 停頓倒數)
@@ -120,9 +128,16 @@ public:
         switch (state) {
         case PlayerState::ALIVE:
             HandleInput(dt);
+            UpdateRocketState(dt);
 
+            // 按下 Q 鍵發動大招 (這裡示範兩種大招，你可以自己決定要用哪一種)
             if (Input::GetKey(GLFW_KEY_Q) && IsSpecialReady()) {
-                StartSpecialShark();
+                // 如果你想用鯊魚： StartSpecialShark();
+                // 如果你想用火箭：
+                ActivateRocketSpecial();
+
+                // 扣除能量
+                currentCharge = 0.0f;
             }
 
             if (level && mapFloor && mapObstacle) {
@@ -176,7 +191,7 @@ public:
     GameObject* GetVisualBody() { return visualBody; }
 
     void AddSpecialCharge(float amount) {
-         if (state != PlayerState::ALIVE) return; 
+        if (state != PlayerState::ALIVE) return;
 
         if (currentCharge < MAX_SPECIAL) {
             currentCharge += amount;
@@ -201,9 +216,12 @@ public:
         state = PlayerState::DEAD;
         respawnTimer = RESPAWN_TIME;
 
+        // 死亡時重置大招狀態
+        isRocketActive = false;
+        rocketAmmo = 0;
+
         if (visualBody) visualBody->transform->scale = glm::vec3(0.0f);
 
-        // 2. 播放音效
         AudioManager::Instance().PlayOneShot("die", 1.0f);
 
         if (cameraRef) {
@@ -219,9 +237,6 @@ public:
 
         if (visualBody) visualBody->active = true;
 
-        // 設定起點與終點 (根據隊伍)
-        // 這裡假設我們能拿到 Level 的資訊，或者寫死
-        // 假設 Team 1 在 -40, Team 2 在 40
         float zDir = (teamID == 1) ? -1.0f : 1.0f;
         jumpTargetPos = glm::vec3(0, 0.0f, 30.0f * zDir); // 落地點
 
@@ -234,9 +249,44 @@ public:
         if (!hasBomb) {
             hasBomb = true;
             std::cout << "[Player] Picked up a Bomb! Press R to throw." << std::endl;
-            // 這裡可以播放音效 "item_get"
         }
     }
+
+    // 火箭大招邏輯
+    void ActivateRocketSpecial() {
+        if (isRocketActive) return;
+
+        isRocketActive = true;
+        rocketAmmo = 3;
+        rocketDurationTimer = 6.0f;
+
+        AudioManager::Instance().PlayOneShot("shark", 0.6f);    // 播放啟動音效
+        std::cout << ">>> ROCKET LAUNCHER EQUIPPED! (Ammo: 3) <<<" << std::endl;
+    }
+
+    void UpdateRocketState(float dt) {
+        if (!isRocketActive) return;
+
+        // 1. 倒數計時
+        rocketDurationTimer -= dt;
+        if (rocketDurationTimer <= 0.0f) {
+            DeactivateRocketSpecial();
+            return;
+        }
+
+        // 2. 射擊冷卻倒數
+        if (rocketCooldownTimer > 0.0f) {
+            rocketCooldownTimer -= dt;
+        }
+    }
+
+    void DeactivateRocketSpecial() {
+        isRocketActive = false;
+        rocketAmmo = 0;
+        std::cout << "Special Ended." << std::endl;
+    }
+
+    // ==========================================
 
     void StartSpecialShark() {
         if (state != PlayerState::ALIVE) return;
@@ -244,10 +294,7 @@ public:
         state = PlayerState::SHARKING;
         sharkDashCount = 3;
         StartNextDash();
-
-        // 播放啟動音效
         AudioManager::Instance().PlayOneShot("shark", 1.0f);
-        std::cout << "Shark Triple Dash Start!" << std::endl;
     }
 
     void StartNextDash() {
@@ -259,20 +306,17 @@ public:
         if (cameraRef) {
             camFwd = cameraRef->transform->GetForward();
         }
-        // 2. 壓平 Y 軸
         camFwd.y = 0.0f;
         if (glm::length(camFwd) > 0.01f) {
             camFwd = glm::normalize(camFwd);
         }
         sharkDashDirection = camFwd;
 
-        // 3. 設定速度
         velocity.x = sharkDashDirection.x * sharkSpeed;
         velocity.z = sharkDashDirection.z * sharkSpeed;
         velocity.y = 2.0f;
 
         transform->LookAt(transform->position + sharkDashDirection);
-
         AudioManager::Instance().PlayOneShot("shark", 0.6f);
     }
 
@@ -288,14 +332,12 @@ public:
             velocity.z = sharkDashDirection.z * sharkSpeed;
             velocity.y += gravity * dt;
 
-            // shoot ink
             sharkInkTimer += dt;
             if (sharkInkTimer > 0.08f) {
                 sharkInkTimer = 0.0f;
                 requestSharkSpray = true;
             }
 
-            // dash end
             if (sharkStateTimer <= 0.0f) {
                 sharkDashCount--;
                 velocity = glm::vec3(0);
@@ -313,7 +355,6 @@ public:
             velocity = glm::vec3(0);
             velocity.y += gravity * dt;
 
-			// follow camera
             if (cameraRef) {
                 glm::vec3 camFwd = cameraRef->transform->GetForward();
                 camFwd.y = 0;
@@ -360,12 +401,10 @@ public:
         bool isSquidForm = isSwimming || state == PlayerState::SHARKING;
 
         if (isSquidForm) {
-            // 變魷魚：隱藏人，顯示魷魚
             visualHuman->active = false;
             visualSquid->active = true;
         }
         else {
-            // 變人：顯示人，隱藏魷魚
             visualHuman->active = true;
             visualSquid->active = false;
         }
@@ -382,7 +421,7 @@ private:
 
         if (cameraRef) {
             cameraRef->transform->position = GetSpawnPosition();
-            cameraRef->transform->LookAt(glm::vec3(sin(glfwGetTime())*5.0f, 0, 0));
+            cameraRef->transform->LookAt(glm::vec3(sin(glfwGetTime()) * 5.0f, 0, 0));
         }
 
         if (respawnTimer <= 0.0f) {
@@ -390,45 +429,30 @@ private:
         }
     }
 
-    // 超級跳躍物理 (拋物線)
     void UpdateSuperJump(float dt) {
         jumpTimer += dt;
-        float t = jumpTimer / JUMP_DURATION; // 0.0 ~ 1.0
+        float t = jumpTimer / JUMP_DURATION;
 
         if (t >= 1.0f) {
             transform->position = jumpTargetPos;
             state = PlayerState::ALIVE;
-            // AudioManager::Instance().PlayOneShot("land", 0.8f);
             if (camera) camera->TriggerShake(0.2f, 0.1f);
             return;
         }
 
-        // 拋物線移動
         glm::vec3 currentPos = glm::mix(jumpStartPos, jumpTargetPos, t);
-        float heightOffset = 15.0f * sin(t * 3.14159f); // 弧線高度
+        float heightOffset = 15.0f * sin(t * 3.14159f);
         currentPos.y += heightOffset;
 
         transform->position = currentPos;
-
-        // 旋轉特效
         transform->rotation.y += 720.0f * dt;
         transform->rotation.x = -90.0f * (1.0f - t);
-    }
-
-    void StartSpecialLaser() {
-        currentCharge = 0.0f;
-        requestLaser = true;
-        AudioManager::Instance().PlayOneShot("laser_fire", 1.0f);
-        if (camera) camera->TriggerShake(0.4f, 0.2f);
     }
 
     void HandleInput(float dt) {
         if (!cameraRef) return;
 
         bool onMyInk = false;
-        float mapSize = 80.0f;
-        if (level) mapSize = level->mapSize;
-
         if (mapFloor && mapObstacle && level) {
             float h = level->GetHeightAt(transform->position.x, transform->position.z);
             SplatMap* target = (h > 0.5f) ? mapObstacle : mapFloor;
@@ -442,14 +466,8 @@ private:
         bool wantSwim = Input::GetKey(GLFW_KEY_LEFT_SHIFT);
         bool nextIsSwimming = (wantSwim && onMyInk);
 
-        // 狀態切換偵測
         if (nextIsSwimming != isSwimming) {
-            if (nextIsSwimming) {
-                AudioManager::Instance().PlayOneShot("swim", 0.3f);
-            }
-            else {
-                AudioManager::Instance().PlayOneShot("swim", 0.3f);
-            }
+            AudioManager::Instance().PlayOneShot("swim", 0.3f);
         }
 
         isSwimming = nextIsSwimming;
@@ -472,34 +490,47 @@ private:
         }
 
         if (isSwimming) {
-            // A. 魷魚狀態：面向 "移動方向"
-            // 只有在移動時才轉向，這樣游起來比較自然
             if (glm::length(targetVel) > 0.0f) {
                 RotateTowards(targetVel, 10.0f, dt);
             }
         }
         else {
-            // B. 人型態：始終面向 "鏡頭準心" (TPS 標準操作)
-            // 這樣你的準心指哪，人就朝哪，方便隨時射擊
-            // 即使沒在移動，也要跟著鏡頭轉
             RotateTowards(camFwd, 15.0f, dt);
         }
 
-        float friction = 10.0f; // 數值越大越靈敏，越小越滑
+        float friction = 10.0f;
         velocity.x = glm::mix(velocity.x, targetVel.x, friction * dt);
         velocity.z = glm::mix(velocity.z, targetVel.z, friction * dt);
 
-        // 4. 跳躍
         if (Input::GetKey(GLFW_KEY_SPACE) && isGrounded && !isSwimming) {
             velocity.y = sqrt(2.0f * jumpHeight * abs(gravity));
             isGrounded = false;
         }
 
-        bool hasInk = (hudRef && hudRef->currentInk > 0.0f);
-        bool isFiring = Input::GetMouseButton(0) && !isSwimming && hasInk;
+        // 射擊邏輯 (優先判斷火箭)
 
-        glm::vec3 gunPos = transform->position + glm::vec3(0, 1.5f, 0) + right * 0.5f + front * 0.5f;
+        // 1. 先檢查是否要發射火箭 (不可潛水)
+        if (isRocketActive && !isSwimming) {
+            if (Input::GetMouseButton(0) && rocketCooldownTimer <= 0.0f && rocketAmmo > 0) {
+                // 設定請求旗標，讓外部抓去發送封包
+                requestRocketFire = true;
 
+                // 扣除彈藥與設定冷卻
+                rocketAmmo--;
+                rocketCooldownTimer = 0.6f;
+
+                // 播放音效
+                AudioManager::Instance().PlayOneShot("rocket_shot", 0.7f);
+
+                // 如果射完了，結束大招
+                if (rocketAmmo <= 0) {
+                    DeactivateRocketSpecial();
+                }
+            }
+            return;
+        }
+
+        // 普通武器射擊
         if (weapon) {
             bool hasInk = (hudRef && hudRef->currentInk >= weapon->inkCost);
             bool isFiring = Input::GetMouseButton(0) && !isSwimming && hasInk;
@@ -510,12 +541,8 @@ private:
                 if (hudRef) hudRef->ConsumeInk(weapon->inkCost);
                 camera->TriggerShake(0.1f, 0.05f);
                 AudioManager::Instance().PlayOneShot("shoot", 0.3f);
-                
-                // 大招集氣
-                float chargeAmount = 5.0f;
-                // 根據不同武器設定不同的量
-                // chargeAmount = weapon->specialGain;
-                AddSpecialCharge(chargeAmount);
+
+                AddSpecialCharge(5.0f); // 集氣
             }
         }
 
@@ -538,7 +565,6 @@ private:
             nextH = level->GetHeightAt(nextPos.x, nextPos.z);
         }
 
-        // 高低差檢查
         float stepHeight = 0.5f;
         if (nextH > currentH + stepHeight) {
             velocity.x = 0;
@@ -549,7 +575,6 @@ private:
             transform->position.z = nextPos.z;
         }
 
-        // 垂直移動
         velocity.y += gravity * dt;
         transform->position += velocity * dt;
 
@@ -558,12 +583,11 @@ private:
             groundHeight = level->GetHeightAt(transform->position.x, transform->position.z);
         }
         if (transform->position.y < groundHeight) {
-            transform->position.y = groundHeight; // 拉回地板
+            transform->position.y = groundHeight;
             velocity.y = 0;
             isGrounded = true;
         }
         else {
-            // 如果離地很近也算著地 (避免斜坡抖動)
             if (transform->position.y - groundHeight < 0.1f && velocity.y <= 0) {
                 transform->position.y = groundHeight;
                 isGrounded = true;
@@ -582,16 +606,11 @@ private:
     void UpdateInk(float dt) {
         if (!hudRef) return;
 
-        // 判斷是否正在射擊 (按住左鍵 且 沒有潛水 且 墨水足夠)
-        // 這裡假設你有變數 currentInk，或者直接操作 HUD
-        // 如果你的架構是 HUD 只有顯示功能，那你應該在 Player 裡記錄 currentInk
-        // 但根據你的程式碼，看來是 HUD 在管墨水數值，我們先照舊
-
         bool isShooting = Input::GetMouseButton(0) && !isSwimming;
+        // 如果正在射火箭，也算是在射擊，不回充
+        if (isRocketActive && Input::GetMouseButton(0)) isShooting = true;
 
-        // 只有 "沒有在射擊" 的時候才回充
         if (!isShooting) {
-            // 潛水回充快 (0.5)，站立回充慢 (0.1)
             float refillRate = isSwimming ? 0.5f : 0.1f;
             hudRef->RefillInk(refillRate * dt);
         }
