@@ -20,7 +20,7 @@ enum class UIState {
 class GUIManager {
 public:
     // 大廳格子資料
-    LobbySlotInfo lobbySlots[8];
+    LobbySlotInfo lobbySlots[6];
 
     // --- Login / Networking inputs ---
     // Join: allow hostname/IP, and optionally "host:port" (useful for playit.gg)

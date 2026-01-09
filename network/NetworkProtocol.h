@@ -60,7 +60,7 @@ struct LobbySlotInfo {
 // 大廳狀態封包
 struct PacketLobbyState {
     PacketHeader header;
-    LobbySlotInfo slots[8]; // 固定 8 個位置
+    LobbySlotInfo slots[6]; // 固定 6 個位置
 };
 
 // 開始遊戲封包

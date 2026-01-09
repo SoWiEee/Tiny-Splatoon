@@ -33,7 +33,7 @@ public:
                 PacketLobbyState pkt;
 
                 // 1. 初始化空資料
-                for (int i = 0; i < 8; i++) {
+                for (int i = 0; i < 6; i++) {
                     pkt.slots[i].playerID = -1;
                     pkt.slots[i].teamID = 0;
                 }
@@ -44,7 +44,7 @@ public:
 
                 // 3. 填入連線的 Client
                 auto& clientIDs = NetworkManager::Instance().connectedPlayerIDs;
-                for (size_t i = 0; i < clientIDs.size() && i < 6; i++) {
+                for (size_t i = 0; i < clientIDs.size() && i < 5; i++) {
                     int pid = clientIDs[i];
                     pkt.slots[i + 1].playerID = pid;
                     pkt.slots[i + 1].teamID = (pid % 2 == 0) ? 1 : 2;
