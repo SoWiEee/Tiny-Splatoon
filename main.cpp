@@ -68,7 +68,7 @@ int main() {
         timer.Tick();
         float dt = timer.GetDeltaTime();
 
-        if (Input::GetKey(GLFW_KEY_ESCAPE)) break;
+        // if (Input::GetKey(GLFW_KEY_ESCAPE)) break;
 
         NetworkManager::Instance().Update();
         while (NetworkManager::Instance().HasPackets()) {
