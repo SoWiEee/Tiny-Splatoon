@@ -12,7 +12,7 @@ GUIManager::GUIManager(GLFWwindow* window) : m_Window(window) {
     ImGui_ImplOpenGL3_Init("#version 450");
 
     // 初始化大廳資料
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         lobbySlots[i].playerID = -1;
         lobbySlots[i].teamID = 0;
     }
@@ -159,7 +159,7 @@ void GUIManager::DrawLobbyCircles(int w, int h) {
     float totalW = (8 - 1) * spacing;
     float startX = (w - totalW) * 0.5f;
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         float x = startX + (i * spacing);
         float y = startY;
 

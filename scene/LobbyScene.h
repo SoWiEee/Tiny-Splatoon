@@ -44,7 +44,7 @@ public:
 
                 // 3. 填入連線的 Client
                 auto& clientIDs = NetworkManager::Instance().connectedPlayerIDs;
-                for (size_t i = 0; i < clientIDs.size() && i < 7; i++) {
+                for (size_t i = 0; i < clientIDs.size() && i < 6; i++) {
                     int pid = clientIDs[i];
                     pkt.slots[i + 1].playerID = pid;
                     pkt.slots[i + 1].teamID = (pid % 2 == 0) ? 1 : 2;
