@@ -200,7 +200,7 @@ public:
         // 加入 World 管理列表 (渲染用)
         visualEntities.push_back(std::move(humanObj));
         visualEntities.push_back(std::move(squidObj));
-        visualEntities.push_back(std::move(shadowObj)); // 記得加影子
+        visualEntities.push_back(std::move(shadowObj));
 
         // Create AI (Server Only)
         /*if (NetworkManager::Instance().IsServer()) {
@@ -912,7 +912,7 @@ private:
                                 // 傷害
                                 auto hp = localPlayer->GetComponent<Health>();
                                 if (hp && !hp->isDead) {
-                                    hp->TakeDamage(100.0f); // 直接秒殺
+                                    hp->TakeDamage(50.0f); // 直接秒殺
                                     if (hp->isDead) {
                                         // Send Kill Packet
                                         PacketKillEvent kPkt;
