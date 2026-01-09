@@ -36,7 +36,7 @@ public:
 
         if (pType == ProjectileType::BOMB) {
             // --- ¬µ¼u³]©w ---
-            gravity = 20.0f;
+            gravity = 10.0f;
             fuseTimer = 2.0f;
             AddComponent<MeshRenderer>("Cube", glm::vec3(0.1f, 0.1f, 0.1f));
 
