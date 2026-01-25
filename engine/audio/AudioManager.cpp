@@ -1,4 +1,4 @@
-#include "AudioManager.h"
+#include "AudioManager.hpp"
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 #include <iostream>

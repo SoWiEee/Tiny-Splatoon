@@ -1,4 +1,4 @@
-#include "GUIManager.h"
+#include "GUIManager.hpp"
 #include <string>
 
 GUIManager::GUIManager(GLFWwindow* window) : m_Window(window) {

@@ -1,6 +1,6 @@
 #pragma once
-#include "../engine/GameObject.h"
-#include "../components/MeshRenderer.h"
+#include "../engine/GameObject.hpp"
+#include "../components/MeshRenderer.hpp"
 #include <glm/glm.hpp>
 #include <cmath>
 

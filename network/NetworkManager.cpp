@@ -1,4 +1,4 @@
-#include "NetworkManager.h"
+#include "NetworkManager.hpp"
 #include <iostream>
 #include <cassert>
 #include <algorithm>

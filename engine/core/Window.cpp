@@ -1,6 +1,5 @@
-#include "Window.h"
+#include "Window.hpp"
 
-// 滑鼠回呼函式 (全域)
 void mouse_callback_proxy(GLFWwindow* window, double xpos, double ypos) {
     // 如果你有 Camera 需要這數據，可以在這裡轉發，或者讓 Camera 直接去問 Input::GetMousePosition()
 }

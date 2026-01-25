@@ -1,5 +1,5 @@
-#include "GameScene.h"
-#include "LoginScene.h"
+#include "GameScene.hpp"
+#include "LoginScene.hpp"
 
 Camera* GameScene::CurrentCamera = nullptr;
 
