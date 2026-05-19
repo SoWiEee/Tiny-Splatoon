@@ -32,24 +32,24 @@ public:
             if (lobbyUpdateTimer > 0.5f) {
                 PacketLobbyState pkt;
 
-                // 1. ªì©l¤ÆªÅ¸ê®Æ
-                for (int i = 0; i < 6; i++) {
+                // 1. ï¿½ï¿½lï¿½ÆªÅ¸ï¿½ï¿½
+                for (int i = 0; i < kLobbySlotCount; i++) {
                     pkt.slots[i].playerID = -1;
                     pkt.slots[i].teamID = 0;
                 }
 
-                // 2. ¶ñ¤J Server ¦Û¤v (Slot 0)
+                // 2. ï¿½ï¿½J Server ï¿½Û¤v (Slot 0)
                 pkt.slots[0].playerID = 0;
                 pkt.slots[0].teamID = 1;
 
-                // 3. ¶ñ¤J³s½uªº Client
+                // 3. ï¿½ï¿½Jï¿½sï¿½uï¿½ï¿½ Client
                 auto& clientIDs = NetworkManager::Instance().connectedPlayerIDs;
-                for (size_t i = 0; i < clientIDs.size() && i < 5; i++) {
+                for (size_t i = 0; i < clientIDs.size() && i < (kLobbySlotCount - 1); i++) {
                     int pid = clientIDs[i];
                     pkt.slots[i + 1].playerID = pid;
                     pkt.slots[i + 1].teamID = (pid % 2 == 0) ? 1 : 2;
 
-                    // ±q Map Åª¨úªZ¾¹Ãþ«¬¶ñ¤J«Ê¥]
+                    // ï¿½q Map Åªï¿½ï¿½ï¿½Zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Jï¿½Ê¥]
                     if (NetworkManager::Instance().playerWeaponMap.count(pid)) {
                         pkt.slots[i + 1].weaponType = NetworkManager::Instance().playerWeaponMap[pid];
                     }
@@ -58,10 +58,10 @@ public:
                     }
                 }
 
-                // 4. ¼s¼½
+                // 4. ï¿½sï¿½ï¿½
                 NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
 
-                // 5. ¥»¦a UI ¤]­n§ó·s
+                // 5. ï¿½ï¿½ï¿½a UI ï¿½]ï¿½nï¿½ï¿½s
                 gui->UpdateLobbyState(pkt);
 
                 lobbyUpdateTimer = 0.0f;
@@ -81,35 +81,35 @@ public:
         gui->DrawLobby(startGame);
 
         if (startGame && isServer) {
-            // 1. ¼s¼½¶}©l«Ê¥]
+            // 1. ï¿½sï¿½ï¿½ï¿½}ï¿½lï¿½Ê¥]
             PacketGameStart pkt;
             pkt.header.type = PacketType::S2C_GAME_START;
             NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
 
-            // 2. ¤Á´«¨ì¹CÀ¸³õ´º
-            SceneManager::Instance().SwitchTo(std::make_unique<GameScene>());
+            // 2. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            SceneManager::Instance().SwitchTo(std::make_unique<GameScene>(gui));
         }
     }
 
-    // ³B²zºô¸ô«Ê¥]
+    // ï¿½Bï¿½zï¿½ï¿½ï¿½ï¿½ï¿½Ê¥]
     void OnPacket(const ReceivedPacket& pkt) override {
-        // Client: ±µ¦¬¤jÆU§ó·s
+        // Client: ï¿½ï¿½ï¿½ï¿½ï¿½jï¿½Uï¿½ï¿½s
         if (pkt.type == PacketType::S2C_LOBBY_UPDATE) {
             gui->UpdateLobbyState(*(PacketLobbyState*)pkt.data.data());
         }
-        // Client: ±µ¦¬¶}©l¹CÀ¸°T¸¹
+        // Client: ï¿½ï¿½ï¿½ï¿½ï¿½}ï¿½lï¿½Cï¿½ï¿½ï¿½Tï¿½ï¿½
         else if (pkt.type == PacketType::S2C_GAME_START) {
             std::cout << "[Lobby] Game Started!" << std::endl;
-            SceneManager::Instance().SwitchTo(std::make_unique<GameScene>());
+            SceneManager::Instance().SwitchTo(std::make_unique<GameScene>(gui));
         }
-        // Client: ±µ¦¬Åwªï°T®§ (³]©w ID)
+        // Client: ï¿½ï¿½ï¿½ï¿½ï¿½wï¿½ï¿½Tï¿½ï¿½ (ï¿½]ï¿½w ID)
         else if (pkt.type == PacketType::S2C_JOIN_ACCEPT) {
             auto* p = (PacketJoinAccept*)pkt.data.data();
             NetworkManager::Instance().SetMyPlayerID(p->yourPlayerID);
             NetworkManager::Instance().SetMyTeamID(p->yourTeamID);
             std::cout << ">> Lobby Joined! ID: " << p->yourPlayerID << std::endl;
         }
-        // Server ³B²z´«ªZ¾¹½Ð¨D
+        // Server ï¿½Bï¿½zï¿½ï¿½ï¿½Zï¿½ï¿½ï¿½Ð¨D
         if (isServer && pkt.type == PacketType::C2S_LOBBY_CHANGE_WEAPON) {
             auto* p = (PacketLobbyChangeWeapon*)pkt.data.data();
             NetworkManager::Instance().playerWeaponMap[p->playerID] = p->newWeapon;

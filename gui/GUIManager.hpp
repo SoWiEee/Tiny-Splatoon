@@ -9,18 +9,18 @@
 #include "../network/NetworkManager.hpp"
 #include "../network/NetworkProtocol.hpp"
 
-// ©w¸q UI Åã¥Üª¬ºA
+// ï¿½wï¿½q UI ï¿½ï¿½Üªï¿½ï¿½A
 enum class UIState {
     LOGIN,
     LOBBY,
-    HUD,    // ¹CÀ¸¤¤ªº¤¶­±
-    NONE    // Ãö³¬ UI
+    HUD,    // ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    NONE    // ï¿½ï¿½ï¿½ï¿½ UI
 };
 
 class GUIManager {
 public:
-    // ¤jÆU®æ¤l¸ê®Æ
-    LobbySlotInfo lobbySlots[6];
+    // ï¿½jï¿½Uï¿½ï¿½lï¿½ï¿½ï¿½
+    LobbySlotInfo lobbySlots[kLobbySlotCount];
 
     // --- Login / Networking inputs ---
     // Join: allow hostname/IP, and optionally "host:port" (useful for playit.gg)
@@ -32,19 +32,19 @@ public:
     // Host: local UDP port to listen on.
     int hostPort = 7777;
 
-    // «Øºc»P¸Ñºc
+    // ï¿½Øºcï¿½Pï¿½Ñºc
     GUIManager(GLFWwindow* window);
     ~GUIManager();
 
-    // ®Ö¤ß¬yµ{
-    void BeginFrame(); // ¶}©lÃ¸»s
-    void Render();     // µ²§ô¨Ã´è¬V
+    // ï¿½Ö¤ß¬yï¿½{
+    void BeginFrame(); // ï¿½}ï¿½lÃ¸ï¿½s
+    void Render();     // ï¿½ï¿½ï¿½ï¿½ï¿½Ã´ï¿½V
 
-    // Ã¸»s¦U­Ó­¶­±
+    // Ã¸ï¿½sï¿½Uï¿½Ó­ï¿½ï¿½ï¿½
     void DrawLogin(bool& outStartServer, bool& outConnectClient);
-    void DrawLobby(bool& outStartGame); // outStartGame: Server «ö¤U¶}©l¦^¶Ç true
+    void DrawLobby(bool& outStartGame); // outStartGame: Server ï¿½ï¿½ï¿½Uï¿½}ï¿½lï¿½^ï¿½ï¿½ true
 
-    // §ó·s¸ê®Æ¤¶­±
+    // ï¿½ï¿½sï¿½ï¿½Æ¤ï¿½ï¿½ï¿½
     void UpdateLobbyState(const PacketLobbyState& pkt);
     void SetState(UIState newState) { currentState = newState; }
     UIState GetState() const { return currentState; }

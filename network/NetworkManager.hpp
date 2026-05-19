@@ -23,6 +23,7 @@ public:
     static bool ParseHostPort(const std::string& input, std::string& outHost, int& outPort, int defaultPort = 7777);
     std::vector<int> connectedPlayerIDs;
     std::map<int, WeaponType> playerWeaponMap;
+    std::map<HSteamNetConnection, int> connectionPlayerIDs;
 
     // GNS init
     bool Initialize();
@@ -33,7 +34,7 @@ public:
     bool Connect(const std::string& hostOrIp, int port);
     void Disconnect();
 
-    // --- ¥D°j°é ---
+    // --- ï¿½Dï¿½jï¿½ï¿½ ---
     void Update();
 
     void Send(HSteamNetConnection conn, const void* data, size_t size, bool reliable = false);
@@ -44,14 +45,14 @@ public:
         }
     }
 
-    // Server ¼s¼½¥Î
+    // Server ï¿½sï¿½ï¿½ï¿½ï¿½
     void Broadcast(const void* data, size_t size, bool reliable = false, HSteamNetConnection except = k_HSteamNetConnection_Invalid);
 
-    // --- ±µ¦¬ ---
+    // --- ï¿½ï¿½ï¿½ï¿½ ---
     bool HasPackets();
     ReceivedPacket PopPacket();
 
-    // --- ª¬ºA ---
+    // --- ï¿½ï¿½ï¿½A ---
     bool IsServer() const { return m_IsServer; }
     bool IsConnected() const { return m_IsConnected; }
     int GetMyPlayerID() const { return m_MyID; }
@@ -65,24 +66,24 @@ private:
     NetworkManager() {}
     ~NetworkManager() { Shutdown(); }
 
-    // GNS ¤¶­±«ü¼Ð
+    // GNS ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     ISteamNetworkingSockets* m_pInterface = nullptr;
 
-    // Server ¥ÎªººÊÅ¥ Socket
+    // Server ï¿½Îªï¿½ï¿½ï¿½Å¥ Socket
     HSteamListenSocket m_hListenSock = k_HSteamListenSocket_Invalid;
 
-    // Server ºÝªº³s½u¦Cªí (Client ID -> Connection Handle)
-    // ³o¸Ì¬°¤FÂ²³æ¡A§Ú­Ì¥ý¥u¦s Connection Handle
+    // Server ï¿½Ýªï¿½ï¿½sï¿½uï¿½Cï¿½ï¿½ (Client ID -> Connection Handle)
+    // ï¿½oï¿½Ì¬ï¿½ï¿½FÂ²ï¿½ï¿½Aï¿½Ú­Ì¥ï¿½ï¿½uï¿½s Connection Handle
     std::vector<HSteamNetConnection> m_ClientConnections;
 
-    // Client ¥Îªº³s½u Handle (³s¨ì Server ªº¨º±ø½u)
+    // Client ï¿½Îªï¿½ï¿½sï¿½u Handle (ï¿½sï¿½ï¿½ Server ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½u)
     HSteamNetConnection m_hConnection = k_HSteamNetConnection_Invalid;
 
-    // ª¬ºA»P¦î¦C
+    // ï¿½ï¿½ï¿½Aï¿½Pï¿½ï¿½C
     WeaponType m_MyWeaponType = WeaponType::SHOOTER;
     bool m_IsServer = false;
     bool m_IsConnected = false;
-    int m_MyID = -1; // -1 ¥Nªí©|¥¼¤À°t
+    int m_MyID = -1; // -1 ï¿½Nï¿½ï¿½ï¿½|ï¿½ï¿½ï¿½ï¿½ï¿½t
     int m_MyTeamID = 1;
     int m_NextClientID = 1;
     std::queue<ReceivedPacket> m_PacketQueue;
@@ -92,10 +93,10 @@ private:
     // Resolve IPv4/IPv6 or hostname (DNS) to a SteamNetworkingIPAddr
     bool ResolveHostToAddr(const std::string& hostOrIp, int port, SteamNetworkingIPAddr& outAddr);
 
-    // --- GNS ¦^©I¨ç¦¡ (³B²z³s½uª¬ºA§ïÅÜ) ---
-    // ¥²¶·¬O static ¤~¯à¶Çµ¹ GNS
+    // --- GNS ï¿½^ï¿½Iï¿½ç¦¡ (ï¿½Bï¿½zï¿½sï¿½uï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½ï¿½) ---
+    // ï¿½ï¿½ï¿½ï¿½ï¿½O static ï¿½~ï¿½ï¿½Çµï¿½ GNS
     static void OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* pInfo);
 
-    // ³B²z³s½uª¬ºAªº¤º³¡ÅÞ¿è
+    // ï¿½Bï¿½zï¿½sï¿½uï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¿ï¿½
     void OnConnectionStatusChangedHelper(SteamNetConnectionStatusChangedCallback_t* pInfo);
 };

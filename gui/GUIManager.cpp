@@ -11,8 +11,8 @@ GUIManager::GUIManager(GLFWwindow* window) : m_Window(window) {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 450");
 
-    // ªì©l¤Æ¤jÆU¸ê®Æ
-    for (int i = 0; i < 6; i++) {
+    // ï¿½ï¿½lï¿½Æ¤jï¿½Uï¿½ï¿½ï¿½
+    for (int i = 0; i < kLobbySlotCount; i++) {
         lobbySlots[i].playerID = -1;
         lobbySlots[i].teamID = 0;
     }
@@ -36,16 +36,16 @@ void GUIManager::Render() {
 }
 
 void GUIManager::UpdateLobbyState(const PacketLobbyState& pkt) {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < kLobbySlotCount; i++) {
         lobbySlots[i] = pkt.slots[i];
     }
 }
 
-// --- Ã¸»sµn¤Jµe­± ---
+// --- Ã¸ï¿½sï¿½nï¿½Jï¿½eï¿½ï¿½ ---
 void GUIManager::DrawLogin(bool& outStartServer, bool& outConnectClient) {
     if (currentState != UIState::LOGIN) return;
 
-    // ¨ú±oµøµ¡¤j¤p¥H¸m¤¤
+    // ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½jï¿½pï¿½Hï¿½mï¿½ï¿½
     int w, h;
     glfwGetWindowSize(m_Window, &w, &h);
 
@@ -88,38 +88,38 @@ void GUIManager::DrawLogin(bool& outStartServer, bool& outConnectClient) {
     }
 }
 
-// --- Ã¸»s¤jÆUµe­± ---
+// --- Ã¸ï¿½sï¿½jï¿½Uï¿½eï¿½ï¿½ ---
 void GUIManager::DrawLobby(bool& outStartGame) {
     if (currentState != UIState::LOBBY) return;
 
     int w, h;
     glfwGetWindowSize(m_Window, &w, &h);
 
-    // ¥þ¿Ã¹õµLÃä®Øµøµ¡
+    // ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Lï¿½ï¿½Øµï¿½ï¿½ï¿½
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImVec2((float)w, (float)h));
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBackground;
 
     if (ImGui::Begin("LobbyOverlay", nullptr, flags)) {
 
-        // 1. ¼ÐÃD
+        // 1. ï¿½ï¿½ï¿½D
         ImGui::SetWindowFontScale(3.0f);
         std::string title = "Tiny Splatoon Lobby";
         float textW = ImGui::CalcTextSize(title.c_str()).x;
         ImGui::SetCursorPos(ImVec2((w - textW) * 0.5f, h * 0.1f));
         ImGui::Text("%s", title.c_str());
 
-        // 2. Ã¸»s 8 ­Ó¶ê°é
+        // 2. Ã¸ï¿½s 8 ï¿½Ó¶ï¿½ï¿½
         DrawLobbyCircles(w, h);
-        // ªZ¾¹¿ï¾Ü¾¹
+        // ï¿½Zï¿½ï¿½ï¿½ï¿½Ü¾ï¿½
         ImGui::SetCursorPos(ImVec2(w * 0.1f, h * 0.6f));
         WeaponType currentWeapon = NetworkManager::Instance().GetMyWeaponType();
-        // ¦pªG¦³ÅÜ§ó¡A³o­Ó¨ç¦¡·|¦^¶Ç true¡A¨Ã§ó·s currentWeapon
+        // ï¿½pï¿½Gï¿½ï¿½ï¿½Ü§ï¿½Aï¿½oï¿½Ó¨ç¦¡ï¿½|ï¿½^ï¿½ï¿½ trueï¿½Aï¿½Ã§ï¿½s currentWeapon
         if (DrawWeaponSelector(currentWeapon)) {
-            // §ó·s¥»¦a°O¿ý
+            // ï¿½ï¿½sï¿½ï¿½ï¿½aï¿½Oï¿½ï¿½
             NetworkManager::Instance().SetMyWeaponType(currentWeapon);
 
-            // µo°e«Ê¥]³qª¾ Server
+            // ï¿½oï¿½eï¿½Ê¥]ï¿½qï¿½ï¿½ Server
             PacketLobbyChangeWeapon pkt;
             pkt.header.type = PacketType::C2S_LOBBY_CHANGE_WEAPON;
             pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
@@ -127,7 +127,7 @@ void GUIManager::DrawLobby(bool& outStartGame) {
             NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
         }
 
-        // 3. «ö¶s (Server Åã¥Ü Start, Client Åã¥Ü Waiting)
+        // 3. ï¿½ï¿½ï¿½s (Server ï¿½ï¿½ï¿½ Start, Client ï¿½ï¿½ï¿½ Waiting)
         ImGui::SetWindowFontScale(2.0f);
         if (NetworkManager::Instance().IsServer()) {
             std::string btnText = "START GAME";
@@ -148,36 +148,36 @@ void GUIManager::DrawLobby(bool& outStartGame) {
     ImGui::End();
 }
 
-// --- Ã¸»s¶ê°éªº»²§U¨ç¦¡ ---
+// --- Ã¸ï¿½sï¿½ï¿½éªºï¿½ï¿½ï¿½Uï¿½ç¦¡ ---
 void GUIManager::DrawLobbyCircles(int w, int h) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
     float startY = h * 0.4f;
     float radius = 40.0f;
     float spacing = 120.0f;
-    // ºâ¥X°_©l X¡AÅý 8 ­Ó¶ê¸m¤¤
-    float totalW = (8 - 1) * spacing;
+    // ï¿½ï¿½Xï¿½_ï¿½l Xï¿½Aï¿½ï¿½ 8 ï¿½Ó¶ï¿½mï¿½ï¿½
+    float totalW = (kLobbySlotCount - 1) * spacing;
     float startX = (w - totalW) * 0.5f;
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < kLobbySlotCount; i++) {
         float x = startX + (i * spacing);
         float y = startY;
 
-        // ¨M©wÃC¦â
-        ImU32 color = IM_COL32(100, 100, 100, 255); // ¦Ç¦â (ªÅ)
+        // ï¿½Mï¿½wï¿½Cï¿½ï¿½
+        ImU32 color = IM_COL32(100, 100, 100, 255); // ï¿½Ç¦ï¿½ (ï¿½ï¿½)
 
         if (lobbySlots[i].playerID != -1) {
-            if (lobbySlots[i].teamID == 1) color = IM_COL32(255, 50, 50, 255); // ¬õ
-            if (lobbySlots[i].teamID == 2) color = IM_COL32(50, 255, 50, 255); // ºñ
+            if (lobbySlots[i].teamID == 1) color = IM_COL32(255, 50, 50, 255); // ï¿½ï¿½
+            if (lobbySlots[i].teamID == 2) color = IM_COL32(50, 255, 50, 255); // ï¿½ï¿½
         }
 
-        // µe¹ê¤ß¶ê
+        // ï¿½eï¿½ï¿½ß¶ï¿½
         draw_list->AddCircleFilled(ImVec2(x, y), radius, color);
-        // µeÃä®Ø
+        // ï¿½eï¿½ï¿½ï¿½
         draw_list->AddCircle(ImVec2(x, y), radius, IM_COL32(255, 255, 255, 200), 0, 3.0f);
 
-        // µe¦W¦r (P1, P2...)
-        // ¦pªG¬O¦Û¤v¡A¥i¥H¼Ðµù (You)
+        // ï¿½eï¿½Wï¿½r (P1, P2...)
+        // ï¿½pï¿½Gï¿½Oï¿½Û¤vï¿½Aï¿½iï¿½Hï¿½Ðµï¿½ (You)
         std::string name = "P" + std::to_string(i + 1);
         int myID = NetworkManager::Instance().GetMyPlayerID();
         if (lobbySlots[i].playerID != -1 && lobbySlots[i].playerID == myID) {
@@ -186,8 +186,8 @@ void GUIManager::DrawLobbyCircles(int w, int h) {
 
         ImGui::SetWindowFontScale(1.5f);
         float nameW = ImGui::CalcTextSize(name.c_str()).x;
-        // §â Cursor ²¾¨ì¶ê°é¤U¤è
-        ImGui::SetCursorPos(ImVec2(x - nameW * 0.5f - 10, y + radius + 15)); // ·L½Õ¦ì¸m
+        // ï¿½ï¿½ Cursor ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Uï¿½ï¿½
+        ImGui::SetCursorPos(ImVec2(x - nameW * 0.5f - 10, y + radius + 15)); // ï¿½Lï¿½Õ¦ï¿½m
         ImGui::Text("%s", name.c_str());
     }
 }
@@ -199,14 +199,14 @@ bool GUIManager::DrawWeaponSelector(WeaponType& currentSelection) {
     ImGui::Text("Select Weapon:");
     ImGui::SameLine();
 
-    // ©w¸q«ö¶s¼Ë¦¡
+    // ï¿½wï¿½qï¿½ï¿½ï¿½sï¿½Ë¦ï¿½
     auto DrawWeaponBtn = [&](const char* label, WeaponType type) {
-        // ¦pªG¿ï¤¤¡A§ïÅÜ«ö¶sÃC¦â
+        // ï¿½pï¿½Gï¿½ï¤¤ï¿½Aï¿½ï¿½ï¿½Ü«ï¿½ï¿½sï¿½Cï¿½ï¿½
         if (currentSelection == type) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.8f, 0.2f, 1.0f)); // «Gºñ¦â
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.8f, 0.2f, 1.0f)); // ï¿½Gï¿½ï¿½ï¿½
         }
         else {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // ¦Ç¦â
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f)); // ï¿½Ç¦ï¿½
         }
 
         if (ImGui::Button(label, ImVec2(120, 40))) {
@@ -222,7 +222,7 @@ bool GUIManager::DrawWeaponSelector(WeaponType& currentSelection) {
     ImGui::SameLine();
     DrawWeaponBtn("Slosher", WeaponType::SLOSHER);
 
-    // Åã¥ÜÄÝ©Ê­±ªO
+    // ï¿½ï¿½ï¿½ï¿½Ý©Ê­ï¿½ï¿½O
     ImGui::Spacing();
     ImGui::Indent(20.0f);
     ImGui::SetWindowFontScale(1.2f);

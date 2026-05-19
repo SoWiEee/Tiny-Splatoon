@@ -13,13 +13,13 @@
     #pragma comment(lib, "Ws2_32.lib")
 #endif
 
-// ¹ê§@ Singleton
+// ï¿½ï¿½@ Singleton
 NetworkManager& NetworkManager::Instance() {
     static NetworkManager instance;
     return instance;
 }
 
-// ÀRºA Callback Âàµoµ¹¹êÅé
+// ï¿½Rï¿½A Callback ï¿½ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 void NetworkManager::OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* pInfo) {
     NetworkManager::Instance().OnConnectionStatusChangedHelper(pInfo);
 }
@@ -69,6 +69,9 @@ void NetworkManager::Shutdown() {
 bool NetworkManager::StartServer(int port) {
     m_IsServer = true;
     m_ClientConnections.clear();
+    connectedPlayerIDs.clear();
+    playerWeaponMap.clear();
+    connectionPlayerIDs.clear();
 
     SteamNetworkingIPAddr serverAddr;
     serverAddr.Clear();
@@ -215,11 +218,11 @@ void NetworkManager::Disconnect() {
 void NetworkManager::Update() {
     if (!m_pInterface) return;
 
-    // 1. ³B²z¥þ°ì¦^©I (³s½u¡BÂ_½u¨Æ¥ó)
+    // 1. ï¿½Bï¿½zï¿½ï¿½ï¿½ï¿½^ï¿½I (ï¿½sï¿½uï¿½Bï¿½_ï¿½uï¿½Æ¥ï¿½)
     m_pInterface->RunCallbacks();
 
-    // 2. ±µ¦¬°T®§ (Polling)
-    // ¦¬¶°©Ò¦³¬¡ÅD³s½u
+    // 2. ï¿½ï¿½ï¿½ï¿½ï¿½Tï¿½ï¿½ (Polling)
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ò¦ï¿½ï¿½ï¿½ï¿½Dï¿½sï¿½u
     std::vector<HSteamNetConnection> connectionsToCheck;
     if (m_IsServer) {
         connectionsToCheck = m_ClientConnections;
@@ -233,7 +236,7 @@ void NetworkManager::Update() {
         int numMsgs = m_pInterface->ReceiveMessagesOnConnection(conn, &pIncomingMsg, 1);
 
         if (numMsgs > 0) {
-            // ³B²z³o«h°T®§
+            // ï¿½Bï¿½zï¿½oï¿½hï¿½Tï¿½ï¿½
             if (pIncomingMsg->GetSize() >= sizeof(PacketHeader)) {
                 ReceivedPacket pkt;
                 PacketHeader* header = (PacketHeader*)pIncomingMsg->GetData();
@@ -245,26 +248,34 @@ void NetworkManager::Update() {
 
                 m_PacketQueue.push(pkt);
             }
-            // ÄÀ©ñ GNS ªº°T®§°O¾ÐÅé
+            // ï¿½ï¿½ï¿½ï¿½ GNS ï¿½ï¿½ï¿½Tï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½
             pIncomingMsg->Release();
         }
     }
 }
 
-// ³B²z³s½uª¬ºA§ïÅÜ
+// ï¿½Bï¿½zï¿½sï¿½uï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½ï¿½
 void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusChangedCallback_t* pInfo) {
     switch (pInfo->m_info.m_eState) {
     case k_ESteamNetworkingConnectionState_None:
-        // ¾P·´¤¤
+        // ï¿½Pï¿½ï¿½ï¿½ï¿½
         break;
 
     case k_ESteamNetworkingConnectionState_ClosedByPeer:
     case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
-        // Â_½u
+        // ï¿½_ï¿½u
         if (m_IsServer) {
-            // ±q client list ²¾°£
+            // ï¿½q client list ï¿½ï¿½ï¿½ï¿½
             auto it = std::remove(m_ClientConnections.begin(), m_ClientConnections.end(), pInfo->m_hConn);
             m_ClientConnections.erase(it, m_ClientConnections.end());
+
+            auto idIt = connectionPlayerIDs.find(pInfo->m_hConn);
+            if (idIt != connectionPlayerIDs.end()) {
+                int playerID = idIt->second;
+                connectionPlayerIDs.erase(idIt);
+                connectedPlayerIDs.erase(std::remove(connectedPlayerIDs.begin(), connectedPlayerIDs.end(), playerID), connectedPlayerIDs.end());
+                playerWeaponMap.erase(playerID);
+            }
         }
         else {
             m_IsConnected = false;
@@ -285,31 +296,23 @@ void NetworkManager::OnConnectionStatusChangedHelper(SteamNetConnectionStatusCha
             }
 
             std::cout << "Accepted connection " << pInfo->m_hConn << std::endl;
-
-            // S2C_JOIN_ACCEPT
-            PacketJoinAccept pkt;
-            pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
-            // Connection Handle as Player ID
-            pkt.yourPlayerID = (int)pInfo->m_hConn;
-            pkt.yourTeamID = (pkt.yourPlayerID % 2 == 0) ? 1 : 2;
-
-            Send(pInfo->m_hConn, &pkt, sizeof(pkt), true);
         }
         break;
 
     case k_ESteamNetworkingConnectionState_Connected:
-        // ³s½u¦¨¥\¡I
+        // ï¿½sï¿½uï¿½ï¿½ï¿½\ï¿½I
         if (m_IsServer) {
             std::cout << "Client connected! Handle: " << pInfo->m_hConn << std::endl;
             int newID = m_NextClientID++;
             m_ClientConnections.push_back(pInfo->m_hConn);
             connectedPlayerIDs.push_back(newID);
+            connectionPlayerIDs[pInfo->m_hConn] = newID;
 
             PacketJoinAccept pkt;
             pkt.header.type = PacketType::S2C_JOIN_ACCEPT;
             pkt.yourPlayerID = newID;   // Server=0, Clients=1,2,3...
 
-            // °¸¼Æ ID = Team 1 (¬õ), ©_¼Æ ID = Team 2 (ºñ)
+            // ï¿½ï¿½ï¿½ï¿½ ID = Team 1 (ï¿½ï¿½), ï¿½_ï¿½ï¿½ ID = Team 2 (ï¿½ï¿½)
             pkt.yourTeamID = (pkt.yourPlayerID % 2 == 0) ? 1 : 2;
 
             m_pInterface->SendMessageToConnection(pInfo->m_hConn, &pkt, sizeof(pkt), k_nSteamNetworkingSend_Reliable, nullptr);

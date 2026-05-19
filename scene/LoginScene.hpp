@@ -9,8 +9,7 @@ class LoginScene : public Scene {
     GUIManager* gui;
 
 public:
-    LoginScene() {}
-    LoginScene(GUIManager* guiManager) : gui(guiManager) {}
+    explicit LoginScene(GUIManager* guiManager) : gui(guiManager) {}
     virtual ~LoginScene() { OnExit(); }
 
     void OnEnter() override {
@@ -26,7 +25,7 @@ public:
     }
 
     void Update(float dt) override {
-        // µn¤Jµe­±¨S¦³¹CÀ¸ÅÞ¿è­n§ó·s
+        // ï¿½nï¿½Jï¿½eï¿½ï¿½ï¿½Sï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½Þ¿ï¿½nï¿½ï¿½s
     }
 
     void Render() override {
@@ -40,24 +39,24 @@ public:
         bool startServer = false;
         bool connectClient = false;
 
-        // ©I¥s GUIManager Ã¸»sµn¤J®Ø
+        // ï¿½Iï¿½s GUIManager Ã¸ï¿½sï¿½nï¿½Jï¿½ï¿½
         gui->DrawLogin(startServer, connectClient);
 
-        // --- ³B²z«ö¶sÅÞ¿è ---
+        // --- ï¿½Bï¿½zï¿½ï¿½ï¿½sï¿½Þ¿ï¿½ ---
 
-        // A. ±Ò°Ê¦øªA¾¹
+        // A. ï¿½Ò°Ê¦ï¿½ï¿½Aï¿½ï¿½
         if (startServer) {
             if (NetworkManager::Instance().StartServer(gui->hostPort)) {
-                // Server ¦Û¤v¦û¾Ú²Ä 1 ­Ó¦ì¸m (¬õ¦â)
+                // Server ï¿½Û¤vï¿½ï¿½ï¿½Ú²ï¿½ 1 ï¿½Ó¦ï¿½m (ï¿½ï¿½ï¿½ï¿½)
                 gui->lobbySlots[0].playerID = 0;
                 gui->lobbySlots[0].teamID = 1;
 
-                // ¤Á´«¨ì¤jÆU³õ´º (Server ¼Ò¦¡)
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½jï¿½Uï¿½ï¿½ï¿½ï¿½ (Server ï¿½Ò¦ï¿½)
                 SceneManager::Instance().SwitchTo(std::make_unique<LobbyScene>(gui, true));
             }
         }
 
-        // B. ³s½u«È¤áºÝ
+        // B. ï¿½sï¿½uï¿½È¤ï¿½ï¿½
         if (connectClient) {
             std::string host;
             int port = gui->joinPort;
@@ -65,7 +64,7 @@ public:
                 return;
             }
             if (NetworkManager::Instance().Connect(host, port)) {
-                // ¤Á´«¨ì¤jÆU³õ´º (Client ¼Ò¦¡)
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½jï¿½Uï¿½ï¿½ï¿½ï¿½ (Client ï¿½Ò¦ï¿½)
                 SceneManager::Instance().SwitchTo(std::make_unique<LobbyScene>(gui, false));
             }
         }

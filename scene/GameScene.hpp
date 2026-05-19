@@ -10,8 +10,9 @@
 #include "../components/Camera.hpp"
 #include "../components/HUD.hpp"
 #include "../components/Scoreboard.hpp"
+#include "../gui/GUIManager.hpp"
 
-// 前向宣告
+// 嚙箴嚙碾嚙褐告
 class LoginScene;
 
 class GameScene : public Scene {
@@ -24,8 +25,9 @@ public:
     Scoreboard* scoreboard = nullptr;
     std::unique_ptr<Shader> shader;
     static Camera* CurrentCamera;
+    GUIManager* gui = nullptr;
 
-    GameScene() {}
+    explicit GameScene(GUIManager* guiManager) : gui(guiManager) {}
 
     virtual ~GameScene() { OnExit(); }
 

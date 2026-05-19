@@ -8,36 +8,36 @@
 
 class Lobby {
 public:
-    // ¥»¦aÀx¦sªº 8 ­Ó®æ¤lª¬ºA
-    LobbySlotInfo slots[8];
+    // ï¿½ï¿½ï¿½aï¿½xï¿½sï¿½ï¿½ 8 ï¿½Ó®ï¿½lï¿½ï¿½ï¿½A
+    LobbySlotInfo slots[kLobbySlotCount];
     bool isGameStarted = false;
 
     Lobby() {
-        // ªì©l¤Æ¡G¥þ³¡¨S¤H (-1)
-        for (int i = 0; i < 8; i++) {
+        // ï¿½ï¿½lï¿½Æ¡Gï¿½ï¿½ï¿½ï¿½ï¿½Sï¿½H (-1)
+        for (int i = 0; i < kLobbySlotCount; i++) {
             slots[i].playerID = -1;
             slots[i].teamID = 0;
         }
     }
 
-    // §ó·s¤jÆU¸ê®Æ (·í¦¬¨ì Server «Ê¥]®É©I¥s)
+    // ï¿½ï¿½sï¿½jï¿½Uï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Server ï¿½Ê¥]ï¿½É©Iï¿½s)
     void UpdateState(const PacketLobbyState& pkt) {
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < kLobbySlotCount; i++) {
             slots[i] = pkt.slots[i];
         }
     }
 
-    // Ã¸»s UI (¦b Main Loop ©I¥s)
+    // Ã¸ï¿½s UI (ï¿½b Main Loop ï¿½Iï¿½s)
     void DrawUI(int windowWidth, int windowHeight) {
-        // ³]©w ImGui µøµ¡¦ûº¡¥þ¿Ã¹õ¡A¥B¨S¦³¼ÐÃD¦C (¬Ý°_¨Ó¹³¹CÀ¸­ì¥Í¤¶­±)
+        // ï¿½]ï¿½w ImGui ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½Aï¿½Bï¿½Sï¿½ï¿½ï¿½ï¿½ï¿½Dï¿½C (ï¿½Ý°_ï¿½Ó¹ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½Í¤ï¿½ï¿½ï¿½)
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(ImVec2((float)windowWidth, (float)windowHeight));
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 
         if (ImGui::Begin("LobbyScreen", nullptr, window_flags)) {
 
-            // 1. ¼ÐÃD
-            // Åý¤å¦r¸m¤¤µy·L³Â·Ð¤@ÂI¡A³o¸ÌÂ²³æ¸m¤¤
+            // 1. ï¿½ï¿½ï¿½D
+            // ï¿½ï¿½ï¿½ï¿½rï¿½mï¿½ï¿½ï¿½yï¿½Lï¿½Â·Ð¤@ï¿½Iï¿½Aï¿½oï¿½ï¿½Â²ï¿½ï¿½mï¿½ï¿½
             float fontSize = 3.0f;
             ImGui::SetWindowFontScale(fontSize);
 
@@ -47,38 +47,38 @@ public:
             ImGui::SetCursorPosY(windowHeight * 0.2f);
             ImGui::Text("%s", title.c_str());
 
-            // 2. Ã¸»s 8 ­Ó¶ê°é
-            ImGui::SetWindowFontScale(1.5f); // ÁY¤p¤@ÂI¦rÅéµ¹¦W¦r¥Î
+            // 2. Ã¸ï¿½s 8 ï¿½Ó¶ï¿½ï¿½
+            ImGui::SetWindowFontScale(1.5f); // ï¿½Yï¿½pï¿½@ï¿½Iï¿½rï¿½éµ¹ï¿½Wï¿½rï¿½ï¿½
 
             float startY = windowHeight * 0.4f;
             float circleRadius = 40.0f;
             float spacing = 110.0f;
-            float startX = (windowWidth - (8 * spacing)) * 0.5f + (spacing * 0.5f);
+            float startX = (windowWidth - (kLobbySlotCount * spacing)) * 0.5f + (spacing * 0.5f);
 
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < kLobbySlotCount; i++) {
                 float x = startX + (i * spacing);
                 float y = startY;
 
-                // ¨M©wÃC¦â
-                ImU32 color = IM_COL32(100, 100, 100, 255); // ¦Ç¦â (ªÅ)
+                // ï¿½Mï¿½wï¿½Cï¿½ï¿½
+                ImU32 color = IM_COL32(100, 100, 100, 255); // ï¿½Ç¦ï¿½ (ï¿½ï¿½)
                 if (slots[i].playerID != -1) {
-                    if (slots[i].teamID == 1) color = IM_COL32(255, 50, 50, 255); // ¬õ
-                    if (slots[i].teamID == 2) color = IM_COL32(50, 255, 50, 255); // ºñ
+                    if (slots[i].teamID == 1) color = IM_COL32(255, 50, 50, 255); // ï¿½ï¿½
+                    if (slots[i].teamID == 2) color = IM_COL32(50, 255, 50, 255); // ï¿½ï¿½
                 }
 
-                // µe¶ê
+                // ï¿½eï¿½ï¿½
                 draw_list->AddCircleFilled(ImVec2(x, y), circleRadius, color);
 
-                // µe¦W¦r (Player 1~8)
+                // ï¿½eï¿½Wï¿½r (Player 1~8)
                 std::string name = "P" + std::to_string(i + 1);
                 float nameW = ImGui::CalcTextSize(name.c_str()).x;
                 ImGui::SetCursorPos(ImVec2(x - nameW * 0.5f, y + circleRadius + 10));
                 ImGui::Text("%s", name.c_str());
             }
 
-            // 3. Start «ö¶s (¥u¦³ Server ¬Ý±o¨ì)
+            // 3. Start ï¿½ï¿½ï¿½s (ï¿½uï¿½ï¿½ Server ï¿½Ý±oï¿½ï¿½)
             if (NetworkManager::Instance().IsServer()) {
                 ImGui::SetWindowFontScale(2.0f);
                 std::string btnText = "START GAME";
@@ -88,12 +88,12 @@ public:
                 ImGui::SetCursorPos(ImVec2((windowWidth - btnW) * 0.5f, windowHeight * 0.7f));
 
                 if (ImGui::Button(btnText.c_str(), ImVec2(btnW, btnH))) {
-                    // Server «ö¤U¶}©l
+                    // Server ï¿½ï¿½ï¿½Uï¿½}ï¿½l
                     StartGame();
                 }
             }
             else {
-                // Client Åã¥Ü "Waiting for host..."
+                // Client ï¿½ï¿½ï¿½ "Waiting for host..."
                 ImGui::SetWindowFontScale(1.5f);
                 std::string waitText = "Waiting for host to start...";
                 float waitW = ImGui::CalcTextSize(waitText.c_str()).x;
@@ -106,12 +106,12 @@ public:
 
 private:
     void StartGame() {
-        // µo°e¶}©l«Ê¥]µ¹©Ò¦³¤H
+        // ï¿½oï¿½eï¿½}ï¿½lï¿½Ê¥]ï¿½ï¿½ï¿½Ò¦ï¿½ï¿½H
         PacketGameStart pkt;
         pkt.header.type = PacketType::S2C_GAME_START;
         NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true); // Reliable
 
-        // Server ¦Û¤v¤]¤Á´«ª¬ºA (³z¹L flag)
+        // Server ï¿½Û¤vï¿½]ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½A (ï¿½zï¿½L flag)
         isGameStarted = true;
     }
 };

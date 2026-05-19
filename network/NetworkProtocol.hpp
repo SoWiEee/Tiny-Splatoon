@@ -2,91 +2,93 @@
 #include <glm/glm.hpp>
 #include <cstdint>
 
-// ¬°¤F½T«O¤£¦P¹q¸£/½sÄ¶¾¹¤§¶¡ªº°O¾ÐÅé¹ï»ô¤@­P¡A§Ú­Ì±j¨î 1 byte ¹ï»ô
+// ï¿½ï¿½ï¿½Fï¿½Tï¿½Oï¿½ï¿½ï¿½Pï¿½qï¿½ï¿½/ï¿½sÄ¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½@ï¿½Pï¿½Aï¿½Ú­Ì±jï¿½ï¿½ 1 byte ï¿½ï¿½ï¿½
 #pragma pack(push, 1)
 
-// «Ê¥]Ãþ«¬ ID
+inline constexpr int kLobbySlotCount = 6;
+
+// ï¿½Ê¥]ï¿½ï¿½ï¿½ï¿½ ID
 enum class PacketType : uint8_t {
-    // --- ³s½uºÞ²z ---
-    C2S_JOIN_REQUEST,    // Client -> Server: §Ú·Q¥[¤J
-    S2C_JOIN_ACCEPT,     // Server -> Client: Åwªï¡A§Aªº ID ¬O³o­Ó
+    // --- ï¿½sï¿½uï¿½Þ²z ---
+    C2S_JOIN_REQUEST,    // Client -> Server: ï¿½Ú·Qï¿½[ï¿½J
+    S2C_JOIN_ACCEPT,     // Server -> Client: ï¿½wï¿½ï¿½Aï¿½Aï¿½ï¿½ ID ï¿½Oï¿½oï¿½ï¿½
 
-    // --- ¹CÀ¸¦P¨B ---
-    C2S_PLAYER_STATE,    // Client -> Server: §Ú²¾°Ê¨ì¤F­þ¸Ì
-    S2C_WORLD_STATE,     // Server -> Client: ©Ò¦³¤Hªº¦ì¸m¦b³o¸Ì
-	S2C_GAME_STATE,      // Server -> Client: ¹CÀ¸ª¬ºA§ó·s (¤ñ¤À)
+    // --- ï¿½Cï¿½ï¿½ï¿½Pï¿½B ---
+    C2S_PLAYER_STATE,    // Client -> Server: ï¿½Ú²ï¿½ï¿½Ê¨ï¿½Fï¿½ï¿½ï¿½ï¿½
+    S2C_WORLD_STATE,     // Server -> Client: ï¿½Ò¦ï¿½ï¿½Hï¿½ï¿½ï¿½ï¿½mï¿½bï¿½oï¿½ï¿½
+	S2C_GAME_STATE,      // Server -> Client: ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½Aï¿½ï¿½s (ï¿½ï¿½ï¿½)
 
-    // --- ¹CÀ¸¨Æ¥ó ---
-    C2S_LOBBY_CHANGE_WEAPON, // Client ³qª¾ Server §Ú´«ªZ¾¹¤F
-    C2S_SHOOT,           // Client -> Server: §Ú¶}ºj¤F
-    S2C_SHOOT_EVENT,     // Server -> Client: ¬Y¤H¶}ºj¤F (¤j®a¥Í¦¨¤l¼u)
-    C2S_THROW_BOMB,      // Client -> Server: §Ú¥á¬µ¼u¤F
-    S2C_SPAWN_BOMB,      // Server -> All: ¦³¤H¥á¬µ¼u¤F¡A½Ð¦b§A­Ìªº¥@¬É¥Í¦¨
-    S2C_SPLAT_UPDATE,    // Server -> Client: ¦aªO³o¸ÌÅ¼¤F (¤j®aµe¹Ï)
-    S2C_LOBBY_UPDATE,    // Server -> Client: §ó·s¤jÆU 8 ­Ó®æ¤lªºª¬ºA
-    S2C_GAME_START,      // Server -> Client: ¹CÀ¸¶}©l¡I
-    S2C_KILL_EVENT,      // À»±þ³qª¾
-    C2S_SPECIAL_ATTACK,  // Client -> Server: §Ú­n¶}¤j
-    S2C_SPECIAL_ATTACK   // Server -> Clients: ¦³¤H¶}¤j
+    // --- ï¿½Cï¿½ï¿½ï¿½Æ¥ï¿½ ---
+    C2S_LOBBY_CHANGE_WEAPON, // Client ï¿½qï¿½ï¿½ Server ï¿½Ú´ï¿½ï¿½Zï¿½ï¿½ï¿½F
+    C2S_SHOOT,           // Client -> Server: ï¿½Ú¶}ï¿½jï¿½F
+    S2C_SHOOT_EVENT,     // Server -> Client: ï¿½Yï¿½Hï¿½}ï¿½jï¿½F (ï¿½jï¿½aï¿½Í¦ï¿½ï¿½lï¿½u)
+    C2S_THROW_BOMB,      // Client -> Server: ï¿½Ú¥á¬µï¿½uï¿½F
+    S2C_SPAWN_BOMB,      // Server -> All: ï¿½ï¿½ï¿½Hï¿½á¬µï¿½uï¿½Fï¿½Aï¿½Ð¦bï¿½Aï¿½Ìªï¿½ï¿½@ï¿½É¥Í¦ï¿½
+    S2C_SPLAT_UPDATE,    // Server -> Client: ï¿½aï¿½Oï¿½oï¿½ï¿½Å¼ï¿½F (ï¿½jï¿½aï¿½eï¿½ï¿½)
+    S2C_LOBBY_UPDATE,    // Server -> Client: ï¿½ï¿½sï¿½jï¿½U 8 ï¿½Ó®ï¿½lï¿½ï¿½ï¿½ï¿½ï¿½A
+    S2C_GAME_START,      // Server -> Client: ï¿½Cï¿½ï¿½ï¿½}ï¿½lï¿½I
+    S2C_KILL_EVENT,      // ï¿½ï¿½ï¿½ï¿½ï¿½qï¿½ï¿½
+    C2S_SPECIAL_ATTACK,  // Client -> Server: ï¿½Ú­nï¿½}ï¿½j
+    S2C_SPECIAL_ATTACK   // Server -> Clients: ï¿½ï¿½ï¿½Hï¿½}ï¿½j
 };
 
-// ©Ò¦³«Ê¥]ªº¦@³q¼ÐÀY
+// ï¿½Ò¦ï¿½ï¿½Ê¥]ï¿½ï¿½ï¿½@ï¿½qï¿½ï¿½ï¿½Y
 struct PacketHeader {
     PacketType type;
 };
 
-// ªZ¾¹Ãþ«¬©w¸q
+// ï¿½Zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½wï¿½q
 enum class WeaponType : uint8_t {
     SHOOTER = 0,
     BRUSH   = 1,
     SLOSHER = 2
 };
 
-// ´«ªZ¾¹½Ð¨D«Ê¥]
+// ï¿½ï¿½ï¿½Zï¿½ï¿½ï¿½Ð¨Dï¿½Ê¥]
 struct PacketLobbyChangeWeapon {
     PacketHeader header;
     int playerID;
     WeaponType newWeapon;
 };
 
-// ¤jÆU³æ­Ó®æ¤lªº¸ê°T
+// ï¿½jï¿½Uï¿½ï¿½Ó®ï¿½lï¿½ï¿½ï¿½ï¿½T
 struct LobbySlotInfo {
-    int playerID;   // -1 ¥Nªí¨S¤H
-    int teamID;     // 1=¬õ, 2=ºñ
-    bool isReady;   // (¥i¿ï)
+    int playerID;   // -1 ï¿½Nï¿½ï¿½ï¿½Sï¿½H
+    int teamID;     // 1=ï¿½ï¿½, 2=ï¿½ï¿½
+    bool isReady;   // (ï¿½iï¿½ï¿½)
     WeaponType weaponType;
 };
 
-// ¤jÆUª¬ºA«Ê¥]
+// ï¿½jï¿½Uï¿½ï¿½ï¿½Aï¿½Ê¥]
 struct PacketLobbyState {
     PacketHeader header;
-    LobbySlotInfo slots[6]; // ©T©w 6 ­Ó¦ì¸m
+    LobbySlotInfo slots[kLobbySlotCount];
 };
 
-// ¶}©l¹CÀ¸«Ê¥]
+// ï¿½}ï¿½lï¿½Cï¿½ï¿½ï¿½Ê¥]
 struct PacketGameStart {
     PacketHeader header;
 };
 
-// 1. ¥[¤J½Ð¨D
+// 1. ï¿½[ï¿½Jï¿½Ð¨D
 struct PacketJoinRequest {
     PacketHeader header;
-    // ¥i¥H¥[ char name[32];
+    // ï¿½iï¿½Hï¿½[ char name[32];
 };
 
-// 2. ¥[¤J³\¥i
+// 2. ï¿½[ï¿½Jï¿½\ï¿½i
 struct PacketJoinAccept {
     PacketHeader header;
-    int yourPlayerID;   // Server ¤À°tµ¹§Aªº ID
+    int yourPlayerID;   // Server ï¿½ï¿½ï¿½tï¿½ï¿½ï¿½Aï¿½ï¿½ ID
     int yourTeamID;     // 1=Red, 2=Green
 };
 
-// 3. ª±®aª¬ºA (¦ì¸m¦P¨B)
+// 3. ï¿½ï¿½ï¿½aï¿½ï¿½ï¿½A (ï¿½ï¿½mï¿½Pï¿½B)
 struct PacketPlayerState {
     PacketHeader header;
-    int playerID;       // ½Öªºª¬ºA
+    int playerID;       // ï¿½Öªï¿½ï¿½ï¿½ï¿½A
     glm::vec3 position;
-    glm::vec3 velocity; // ¥Î©ó¹w´ú´¡­È
+    glm::vec3 velocity; // ï¿½Î©ï¿½wï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     float rotationY;
     bool isSwimming;
     bool isDead;
@@ -99,7 +101,7 @@ enum class ProjectileType : uint8_t {
     ROCKET = 2
 };
 
-// 4. ®gÀ»½Ð¨D
+// 4. ï¿½gï¿½ï¿½ï¿½Ð¨D
 struct PacketShoot {
     PacketHeader header;
     int playerID;
@@ -112,7 +114,7 @@ struct PacketShoot {
     ProjectileType type = ProjectileType::BULLET;
 };
 
-// 5. ¶î¦a¦P¨B
+// 5. ï¿½ï¿½aï¿½Pï¿½B
 struct PacketSplatUpdate {
     PacketHeader header;
     float u;
@@ -123,13 +125,13 @@ struct PacketSplatUpdate {
 
 struct PacketSpecialLaser {
     PacketHeader header;
-    int playerID;       // ½Ö®gªº (attackerID)
-    int teamID;         // ¶¤¥îÃC¦â
-    glm::vec3 origin;   // µo®g¦ì¸m
-    glm::vec3 direction;// µo®g¤è¦V
+    int playerID;       // ï¿½Ö®gï¿½ï¿½ (attackerID)
+    int teamID;         // ï¿½ï¿½ï¿½ï¿½ï¿½Cï¿½ï¿½
+    glm::vec3 origin;   // ï¿½oï¿½gï¿½ï¿½m
+    glm::vec3 direction;// ï¿½oï¿½gï¿½ï¿½V
 };
 
-// ¤j©Û§ðÀ»«Ê¥]
+// ï¿½jï¿½Û§ï¿½ï¿½ï¿½ï¿½Ê¥]
 struct PacketSpecialAttack {
     PacketHeader header;
     int playerID;
@@ -137,20 +139,20 @@ struct PacketSpecialAttack {
     glm::vec3 position;
 };
 
-// ¤À¼Æ»P¹CÀ¸ª¬ºA«Ê¥]
+// ï¿½ï¿½ï¿½Æ»Pï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½Aï¿½Ê¥]
 struct PacketGameState {
     PacketHeader header;
-    float scoreTeam1;   // ¬õ¶¤¤À¼Æ
-    float scoreTeam2;   // ºñ¶¤¤À¼Æ
-    float timeRemaining; // ³Ñ¾l®É¶¡ (¬í)
+    float scoreTeam1;   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    float scoreTeam2;   // ï¿½ñ¶¤¤ï¿½ï¿½ï¿½
+    float timeRemaining; // ï¿½Ñ¾lï¿½É¶ï¿½ (ï¿½ï¿½)
 };
 
 struct PacketKillEvent {
     PacketHeader header;
-    int killerID; // ¥û¤â ID
-    int victimID; // ¦ºªÌ ID
-    int killerTeam; // ¥û¤â¶¤¥î (¥Î¨ÓÅã¥ÜÃC¦â)
-    int victimTeam; // ¦ºªÌ¶¤¥î
+    int killerID; // ï¿½ï¿½ï¿½ï¿½ ID
+    int victimID; // ï¿½ï¿½ï¿½ï¿½ ID
+    int killerTeam; // ï¿½ï¿½ï¿½â¶¤ï¿½ï¿½ (ï¿½Î¨ï¿½ï¿½ï¿½ï¿½ï¿½Cï¿½ï¿½)
+    int victimTeam; // ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½ï¿½
 };
 
 #pragma pack(pop)

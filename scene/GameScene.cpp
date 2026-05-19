@@ -41,8 +41,8 @@ void GameScene::OnExit() {
 
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-    // Â÷¶}¹CÀ¸³õ´º®É¡AÂ_¶}ºô¸ô³s½u¬O¤@­Ó¦n²ßºD
-    // ³o¼Ë¦^¨ì LoginScene ¤~¯à­«·s³s½u©Î·í Host
+    // ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¡Aï¿½_ï¿½}ï¿½ï¿½ï¿½ï¿½ï¿½sï¿½uï¿½Oï¿½@ï¿½Ó¦nï¿½ßºD
+    // ï¿½oï¿½Ë¦^ï¿½ï¿½ LoginScene ï¿½~ï¿½à­«ï¿½sï¿½sï¿½uï¿½Î·ï¿½ Host
     if (NetworkManager::Instance().IsConnected()) {
         NetworkManager::Instance().Disconnect();
     }
@@ -61,7 +61,7 @@ void GameScene::Update(float dt) {
 
     if (world->state == WorldState::FINISHED && world->finishTimer <= 0.0f) {
         std::cout << "Return to Lobby..." << std::endl;
-        SceneManager::Instance().SwitchTo(std::make_unique<LoginScene>());
+        SceneManager::Instance().SwitchTo(std::make_unique<LoginScene>(gui));
         return;
     }
 
@@ -101,7 +101,7 @@ void GameScene::Update(float dt) {
     else if (world->state == WorldState::FINISHED) {
         // Top-Down view
         if (cameraObj) {
-            // ¥Ø¼Ð¦ì¸m¡G¦a¹Ï¤¤¤ß°ªªÅ
+            // ï¿½Ø¼Ð¦ï¿½mï¿½Gï¿½aï¿½Ï¤ï¿½ï¿½ß°ï¿½ï¿½ï¿½
             glm::vec3 targetPos = glm::vec3(0, 40.0f, 0);
             glm::vec3 currentPos = cameraObj->transform->position;
 
@@ -151,7 +151,7 @@ void GameScene::DrawUI() {
             hud->DrawOverlay(hpPercent, spPercent);
         }
 
-        // ¦¬¶°©Ò¦³ª±®aª¬ºA
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ò¦ï¿½ï¿½ï¿½ï¿½aï¿½ï¿½ï¿½A
         std::vector<UIPlayerStatus> playerStatuses;
 
         if (world->localPlayer) {
@@ -175,11 +175,11 @@ void GameScene::DrawUI() {
                 world->enemyAI->teamID,
                 isDead,
                 false,
-                false // AI ¼ÈµL¤j©Û
+                false // AI ï¿½ÈµLï¿½jï¿½ï¿½
                 });
         }
 
-        // »·ºÝª±®a
+        // ï¿½ï¿½ï¿½Ýªï¿½ï¿½a
         for (auto& pair : world->remotePlayers) {
             int id = pair.first;
             RemotePlayer* rp = pair.second.get();
