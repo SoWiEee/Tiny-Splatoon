@@ -232,25 +232,32 @@ void NetworkManager::Update() {
     }
 
     for (auto conn : connectionsToCheck) {
-        ISteamNetworkingMessage* pIncomingMsg = nullptr;
-        int numMsgs = m_pInterface->ReceiveMessagesOnConnection(conn, &pIncomingMsg, 1);
+        ISteamNetworkingMessage* incomingMsgs[32] = {};
+        int numMsgs = 0;
 
-        if (numMsgs > 0) {
-            // �B�z�o�h�T��
-            if (pIncomingMsg->GetSize() >= sizeof(PacketHeader)) {
-                ReceivedPacket pkt;
-                PacketHeader* header = (PacketHeader*)pIncomingMsg->GetData();
-                pkt.type = header->type;
-                pkt.fromConnection = conn;
+        do {
+            numMsgs = m_pInterface->ReceiveMessagesOnConnection(conn, incomingMsgs, 32);
 
-                pkt.data.resize(pIncomingMsg->GetSize());
-                memcpy(pkt.data.data(), pIncomingMsg->GetData(), pIncomingMsg->GetSize());
+            for (int i = 0; i < numMsgs; ++i) {
+                ISteamNetworkingMessage* pIncomingMsg = incomingMsgs[i];
 
-                m_PacketQueue.push(pkt);
+                // �B�z�o�h�T��
+                if (pIncomingMsg->GetSize() >= sizeof(PacketHeader)) {
+                    ReceivedPacket pkt;
+                    PacketHeader* header = (PacketHeader*)pIncomingMsg->GetData();
+                    pkt.type = header->type;
+                    pkt.fromConnection = conn;
+
+                    pkt.data.resize(pIncomingMsg->GetSize());
+                    memcpy(pkt.data.data(), pIncomingMsg->GetData(), pIncomingMsg->GetSize());
+
+                    m_PacketQueue.push(pkt);
+                }
+
+                // ���� GNS ���T���O����
+                pIncomingMsg->Release();
             }
-            // ���� GNS ���T���O����
-            pIncomingMsg->Release();
-        }
+        } while (numMsgs > 0);
     }
 }
 

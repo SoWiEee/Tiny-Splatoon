@@ -6,6 +6,7 @@
 #pragma pack(push, 1)
 
 inline constexpr int kLobbySlotCount = 6;
+inline constexpr float kMatchDurationSeconds = 180.0f;
 
 // �ʥ]���� ID
 enum class PacketType : uint8_t {

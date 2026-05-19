@@ -16,6 +16,14 @@ struct ReceivedPacket {
     HSteamNetConnection fromConnection; // connection handle
 };
 
+template <typename T>
+const T* TryGetPacket(const ReceivedPacket& packet) {
+    if (packet.data.size() < sizeof(T)) {
+        return nullptr;
+    }
+    return reinterpret_cast<const T*>(packet.data.data());
+}
+
 class NetworkManager {
 public:
     static NetworkManager& Instance();

@@ -95,7 +95,9 @@ public:
     void OnPacket(const ReceivedPacket& pkt) override {
         // Client: �����j�U��s
         if (pkt.type == PacketType::S2C_LOBBY_UPDATE) {
-            gui->UpdateLobbyState(*(PacketLobbyState*)pkt.data.data());
+            if (const auto* lobbyState = TryGetPacket<PacketLobbyState>(pkt)) {
+                gui->UpdateLobbyState(*lobbyState);
+            }
         }
         // Client: �����}�l�C���T��
         else if (pkt.type == PacketType::S2C_GAME_START) {
@@ -104,16 +106,18 @@ public:
         }
         // Client: �����w��T�� (�]�w ID)
         else if (pkt.type == PacketType::S2C_JOIN_ACCEPT) {
-            auto* p = (PacketJoinAccept*)pkt.data.data();
-            NetworkManager::Instance().SetMyPlayerID(p->yourPlayerID);
-            NetworkManager::Instance().SetMyTeamID(p->yourTeamID);
-            std::cout << ">> Lobby Joined! ID: " << p->yourPlayerID << std::endl;
+            if (const auto* joinAccept = TryGetPacket<PacketJoinAccept>(pkt)) {
+                NetworkManager::Instance().SetMyPlayerID(joinAccept->yourPlayerID);
+                NetworkManager::Instance().SetMyTeamID(joinAccept->yourTeamID);
+                std::cout << ">> Lobby Joined! ID: " << joinAccept->yourPlayerID << std::endl;
+            }
         }
         // Server �B�z���Z���ШD
         if (isServer && pkt.type == PacketType::C2S_LOBBY_CHANGE_WEAPON) {
-            auto* p = (PacketLobbyChangeWeapon*)pkt.data.data();
-            NetworkManager::Instance().playerWeaponMap[p->playerID] = p->newWeapon;
-            std::cout << "[Lobby] Player " << p->playerID << " changed weapon to " << (int)p->newWeapon << std::endl;
+            if (const auto* weaponChange = TryGetPacket<PacketLobbyChangeWeapon>(pkt)) {
+                NetworkManager::Instance().playerWeaponMap[weaponChange->playerID] = weaponChange->newWeapon;
+                std::cout << "[Lobby] Player " << weaponChange->playerID << " changed weapon to " << (int)weaponChange->newWeapon << std::endl;
+            }
         }
     }
 };

@@ -71,7 +71,7 @@ public:
     std::pair<float, float> CalculatePercentages() {
         int count1 = 0;
         int count2 = 0;
-        int totalPixels = width * height;
+        const int totalCells = GRID_SIZE * GRID_SIZE;
 
         for (int i = 0; i < GRID_SIZE; i++) {
             for (int j = 0; j < GRID_SIZE; j++) {
@@ -80,9 +80,9 @@ public:
             }
         }
 
-        if (totalPixels == 0) return { 0.0f, 0.0f };
+        if (totalCells == 0) return { 0.0f, 0.0f };
 
-        return { (float)count1 / totalPixels, (float)count2 / totalPixels };
+        return { (float)count1 / totalCells, (float)count2 / totalCells };
     }
 
 private:

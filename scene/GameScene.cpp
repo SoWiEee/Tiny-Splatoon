@@ -205,7 +205,7 @@ void GameScene::DrawUI() {
     }
     else if (world->state == WorldState::FINISHED) {
         scoreboard->SetShowScoreBar(true);
-        float animTime = 5.0f - world->finishTimer;
+        float animTime = GameWorld::kMatchFinishDelaySeconds - world->finishTimer;
 
         int myTeam = 1;
         if (world->localPlayer) myTeam = world->localPlayer->teamID;

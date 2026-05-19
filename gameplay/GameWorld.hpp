@@ -33,7 +33,13 @@ enum class WorldState {
 
 class GameWorld {
 public:
-    // --- ¨t²Îª«¥ó ---
+    static constexpr float kItemRespawnIntervalSeconds = 5.0f;
+    static constexpr float kPlayerSyncIntervalSeconds = 0.05f;
+    static constexpr float kScoreSyncIntervalSeconds = 0.5f;
+    static constexpr float kMatchFinishDelaySeconds = 5.0f;
+    static constexpr float kEntityHitRadius = 0.5f;
+
+    // --- ç³»çµ±ç‰©ä»¶ ---
     std::unique_ptr<Level> level;
     std::unique_ptr<SplatMap> mapFloor;
     std::unique_ptr<SplatMap> mapObstacle;
@@ -42,11 +48,12 @@ public:
     Scoreboard* scoreboardRef = nullptr;
     HUD* hudRef = nullptr;
 
-    // --- ¹êÅéª«¥ó ---
+    // --- å¯¦é«”ç‰©ä»¶ ---
     std::unique_ptr<Player> localPlayer;
     std::unique_ptr<Enemy> enemyAI;
     std::vector<std::unique_ptr<Projectile>> projectiles;
     std::vector<std::unique_ptr<Item>> items;
+    std::vector<Entity*> frameCollisionTargets;
 
     std::vector<std::unique_ptr<GameObject>> visualEntities;
     std::shared_ptr<Mesh> meshRedTeam;
@@ -55,22 +62,22 @@ public:
     std::shared_ptr<Texture> texGreenTeam;
     
     float itemRespawnTimer = 0.0f;
-    // »·ºİª±®a¦Cªí
+    // é ç«¯ç©å®¶åˆ—è¡¨
     std::map<int, std::unique_ptr<RemotePlayer>> remotePlayers;
 
 
-    // ¦P¨B­p®É¾¹
+    // åŒæ­¥è¨ˆæ™‚å™¨
     float syncTimer = 0.0f;
 
-    // ¹CÀ¸ª¬ºAÅÜ¼Æ
+    // éŠæˆ²ç‹€æ…‹è®Šæ•¸
     WorldState state = WorldState::PLAYING;
-    float gameTimeRemaining = 180.0f; // 3 ¤ÀÄÁ
-    float finishTimer = 0.0f;         // µ²§ô«áªº 5 ¬í­Ë¼Æ
+    float gameTimeRemaining = kMatchDurationSeconds; // 3 åˆ†é˜
+    float finishTimer = 0.0f;         // çµæŸå¾Œçš„ 5 ç§’å€’æ•¸
 
-    // ³Ì²×µ²ªG½w¦s
+    // æœ€çµ‚çµæœç·©å­˜
     float finalScoreTeam1 = 0.0f;
     float finalScoreTeam2 = 0.0f;
-    int winningTeam = 0; // 0=¥­¤â, 1=¬õ, 2=ºñ
+    int winningTeam = 0; // 0=å¹³æ‰‹, 1=ç´…, 2=ç¶ 
 
     void Init(GameObject* mainCamera, HUD* hud, Scoreboard* scoreboard) {
         level = std::make_unique<Level>();
@@ -90,7 +97,7 @@ public:
         if (!NetworkManager::Instance().IsConnected()) {
             myTeam = 1;
         }
-        // Server ±j¨î³]©w
+        // Server å¼·åˆ¶è¨­å®š
         if (NetworkManager::Instance().IsServer()) {
             NetworkManager::Instance().SetMyPlayerID(0);
             NetworkManager::Instance().SetMyTeamID(1);
@@ -105,21 +112,21 @@ public:
 
         switch (myWeaponType) {
         case WeaponType::SHOOTER:
-            localPlayer->weapon = new ShooterWeapon(myTeam, teamColor);
+            localPlayer->EquipWeapon(std::make_unique<ShooterWeapon>(myTeam, teamColor));
             break;
         case WeaponType::BRUSH:
-            localPlayer->weapon = new BrushWeapon(myTeam, teamColor);
+            localPlayer->EquipWeapon(std::make_unique<BrushWeapon>(myTeam, teamColor));
             break;
         case WeaponType::SLOSHER:
-            localPlayer->weapon = new SlosherWeapon(myTeam, teamColor);
+            localPlayer->EquipWeapon(std::make_unique<SlosherWeapon>(myTeam, teamColor));
             break;
         default:
-            localPlayer->weapon = new ShooterWeapon(myTeam, teamColor);
+            localPlayer->EquipWeapon(std::make_unique<ShooterWeapon>(myTeam, teamColor));
             break;
         }
 
         // ==========================================================
-        // 4. ¹w¥ı¸ü¤J¸ê·½ (Pre-load Assets)
+        // 4. é å…ˆè¼‰å…¥è³‡æº (Pre-load Assets)
         // ==========================================================
 
         // --- Red Team Resources ---
@@ -132,30 +139,30 @@ public:
         texGreenTeam = std::make_shared<Texture>();
         texGreenTeam->Load("assets/textures/texture-f.png");
 
-        // ¨¾§b¡G¦pªG¸ü¤J¥¢±Ñ¡A¤¬¬Û«ü¬£¡AÁ×§KªÅ«ü¼Ğ crash
+        // é˜²å‘†ï¼šå¦‚æœè¼‰å…¥å¤±æ•—ï¼Œäº’ç›¸æŒ‡æ´¾ï¼Œé¿å…ç©ºæŒ‡æ¨™ crash
         if (!meshRedTeam) meshRedTeam = MeshFactory::GetCube();
         if (!meshGreenTeam) meshGreenTeam = meshRedTeam;
 
-        // [ÃöÁä­×¥¿] ®Ú¾Ú§Úªº¶¤¥î¡A¿ï¾Ü­n¨Ï¥Îªº¸ê·½
+        // [é—œéµä¿®æ­£] æ ¹æ“šæˆ‘çš„éšŠä¼ï¼Œé¸æ“‡è¦ä½¿ç”¨çš„è³‡æº
         std::shared_ptr<Mesh> myMesh = (myTeam == 1) ? meshRedTeam : meshGreenTeam;
         std::shared_ptr<Texture> myTex = (myTeam == 1) ? texRedTeam : texGreenTeam;
 
 
         // ==========================================================
-        // 5. «Ø¥ß [¤H«¬ºA] µøÄ± (Human Visual)
+        // 5. å»ºç«‹ [äººå‹æ…‹] è¦–è¦º (Human Visual)
         // ==========================================================
         auto humanObj = std::make_unique<GameObject>("Visual_Human");
-        humanObj->SetParent(localPlayer.get()); // ¸j©w¨ì Player
+        humanObj->SetParent(localPlayer.get()); // ç¶å®šåˆ° Player
 
         if (myMesh) {
-            // ¨Ï¥Î¥Õ¦â (1.0f) ¤~¯àÅã¥Ü¶K¹Ï­ì¦â
+            // ä½¿ç”¨ç™½è‰² (1.0f) æ‰èƒ½é¡¯ç¤ºè²¼åœ–åŸè‰²
             auto mr = humanObj->AddComponent<MeshRenderer>(myMesh, glm::vec3(1.0f));
 
             if (myTex) {
                 mr->SetTexture(myTex);
             }
             else {
-                // ¦pªG¨S¶K¹Ï¡A´N¥Î¶¤¥îÃC¦â³»´À
+                // å¦‚æœæ²’è²¼åœ–ï¼Œå°±ç”¨éšŠä¼é¡è‰²é ‚æ›¿
                 mr->SetColor(teamColor);
             }
 
@@ -169,35 +176,35 @@ public:
         }
 
         // ==========================================================
-        // 6. «Ø¥ß [¾{³½«¬ºA] µøÄ± (Squid Visual)
+        // 6. å»ºç«‹ [é­·é­šå‹æ…‹] è¦–è¦º (Squid Visual)
         // ==========================================================
         auto squidObj = std::make_unique<GameObject>("Visual_Squid");
         squidObj->SetParent(localPlayer.get());
-        squidObj->active = false; // ¹w³]ÁôÂÃ
+        squidObj->active = false; // é è¨­éš±è—
 
-        // ¼È®É¥Î«ó¤è¶ô¥N´À¾{³½
+        // æš«æ™‚ç”¨æ‰æ–¹å¡Šä»£æ›¿é­·é­š
         squidObj->AddComponent<MeshRenderer>("Cube", teamColor);
-        squidObj->transform->scale = glm::vec3(0.4f, 0.2f, 0.6f); // «óªø«¬
-        squidObj->transform->position = glm::vec3(0, -0.8f, 0);   // ¶K¦a
+        squidObj->transform->scale = glm::vec3(0.4f, 0.2f, 0.6f); // æ‰é•·å‹
+        squidObj->transform->position = glm::vec3(0, -0.8f, 0);   // è²¼åœ°
 
         // ==========================================================
-        // 7. [·s¼W] «Ø¥ß¼v¤l (Shadow) - ¤§«e²¾°£«Øºc¤l«á­n¸É¦^¨Ó
+        // 7. [æ–°å¢] å»ºç«‹å½±å­ (Shadow) - ä¹‹å‰ç§»é™¤å»ºæ§‹å­å¾Œè¦è£œå›ä¾†
         // ==========================================================
         auto shadowObj = std::make_unique<GameObject>("Shadow");
         shadowObj->SetParent(localPlayer.get());
         shadowObj->AddComponent<MeshRenderer>("Plane", glm::vec3(0, 0, 0));
-        shadowObj->transform->position = glm::vec3(0, 0.05f, 0); // µy·L¯B°_
+        shadowObj->transform->position = glm::vec3(0, 0.05f, 0); // ç¨å¾®æµ®èµ·
         shadowObj->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f);
 
 
         // ==========================================================
-        // 8. ¸j©w»Pµù¥U
+        // 8. ç¶å®šèˆ‡è¨»å†Š
         // ==========================================================
 
-        // §i¶D Player µøÄ±ª«¥ó¦b­ş (¥Î©óÅÜ¨­¤Á´«)
+        // å‘Šè¨´ Player è¦–è¦ºç‰©ä»¶åœ¨å“ª (ç”¨æ–¼è®Šèº«åˆ‡æ›)
         localPlayer->SetupVisuals(humanObj.get(), squidObj.get());
 
-        // ¥[¤J World ºŞ²z¦Cªí (´è¬V¥Î)
+        // åŠ å…¥ World ç®¡ç†åˆ—è¡¨ (æ¸²æŸ“ç”¨)
         visualEntities.push_back(std::move(humanObj));
         visualEntities.push_back(std::move(squidObj));
         visualEntities.push_back(std::move(shadowObj));
@@ -214,24 +221,24 @@ public:
         }*/
     }
 
-    // ²Î¤@§ë®gª«¥Í¦¨¨ç¼Æ (Rocket / Bomb / Normal)
+    // çµ±ä¸€æŠ•å°„ç‰©ç”Ÿæˆå‡½æ•¸ (Rocket / Bomb / Normal)
     void CreateProjectile(int ownerID, int teamID, glm::vec3 startPos, glm::vec3 dir, ProjectileType type) {
         float speed = 25.0f;
         float scale = 0.3f;
         glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
 
-        // ®Ú¾ÚÃş«¬½Õ¾ã°Ñ¼Æ
+        // æ ¹æ“šé¡å‹èª¿æ•´åƒæ•¸
         if (type == ProjectileType::ROCKET) {
-            speed = 35.0f; // ¤õ½b«Ü§Ö
-            scale = 0.8f;  // ¤õ½b¸û¤j
+            speed = 35.0f; // ç«ç®­å¾ˆå¿«
+            scale = 0.8f;  // ç«ç®­è¼ƒå¤§
         }
         else if (type == ProjectileType::BOMB) {
-            speed = 10.0f; // ¬µ¼u©ßª«½u
+            speed = 10.0f; // ç‚¸å½ˆæ‹‹ç‰©ç·š
         }
 
         glm::vec3 velocity = dir * speed;
 
-        // ¦pªG¤£¬O¤õ½b¤]¤£¬O¬µ¼u¡A¤@¯ë¤l¼u·|¥[¤@ÂI¤W©ß
+        // å¦‚æœä¸æ˜¯ç«ç®­ä¹Ÿä¸æ˜¯ç‚¸å½ˆï¼Œä¸€èˆ¬å­å½ˆæœƒåŠ ä¸€é»ä¸Šæ‹‹
         if (type != ProjectileType::ROCKET && type != ProjectileType::BOMB) {
             velocity.y += 2.0f;
         }
@@ -241,7 +248,7 @@ public:
         projectiles.push_back(std::move(proj));
     }
 
-    // µo°e®gÀ»«Ê¥]»²§U¨ç¼Æ
+    // ç™¼é€å°„æ“Šå°åŒ…è¼”åŠ©å‡½æ•¸
     void SendShootPacket(glm::vec3 pos, glm::vec3 dir, ProjectileType type) {
         if (!NetworkManager::Instance().IsConnected()) return;
 
@@ -252,35 +259,35 @@ public:
         pkt.direction = dir;
         pkt.type = type;
 
-        // ³o¨Ç°Ñ¼Æ¥i¥H¤£¥Î¶Ç¡AÅı±µ¦¬ºİ®Ú¾Ú Type ¦Û¤v¨M©w¡A¦ı¬°¤F¼u©Ê¥ı¶Ç
+        // é€™äº›åƒæ•¸å¯ä»¥ä¸ç”¨å‚³ï¼Œè®“æ¥æ”¶ç«¯æ ¹æ“š Type è‡ªå·±æ±ºå®šï¼Œä½†ç‚ºäº†å½ˆæ€§å…ˆå‚³
         pkt.speed = (type == ProjectileType::ROCKET) ? 35.0f : 25.0f;
         pkt.scale = (type == ProjectileType::ROCKET) ? 0.8f : 0.3f;
         pkt.color = localPlayer->weapon->inkColor;
 
         if (NetworkManager::Instance().IsServer()) {
-            // ¦pªG¬O Server ¦Û¤v®gªº¡Aª½±µÂàµoµ¹§O¤H
+            // å¦‚æœæ˜¯ Server è‡ªå·±å°„çš„ï¼Œç›´æ¥è½‰ç™¼çµ¦åˆ¥äºº
             pkt.header.type = PacketType::S2C_SHOOT_EVENT;
             NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
         }
         else {
-            // Client ½Ğ¨D Server
+            // Client è«‹æ±‚ Server
             NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), true);
         }
     }
 
-    // AABB ¸I¼²ÀË´ú (¥]§t²yÅé¥b®|§P©w)
+    // AABB ç¢°æ’æª¢æ¸¬ (åŒ…å«çƒé«”åŠå¾‘åˆ¤å®š)
     bool CheckCollision(GameObject* bullet, GameObject* target) {
         glm::vec3 posB = bullet->transform->position;
         glm::vec3 posT = target->transform->position;
 
-        // §P©w¤¤¤ßÂIµy·L¤W²¾ (¦]¬°¤H¬O¯¸µÛªº)
+        // åˆ¤å®šä¸­å¿ƒé»ç¨å¾®ä¸Šç§» (å› ç‚ºäººæ˜¯ç«™è‘—çš„)
         glm::vec3 centerT = posT + glm::vec3(0, 1.0f, 0);
         float bulletRadius = bullet->transform->scale.x * 0.5f;
 
         float dist = glm::distance(posB, centerT);
 
-        // §P©w¶ZÂ÷ = ¤H¨­¥b®| (0.5) + ¤l¼u¥b®|
-        return dist < (0.5f + bulletRadius);
+        // åˆ¤å®šè·é›¢ = äººèº«åŠå¾‘ (0.5) + å­å½ˆåŠå¾‘
+        return dist < (kEntityHitRadius + bulletRadius);
     }
 
     void Update(float dt) {
@@ -301,9 +308,9 @@ public:
                 if (obj->active) obj->Update(dt);
             }
 
-            // ³B²zÃT³½¼Q¾¥
+            // è™•ç†é¯Šé­šå™´å¢¨
             if (localPlayer && localPlayer->requestSharkSpray) {
-                SpawnSharkBullets(); // ¥Í¦¨¨â°¼¤l¼u
+                SpawnSharkBullets(); // ç”Ÿæˆå…©å´å­å½ˆ
                 localPlayer->requestSharkSpray = false;
             }
 
@@ -317,14 +324,14 @@ public:
                 SendShootPacket(spawnPos, camFwd, ProjectileType::BOMB);
             }
 
-            // ¤õ½bµo®g°»´ú
+            // ç«ç®­ç™¼å°„åµæ¸¬
             if (localPlayer->requestRocketFire) {
                 localPlayer->requestRocketFire = false;
 
                 glm::vec3 camFwd = localPlayer->cameraRef->transform->GetForward();
                 glm::vec3 spawnPos = localPlayer->transform->position + glm::vec3(0, 1.5f, 0) + camFwd * 1.5f;
 
-                // 1. ¥»¦a¥Í¦¨ (µøÄ±)
+                // 1. æœ¬åœ°ç”Ÿæˆ (è¦–è¦º)
                 CreateProjectile(NetworkManager::Instance().GetMyPlayerID(), localPlayer->teamID, spawnPos, camFwd, ProjectileType::ROCKET);
 
                 SendShootPacket(spawnPos, camFwd, ProjectileType::ROCKET);
@@ -334,17 +341,17 @@ public:
             // generate items
             if (items.size() < 2) {
                 itemRespawnTimer += dt;
-                if (itemRespawnTimer > 5.0f) {
+                if (itemRespawnTimer > kItemRespawnIntervalSeconds) {
                     SpawnRandomItem();
                     itemRespawnTimer = 0.0f;
                 }
             }
 
-            // C. §ó·s»P¬B¨ú§P©w
+            // C. æ›´æ–°èˆ‡æ‹¾å–åˆ¤å®š
             for (auto it = items.begin(); it != items.end(); ) {
                 (*it)->Update(dt);
 
-                // ¬B¨ú¶ZÂ÷§P©w
+                // æ‹¾å–è·é›¢åˆ¤å®š
                 if (localPlayer && !localPlayer->hasBomb) {
                     float dist = glm::distance(localPlayer->transform->position, (*it)->transform->position);
                     if (dist < 1.5f) {
@@ -360,8 +367,8 @@ public:
 			// Network Sync - send player states
             if (NetworkManager::Instance().IsConnected()) {
                 syncTimer += dt;
-                if (syncTimer > 0.05f) {
-                    // 1. µo°eª±®a¦Û¤vªºª¬ºA
+                if (syncTimer > kPlayerSyncIntervalSeconds) {
+                    // 1. ç™¼é€ç©å®¶è‡ªå·±çš„ç‹€æ…‹
                     PacketPlayerState pkt;
                     pkt.header.type = PacketType::C2S_PLAYER_STATE;
                     pkt.playerID = NetworkManager::Instance().GetMyPlayerID();
@@ -374,12 +381,12 @@ public:
 
                     // Server or Client
                     if (NetworkManager::Instance().IsServer()) {
-                        // Server: ¼s¼½¦Û¤v (ID 0)
+                        // Server: å»£æ’­è‡ªå·± (ID 0)
                         PacketPlayerState worldStatePkt = pkt;
                         worldStatePkt.header.type = PacketType::S2C_WORLD_STATE;
                         NetworkManager::Instance().Broadcast(&worldStatePkt, sizeof(worldStatePkt), false);
 
-                        // Server: ¼s¼½ AI (ID 100)
+                        // Server: å»£æ’­ AI (ID 100)
                         if (enemyAI) {
                             PacketPlayerState aiPkt;
                             aiPkt.header.type = PacketType::S2C_WORLD_STATE;
@@ -393,17 +400,17 @@ public:
                         }
                     }
                     else {
-                        // Client: ¶Ç°eµ¹ Server
+                        // Client: å‚³é€çµ¦ Server
                         NetworkManager::Instance().SendToServer(&pkt, sizeof(pkt), false);
                     }
                     syncTimer = 0.0f;
                 }
 
-				// B. ¤À¼Æ»P¹CÀ¸ª¬ºA¦P¨B (0.5s) - server only
+				// B. åˆ†æ•¸èˆ‡éŠæˆ²ç‹€æ…‹åŒæ­¥ (0.5s) - server only
                 static float scoreTimer = 0.0f;
                 scoreTimer += dt;
 
-                if (scoreTimer > 0.5f) {
+                if (scoreTimer > kScoreSyncIntervalSeconds) {
                     if (NetworkManager::Instance().IsServer()) {
                         std::pair<float, float> scores = mapFloor->CalculatePercentages();
                         finalScoreTeam1 = scores.first;
@@ -413,7 +420,7 @@ public:
                         scorePkt.header.type = PacketType::S2C_GAME_STATE;
                         scorePkt.scoreTeam1 = scores.first;
                         scorePkt.scoreTeam2 = scores.second;
-                        scorePkt.timeRemaining = 180.0f;
+                        scorePkt.timeRemaining = std::max(0.0f, gameTimeRemaining);
 
                         NetworkManager::Instance().Broadcast(&scorePkt, sizeof(scorePkt), false);
                     }
@@ -421,12 +428,12 @@ public:
                 }
             }
 
-            // --- 3. §ó·s»·ºİª±®a (´¡­È) ---
+            // --- 3. æ›´æ–°é ç«¯ç©å®¶ (æ’å€¼) ---
             for (auto& pair : remotePlayers) {
                 pair.second->UpdateInterp(dt);
             }
 
-            // --- 4. §ó·s¤l¼uª«²z»P¸I¼² ---
+            // --- 4. æ›´æ–°å­å½ˆç‰©ç†èˆ‡ç¢°æ’ ---
             if (particleSystem) particleSystem->Update(dt);
             UpdateProjectiles(dt);
 
@@ -441,42 +448,42 @@ public:
     }
 
     void Render(Shader& shader, Camera* cam) {
-        // ³]©w¦@¥Î°Ñ¼Æ
+        // è¨­å®šå…±ç”¨åƒæ•¸
         shader.SetFloat("mapSize", level->mapSize);
         shader.SetInt("useInk", 1);
-        shader.SetInt("inkMap", 1); // ¹ïÀ³ GL_TEXTURE1
+        shader.SetInt("inkMap", 1); // å°æ‡‰ GL_TEXTURE1
 
         // ==========================================
-        // 1. [¦aªO¼h] ¸j©w mapFloor -> µe¦aªO
+        // 1. [åœ°æ¿å±¤] ç¶å®š mapFloor -> ç•«åœ°æ¿
         // ==========================================
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, mapFloor->textureID);
 
-        // µe¦aªO
+        // ç•«åœ°æ¿
         if (level->floor) {
             level->floor->Draw(shader);
         }
 
         // ==========================================
-        // 2. [»ÙÃªª«¼h] ¸j©w mapObstacle -> µe½c¤l
+        // 2. [éšœç¤™ç‰©å±¤] ç¶å®š mapObstacle -> ç•«ç®±å­
         // ==========================================
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, mapObstacle->textureID);
 
-        // µe»ÙÃªª«
+        // ç•«éšœç¤™ç‰©
         for (auto obj : level->obstacles) {
             if (obj) obj->Draw(shader);
         }
 
         // ==========================================
-        // 3. [Àğ¾À¼h] Ãö³¬¾¥¤ô -> µeÀğ¾À
+        // 3. [ç‰†å£å±¤] é—œé–‰å¢¨æ°´ -> ç•«ç‰†å£
         // ==========================================
         shader.SetInt("useInk", 0);
         for (auto wall : level->walls) {
             wall->Draw(shader);
         }
 
-        // µe¹D¨ã
+        // ç•«é“å…·
         shader.SetInt("useInk", 0);
         for (auto& item : items) {
             item->Draw(shader);
@@ -494,26 +501,26 @@ public:
         if (localPlayer->GetVisualBody()) localPlayer->GetVisualBody()->Draw(shader);
         if (enemyAI && enemyAI->GetVisualBody()) enemyAI->GetVisualBody()->Draw(shader);
 
-        // 4. µe³±¼v (¶}±Ò¥b³z©ú²V¦X)
+        // 4. ç•«é™°å½± (é–‹å•ŸåŠé€æ˜æ··åˆ)
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE); // Ãö³¬²`«×¼g¤J
-        shader.SetFloat("alpha", 0.5f); // ³]©w¥b³z©ú
+        glDepthMask(GL_FALSE); // é—œé–‰æ·±åº¦å¯«å…¥
+        shader.SetFloat("alpha", 0.5f); // è¨­å®šåŠé€æ˜
 
         auto DrawShadow = [&](GameObject* owner) {
             if (!owner) return;
 
-            // 1. ÀË¬d¥»¾÷ª±®a
+            // 1. æª¢æŸ¥æœ¬æ©Ÿç©å®¶
             if (owner == localPlayer.get()) {
                 if (localPlayer->isSwimming) return;
             }
-            // 2. ÀË¬d»·ºİª±®a (RemotePlayer?)
+            // 2. æª¢æŸ¥é ç«¯ç©å®¶ (RemotePlayer?)
 
             Health* hp = owner->GetComponent<Health>();
             if (hp && hp->isDead) return;
 
             glm::vec3 shadowPos = owner->transform->position;
-            shadowPos.y = 0.02f; // ¶K¦a
+            shadowPos.y = 0.02f; // è²¼åœ°
 
             float height = owner->transform->position.y;
             float scale = 1.5f - (height * 0.3f);
@@ -541,10 +548,10 @@ public:
         glDisable(GL_BLEND);
     }
 
-    // ²Î¤@¦¬¶°¨Ã¥Í¦¨¤l¼u (¥]§tºô¸ôµo°e)
+    // çµ±ä¸€æ”¶é›†ä¸¦ç”Ÿæˆå­å½ˆ (åŒ…å«ç¶²è·¯ç™¼é€)
     void CollectProjectiles(Weapon& weapon) {
         for (const auto& info : weapon.pendingSpawns) {
-            // ¤@¯ë¤l¼u®gÀ»¤]§ï¥Î Helper
+            // ä¸€èˆ¬å­å½ˆå°„æ“Šä¹Ÿæ”¹ç”¨ Helper
             CreateProjectile(NetworkManager::Instance().GetMyPlayerID(), info.team, info.pos, info.dir, ProjectileType::BULLET);
             SendShootPacket(info.pos, info.dir, ProjectileType::BULLET);
         }
@@ -557,95 +564,83 @@ public:
 
     void HandlePacket(const ReceivedPacket& received) {
         auto& net = NetworkManager::Instance();
-
-        // A. Server Logic
         if (net.IsServer()) {
-            // 1. ¦¬¨ì Client ªº¦ì¸m§ó·s -> Âàµo¬° WORLD_STATE
             if (received.type == PacketType::C2S_PLAYER_STATE) {
-                auto* inPkt = (PacketPlayerState*)received.data.data();
-
+                const auto* inPkt = TryGetPacket<PacketPlayerState>(received);
+                if (!inPkt) return;
                 PacketPlayerState outPkt = *inPkt;
                 outPkt.header.type = PacketType::S2C_WORLD_STATE;
-
                 net.Broadcast(&outPkt, sizeof(outPkt), false);
-                HandleWorldState(&outPkt);
+                HandleWorldState(outPkt);
             }
-            // 2. ¦¬¨ì Client ªº®gÀ»½Ğ¨D -> Âàµo¬° SHOOT_EVENT
             else if (received.type == PacketType::C2S_SHOOT) {
-                auto* inPkt = (PacketShoot*)received.data.data();
-
+                const auto* inPkt = TryGetPacket<PacketShoot>(received);
+                if (!inPkt) return;
                 PacketShoot outPkt = *inPkt;
                 outPkt.header.type = PacketType::S2C_SHOOT_EVENT;
-
                 net.Broadcast(&outPkt, sizeof(outPkt), true);
-
-                // Server ¥»¦a¥Í¦¨¤l¼u (°£«D¬O Server ¦Û¤vµoªº¡A¨º´N­«½Æ¤F¡A»İ¹LÂo)
                 if (inPkt->playerID != net.GetMyPlayerID()) {
                     SpawnRemoteProjectile(outPkt);
                 }
             }
             else if (received.type == PacketType::C2S_SPECIAL_ATTACK) {
-                auto* inPkt = (PacketSpecialLaser*)received.data.data();
-
+                const auto* inPkt = TryGetPacket<PacketSpecialLaser>(received);
+                if (!inPkt) return;
                 TriggerLaserBeam(inPkt->origin, inPkt->direction, inPkt->teamID, inPkt->playerID);
-
-				// broadcast
                 PacketSpecialLaser outPkt = *inPkt;
                 outPkt.header.type = PacketType::S2C_SPECIAL_ATTACK;
                 net.Broadcast(&outPkt, sizeof(outPkt), true, received.fromConnection);
             }
         }
-
-		// B. Common Client & Server Logic
-        // move event
         if (received.type == PacketType::S2C_WORLD_STATE) {
-            HandleWorldState((PacketPlayerState*)received.data.data());
+            if (const auto* worldState = TryGetPacket<PacketPlayerState>(received)) {
+                HandleWorldState(*worldState);
+            }
         }
-        // shoot event
         else if (received.type == PacketType::S2C_SHOOT_EVENT) {
-            auto* pkt = (PacketShoot*)received.data.data();
-			// ignore self shoot
+            const auto* pkt = TryGetPacket<PacketShoot>(received);
+            if (!pkt) return;
             if (pkt->playerID != net.GetMyPlayerID()) {
                 SpawnRemoteProjectile(*pkt);
             }
         }
-        // update game state
         else if (received.type == PacketType::S2C_GAME_STATE) {
-            auto* pkt = (PacketGameState*)received.data.data();
+            const auto* pkt = TryGetPacket<PacketGameState>(received);
+            if (!pkt) return;
             finalScoreTeam1 = pkt->scoreTeam1;
             finalScoreTeam2 = pkt->scoreTeam2;
+            gameTimeRemaining = std::max(0.0f, pkt->timeRemaining);
             if (scoreboardRef) {
                 scoreboardRef->SetScores(pkt->scoreTeam1, pkt->scoreTeam2);
             }
-            if (pkt->timeRemaining==0.0f && state != WorldState::FINISHED) {
+            if (pkt->timeRemaining <= 0.0f && state != WorldState::FINISHED) {
                 EndGame();
             }
         }
-        // 4. (¿ï¥Î) ¦¬¨ì Join Accept
-        // ³q±`³o¦b¤jÆU¶¥¬q´N³B²z§¹¤F¡A¦ı¦pªG¬O¤¤³~¥[¤J(Hot Join)¥i¯à·|¥Î¨ì
         else if (received.type == PacketType::S2C_JOIN_ACCEPT) {
-            auto* pkt = (PacketJoinAccept*)received.data.data();
+            const auto* pkt = TryGetPacket<PacketJoinAccept>(received);
+            if (!pkt) return;
             net.SetMyPlayerID(pkt->yourPlayerID);
             localPlayer->teamID = pkt->yourTeamID;
-            // §ó·sÃC¦â...
             glm::vec3 c = (pkt->yourTeamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
             localPlayer->weapon->inkColor = c;
             localPlayer->weapon->teamID = pkt->yourTeamID;
-            if (localPlayer->GetVisualBody())
+            if (localPlayer->GetVisualBody()) {
                 localPlayer->GetVisualBody()->GetComponent<MeshRenderer>()->SetColor(c);
+            }
         }
         else if (received.type == PacketType::S2C_SPECIAL_ATTACK) {
-            auto* pkt = (PacketSpecialLaser*)received.data.data();
+            const auto* pkt = TryGetPacket<PacketSpecialLaser>(received);
+            if (!pkt) return;
             TriggerLaserBeam(pkt->origin, pkt->direction, pkt->teamID, pkt->playerID);
             AudioManager::Instance().PlayOneShot("laser_fire", 1.0f);
         }
         else if (received.type == PacketType::S2C_KILL_EVENT) {
-            auto* pkt = (PacketKillEvent*)received.data.data();
-            // kill log
+            const auto* pkt = TryGetPacket<PacketKillEvent>(received);
+            if (!pkt) return;
             if (hudRef) {
                 hudRef->AddKillLog(pkt->killerID, pkt->victimID, pkt->killerTeam, pkt->victimTeam);
             }
-			// victim die effect
             int myID = NetworkManager::Instance().GetMyPlayerID();
             if (pkt->victimID == myID) {
                 if (localPlayer) {
@@ -655,81 +650,16 @@ public:
             }
         }
     }
-
 private:
     // packet handler
     void ProcessNetworkPackets() {
         auto& net = NetworkManager::Instance();
         while (net.HasPackets()) {
             auto received = net.PopPacket();
-
-            // Server Logic
-            if (net.IsServer()) {
-                if (received.type == PacketType::C2S_PLAYER_STATE) {
-                    // reply player move
-                    auto* inPkt = (PacketPlayerState*)received.data.data();
-                    PacketPlayerState outPkt = *inPkt;
-                    outPkt.header.type = PacketType::S2C_WORLD_STATE;
-                    net.Broadcast(&outPkt, sizeof(outPkt), false);
-
-                    // Server ¥»¦a¤]§ó·sÅã¥Ü
-                    HandleWorldState(&outPkt);
-                }
-                else if (received.type == PacketType::C2S_SHOOT) {
-                    // reply shoot event
-                    auto* inPkt = (PacketShoot*)received.data.data();
-                    PacketShoot outPkt = *inPkt;
-                    outPkt.header.type = PacketType::S2C_SHOOT_EVENT;
-                    net.Broadcast(&outPkt, sizeof(outPkt), true);
-
-                    if (inPkt->playerID != net.GetMyPlayerID()) {
-                        SpawnRemoteProjectile(outPkt);
-                    }
-                }
-            }
-
-			// Common Client & Server Logic
-            if (received.type == PacketType::S2C_WORLD_STATE) {
-                HandleWorldState((PacketPlayerState*)received.data.data());
-            }
-            else if (received.type == PacketType::S2C_SHOOT_EVENT) {
-                auto* pkt = (PacketShoot*)received.data.data();
-				// ignore self shoot
-                if (pkt->playerID != net.GetMyPlayerID()) {
-                    SpawnRemoteProjectile(*pkt);
-                }
-            }
-            else if (received.type == PacketType::S2C_JOIN_ACCEPT) {
-                auto* pkt = (PacketJoinAccept*)received.data.data();
-                net.SetMyPlayerID(pkt->yourPlayerID);   // ID
-                localPlayer->teamID = pkt->yourTeamID;  // team
-                glm::vec3 teamColor = (pkt->yourTeamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
-                localPlayer->weapon->inkColor = teamColor;
-                localPlayer->weapon->teamID = pkt->yourTeamID;
-                if (localPlayer->GetVisualBody()) {
-                    auto mr = localPlayer->GetVisualBody()->GetComponent<MeshRenderer>();
-                    if (mr) {
-                        mr->SetColor(teamColor);
-                    }
-                }
-                std::cout << "Joined Game! ID: " << pkt->yourPlayerID << " Team: " << pkt->yourTeamID << std::endl;
-            }
-            else if (received.type == PacketType::S2C_GAME_STATE) {
-                // score sync
-                auto* pkt = (PacketGameState*)received.data.data();
-                // update client scoreboard
-                if (scoreboardRef) {
-                    scoreboardRef->SetScores(pkt->scoreTeam1, pkt->scoreTeam2);
-                }
-            }
-            else if (received.type == PacketType::S2C_SPECIAL_ATTACK) {
-                auto* pkt = (PacketSpecialLaser*)received.data.data();
-                TriggerLaserBeam(pkt->origin, pkt->direction, pkt->teamID, pkt->playerID);
-            }
+            HandlePacket(received);
         }
     }
-
-    // ¥Í¦¨ºô¸ô¶Ç¨Óªº¤l¼u
+    // ç”Ÿæˆç¶²è·¯å‚³ä¾†çš„å­å½ˆ
     void SpawnRemoteProjectile(const PacketShoot& pkt) {
         int team = (pkt.playerID % 2 == 0) ? 1 : 2;
         if (remotePlayers.find(pkt.playerID) != remotePlayers.end()) {
@@ -739,67 +669,64 @@ private:
         CreateProjectile(pkt.playerID, team, pkt.origin, pkt.direction, pkt.type);
     }
 
-    // §ó·s©Î«Ø¥ß»·ºİª±®a
-    void HandleWorldState(PacketPlayerState* pkt) {
-        int id = pkt->playerID;
+    // æ›´æ–°æˆ–å»ºç«‹é ç«¯ç©å®¶
+    void HandleWorldState(const PacketPlayerState& pkt) {
+        int id = pkt.playerID;
         if (id == NetworkManager::Instance().GetMyPlayerID()) return;
         if (id == -1) return;
         auto it = remotePlayers.find(id);
         int guessedTeam = (id == 100) ? 2 : ((id % 2 == 0) ? 1 : 2);
-
         if (it == remotePlayers.end()) {
-            // [ÃöÁä] ¦pªG¤£¦s¦b¡A´N³Ğ«Ø¥L¡I¨Ã¥B¶Ç¤J«Ê¥]¸Ìªº teamID
-            CreateRemotePlayer(id, guessedTeam, pkt->position);
+            CreateRemotePlayer(id, guessedTeam, pkt.position);
         }
         else {
             it->second->teamID = guessedTeam;
-            it->second->SetTargetState(pkt->position, pkt->rotationY, pkt->isSwimming, pkt->isDead, pkt->isSharking);
+            it->second->SetTargetState(pkt.position, pkt.rotationY, pkt.isSwimming, pkt.isDead, pkt.isSharking);
         }
     }
 
-    // ¤l¼uª«²z§ó·s°j°é
+    // å­å½ˆç‰©ç†æ›´æ–°è¿´åœˆ
     void UpdateProjectiles(float dt) {
         float mapSize = level->mapSize;
         float inkMultiplier = 50.0f;
+        frameCollisionTargets.clear();
+        frameCollisionTargets.reserve(2 + remotePlayers.size());
+        if (localPlayer) frameCollisionTargets.push_back(localPlayer.get());
+        if (enemyAI) frameCollisionTargets.push_back(enemyAI.get());
+        for (auto& pair : remotePlayers) frameCollisionTargets.push_back(pair.second.get());
 
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
             Projectile* p = it->get();
             p->UpdatePhysics(dt);
 
-            bool hitEntity = false; // ¬O§_¼²¨ì¹êÅé
-            bool hitObstacle = false; // ¬O§_¼²¨ì»ÙÃªª«
+            bool hitEntity = false; // æ˜¯å¦æ’åˆ°å¯¦é«”
+            bool hitObstacle = false; // æ˜¯å¦æ’åˆ°éšœç¤™ç‰©
 
-            // ·Ç³Æ¸I¼²¥Ø¼Ğ²M³æ
-            std::vector<Entity*> targets;
-            targets.push_back(localPlayer.get());
-            if (enemyAI) targets.push_back(enemyAI.get());
-            for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
-
-            for (Entity* target : targets) {
+            for (Entity* target : frameCollisionTargets) {
                 if (!target) continue;
                 int targetTeam = target->teamID;
-                if (targetTeam == p->ownerTeam) continue; // ¤£¥´¶¤¤Í
+                if (targetTeam == p->ownerTeam) continue; // ä¸æ‰“éšŠå‹
 
                 if (CheckCollision(p, target)) {
 
-                    // --- [­×§ï­«ÂI] °w¹ï¤õ½bªº¯S®í³B²z ---
+                    // --- [ä¿®æ”¹é‡é»] é‡å°ç«ç®­çš„ç‰¹æ®Šè™•ç† ---
                     if (p->pType == ProjectileType::ROCKET) {
-                        p->isDead = true; // ¼Ğ°O¬°¦º¤`¡AÅı«á­±ªº Rocket Logic Ä²µoÃz¬µ
-                        hitEntity = true; // ¼Ğ°O¼²¨ì¤F¡A¦ı"¤£­n"¦b³o¸Ì erase¡A¤]¤£­n¦b³o¸Ì¦©¦å
-                        break;            // ¸õ¥X¸I¼²°j°é
+                        p->isDead = true; // æ¨™è¨˜ç‚ºæ­»äº¡ï¼Œè®“å¾Œé¢çš„ Rocket Logic è§¸ç™¼çˆ†ç‚¸
+                        hitEntity = true; // æ¨™è¨˜æ’åˆ°äº†ï¼Œä½†"ä¸è¦"åœ¨é€™è£¡ eraseï¼Œä¹Ÿä¸è¦åœ¨é€™è£¡æ‰£è¡€
+                        break;            // è·³å‡ºç¢°æ’è¿´åœˆ
                     }
                     // ----------------------------------
 
-                    // ´¶³q¤l¼uÅŞ¿è (ºû«ù­ì¼Ë)
+                    // æ™®é€šå­å½ˆé‚è¼¯ (ç¶­æŒåŸæ¨£)
                     Health* hp = target->GetComponent<Health>();
                     if (hp) {
                         bool wasAlive = !hp->isDead;
-                        hp->TakeDamage(10.0f); // ´¶³q¤l¼u¶Ë®`
+                        hp->TakeDamage(10.0f); // æ™®é€šå­å½ˆå‚·å®³
 
-                        // ¯S®Ä
+                        // ç‰¹æ•ˆ
                         particleSystem->Emit(p->transform->position, p->inkColor, 15, 8.0f);
 
-                        // À»±ş§P©w (Server)
+                        // æ“Šæ®ºåˆ¤å®š (Server)
                         if (wasAlive && hp->isDead) {
                             if (NetworkManager::Instance().IsServer()) {
                                 int victimID = -99;
@@ -823,7 +750,7 @@ private:
                                 NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
                                 if (hudRef) hudRef->AddKillLog(p->ownerID, victimID, p->ownerTeam, hp->teamID);
                             }
-                            // ¥»¦a¦º¤`³B²z
+                            // æœ¬åœ°æ­»äº¡è™•ç†
                             if (target == localPlayer.get()) {
                                 localPlayer->Die();
                                 SpawnDeathSplat(localPlayer->transform->position, p->inkColor);
@@ -836,19 +763,19 @@ private:
                         }
                     }
 
-                    // À»¤¤¦^õX
+                    // æ“Šä¸­å›é¥‹
                     if (localPlayer && p->ownerTeam == localPlayer->teamID) {
                         AudioManager::Instance().PlayOneShot("hit", 0.8f);
                         if (hudRef) hudRef->ShowHitMarker();
                     }
 
-                    hitEntity = true; // ´¶³q¤l¼u¼²¨ì¹êÅé
+                    hitEntity = true; // æ™®é€šå­å½ˆæ’åˆ°å¯¦é«”
                     break;
                 }
             }
 
-            // 2. ÀË¬d»ÙÃªª«¸I¼² (Box) - ¦pªG¬O¤õ½b¼²Àğ¤]­nÃz¬µ
-            if (!hitEntity) { // ¦pªGÁÙ¨S¼²¨ì¤H¦AÀË¬dÀğ
+            // 2. æª¢æŸ¥éšœç¤™ç‰©ç¢°æ’ (Box) - å¦‚æœæ˜¯ç«ç®­æ’ç‰†ä¹Ÿè¦çˆ†ç‚¸
+            if (!hitEntity) { // å¦‚æœé‚„æ²’æ’åˆ°äººå†æª¢æŸ¥ç‰†
                 for (auto& box : level->colliders) {
                     glm::vec3 pos = p->transform->position;
                     if (pos.x >= box.min.x && pos.x <= box.max.x &&
@@ -856,10 +783,10 @@ private:
                         pos.z >= box.min.z && pos.z <= box.max.z) {
 
                         if (p->pType == ProjectileType::ROCKET) {
-                            p->isDead = true; // ¤õ½b¼²Àğ -> Ä²µoÃz¬µ
+                            p->isDead = true; // ç«ç®­æ’ç‰† -> è§¸ç™¼çˆ†ç‚¸
                         }
                         else {
-                            // ´¶³q¤l¼u¼²Àğ -> ¶îÀğ¨Ã®ø¥¢
+                            // æ™®é€šå­å½ˆæ’ç‰† -> å¡—ç‰†ä¸¦æ¶ˆå¤±
                             auto result = SplatPhysics::WorldToUV(pos, glm::vec3(0), mapSize, mapSize);
                             if (result.hit) {
                                 float uvSize = (p->transform->scale.x * inkMultiplier) / mapSize;
@@ -874,9 +801,9 @@ private:
                 }
             }
 
-            // ³B²z§R°£ÅŞ¿è
-            // ¦pªG¬O´¶³q¤l¼u¼²¨ìªF¦è -> §R°£
-            // ¦pªG¬O¤õ½b¼²¨ìªF¦è -> ¤£­n§R°£ (hitEntity/hitObstacle ¬° true¡A¦ı§Ú­Ì§â p->isDead ³]¬° true ¤F¡AÅı¥¦¶i¤J¤U¤èªº Rocket Logic)
+            // è™•ç†åˆªé™¤é‚è¼¯
+            // å¦‚æœæ˜¯æ™®é€šå­å½ˆæ’åˆ°æ±è¥¿ -> åˆªé™¤
+            // å¦‚æœæ˜¯ç«ç®­æ’åˆ°æ±è¥¿ -> ä¸è¦åˆªé™¤ (hitEntity/hitObstacle ç‚º trueï¼Œä½†æˆ‘å€‘æŠŠ p->isDead è¨­ç‚º true äº†ï¼Œè®“å®ƒé€²å…¥ä¸‹æ–¹çš„ Rocket Logic)
             if (p->pType != ProjectileType::ROCKET && (hitEntity || hitObstacle)) {
                 it = projectiles.erase(it);
                 continue;
@@ -888,12 +815,12 @@ private:
                     p->hasExploded = true;
                     glm::vec3 hitPos = p->transform->position;
 
-                    // 1. Ãz¬µ¯S®Ä
+                    // 1. çˆ†ç‚¸ç‰¹æ•ˆ
                     if (particleSystem) particleSystem->Emit(hitPos, p->inkColor, 80, 40.0f);
                     AudioManager::Instance().PlayOneShot("explode", 1.0f);
 
-                    // 2. ¶î¦a (¤j½d³ò)
-                    // ¶î¤@­Ó¤j¶ê
+                    // 2. å¡—åœ° (å¤§ç¯„åœ)
+                    // å¡—ä¸€å€‹å¤§åœ“
                     float rRadius = 4.0f;
                     float uvSize = (rRadius * 2.0f) / mapSize;
                     auto res = SplatPhysics::WorldToUV(hitPos, glm::vec3(0), mapSize, mapSize);
@@ -903,16 +830,16 @@ private:
                         painter->Paint(target, res.uv, uvSize, p->inkColor, 0, p->ownerTeam);
                     }
 
-                    // 3. ¶Ë®`§P©w (Server Only)
+                    // 3. å‚·å®³åˆ¤å®š (Server Only)
                     if (NetworkManager::Instance().IsServer()) {
                         float blastRadius = 8.0f;
-                        // ÀË¬d¥»¾÷
+                        // æª¢æŸ¥æœ¬æ©Ÿ
                         if (localPlayer && localPlayer->teamID != p->ownerTeam) {
                             if (glm::distance(localPlayer->transform->position, hitPos) < blastRadius) {
-                                // ¶Ë®`
+                                // å‚·å®³
                                 auto hp = localPlayer->GetComponent<Health>();
                                 if (hp && !hp->isDead) {
-                                    hp->TakeDamage(50.0f); // ª½±µ¬í±ş
+                                    hp->TakeDamage(50.0f); // ç›´æ¥ç§’æ®º
                                     if (hp->isDead) {
                                         // Send Kill Packet
                                         PacketKillEvent kPkt;
@@ -931,7 +858,7 @@ private:
                             float dist = glm::distance(p->transform->position, rp->transform->position);
 
                             if (dist < blastRadius) {
-                                // §PÂ_¼Ä§Ú (©Î¦Û±ş)
+                                // åˆ¤æ–·æ•µæˆ‘ (æˆ–è‡ªæ®º)
                                 if (rp->teamID != p->ownerTeam || pair.first == p->ownerID) {
                                     ProcessKillEvent(p->ownerID, rp, p->ownerTeam);
                                 }
@@ -944,14 +871,14 @@ private:
                 }
             }
             else if (p->pType == ProjectileType::BOMB) {
-                // 1. ­Ë¼ÆÄµ¥Ü­µ®Ä (³Ñ 1.0 ¬í®É)
+                // 1. å€’æ•¸è­¦ç¤ºéŸ³æ•ˆ (å‰© 1.0 ç§’æ™‚)
                 if (!p->warningPlayed && p->fuseTimer <= 1.0f && p->fuseTimer > 0.0f) {
                     p->warningPlayed = true;
 
-                    // Â²³æªº 3D ­µ®Ä¼ÒÀÀ¡G¥u¦³Â÷¬µ¼u°÷ªñªº¤H¤~Å¥±o¨ì
+                    // ç°¡å–®çš„ 3D éŸ³æ•ˆæ¨¡æ“¬ï¼šåªæœ‰é›¢ç‚¸å½ˆå¤ è¿‘çš„äººæ‰è½å¾—åˆ°
                     if (localPlayer) {
                         float dist = glm::distance(p->transform->position, localPlayer->transform->position);
-                        if (dist < 15.0f) { // 15¦Ì¤ºÅ¥±o¨ì
+                        if (dist < 15.0f) { // 15ç±³å…§è½å¾—åˆ°
                             AudioManager::Instance().PlayOneShot("bomb_beep", 1.0f);
                         }
                     }
@@ -962,47 +889,47 @@ private:
                     float mapSize = level->mapSize;
 
                     // =========================================================
-                    // 1. [¶°§ô¬µ¼uÅŞ¿è] ¼ÒÀÀ 60+ µo¤l¼u¦P®É¸¨¦a
+                    // 1. [é›†æŸç‚¸å½ˆé‚è¼¯] æ¨¡æ“¬ 60+ ç™¼å­å½ˆåŒæ™‚è½åœ°
                     // =========================================================
 
-                    // ³]©w°Ñ¼Æ
-                    float maxRadius = 15.0f; // ³Ì¤jÃz¬µ¥b®| (¤½¤Ø)
-                    int layers = 5;          // ¤À 5 ¼hÂX´² (¦P¤ß¶ê)
+                    // è¨­å®šåƒæ•¸
+                    float maxRadius = 15.0f; // æœ€å¤§çˆ†ç‚¸åŠå¾‘ (å…¬å°º)
+                    int layers = 5;          // åˆ† 5 å±¤æ“´æ•£ (åŒå¿ƒåœ“)
 
-                    // Loop 1: ¨C¤@¼h (±q¤¤¤ß©¹¥~)
+                    // Loop 1: æ¯ä¸€å±¤ (å¾ä¸­å¿ƒå¾€å¤–)
                     for (int l = 0; l <= layers; l++) {
                         float currentRadius = (maxRadius / layers) * l;
 
-                        // ¶V¥~°é¡A¾¥¤ô¼Æ¶q¶V¦h
+                        // è¶Šå¤–åœˆï¼Œå¢¨æ°´æ•¸é‡è¶Šå¤š
                         int countInLayer = (l == 0) ? 1 : (l * 8);
 
-                        // Loop 2: ¨C¤@ºw¾¥¤ô
+                        // Loop 2: æ¯ä¸€æ»´å¢¨æ°´
                         for (int i = 0; i < countInLayer; i++) {
-                            // ­pºâ¨¤«×
+                            // è¨ˆç®—è§’åº¦
                             float angle = (360.0f / countInLayer) * i;
-                            // ¥[¤J¤@ÂIÀH¾÷°¾²¾¡AÅı§Îª¬¤£­n¤Ó¶ê¡A¤ñ¸û¦ÛµM
+                            // åŠ å…¥ä¸€é»éš¨æ©Ÿåç§»ï¼Œè®“å½¢ç‹€ä¸è¦å¤ªåœ“ï¼Œæ¯”è¼ƒè‡ªç„¶
                             float randOffset = ((rand() % 100) / 100.0f) * 2.0f;
                             float finalRadius = currentRadius + randOffset;
 
-                            // ­pºâ¦ì¸m
+                            // è¨ˆç®—ä½ç½®
                             float rad = glm::radians(angle);
                             glm::vec3 offset(cos(rad) * finalRadius, 0, sin(rad) * finalRadius);
                             glm::vec3 splatPos = bombPos + offset;
 
-                            // ­pºâ¾¥¤ô¤j¤p (¤¤¶¡¤j¡A®ÇÃä¤p)
-                            // ¤º°é¤j¤p¬ù 4.0¡A¥~°é»¼´î¨ì 1.5
+                            // è¨ˆç®—å¢¨æ°´å¤§å° (ä¸­é–“å¤§ï¼Œæ—é‚Šå°)
+                            // å…§åœˆå¤§å°ç´„ 4.0ï¼Œå¤–åœˆéæ¸›åˆ° 1.5
                             float scale = 4.0f - (2.5f * (float)l / layers);
                             float uvSize = (scale * 2.0f) / mapSize;
                             float rot = (float)(rand() % 360);
 
-                            // °õ¦æ¶î¦a (Paint)
+                            // åŸ·è¡Œå¡—åœ° (Paint)
                             auto result = SplatPhysics::WorldToUV(splatPos, glm::vec3(0), mapSize, mapSize);
                             if (result.hit) {
-                                // §PÂ_°ª«× (¦aªO vs »ÙÃªª«)
+                                // åˆ¤æ–·é«˜åº¦ (åœ°æ¿ vs éšœç¤™ç‰©)
                                 float h = level->GetHeightAt(splatPos.x, splatPos.z);
                                 SplatMap* target = (h > 0.5f) ? mapObstacle.get() : mapFloor.get();
 
-                                // ¨C¤@ºw³£°õ¦æ¤@¦¸ UpdateCPUData¡A½T«Oºô®æ³Q¶ñº¡
+                                // æ¯ä¸€æ»´éƒ½åŸ·è¡Œä¸€æ¬¡ UpdateCPUDataï¼Œç¢ºä¿ç¶²æ ¼è¢«å¡«æ»¿
                                 painter->Paint(target, result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
                             }
                         }
@@ -1010,16 +937,16 @@ private:
                     AudioManager::Instance().PlayOneShot("explode", 1.0f);
                     if (particleSystem) particleSystem->Emit(bombPos, p->inkColor, 50, 25.0f);
 
-                    // --- B. ¶Ë®`§P©w (¥u¦³ Server °õ¦æ) ---
+                    // --- B. å‚·å®³åˆ¤å®š (åªæœ‰ Server åŸ·è¡Œ) ---
                     if (NetworkManager::Instance().IsServer()) {
                         float blastRadius = 10.0f;
                         float damage = 999.0f;
 
-                        // 1. ÀË¬d¥»¾÷ª±®a (Server ¦Û¤v)
+                        // 1. æª¢æŸ¥æœ¬æ©Ÿç©å®¶ (Server è‡ªå·±)
                         if (localPlayer) {
                             float dist = glm::distance(p->transform->position, localPlayer->transform->position);
                             if (dist < blastRadius) {
-                                // ³W«h¡G·|¬µ¦º¼Ä¤H¡A¤]·|¬µ¦º¦Û¤v(¦Û±ş)¡A¦ı¤£·|¬µ¦º¶¤¤Í
+                                // è¦å‰‡ï¼šæœƒç‚¸æ­»æ•µäººï¼Œä¹Ÿæœƒç‚¸æ­»è‡ªå·±(è‡ªæ®º)ï¼Œä½†ä¸æœƒç‚¸æ­»éšŠå‹
                                 if (localPlayer->teamID != p->ownerTeam || p->ownerID == NetworkManager::Instance().GetMyPlayerID()) {
                                     auto hp = localPlayer->GetComponent<Health>();
                                     if (hp) {
@@ -1032,7 +959,7 @@ private:
                             }
                         }
 
-                        // 2. ÀË¬d AI
+                        // 2. æª¢æŸ¥ AI
                         if (enemyAI) {
                             float dist = glm::distance(p->transform->position, enemyAI->transform->position);
                             if (dist < blastRadius) {
@@ -1046,13 +973,13 @@ private:
                             }
                         }
 
-                        // 3. ÀË¬d»·ºİª±®a (Clients)
+                        // 3. æª¢æŸ¥é ç«¯ç©å®¶ (Clients)
                         for (auto& pair : remotePlayers) {
                             RemotePlayer* rp = pair.second.get();
                             float dist = glm::distance(p->transform->position, rp->transform->position);
 
                             if (dist < blastRadius) {
-                                // §PÂ_¼Ä§Ú (©Î¦Û±ş)
+                                // åˆ¤æ–·æ•µæˆ‘ (æˆ–è‡ªæ®º)
                                 if (rp->teamID != p->ownerTeam || pair.first == p->ownerID) {
                                     ProcessKillEvent(p->ownerID, rp, p->ownerTeam);
                                 }
@@ -1064,25 +991,25 @@ private:
                     continue;
                 }
 
-                // B. ¼²¦a¤Ï¼u (Bouncing)
+                // B. æ’åœ°åå½ˆ (Bouncing)
                 if (p->hasHitFloor) {
-                    // Â²³æ¤Ï¼u¡GY ¶b³t«×¤ÏÂà¨Ã°I´î
-                    p->velocity.y = -p->velocity.y * 0.8f; // ¼u©Ê«Y¼Æ
-                    p->velocity.x *= 0.9f; // ¼¯À¿¤O
+                    // ç°¡å–®åå½ˆï¼šY è»¸é€Ÿåº¦åè½‰ä¸¦è¡°æ¸›
+                    p->velocity.y = -p->velocity.y * 0.8f; // å½ˆæ€§ä¿‚æ•¸
+                    p->velocity.x *= 0.9f; // æ‘©æ“¦åŠ›
                     p->velocity.z *= 0.9f;
 
-                    // ¦pªG¼u¸õ¤Ó¤p´N°±¤î
+                    // å¦‚æœå½ˆè·³å¤ªå°å°±åœæ­¢
                     if (abs(p->velocity.y) < 1.0f) p->velocity.y = 0;
 
-                    // ­×¥¿¦ì¸m
+                    // ä¿®æ­£ä½ç½®
                     p->transform->position = p->hitPosition + glm::vec3(0, 0.1f, 0);
-                    p->hasHitFloor = false; // ­«¸m¸I¼²ºX¼Ğ
+                    p->hasHitFloor = false; // é‡ç½®ç¢°æ’æ——æ¨™
                 }
                 ++it;
                 continue;
             }
 
-            // ¦aªO¸I¼²¶î¦a
+            // åœ°æ¿ç¢°æ’å¡—åœ°
             if (p->hasHitFloor) {
                 auto result = SplatPhysics::WorldToUV(
                     p->hitPosition, level->floor->transform->position,
@@ -1094,8 +1021,8 @@ private:
                     float rot = (float)(rand() % 360);
                     float paintSize = p->transform->scale.x * 0.7f;
                     painter->Paint(mapFloor.get(), result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
-                    // À»¤¤¦aªO¼Q¾¥¤ô
-                    // ²£¥Í 10 Áû²É¤l¡A³t«× 5.0f
+                    // æ“Šä¸­åœ°æ¿å™´å¢¨æ°´
+                    // ç”¢ç”Ÿ 10 é¡†ç²’å­ï¼Œé€Ÿåº¦ 5.0f
                     particleSystem->Emit(p->hitPosition + glm::vec3(0, 0.2f, 0), p->inkColor, 10, 5.0f);
                 }
                 it = projectiles.erase(it);
@@ -1109,7 +1036,7 @@ private:
         }
     }
 
-    // ³B²zÀ»±ş¨Æ¥ó¡GÃÑ§O¨­¤À -> µo°e«Ê¥] -> §ó·s¥»¦a UI
+    // è™•ç†æ“Šæ®ºäº‹ä»¶ï¼šè­˜åˆ¥èº«åˆ† -> ç™¼é€å°åŒ… -> æ›´æ–°æœ¬åœ° UI
     void ProcessKillEvent(int killerID, Entity* victim, int killerTeam) {
         int victimID = -99;
         int victimTeam = victim->teamID;
@@ -1165,15 +1092,15 @@ private:
 		// fetch resource via teamID
         std::shared_ptr<Mesh> targetMesh;
         std::shared_ptr<Texture> targetTex;
-        glm::vec3 tintColor = glm::vec3(1.0f); // ¹w³]¥Õ¦â
+        glm::vec3 tintColor = glm::vec3(1.0f); // é è¨­ç™½è‰²
         glm::vec3 teamColor = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
 
-        if (teamID == 1) { // ¬õ¶¤
+        if (teamID == 1) { // ç´…éšŠ
             targetMesh = meshRedTeam;
             targetTex = texRedTeam;
             if (!targetTex) tintColor = glm::vec3(1.0f, 0.2f, 0.2f);
         }
-        else { // ºñ¶¤
+        else { // ç¶ éšŠ
             targetMesh = meshGreenTeam;
             targetTex = texGreenTeam;
             if (!targetTex) tintColor = glm::vec3(0.2f, 1.0f, 0.2f);
@@ -1190,7 +1117,7 @@ private:
             humanObj->transform->position = glm::vec3(0, 0.0f, 0);
         }
 
-        // 2) ¾{³½
+        // 2) é­·é­š
         auto squidObj = std::make_unique<GameObject>("RemoteSquid");
         squidObj->SetParent(remoteP.get());
         squidObj->active = false;
@@ -1242,7 +1169,7 @@ private:
 
             projectiles.push_back(std::move(bullet));
 
-            // µo°e«Ê¥]
+            // ç™¼é€å°åŒ…
             if (NetworkManager::Instance().IsConnected()) {
                 PacketShoot pkt;
                 pkt.header.type = PacketType::C2S_SHOOT;
@@ -1259,12 +1186,12 @@ private:
         }
     }
 
-    // ¥Í¦¨²×µ²Ãz¬µ
+    // ç”Ÿæˆçµ‚çµçˆ†ç‚¸
     void SpawnSharkExplosion() {
         Player* p = localPlayer.get();
         auto bomb = std::make_unique<Projectile>(
             p->transform->position,
-            glm::vec3(0), // ¨S³t«×
+            glm::vec3(0), // æ²’é€Ÿåº¦
             p->weapon->inkColor,
             p->teamID,
             1.0f,
@@ -1276,10 +1203,10 @@ private:
 
         projectiles.push_back(std::move(bomb));
 
-        // ³o¸Ì¤£»İ­nµo°e SHOOT «Ê¥]¡A¦]¬°Ãz¬µ¬O Server Åv«Â§P©wªº
-        // ¦ı¬°¤FµøÄ±¦P¨B¡A§Ú­Ì¥i¥Hµo°e¤@­Ó SHOOT «Ê¥]±a¦³ BOMB Äİ©Ê¥B³t«×¬° 0
-        // ©ÎªÌ¨Ì¾a Server ¼s¼½Ãz¬µ¨Æ¥ó
-        // ³ÌÂ²³æªº¤èªk¡Gµo°e¤@­Ó BOMB SHOOT¡A¦ı fuseTimer ·¥µu
+        // é€™è£¡ä¸éœ€è¦ç™¼é€ SHOOT å°åŒ…ï¼Œå› ç‚ºçˆ†ç‚¸æ˜¯ Server æ¬Šå¨åˆ¤å®šçš„
+        // ä½†ç‚ºäº†è¦–è¦ºåŒæ­¥ï¼Œæˆ‘å€‘å¯ä»¥ç™¼é€ä¸€å€‹ SHOOT å°åŒ…å¸¶æœ‰ BOMB å±¬æ€§ä¸”é€Ÿåº¦ç‚º 0
+        // æˆ–è€…ä¾é  Server å»£æ’­çˆ†ç‚¸äº‹ä»¶
+        // æœ€ç°¡å–®çš„æ–¹æ³•ï¼šç™¼é€ä¸€å€‹ BOMB SHOOTï¼Œä½† fuseTimer æ¥µçŸ­
         if (NetworkManager::Instance().IsConnected()) {
             PacketShoot pkt;
             pkt.header.type = PacketType::C2S_SHOOT;
@@ -1301,20 +1228,20 @@ private:
         glm::vec3 currentPos = start;
         glm::vec3 endPos = start + (dir * maxDist);
 
-        // 1. ´M§ä¼²ÀğÂI (raycast)
+        // 1. å°‹æ‰¾æ’ç‰†é» (raycast)
         for (float d = 0; d < maxDist; d += stepSize) {
             currentPos += dir * stepSize;
             float terrainH = level->GetHeightAt(currentPos.x, currentPos.z);
 
-            // ¦pªG¦a§Î°ª«× > ¹p®g°ª«×¡A¥Nªí¼²Àğ¤F
+            // å¦‚æœåœ°å½¢é«˜åº¦ > é›·å°„é«˜åº¦ï¼Œä»£è¡¨æ’ç‰†äº†
             if (terrainH > currentPos.y) {
-                endPos = currentPos; // §ó·s²×ÂI¬°¼²À»ÂI
+                endPos = currentPos; // æ›´æ–°çµ‚é»ç‚ºæ’æ“Šé»
                 break;
             }
         }
 
-        // 2. µe¾¥¤ô
-        // ±q°_ÂI¨ì²×ÂI¡A¨C¹j¤@¬q¶ZÂ÷µe¤@­Ó¾¥¸ñ
+        // 2. ç•«å¢¨æ°´
+        // å¾èµ·é»åˆ°çµ‚é»ï¼Œæ¯éš”ä¸€æ®µè·é›¢ç•«ä¸€å€‹å¢¨è·¡
         float dist = glm::distance(start, endPos);
         float inkSpacing = 1.5f;
         int paintSteps = (int)(dist / inkSpacing);
@@ -1322,14 +1249,14 @@ private:
         float uvSize = beamWidth / level->mapSize;
         glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
 
-        // ªu½uÃ¸»s
+        // æ²¿ç·šç¹ªè£½
         for (int i = 0; i <= paintSteps; i++) {
             float t = (float)i / (float)paintSteps;
             glm::vec3 paintPos = glm::mix(start, endPos, t);
 
             auto result = SplatPhysics::WorldToUV(paintPos, glm::vec3(0), level->mapSize, level->mapSize);
             if (result.hit) {
-                // ¹p®g¸g¹Lªº¦a¤è¡A¦pªG¬O°ª³B´Nµe ObstacleMap¡A§C³B´Nµe FloorMap
+                // é›·å°„ç¶“éçš„åœ°æ–¹ï¼Œå¦‚æœæ˜¯é«˜è™•å°±ç•« ObstacleMapï¼Œä½è™•å°±ç•« FloorMap
                 float h = level->GetHeightAt(paintPos.x, paintPos.z);
                 SplatMap* targetMap = (h > 0.5f) ? mapObstacle.get() : mapFloor.get();
 
@@ -1346,19 +1273,19 @@ private:
         if (enemyAI) targets.push_back(enemyAI.get());
         for (auto& pair : remotePlayers) targets.push_back(pair.second.get());
 
-        // ¹p®g§P©w¼e«× (¤ñ¾¥¤ô¼e«×¤p¤@ÂI¡A­n¨Dºë·Ç)
+        // é›·å°„åˆ¤å®šå¯¬åº¦ (æ¯”å¢¨æ°´å¯¬åº¦å°ä¸€é»ï¼Œè¦æ±‚ç²¾æº–)
         float hitWidth = 3.0f;
 
         for (Entity* t : targets) {
-            // ­pºâ ÂI(Enemy) ¨ì ½u¬q(Start-End) ªº³Ìµu¶ZÂ÷
+            // è¨ˆç®— é»(Enemy) åˆ° ç·šæ®µ(Start-End) çš„æœ€çŸ­è·é›¢
             float d = PointToLineSegmentDistance(t->transform->position, start, endPos);
 
             if (d < hitWidth) {
                 Health* hp = t->GetComponent<Health>();
                 if (hp && hp->teamID != teamID) {
-                    hp->TakeDamage(999.0f); // ¬í±ş
+                    hp->TakeDamage(999.0f); // ç§’æ®º
 
-                    // ¦º¤`³B²z
+                    // æ­»äº¡è™•ç†
                     if (hp->isDead) {
                         ProcessKillEvent(attackerID, t, teamID);
                         if (t == enemyAI.get()) {
@@ -1375,26 +1302,26 @@ private:
         }
     }
 
-    // ¥Í¦¨ÀH¾÷¹D¨ã
+    // ç”Ÿæˆéš¨æ©Ÿé“å…·
     void SpawnRandomItem() {
         if (level->itemSpawnPoints.empty()) return;
         int idx = rand() % level->itemSpawnPoints.size();
         glm::vec3 pos = level->itemSpawnPoints[idx];
 
-        // Á×§K­«Å|¥Í¦¨
+        // é¿å…é‡ç–Šç”Ÿæˆ
         for (auto& item : items) if (glm::distance(item->transform->position, pos) < 1.0f) return;
 
         items.push_back(std::make_unique<Item>(pos, ItemType::BOMB));
     }
 
-    // ¥Í¦¨¬µ¼u¹êÅé
+    // ç”Ÿæˆç‚¸å½ˆå¯¦é«”
     void SpawnBombProjectile() {
         if (!localPlayer) return;
         Player* pl = localPlayer.get();
         int myID = NetworkManager::Instance().GetMyPlayerID();
         glm::vec3 spawnPos = pl->transform->position + glm::vec3(0, 2.5f, 0) + pl->transform->GetForward() * 0.5f;
 
-        // ©¹¤W¬İ¤@ÂI
+        // å¾€ä¸Šçœ‹ä¸€é»
         glm::vec3 dir = glm::vec3(0, 0, -1);
         if (pl->cameraRef) {
             dir = pl->cameraRef->transform->GetForward();
@@ -1402,7 +1329,7 @@ private:
         dir.y += 0.4f;
         glm::vec3 velocity = glm::normalize(dir) * 15.0f;
 
-        // «Ø¥ß¬µ¼u
+        // å»ºç«‹ç‚¸å½ˆ
         auto bomb = std::make_unique<Projectile>(
             spawnPos, velocity, pl->weapon->inkColor, pl->teamID, 1.0f,
             NetworkManager::Instance().GetMyPlayerID(), ProjectileType::BOMB
@@ -1426,12 +1353,12 @@ private:
         AudioManager::Instance().PlayOneShot("shoot", 0.8f);
     }
 
-    // ­pºâÂI¨ì½u¬qªº³Ìµu¶ZÂ÷
+    // è¨ˆç®—é»åˆ°ç·šæ®µçš„æœ€çŸ­è·é›¢
     float PointToLineSegmentDistance(glm::vec3 p, glm::vec3 a, glm::vec3 b) {
         glm::vec3 ab = b - a;
         float t = glm::dot(p - a, ab) / glm::dot(ab, ab);
 
-        // ­­¨î t ¦b 0~1 ¤§¶¡ (½u¬q¤º)
+        // é™åˆ¶ t åœ¨ 0~1 ä¹‹é–“ (ç·šæ®µå…§)
         if (t < 0.0f) t = 0.0f;
         if (t > 1.0f) t = 1.0f;
 
@@ -1447,7 +1374,7 @@ private:
             float rot = (float)(rand() % 360);
             float uvSize = 25.0f / mapSize;
 
-            // §PÂ_¦º¦b­ş¸Ì¡A´Nµe¦b­ş¸Ì
+            // åˆ¤æ–·æ­»åœ¨å“ªè£¡ï¼Œå°±ç•«åœ¨å“ªè£¡
             float h = level->GetHeightAt(pos.x, pos.z);
             SplatMap* targetMap = (h > 0.5f) ? mapObstacle.get() : mapFloor.get();
 
@@ -1460,7 +1387,7 @@ private:
         if (state == WorldState::FINISHED) return;
 
         state = WorldState::FINISHED;
-        finishTimer = 5.0f; // °±¯d 5 ¬í
+        finishTimer = kMatchFinishDelaySeconds; // åœç•™ 5 ç§’
         gameTimeRemaining = 0.0f;
 
         if (NetworkManager::Instance().IsServer()) {
@@ -1474,6 +1401,7 @@ private:
             pkt.header.type = PacketType::S2C_GAME_STATE;
             pkt.scoreTeam1 = finalScoreTeam1;
             pkt.scoreTeam2 = finalScoreTeam2;
+            pkt.timeRemaining = 0.0f;
             NetworkManager::Instance().Broadcast(&pkt, sizeof(pkt), true);
         }
 

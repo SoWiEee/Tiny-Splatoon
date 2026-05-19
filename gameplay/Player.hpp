@@ -12,12 +12,13 @@
 #include "BrushWeapon.hpp"
 #include "SlosherWeapon.hpp"
 #include "../splat/SplatMap.hpp"
+#include <memory>
 
 enum class PlayerState {
-    ALIVE,      // ¥¿±`¹Cª±
-    DEAD,       // ¦º¤` (µ¥«İ­«¥Í)
-    LAUNCHING,  // ¶W¯Å¸õÅD¶i³õ¤¤
-    SHARKING    // ÃT³½§¤ÃMª¬ºA
+    ALIVE,      // ç”‡?è™œ?ï“‚î˜
+    DEAD,       // ç”‡é¢±æ»¿ (è‘ï£??ïš™?)
+    LAUNCHING,  // é ï†±?é å”¾??è„£î¹­éŠ?
+    SHARKING    // æ”³ï“„??î“’??Â€??
 };
 
 class Player : public Entity {
@@ -35,45 +36,45 @@ public:
     bool isSwimming = false;
     PlayerState state = PlayerState::ALIVE;
     float respawnTimer = 0.0f;
-    float const RESPAWN_TIME = 4.0f; // ¦º¤`«á 4 ¬í­«¥Í
+    float const RESPAWN_TIME = 4.0f; // ç”‡é¢±æ»¿æ•º?4 è˜î˜Œ???
 
-    // --- ¹D¨ãª¬ºA ---
+    // --- ?îš¥ï†?Â€??---
     bool hasBomb = false;
     bool requestBombThrow = false;
 
-    // --- ¤õ½b¤j©Û (Tri-zooka) ª¬ºA ---
-    bool isRocketActive = false;    // ¬O§_¥¿¦b¤j©Û¼Ò¦¡
-    int rocketAmmo = 0;             // ³Ñ¾lµo®g¦¸¼Æ (3¦¸)
-    float rocketCooldownTimer = 0.0f; // ®gÀ»¶¡¹j
-    float rocketDurationTimer = 0.0f; // ¤j©Û«ùÄò®É¶¡
-    bool requestRocketFire = false;   // [½Ğ¨D] µo®g¤õ½b (µ¹ NetworkManager ¬İ)
+    // --- ?æ€æ‚Œæ†­æ‰³? (Tri-zooka) ?Â€??---
+    bool isRocketActive = false;    // ?è‡¬î’ç”‡?î¯­æ†­æ‰³?ç’…âˆª?
+    int rocketAmmo = 0;             // ?æ‹š??æ¾†?ç”ˆâŠ¥î² (3ç”ˆ?
+    float rocketCooldownTimer = 0.0f; // æ’ ï„“??îš©?
+    float rocketDurationTimer = 0.0f; // æ†­æ‰³??î¼½??î¿œ?
+    bool requestRocketFire = false;   // [éš¢ï•?] ?æ¾†??æ€æ‚Œ (è¯?NetworkManager ??
 
-    // --- ÃT³½§¤ÃM°Ñ¼Æ ---
-    int sharkDashCount = 0;         // ³Ñ¾l½Ä¨ë¦¸¼Æ (Á`¦@ 3 ¦¸)
-    bool isSharkDashing = false;    // ¥Ø«e¬O¦b¡u½Ä¨ë¤¤¡vÁÙ¬O¡u°±¹yºË·Ç¤¤¡v
-    float sharkStateTimer = 0.0f;   // ¦@¥Î­p®É¾¹ (½Ä¨ë­Ë¼Æ ©Î °±¹y­Ë¼Æ)
+    // --- æ”³ï“„??î“’??ï¶î² ---
+    int sharkDashCount = 0;         // ?æ‹š?éŠµî³‡ï›ç”ˆâŠ¥î² (è®è³¢ï…» 3 ç”ˆ?
+    bool isSharkDashing = false;    // ?æ¡€??è‡¬î¯­?ï—½??ç®”è‘‰?ïš›??èƒ¯Â€ï—º??îš§?çšî¡»è‘‰??
+    float sharkStateTimer = 0.0f;   // ?æ¢îœ…é–®ï‡???(éŠµî³‡ï›?î˜‰î² ???î°®??î˜‰î²)
 
-    // °Ñ¼Æ³]©w
+    // ?ï¶î²é–®å‰–?
     float sharkDashDuration = 1.0f;
     float sharkPauseDuration = 0.7f;
-    float sharkSpeed = 13.0f;        // ½Ä¨ë³t«× (­n§Ö¤@ÂI¤~²n)
-    float sharkInkTimer = 0.0f;      // ¼Q¾¥­p®É¾¹
+    float sharkSpeed = 13.0f;        // éŠµî³‡ï›?î¸æ¼² (é–¬î¼»ç¿°éŠÂ€æšºîµ¥???
+    float sharkInkTimer = 0.0f;      // ?æ¸¸â—¢é–®ï‡???
     glm::vec3 sharkDashDirection = glm::vec3(0, 0, 1);
     bool requestSharkSpray = false;
     bool requestSharkExplode = false;
 
     bool requestLaser = false;
-    float currentCharge = 0.0f;       // ·í«e¯à¶q
-    float const MAX_SPECIAL = 100.0f; // ¯à¶q¤W­­
+    float currentCharge = 0.0f;       // ?å—…??è³¡?
+    float const MAX_SPECIAL = 100.0f; // ?è³¡?éŠï“„?
 
-    // ¶W¯Å¸õÅD°Ñ¼Æ
+    // é ï†±?é å”¾??ï¶î²
     glm::vec3 jumpStartPos;
     glm::vec3 jumpTargetPos;
     float jumpTimer = 0.0f;
-    float const JUMP_DURATION = 1.5f; // ¸õÅD­¸¦æ®É¶¡
+    float const JUMP_DURATION = 1.5f; // é å”¾?æ†Œî®??î¿œ?
 
     // reference
-    Weapon* weapon = nullptr;
+    std::unique_ptr<Weapon> weapon;
     SplatMap* mapFloor = nullptr;
     SplatMap* mapObstacle = nullptr;
     GameObject* cameraRef;
@@ -84,10 +85,10 @@ public:
     GameObject* visualHuman = nullptr;
     GameObject* visualSquid = nullptr;
 
-    float healRateSlow = 10.0f;      // ¯¸¥ß¦^¦å (º©ªø)
-    float healRateFast = 20.0f;      // ¼ç¤ô¦^¦å (§Ö³t)
-    float regenDelay = 2.0f;         // ¨ü¶Ë«á­nµ¥ 2 ¬í¤~¯à¶}©l¦^¦å
-    float currentRegenDelay = 0.0f;  // ­p®É¾¹
+    float healRateSlow = 10.0f;      // è¡î©•??îµ§? (çæî±)
+    float healRateFast = 20.0f;      // çî®åŒ?îµ§? (æ•¹æÂ€?
+    float regenDelay = 2.0f;         // ?î¤™î¾ªæ•ºï—½?è‘?2 è˜î˜‰??è³¡?æ†ªï•?éŠµÂ€
+    float currentRegenDelay = 0.0f;  // é–®ï‡???
     float mapLimit = 39.5f;
     float floorSize = 80.0f;
 
@@ -98,7 +99,6 @@ public:
         transform->position = startPos;
 
         if (cam) camera = cam->GetComponent<Camera>();
-        weapon = nullptr;
 
         AddComponent<Health>(team, startPos);
 
@@ -108,16 +108,11 @@ public:
         StartSuperJump();
     }
 
-    ~Player() {
-        if (weapon) delete weapon;
+    void EquipWeapon(std::unique_ptr<Weapon> newWeapon) {
+        weapon = std::move(newWeapon);
     }
 
-    void EquipWeapon(Weapon* newWeapon) {
-        if (weapon) delete weapon;
-        weapon = newWeapon;
-    }
-
-    // ¥DÅŞ¿è§ó·s
+    // éŠé§?é ›èˆ€î­œ??
     void UpdateLogic(float dt) {
         auto hpComp = GetComponent<Health>();
         if (state == PlayerState::ALIVE && hpComp && hpComp->isDead) {
@@ -130,19 +125,19 @@ public:
             HandleInput(dt);
             UpdateRocketState(dt);
 
-            // «ö¤U Q Áäµo°Ê¤j©Û (³o¸Ì¥Ü½d¨âºØ¤j©Û¡A§A¥i¥H¦Û¤v¨M©w­n¥Î­ş¤@ºØ)
+            // ?ï¢? Q ?è‡î¨ª?îŸŸä¹‹??(?î©–ã„è·ç®‡??æ‹è»Šæ†­æ‰³?åš—ï—¹??è‡­èª‘?èŠ¸æ¥›ç˜™ç®?é–¬î¼½îœ…?èŠ¯?è”?
             if (Input::GetKey(GLFW_KEY_Q) && IsSpecialReady()) {
-                // ¦pªG§A·Q¥ÎÃT³½¡G StartSpecialShark();
-                // ¦pªG§A·Q¥Î¤õ½b¡G
+                // æ†’î¿™?é›¿îºŸïƒ?åˆ¸?æ“³î«º? StartSpecialShark();
+                // æ†’î¿™?é›¿îºŸïƒ?å‡½î¼èå“¨?
                 ActivateRocketSpecial();
 
-                // ¦©°£¯à¶q
+                // ??î¨’?è³¡?
                 currentCharge = 0.0f;
             }
 
             if (level && mapFloor && mapObstacle) {
 
-                // 1. ­pºâ UV ®y¼Ğ
+                // 1. é–®ïˆ? UV æ‘¨æ‰³?
                 float u = (transform->position.x / floorSize) + 0.5f;
                 float v = (transform->position.z / floorSize) + 0.5f;
 
@@ -156,14 +151,14 @@ public:
                 bool onEnemyInk = targetMap->IsColorInArea(u, v, enemyTeam, 1);
                 bool onMyInk = targetMap->IsColorInArea(u, v, teamID, 1);
 
-                // --- ¶Ë®`»P¦^¦åÅŞ¿è ---
+                // --- ?ç‘•æ‹¿?ï‹©?éŠµÂ€?î´æ‘© ---
                 auto healthComp = GetComponent<Health>();
                 if (healthComp) {
                     if (!onEnemyInk && currentRegenDelay > 0.0f) {
                         currentRegenDelay -= dt;
                     }
                     else {
-                        // ®Ú¾Ú¬O§_¼ç¤ô¨M©w¦^¦å³t«×
+                        // ?å¯??è‡¬î’çî®åŒç˜™ç®??îµ§??î¸æ¼²
                         if (isSwimming) healthComp->Heal(healRateFast * dt);
                         else healthComp->Heal(healRateSlow * dt);
                     }
@@ -210,13 +205,13 @@ public:
     }
 
     void Die() {
-        // ¨¾¤î­«½Æ¦º¤`
+        // ?è„«è¿«?ïšš?ç”‡é¢±æ»¿
         if (state == PlayerState::DEAD || state == PlayerState::LAUNCHING) return;
 
         state = PlayerState::DEAD;
         respawnTimer = RESPAWN_TIME;
 
-        // ¦º¤`®É­«¸m¤j©Ûª¬ºA
+        // ç”‡é¢±æ»¿?î¿œ?èµæ¡€ä¹‹?î®???
         isRocketActive = false;
         rocketAmmo = 0;
 
@@ -238,7 +233,7 @@ public:
         if (visualBody) visualBody->active = true;
 
         float zDir = (teamID == 1) ? -1.0f : 1.0f;
-        jumpTargetPos = glm::vec3(0, 0.0f, 30.0f * zDir); // ¸¨¦aÂI
+        jumpTargetPos = glm::vec3(0, 0.0f, 30.0f * zDir); // ?è³¢î¯µæšº?
 
         GetComponent<Health>()->Reset();
         if (hudRef) hudRef->RefillInk(100.0f);
@@ -252,7 +247,7 @@ public:
         }
     }
 
-    // ¤õ½b¤j©ÛÅŞ¿è
+    // ?æ€æ‚Œæ†­æ‰³??î´æ‘©
     void ActivateRocketSpecial() {
         if (isRocketActive) return;
 
@@ -260,21 +255,21 @@ public:
         rocketAmmo = 3;
         rocketDurationTimer = 6.0f;
 
-        AudioManager::Instance().PlayOneShot("shark", 0.6f);    // ¼½©ñ±Ò°Ê­µ®Ä
+        AudioManager::Instance().PlayOneShot("shark", 0.6f);    // ?å‰œîœ›?î¸??å–®?
         std::cout << ">>> ROCKET LAUNCHER EQUIPPED! (Ammo: 3) <<<" << std::endl;
     }
 
     void UpdateRocketState(float dt) {
         if (!isRocketActive) return;
 
-        // 1. ­Ë¼Æ­p®É
+        // 1. ?î˜‰î²é–®ï‡?
         rocketDurationTimer -= dt;
         if (rocketDurationTimer <= 0.0f) {
             DeactivateRocketSpecial();
             return;
         }
 
-        // 2. ®gÀ»§N«o­Ë¼Æ
+        // 2. æ’ ï„“??ç‘•ï™­?î˜‰î²
         if (rocketCooldownTimer > 0.0f) {
             rocketCooldownTimer -= dt;
         }
@@ -390,6 +385,7 @@ public:
     }
 
     void SetupVisuals(GameObject* human, GameObject* squid) {
+        visualBody = human;
         visualHuman = human;
         visualSquid = squid;
         UpdateVisualState();
@@ -413,7 +409,7 @@ public:
 private:
     glm::vec3 GetSpawnPosition() {
         float zDir = (teamID == 1) ? -1.0f : 1.0f;
-        jumpStartPos = glm::vec3(0, 15.0f, 40.0f * zDir); // °ªªÅ­«¥ÍÂI
+        jumpStartPos = glm::vec3(0, 15.0f, 40.0f * zDir); // æ“ƒî¦¸å¾?ïš™?æšº?
         return jumpStartPos;
     }
     void UpdateDeadState(float dt) {
@@ -507,22 +503,22 @@ private:
             isGrounded = false;
         }
 
-        // ®gÀ»ÅŞ¿è (Àu¥ı§PÂ_¤õ½b)
+        // æ’ ï„“??î´æ‘© (?èŠ¸??æ–—î¡?æ€æ‚Œ)
 
-        // 1. ¥ıÀË¬d¬O§_­nµo®g¤õ½b (¤£¥i¼ç¤ô)
+        // 1. ?ï‡ç‚?äº¤î¦€?è¥¿??æ¾†??æ€æ‚Œ (éŠïš—î»çî®åŒ)
         if (isRocketActive && !isSwimming) {
             if (Input::GetMouseButton(0) && rocketCooldownTimer <= 0.0f && rocketAmmo > 0) {
-                // ³]©w½Ğ¨DºX¼Ğ¡AÅı¥~³¡§ì¥hµo°e«Ê¥]
+                // é–®å‰–?éš¢ï•??î¤š?åš—ï—½?æ†­î¢€ï€¸?îš¥îª?æ½®Â€î¼»???
                 requestRocketFire = true;
 
-                // ¦©°£¼uÃÄ»P³]©w§N«o
+                // ??î¨’æ•¶ï‰î£™?ï‹¬èº«æ‘°î«°ïˆ??
                 rocketAmmo--;
                 rocketCooldownTimer = 0.6f;
 
-                // ¼½©ñ­µ®Ä
+                // ?å‰œîœ›?å–®?
                 AudioManager::Instance().PlayOneShot("rocket_shot", 0.7f);
 
-                // ¦pªG®g§¹¤F¡Aµ²§ô¤j©Û
+                // æ†’î¿™?æ’ ï„’?éˆ­ï‰–?è¯î“?æ†­æ‰³?
                 if (rocketAmmo <= 0) {
                     DeactivateRocketSpecial();
                 }
@@ -530,7 +526,7 @@ private:
             return;
         }
 
-        // ´¶³qªZ¾¹®gÀ»
+        // ?æ¡…Â€î«±éƒ?å…¸???
         if (weapon) {
             bool hasInk = (hudRef && hudRef->currentInk >= weapon->inkCost);
             bool isFiring = Input::GetMouseButton(0) && !isSwimming && hasInk;
@@ -542,7 +538,7 @@ private:
                 camera->TriggerShake(0.1f, 0.05f);
                 AudioManager::Instance().PlayOneShot("shoot", 0.2f);
 
-                AddSpecialCharge(2.0f); // ¶°®ğ
+                AddSpecialCharge(2.0f); // ?ï‰é™¤
             }
         }
 
@@ -607,7 +603,7 @@ private:
         if (!hudRef) return;
 
         bool isShooting = Input::GetMouseButton(0) && !isSwimming;
-        // ¦pªG¥¿¦b®g¤õ½b¡A¤]ºâ¬O¦b®gÀ»¡A¤£¦^¥R
+        // æ†’î¿™?ç”‡?î¯­æ’ ï„”î¼èå“¨?éŠ‹î¸ƒ??è‡¬î¯­æ’ ï„“?åš—ï—¹??îµ¤?
         if (isRocketActive && Input::GetMouseButton(0)) isShooting = true;
 
         if (!isShooting) {

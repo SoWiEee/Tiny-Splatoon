@@ -8,10 +8,11 @@
 #include "../components/Health.hpp"
 #include <glm/glm.hpp>
 #include <cstdlib>
+#include <memory>
 
 class Enemy : public Entity {
 public:
-    // --- ÄÝ©Ê ---
+    // --- æ’…ç¥†Â€?---
     float moveSpeed = 3.0f;
     float mapLimit = 18.0f;
 
@@ -21,30 +22,26 @@ public:
     glm::vec3 currentDir = glm::vec3(0, 0, 1);
 
     // reference
-    Weapon* weapon = nullptr;;
-    GameObject* visualBody;
-    GameObject* shadow;
+    std::unique_ptr<Weapon> weapon;
+    std::unique_ptr<GameObject> visualBody;
+    std::unique_ptr<GameObject> shadow;
 
     Enemy(glm::vec3 startPos, int team) : Entity("Enemy") {
         this->teamID = team;
 
-        shadow = new GameObject("ShadowBlob");
-        shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f)); // ¶Â¦â
-        // µy·L¯B¦b¦aªO¤W¤@ÂIÂI¡AÁ×§K Z-Fighting
+        shadow = std::make_unique<GameObject>("ShadowBlob");
+        shadow->AddComponent<MeshRenderer>("Plane", glm::vec3(0.0f, 0.0f, 0.0f)); // æšºî•®ï°
+        // è”ïš—å‡ç˜šæ¡€î¯­?å”³î²¡éŠï’¿?æšºîµ¨?åš—ï—¾î¼•??Z-Fighting
         shadow->transform->position = transform->position + glm::vec3(0, 0.02f, 0);
-        shadow->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f); // ³±¼v¤ñ¤Hµy·L¤j¤@ÂI
+        shadow->transform->scale = glm::vec3(1.2f, 1.0f, 1.2f); // ?å•£è”£ç˜¥îçŠ–è”ïš—å‡æ†­æ‰¾?æšº?
         transform->position = startPos;
         AddComponent<Health>(team, startPos);
-        weapon = new ShooterWeapon(team, glm::vec3(0, 1, 0));
+        weapon = std::make_unique<ShooterWeapon>(team, glm::vec3(0, 1, 0));
 
-        visualBody = new GameObject("EnemyBody");
+        visualBody = std::make_unique<GameObject>("EnemyBody");
         visualBody->AddComponent<MeshRenderer>("Cube", weapon->inkColor);
 
         RandomizeDir();
-    }
-
-    ~Enemy() {
-        if (weapon) delete weapon;
     }
 
     void UpdateLogic(float dt) {
@@ -81,7 +78,7 @@ public:
         }
     }
 
-    GameObject* GetVisualBody() { return visualBody; }
+    GameObject* GetVisualBody() { return visualBody.get(); }
 
 private:
     void RandomizeDir() {
@@ -99,8 +96,8 @@ private:
         if (pos.z < -mapLimit) { pos.z = -mapLimit; hit = true; }
 
         if (hit) {
-            pos -= currentDir * moveSpeed * dt; // °h«á
-            RandomizeDir(); // ´«¤è¦V
+            pos -= currentDir * moveSpeed * dt; // ?Â€æ•º?
+            RandomizeDir(); // ?î®Žî¡??
         }
     }
 };
