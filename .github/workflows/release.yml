@@ -1,0 +1,86 @@
+name: Release Windows Build
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set up vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            build-release/vcpkg_installed
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'CMakeLists.txt') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          $vcpkgRoot = Join-Path $env:GITHUB_WORKSPACE "vcpkg"
+          if (-not (Test-Path $vcpkgRoot)) {
+            git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot
+          }
+
+          git -C $vcpkgRoot fetch --depth 1 origin b1b19307e2d2ec1eefbdb7ea069de7d4bcd31f01
+          git -C $vcpkgRoot checkout b1b19307e2d2ec1eefbdb7ea069de7d4bcd31f01
+          & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat")
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          $toolchain = Join-Path $env:GITHUB_WORKSPACE "vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake -S . -B build-release -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build-release --config Release
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $packageRoot = Join-Path $env:GITHUB_WORKSPACE "dist/Tiny-Splatoon"
+          $dllSource = Join-Path $env:GITHUB_WORKSPACE "build-release/vcpkg_installed/x64-windows/bin"
+          $archive = Join-Path $env:GITHUB_WORKSPACE "dist/Tiny-Splatoon-$tag-windows-x64.zip"
+
+          Remove-Item $packageRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
+
+          Copy-Item "build-release/Tiny-Splatoon.exe" $packageRoot
+          Copy-Item "build-release/assets" $packageRoot -Recurse
+
+          if (Test-Path $dllSource) {
+            Get-ChildItem $dllSource -Filter *.dll | Copy-Item -Destination $packageRoot
+          }
+
+          if (Test-Path $archive) {
+            Remove-Item $archive -Force
+          }
+
+          Compress-Archive -Path "$packageRoot/*" -DestinationPath $archive
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Tiny-Splatoon-${{ github.ref_name }}-windows-x64.zip
+          generate_release_notes: true
