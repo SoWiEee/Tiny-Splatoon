@@ -19,7 +19,7 @@ public:
     void OnEnter() override {
         glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         gui->SetState(UIState::LOBBY);
-        AudioManager::Instance().PlayBGM("assets/LifeWillChange.mp3", 0.2f);
+        AudioManager::Instance().PlayBGM("assets/audios/LifeWillChange.mp3", 0.2f);
     }
 
     void OnExit() override {

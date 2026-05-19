@@ -28,7 +28,7 @@ void GameScene::OnEnter() {
     world->scoreboardRef = scoreboard;
 
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    AudioManager::Instance().PlayBGM("assets/game.mp3", 0.1f);
+    AudioManager::Instance().PlayBGM("assets/audios/game.mp3", 0.1f);
 }
 
 void GameScene::OnExit() {

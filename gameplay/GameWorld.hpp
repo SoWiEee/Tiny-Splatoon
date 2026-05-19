@@ -38,6 +38,35 @@ public:
     static constexpr float kScoreSyncIntervalSeconds = 0.5f;
     static constexpr float kMatchFinishDelaySeconds = 5.0f;
     static constexpr float kEntityHitRadius = 0.5f;
+    static constexpr float kDefaultProjectileSpeed = 25.0f;
+    static constexpr float kDefaultProjectileScale = 0.3f;
+    static constexpr float kDefaultProjectileLift = 2.0f;
+    static constexpr float kRocketProjectileSpeed = 35.0f;
+    static constexpr float kRocketProjectileScale = 0.8f;
+    static constexpr float kBombProjectileSpeed = 10.0f;
+    static constexpr float kProjectileInkMultiplier = 50.0f;
+    static constexpr float kProjectileHitDamage = 10.0f;
+    static constexpr float kProjectileHitParticleCount = 15.0f;
+    static constexpr float kProjectileHitParticleSpeed = 8.0f;
+    static constexpr float kObstacleHitParticleCount = 5.0f;
+    static constexpr float kObstacleHitParticleSpeed = 5.0f;
+    static constexpr float kFloorHitParticleCount = 10.0f;
+    static constexpr float kFloorHitParticleSpeed = 5.0f;
+    static constexpr float kRocketExplosionRadius = 4.0f;
+    static constexpr float kRocketBlastRadius = 8.0f;
+    static constexpr float kRocketBlastDamage = 50.0f;
+    static constexpr float kRocketExplosionParticleCount = 80.0f;
+    static constexpr float kRocketExplosionParticleSpeed = 40.0f;
+    static constexpr float kBombWarningRadius = 15.0f;
+    static constexpr float kBombBounceDampingY = 0.8f;
+    static constexpr float kBombBounceDampingXZ = 0.9f;
+    static constexpr float kBombBounceStopVelocity = 1.0f;
+    static constexpr float kBombExplosionRadius = 15.0f;
+    static constexpr int kBombExplosionLayers = 5;
+    static constexpr float kBombBlastRadius = 10.0f;
+    static constexpr float kBombBlastDamage = 999.0f;
+    static constexpr float kBombExplosionParticleCount = 50.0f;
+    static constexpr float kBombExplosionParticleSpeed = 25.0f;
 
     // --- 系統物件 ---
     std::unique_ptr<Level> level;

@@ -143,24 +143,24 @@ void GameWorld::Init(GameObject* mainCamera, HUD* hud, Scoreboard* scoreboard) {
     }
 
 void GameWorld::CreateProjectile(int ownerID, int teamID, glm::vec3 startPos, glm::vec3 dir, ProjectileType type) {
-        float speed = 25.0f;
-        float scale = 0.3f;
+        float speed = kDefaultProjectileSpeed;
+        float scale = kDefaultProjectileScale;
         glm::vec3 color = (teamID == 1) ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
 
         // 根據類型調整參數
         if (type == ProjectileType::ROCKET) {
-            speed = 35.0f; // 火箭很快
-            scale = 0.8f;  // 火箭較大
+            speed = kRocketProjectileSpeed;
+            scale = kRocketProjectileScale;
         }
         else if (type == ProjectileType::BOMB) {
-            speed = 10.0f; // 炸彈拋物線
+            speed = kBombProjectileSpeed;
         }
 
         glm::vec3 velocity = dir * speed;
 
         // 如果不是火箭也不是炸彈，一般子彈會加一點上拋
         if (type != ProjectileType::ROCKET && type != ProjectileType::BOMB) {
-            velocity.y += 2.0f;
+            velocity.y += kDefaultProjectileLift;
         }
 
         auto proj = std::make_unique<Projectile>(startPos, velocity, color, teamID, scale, ownerID, type);
@@ -179,8 +179,8 @@ void GameWorld::SendShootPacket(glm::vec3 pos, glm::vec3 dir, ProjectileType typ
         pkt.type = type;
 
         // 這些參數可以不用傳，讓接收端根據 Type 自己決定，但為了彈性先傳
-        pkt.speed = (type == ProjectileType::ROCKET) ? 35.0f : 25.0f;
-        pkt.scale = (type == ProjectileType::ROCKET) ? 0.8f : 0.3f;
+        pkt.speed = (type == ProjectileType::ROCKET) ? kRocketProjectileSpeed : kDefaultProjectileSpeed;
+        pkt.scale = (type == ProjectileType::ROCKET) ? kRocketProjectileScale : kDefaultProjectileScale;
         pkt.color = localPlayer->weapon->inkColor;
 
         if (NetworkManager::Instance().IsServer()) {
@@ -660,9 +660,9 @@ bool GameWorld::HandleProjectileEntityCollision(Projectile* p) {
             Health* hp = target->GetComponent<Health>();
             if (hp) {
                 bool wasAlive = !hp->isDead;
-                hp->TakeDamage(10.0f);
+                hp->TakeDamage(kProjectileHitDamage);
 
-                particleSystem->Emit(p->transform->position, p->inkColor, 15, 8.0f);
+                particleSystem->Emit(p->transform->position, p->inkColor, kProjectileHitParticleCount, kProjectileHitParticleSpeed);
 
                 if (wasAlive && hp->isDead) {
                     if (NetworkManager::Instance().IsServer()) {
@@ -724,7 +724,7 @@ bool GameWorld::HandleProjectileObstacleCollision(Projectile* p, float mapSize, 
                         float uvSize = (p->transform->scale.x * inkMultiplier) / mapSize;
                         float rot = (float)(rand() % 360);
                         painter->Paint(mapObstacle.get(), result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
-                        particleSystem->Emit(pos, p->inkColor, 5, 5.0f);
+                        particleSystem->Emit(pos, p->inkColor, kObstacleHitParticleCount, kObstacleHitParticleSpeed);
                     }
                 }
                 return true;
@@ -750,9 +750,9 @@ bool GameWorld::HandleBombProjectile(Projectile* p) {
             p->warningPlayed = true;
             if (localPlayer) {
                 float dist = glm::distance(p->transform->position, localPlayer->transform->position);
-                if (dist < 15.0f) {
-                    AudioManager::Instance().PlayOneShot("bomb_beep", 1.0f);
-                }
+            if (dist < kBombWarningRadius) {
+                AudioManager::Instance().PlayOneShot("bomb_beep", 1.0f);
+            }
             }
         }
 
@@ -763,11 +763,11 @@ bool GameWorld::HandleBombProjectile(Projectile* p) {
         }
 
         if (p->hasHitFloor) {
-            p->velocity.y = -p->velocity.y * 0.8f;
-            p->velocity.x *= 0.9f;
-            p->velocity.z *= 0.9f;
+            p->velocity.y = -p->velocity.y * kBombBounceDampingY;
+            p->velocity.x *= kBombBounceDampingXZ;
+            p->velocity.z *= kBombBounceDampingXZ;
 
-            if (abs(p->velocity.y) < 1.0f) p->velocity.y = 0;
+            if (abs(p->velocity.y) < kBombBounceStopVelocity) p->velocity.y = 0;
 
             p->transform->position = p->hitPosition + glm::vec3(0, 0.1f, 0);
             p->hasHitFloor = false;
@@ -778,10 +778,10 @@ bool GameWorld::HandleBombProjectile(Projectile* p) {
 void GameWorld::PaintRocketExplosion(Projectile* p, float mapSize) {
         glm::vec3 hitPos = p->transform->position;
 
-        if (particleSystem) particleSystem->Emit(hitPos, p->inkColor, 80, 40.0f);
+        if (particleSystem) particleSystem->Emit(hitPos, p->inkColor, kRocketExplosionParticleCount, kRocketExplosionParticleSpeed);
         AudioManager::Instance().PlayOneShot("explode", 1.0f);
 
-        float rRadius = 4.0f;
+        float rRadius = kRocketExplosionRadius;
         float uvSize = (rRadius * 2.0f) / mapSize;
         auto res = SplatPhysics::WorldToUV(hitPos, glm::vec3(0), mapSize, mapSize);
         if (res.hit) {
@@ -797,12 +797,12 @@ void GameWorld::ApplyRocketExplosionDamage(Projectile* p) {
         }
 
         glm::vec3 hitPos = p->transform->position;
-        float blastRadius = 8.0f;
+        float blastRadius = kRocketBlastRadius;
         if (localPlayer && localPlayer->teamID != p->ownerTeam) {
             if (glm::distance(localPlayer->transform->position, hitPos) < blastRadius) {
                 auto hp = localPlayer->GetComponent<Health>();
                 if (hp && !hp->isDead) {
-                    hp->TakeDamage(50.0f);
+                    hp->TakeDamage(kRocketBlastDamage);
                     if (hp->isDead) {
                         PacketKillEvent kPkt;
                         kPkt.header.type = PacketType::S2C_KILL_EVENT;
@@ -829,8 +829,8 @@ void GameWorld::ApplyRocketExplosionDamage(Projectile* p) {
 
 void GameWorld::PaintBombExplosion(Projectile* p, float mapSize) {
         glm::vec3 bombPos = p->transform->position;
-        float maxRadius = 15.0f;
-        int layers = 5;
+        float maxRadius = kBombExplosionRadius;
+        int layers = kBombExplosionLayers;
 
         for (int l = 0; l <= layers; l++) {
             float currentRadius = (maxRadius / layers) * l;
@@ -858,7 +858,7 @@ void GameWorld::PaintBombExplosion(Projectile* p, float mapSize) {
             }
         }
         AudioManager::Instance().PlayOneShot("explode", 1.0f);
-        if (particleSystem) particleSystem->Emit(bombPos, p->inkColor, 50, 25.0f);
+        if (particleSystem) particleSystem->Emit(bombPos, p->inkColor, kBombExplosionParticleCount, kBombExplosionParticleSpeed);
     }
 
 void GameWorld::ApplyBombExplosionDamage(Projectile* p) {
@@ -866,8 +866,8 @@ void GameWorld::ApplyBombExplosionDamage(Projectile* p) {
             return;
         }
 
-        float blastRadius = 10.0f;
-        float damage = 999.0f;
+        float blastRadius = kBombBlastRadius;
+        float damage = kBombBlastDamage;
 
         if (localPlayer) {
             float dist = glm::distance(p->transform->position, localPlayer->transform->position);
@@ -920,7 +920,7 @@ bool GameWorld::HandleDefaultProjectile(Projectile* p, float mapSize, float inkM
                 float uvSize = (p->transform->scale.x * inkMultiplier) / mapSize;
                 float rot = (float)(rand() % 360);
                 painter->Paint(mapFloor.get(), result.uv, uvSize, p->inkColor, rot, p->ownerTeam);
-                particleSystem->Emit(p->hitPosition + glm::vec3(0, 0.2f, 0), p->inkColor, 10, 5.0f);
+                particleSystem->Emit(p->hitPosition + glm::vec3(0, 0.2f, 0), p->inkColor, kFloorHitParticleCount, kFloorHitParticleSpeed);
             }
             return true;
         }
@@ -930,7 +930,7 @@ bool GameWorld::HandleDefaultProjectile(Projectile* p, float mapSize, float inkM
 
 void GameWorld::UpdateProjectiles(float dt) {
         float mapSize = level->mapSize;
-        float inkMultiplier = 50.0f;
+        float inkMultiplier = kProjectileInkMultiplier;
         RefreshProjectileCollisionTargets();
 
         for (auto it = projectiles.begin(); it != projectiles.end(); ) {
