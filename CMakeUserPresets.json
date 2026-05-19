@@ -4,6 +4,11 @@
     {
       "name": "default",
       "inherits": "vcpkg",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_VERSION": "10.0.22621.0",
+        "CMAKE_RC_COMPILER": "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64/rc.exe",
+        "CMAKE_MT": "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64/mt.exe"
+      },
       "environment": {
         "VCPKG_ROOT": "C:\\Users\\MintIce\\vcpkg"
       }
