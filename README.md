@@ -8,6 +8,12 @@
 > [!NOTE]
 > 這是一個學習／作品集性質的專案，目標平台為 Windows，採用 listen-server 架構——主機同時也是玩家。
 
+## Demo
+
+[![Tiny-Splatoon gameplay demo](https://img.youtube.com/vi/rS_o25PM3hM/maxresdefault.jpg)](https://youtu.be/rS_o25PM3hM)
+
+點擊上方縮圖觀看遊戲展示影片：[YouTube Demo](https://youtu.be/rS_o25PM3hM)
+
 ## Features
 
 - **團隊塗地對戰** — 紅隊 vs. 綠隊，塗滿地圖、以佔地率決勝。單場時間 180 秒。
