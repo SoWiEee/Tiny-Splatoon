@@ -114,9 +114,29 @@ Tiny-Splatoon/
 
 ## Documentation
 
-- [`spec.md`](spec.md) — 以實作為本的軟體設計文件（場景、網路、遊戲邏輯、墨水系統）。
+### OpenGL 還原進度與驗證入口
+
+還原目前有獨立的地形驗證入口，可檢視從參考版匯出的八張地圖與合法模式變體，以及可塗／計分表面。左鍵可蓋上固定種子的邏輯墨，顯示 CPU 格子的實際歸屬；右鍵拖曳旋轉、W/S 縮放、A/D 平移。這是遷移驗證工具，尚非完整還原的遊戲模式。
+
+```powershell
+.\build\Tiny-Splatoon.exe --reference-stage halyard --reference-mode turf
+.\build\Tiny-Splatoon.exe --reference-stage halyard --paint-probe 1 --capture build\captures\halyard.png --frames 3
+ctest --test-dir build --output-on-failure
+node tools/export-reference.mjs --check
+.\tools\check-stage-viewer.ps1
+```
+
+匯出工具使用 Node.js 22.17+，直接讀取鎖定的 `splat-ref/`；一般原生建置及地形檢視使用已提交的產物，不需要 Node.js 或參考資料夾。更新來源須依規格先處理基準變更，不可直接覆寫雜湊清單。
+
+Windows Optimus 筆電的執行檔會透過 `NvOptimusEnablement` 請求 NVIDIA 獨立顯卡；Windows 或驅動的個別程式設定仍可能覆寫此偏好。地形工具啟動時會輸出實際的 OpenGL renderer，請以該紀錄確認使用的顯卡。
+
+- [需求進度與限制](docs/restoration-progress.md)
+- [地形／碰撞／墨水測試](tests/)
+
+- [`spec.md`](spec.md) — 以 `splat-ref/` 為基準的 OpenGL 完整還原規格，定義後續開發範圍、來源優先序及逐項驗收條件。
+- [`docs/reference-baseline.sha256`](docs/reference-baseline.sha256) — 本次參考版本的檔案雜湊清單。
 - [`architecture.md`](architecture.md) — 關於 `GameWorld` 職責拆分與重構方向的筆記。
 - [DeepWiki](https://deepwiki.com/SoWiEee/Tiny-Splatoon) — 自動生成、可瀏覽的程式碼庫總覽。
 
 > [!NOTE]
-> `spec.md` 記錄的是專案「當前實作」的樣貌，包含已知落差——例如部分已宣告的封包型別尚未使用、AI 敵人已存在於程式碼中但目前停用。它是當前行為的權威依據。
+> `spec.md` 描述後續要達成的完整還原目標，並不表示目前 C++ 版已完成這些功能。本 README 的遊玩方式與功能清單仍描述現有版本；還原進度須依規格逐項驗收。

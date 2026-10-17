@@ -21,6 +21,7 @@
 #include "scene/Lobby.hpp"
 #include "scene/LoginScene.hpp"
 #include "scene/GameScene.hpp"
+#include "restoration/StageViewer.hpp"
 
 enum class GameState {
     LOGIN_MENU,
@@ -39,7 +40,10 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     }
 }
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc > 1 && std::string(argv[1]) == "--reference-stage") {
+        return restoration::RunStageViewer(argc, argv);
+    }
     // Network, Window, GUI Init
     NetworkManager::Instance().Initialize();
     Window window(SCR_WIDTH, SCR_HEIGHT, "Tiny Splatoon");
