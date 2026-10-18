@@ -118,12 +118,17 @@ Tiny-Splatoon/
 
 還原目前有獨立的地形驗證入口，可檢視從參考版匯出的八張地圖與合法模式變體，以及可塗／計分表面。左鍵可蓋上固定種子的邏輯墨，顯示 CPU 格子的實際歸屬；右鍵拖曳旋轉、W/S 縮放、A/D 平移。這是遷移驗證工具，尚非完整還原的遊戲模式。
 
+另有可操作的原生練習預覽：`--reference-game halyard`。選場後按 Start practice，WASD 移動、滑鼠瞄準、左鍵 Spritzer 射擊、Shift 變形／己墨游泳／攀牆、Space 跳躍、Esc 暫停與返回。模擬固定 60 Hz；七張離線地圖可測試，Cargo 仍需正式線上流程。人物目前以碰撞膠囊顯示，正式角色、道具外觀、全裝備、AI 和模式仍待遷移。
+
 ```powershell
 .\build\Tiny-Splatoon.exe --reference-stage halyard --reference-mode turf
+.\build\Tiny-Splatoon.exe --reference-game halyard
+.\build\Tiny-Splatoon.exe --reference-game halyard --play-probe 1 --frames 240 --capture build\captures\practice\halyard.png
 .\build\Tiny-Splatoon.exe --reference-stage halyard --paint-probe 1 --capture build\captures\halyard.png --frames 3
 ctest --test-dir build --output-on-failure
 node tools/export-reference.mjs --check
 .\tools\check-stage-viewer.ps1
+.\tools\check-native-practice.ps1
 ```
 
 匯出工具使用 Node.js 22.17+，直接讀取鎖定的 `splat-ref/`；一般原生建置及地形檢視使用已提交的產物，不需要 Node.js 或參考資料夾。更新來源須依規格先處理基準變更，不可直接覆寫雜湊清單。

@@ -50,3 +50,8 @@ test('reference export matches locked source and generated artifacts', () => {
   assert.match(fixtures, /std::array<GroundFixture, 851>/);
   assert.match(fixtures, /std::array<RayFixture, 920>/);
 });
+
+test('controller, actor and camera fixtures match the locked reference modules', () => {
+  for (const subject of ['controller', 'player', 'camera'])
+    execFileSync(process.execPath, [`tools/export-${subject}-fixtures.mjs`, '--check'], { cwd: root, timeout: 120000 });
+});

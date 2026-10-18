@@ -30,6 +30,8 @@ add_library(reference_geometry STATIC
     restoration/ReferenceData.cpp
     restoration/StageGeometry.cpp
     restoration/FacePaint.cpp
+    restoration/PlayerSimulation.cpp
+    restoration/FollowCamera.cpp
 )
 target_link_libraries(reference_geometry PUBLIC glm::glm)
 target_sources(Tiny-Splatoon PRIVATE restoration/StageViewer.cpp)
@@ -60,6 +62,18 @@ if(BUILD_TESTING)
     add_executable(face_paint_test tests/face_paint_test.cpp)
     target_link_libraries(face_paint_test PRIVATE reference_geometry)
     add_test(NAME reference_face_paint COMMAND face_paint_test)
+
+    add_executable(controller_physics_test tests/controller_physics_test.cpp)
+    target_link_libraries(controller_physics_test PRIVATE reference_geometry)
+    add_test(NAME reference_controller_physics COMMAND controller_physics_test)
+
+    add_executable(player_simulation_test tests/player_simulation_test.cpp)
+    target_link_libraries(player_simulation_test PRIVATE reference_geometry)
+    add_test(NAME reference_player_simulation COMMAND player_simulation_test)
+
+    add_executable(follow_camera_test tests/follow_camera_test.cpp)
+    target_link_libraries(follow_camera_test PRIVATE reference_geometry)
+    add_test(NAME reference_follow_camera COMMAND follow_camera_test)
 
     find_program(REFERENCE_NODE_EXECUTABLE node)
     if(REFERENCE_NODE_EXECUTABLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/splat-ref/src/config.js")

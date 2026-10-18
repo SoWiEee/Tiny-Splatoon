@@ -8,20 +8,22 @@
 - 地形核心：使用來源建立的 oriented blocks／faces，以及 PropKit 產生的道具碰撞體；原生 pointInside、groundHeight、raycast 保留來源的空間查詢順序。CPU 幾何使用 double 對齊 JavaScript Number；測試期望值來自 JavaScript Level／Physics，非 C++ 自己產生。
 - 墨水核心：face-space CPU grid、dead cells、seeded splat、coverage 與 atlas packing；邏輯格顯示不等於最終 GPU 墨材質。
 - OpenGL stage lab：可切換圖／模式、可塗與計分表面、碰撞體、邏輯墨／清墨／coverage，提供可重現 PNG 捕捉。
+- P2 原生練習預覽：`--reference-game`，七張離線 Turf 地圖的本地玩家、Spritzer 射擊／落墨／充能、基本 HUD、選場／開始／暫停／重設／返回。固定 60 Hz；Capsule／flat footprint／台階／鐵網／屋頂滑落／欄杆／出生區屏障與跟隨相機已接入。
 
 ## 目前明確未完成
 
-正常啟動仍走既有遊戲；新工具需 --reference-stage。沒有宣稱原遊戲已遷移。標準化碰撞資料已含 layout 與 dressing 生成的 prop colliders；道具外觀尚未繪製，碰撞檢視僅顯示其定向包圍盒。原生畫面未還原 rounded bevel、程序材質、壁畫、海水、環境、角色、動畫、光影後製或完整墨水 GPU 動畫。
+正常啟動仍走既有遊戲；新入口需 --reference-stage 或 --reference-game。沒有宣稱原遊戲已遷移。標準化碰撞資料已含 layout 與 dressing 生成的 prop colliders；道具外觀尚未繪製，碰撞檢視僅顯示其定向包圍盒，練習人物僅為碰撞膠囊。原生畫面未還原 rounded bevel、程序材質、壁畫、海水、環境、角色、動畫、光影後製或完整墨水 GPU 動畫。
 
 全裝備、AI、模式規則、正式選單／練習、房碼／同步、音樂／外觀／保存尚未遷移。Cargo 可診斷檢視不代表能離線遊玩，Cargo Boss 組合不存在。
 
-P0 仍缺固定條件的參考視聽 captures；P1 仍缺完整角色碰撞／GPU 墨與端到端整合。不得將本次資料與查詢測試寫成 P0/P1 全部通過。
+P0 仍缺固定條件的參考視聽 captures；P1/P2 的基礎碰撞、邏輯墨與本地玩家已有端到端接點，但 GPU 墨、角色動畫／槍口／完整裝備與全場路線對照未完成。不得將本次資料與查詢測試寫成 P0/P1/P2 全部通過。
 
 ## 驗證方式
 
 - node --test tests/reference-export.test.mjs：檢查鎖定來源、可重現產物、名冊與合法組合。
 - ctest --test-dir build --output-on-failure：原生幾何、墨水及可用時的匯出對照。
 - build/Tiny-Splatoon.exe --reference-stage halyard --paint-probe 1 --capture build/captures/halyard.png --frames 3：診斷畫面捕捉。
+- tools/check-native-practice.ps1：七張離線地圖，各 240 步移動／跳／射擊／squid 探測、GPU 墨資料／清墨／重塗回讀及非法組合拒絕。
 - 實際測試與硬體結果另見本文末尾；沒有紀錄不能視為驗收。
 
 ## 需求追蹤
@@ -32,41 +34,41 @@ P0 仍缺固定條件的參考視聽 captures；P1 仍缺完整角色碰撞／GP
 |---|---|---|
 | ENG-01 | 實作中 | 僅資料／layout／查詢或邏輯墨基礎；完整需求待驗收 |
 | ENG-02 | 實作中 | 僅資料／layout／查詢或邏輯墨基礎；完整需求待驗收 |
-| ENG-03 | 未實作 | 尚無原生還原證據 |
+| ENG-03 | 實作中 | 練習模擬固定 60 Hz、渲染獨立；全武器／網路／完整時計待驗收 |
 | ENG-04 | 未實作 | 尚無原生還原證據 |
-| ENG-05 | 未實作 | 尚無原生還原證據 |
+| ENG-05 | 實作中 | 練習可重設／換圖與清理 GL；音效／網路及完整重入待驗收 |
 | ENG-06 | 實作中 | 僅資料／layout／查詢或邏輯墨基礎；完整需求待驗收 |
 | FLOW-01 | 未實作 | 尚無原生還原證據 |
 | FLOW-02 | 未實作 | 尚無原生還原證據 |
-| FLOW-03 | 未實作 | 尚無原生還原證據 |
+| FLOW-03 | 實作中 | 七張離線 Turf 選場；完整模式／預覽／設定待移植 |
 | FLOW-04 | 未實作 | 尚無原生還原證據 |
 | FLOW-05 | 未實作 | 尚無原生還原證據 |
 | FLOW-06 | 未實作 | 尚無原生還原證據 |
-| FLOW-07 | 未實作 | 尚無原生還原證據 |
-| FLOW-08 | 未實作 | 尚無原生還原證據 |
-| FLOW-09 | 未實作 | 尚無原生還原證據 |
+| FLOW-07 | 實作中 | 練習暫停凍結模擬、恢復／重設／返回；正式介面與線上待驗收 |
+| FLOW-08 | 實作中 | GLFW 失焦暫停、恢復重置游標差與阻擋按鈕點穿；人工互動矩陣待驗收 |
+| FLOW-09 | 實作中 | 單人無倒數預覽；完整換裝／工具／正式外觀待移植 |
 | FLOW-10 | 未實作 | 尚無原生還原證據 |
-| INPUT-01 | 未實作 | 尚無原生還原證據 |
+| INPUT-01 | 實作中 | raw mouse 與來源 gain／pitch 範圍；可調設定及短按事件待移植 |
 | INPUT-02 | 未實作 | 尚無原生還原證據 |
 | INPUT-03 | 未實作 | 尚無原生還原證據 |
 | INPUT-04 | 未實作 | 尚無原生還原證據 |
-| CAM-01 | 未實作 | 尚無原生還原證據 |
+| CAM-01 | 實作中 | 正常跟隨／彈簧／遮擋／肩位有來源逐幀對照；角色槍口仍為碰撞體替代 |
 | CAM-02 | 未實作 | 尚無原生還原證據 |
-| CAM-03 | 未實作 | 尚無原生還原證據 |
-| MOVE-01 | 未實作 | 尚無原生還原證據 |
-| MOVE-02 | 未實作 | 尚無原生還原證據 |
-| MOVE-03 | 未實作 | 尚無原生還原證據 |
-| MOVE-04 | 未實作 | 尚無原生還原證據 |
-| MOVE-05 | 未實作 | 尚無原生還原證據 |
-| MOVE-06 | 未實作 | 尚無原生還原證據 |
+| CAM-03 | 實作中 | 82° 水平 FOV 正確轉換、正常跟隨 FOV kick；設定／完整震動待移植 |
+| MOVE-01 | 實作中 | kid／squid capsule 尺寸接入；模型動畫尚未還原 |
+| MOVE-02 | 實作中 | run／dry squid／swim／enemy ink 速度有來源軌跡對照 |
+| MOVE-03 | 實作中 | 加減速／反向／轉向／空控／慣性有來源軌跡對照 |
+| MOVE-04 | 實作中 | 跳／gravity／buffer／coyote／落地回復；完整時序矩陣待驗收 |
+| MOVE-05 | 實作中 | 台階／支撐／body／roof／rail／grate 已接入；八圖完整路線待驗收 |
+| MOVE-06 | 實作中 | 攀牆／越頂／emerge／fire buffer 接入；完整邊界矩陣待驗收 |
 | MOVE-07 | 未實作 | 尚無原生還原證據 |
 | MOVE-08 | 未實作 | 尚無原生還原證據 |
-| COMBAT-01 | 未實作 | 尚無原生還原證據 |
-| COMBAT-02 | 未實作 | 尚無原生還原證據 |
-| COMBAT-03 | 未實作 | 尚無原生還原證據 |
-| COMBAT-04 | 未實作 | 尚無原生還原證據 |
+| COMBAT-01 | 實作中 | 本地 HP／傷害／出生無敵；敵人命中／全武器規則待移植 |
+| COMBAT-02 | 實作中 | 敵墨傷害／上限／回血有來源對照及斷言 |
+| COMBAT-03 | 實作中 | 墨槽與回墨、Spritzer cadence／耗墨接入；全裝備待移植 |
+| COMBAT-04 | 實作中 | 新取得 turf 面積充能接入；完整特殊／裝備待移植 |
 | COMBAT-05 | 未實作 | 尚無原生還原證據 |
-| COMBAT-06 | 未實作 | 尚無原生還原證據 |
+| COMBAT-06 | 實作中 | 5.5 秒重生／1.6 秒保護、清理本生命彈丸；擊殺統計／死亡演出待移植 |
 | COMBAT-07 | 未實作 | 尚無原生還原證據 |
 | AI-01 | 未實作 | 尚無原生還原證據 |
 | AI-02 | 未實作 | 尚無原生還原證據 |
@@ -163,3 +165,15 @@ P0 仍缺固定條件的參考視聽 captures；P1 仍缺完整角色碰撞／GP
 - 獨立唯讀驗證結果：CONFIRMED，範圍限於道具碰撞資料、CPU 雙精度對照、診斷擷取與 NVIDIA 提示；無新增發現，不代表完整遊戲或視覺一致性已驗收。
 
 擷取檔與建置紀錄是本機驗證產物，後續可用上述指令重新產生。正式遊戲操作、角色與道具外觀、音效、GPU 墨材質及連線同步仍待遷移。
+
+## 2026-10-18 P2 練習整合
+
+- 提交回復點 `d0a1fd9` 包含上一輪資料／地形／CPU 墨／GTX 1650 提示；本節描述其後的玩家整合。
+- MSVC 建置成功，CTest 6/6 通過。新增控制器來源對照：292 ground、584 body、292 capsule、292 bodyFits、146 camera probe；保留原有 23 變體查詢與墨水格點驗證。
+- 實際 JavaScript Actor 的 350 個取樣點（60／120 Hz）對照 position／velocity／yaw／HP／ink／ground／squid／submerged／climbing；涵蓋跑動、煞車、反向、轉彎、跳、游泳、敵墨、攀牆越頂、開火／收火移動、台階、屋頂、欄杆、鐵網與出生區屏障。
+- 實際 CameraRig／Physics 的 20 個連續影格對照 eye／forward／FOV，包含 30／60／120 Hz 與 0.05 秒步長、跳落／遮擋／地板／肩位／後座／傳送。
+- 七張離線地圖各執行 240 個 60 Hz 步驟及 PNG 擷取；每圖有射擊與 turf 格點，並對 GPU ownership 貼圖做三次完整回讀（射擊結果／清墨／敵隊重塗），與 CPU sample 逐像素相符。紀錄：`build/captures/practice/smoke-results.json`。全數使用 GTX 1650；Cargo 與 Zones 的練習組合在開窗前拒絕。
+- 墨格上傳改為僅更新變動區域，避免每次落墨重算完整 4096² 貼圖；這仍是邏輯格視覺化，並非最終墨水材質。
+- 獨立唯讀驗證：CONFIRMED，範圍限於上述離線練習切片。其發現的 PowerShell 5.1 預期 stderr 提早中止問題已修正；之後以 `powershell.exe` 重跑七圖腳本亦通過，PowerShell 7 的測試同樣通過。
+
+仍未完成：來源 skinned character／程序動畫及動態槍口、完整 projectile／敵方傷害對照、全武器／副武器／特殊、AI、Turf／Zones／Boss 生命周期、正式選單與 Practice 工具、音效／連線／保存。滑鼠／暫停／焦點與選單互動仍需人工驗收；自動腳本不代表已測過人工操作。

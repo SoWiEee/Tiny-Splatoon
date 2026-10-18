@@ -16,7 +16,11 @@ foreach ($stageId in @('tidewater','kelpline','halyard','saltpan','crossmarket',
     $stageResults += [pscustomobject]@{stage=$stageId; mode='turf'; capture=$capturePath; log=($captureLog -join "`n")}
     Write-Output ($stageId + ': capture passed')
 }
-$invalidLog = & $stageExecutable --reference-stage cargo --reference-mode boss 2>&1
+try {
+    # Windows PowerShell 5.1 treats redirected native stderr as a PowerShell error record.
+    $ErrorActionPreference = 'Continue'
+    $invalidLog = & $stageExecutable --reference-stage cargo --reference-mode boss 2>&1
+} finally { $ErrorActionPreference = 'Stop' }
 if ($LASTEXITCODE -ne 1 -or ($invalidLog -join "`n") -notmatch 'unsupported stage/mode') {
     throw 'Cargo Boss must be rejected before creating a window'
 }
