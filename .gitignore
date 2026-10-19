@@ -1,4 +1,9 @@
-.vs
-build
-out
+/.vs/
+/build*/
+/out/
+/output/
+/.playwright-cli/
+/CMakeUserPresets.json
+*.obj
+*.pdb
 splat-ref/

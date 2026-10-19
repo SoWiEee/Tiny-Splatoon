@@ -118,3 +118,7 @@ Turf AI：
 ### 2026-10-20 提交與推送指示更新
 
 使用者追加要求將既有 `.gitignore` 變更一併 commit 並 push。完成本輪接受與獨立核查後，明確 stage 還原來源／資產／測試／效能紀錄及 `.gitignore`，提交並正常推送目前分支；`review.md` 刪除與建置／工具暫存檔仍不納入。不使用 force push。此指示取代上方歷史段落對 `.gitignore` 與不推送的舊限制。
+
+### 2026-10-20 唯一入口與清理指示
+
+使用者要求只保留 restoration，移除舊 OpenGL 程式並連同 review.md 的刪除 commit/push；本輪不分派 agent 驗證，由主 agent 自行建置與測試。此指示取代上方歷史段落的舊入口保留／review.md 不提交安排；完整來源玩法與視覺仍依 spec.md 逐項完成。

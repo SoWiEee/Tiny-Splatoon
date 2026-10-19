@@ -22,3 +22,17 @@ for (const args of [
     assert.doesNotMatch(result.stdout, /GPU /);
   });
 }
+
+for (const args of [
+  ['--capture', 'unused.png'],
+  ['--paint-probe', '0'],
+  ['--benchmark-report', 'unused.json'],
+]) {
+  test(`default native menu requires an explicit diagnostic entry for ${args[0]}`, () => {
+    const result = spawnSync(executable, args, { encoding: 'utf8', timeout: 10000 });
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, /--native cannot be combined/);
+    assert.doesNotMatch(result.stdout, /GPU /);
+  });
+}

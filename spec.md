@@ -72,9 +72,11 @@
 | ENG-05 | 場景、GPU、音效、網路可清理及重入；重賽／切圖不殘留 actor、墨、裝置、監聽、loop 或按鍵。 |
 | ENG-06 | shader／資源／裝置／連線失敗有可恢復錯誤；不能靜默降成 stub、假結果或空白畫面當作通過。 |
 
-可保留 `engine/`、`gameplay/`、`scene/`、`components/`、`splat/`、`gui/`、`network/`。模組拆分依耦合決定，不要求先重寫引擎。
+目前原生程式集中於 `restoration/`；模組拆分依耦合決定，不要求重寫已驗證的模擬與渲染。
 
 2026-10-19 架構決策：若既有主程式架構不適合來源契約，可在 `restoration/` 完成原生 application、輸入、場景與資源生命週期，再替換舊入口。玩家入口與驗收工具共用同一套 actor／runner／world／match／pose，不維護第二套玩法。每個視窗只建立一個 GLFW／OpenGL／ImGui 生命週期，GPU 資源須在 context 結束前釋放。舊檔案於呼叫與建置依賴移除、替代流程可運作且受影響驗收通過後才刪除；目錄重組與入口切換不改變本規格的完整還原要求。
+
+2026-10-20 使用者決策：移除舊 OpenGL 程式，僅保留最新 `restoration/`；普通啟動直接進入原生選圖。舊場景／網路／音效／renderer 與未使用資產、依賴一併移除；NVIDIA 選卡提示保留於 restoration；GameNetworkingSockets 套件宣告依使用者補充保留供未來連線接入，目前不連結／初始化。此決策取代保留舊入口的遷移安排；完整 UI／音效／連線／模式等需求仍須依本規格開發，不能因舊碼刪除而標完成。
 
 ## 3. 啟動、選單與完整流程
 
@@ -393,7 +395,7 @@ ID、順序、名稱、預設 kit、數值、動畫／音效／UI／網路均屬
 
 ## 14. 線上房間與同步
 
-來源：`splat-ref/src/net/{session,transport,netmatch}.js`、`server/src/index.js`、`docs/NET.md`。現有GameNetworkingSockets host:port不能等同本節完成；正式傳輸選擇須保留房碼與行為契約。
+來源：`splat-ref/src/net/{session,transport,netmatch}.js`、`server/src/index.js`、`docs/NET.md`。已移除的舊GameNetworkingSockets host:port不能等同本節完成；正式傳輸選擇須保留房碼與行為契約。
 
 | ID | 強制需求 |
 |---|---|

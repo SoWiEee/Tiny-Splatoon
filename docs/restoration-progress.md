@@ -278,3 +278,17 @@ P11 live pose 接受：32 基本場景與 19 外觀／形態／LOD 代表場景�
 最終 Release 回歸：31/31 CTest 全數通過（150.02 秒，`build/p11-final-ctest.log`），含 51 live pose 場景、2598 Actor 樣本、19 special ID 核心測試、來源 AI／21 場 4v4、23 shader／37 固定模型與全部已註冊來源重建。
 
 其後 benchmark 視窗的實際 framebuffer 尺寸檢查在量測前拒絕有邊框視窗；改成僅 benchmark 使用無邊框後，七圖各 120+600 影格均於 GTX 1650／NVIDIA 591.74／1920×1080／VSync off 完成。平均 301.8–484.9 FPS，CPU p95 2.58–4.26 ms，GPU p95 1.12–1.62 ms；4200 幀原始 CSV 與完整 metadata／hash 保留於 [效能紀錄](benchmarks/turf-2026-10-20/README.md)。這次視窗修正另以實際七圖量測及 CLI 檢查驗證，沒有重算或降低解析度。QA-12 仍未通過完整工作量。
+
+### 2026-10-20 退役舊程式，restoration 成為唯一入口
+
+使用者明確要求移除舊 OpenGL 程式、整理後連同 review.md 刪除一起 commit/push，並不分派 agent 驗證。本輪由主 agent 自行檢查，歷史遷移段落中「保留舊入口」的安排已被此決策取代。
+
+普通啟動與 `--frames N` 現在直接進入 restoration 原生選圖，`--native` 保留為相容別名；明確地形／練習／Turf／benchmark 指令維持。刪除舊 engine／components／gameplay／splat／scene／gui／network 及未引用資產，將 NVIDIA 提示移至 restoration，移除 fmt 依賴。依使用者補充，GameNetworkingSockets 保留於 vcpkg 供後續多人連線使用，目前不連結／初始化；舊網路 manager／protocol 仍移除。共用模擬庫命名為 restoration_core；個人 CMakeUserPresets 留在本機並忽略。
+
+本次是程式與建置整併，不增加玩法完成數。完整選單、音效、保存、網路、Zones／Boss、最終視效與 LOD 切換仍保持未完成；先前 benchmark 數據綁定前次建置，不冒稱本輪已重測最終效能。
+
+本輪自行驗證：MSVC x64 Release 全目標建置成功；32/32 CTest 通過（179.06 秒，`build/cleanup-ctest.log`），包含新預設選圖開窗測試、11 項原生 CLI 規則、51 pose 場景、裝備／AI／GPU／來源重建。GameNetworkingSockets 宣告保留後重新設定／建置成功，Ninja 無額外工作；執行檔的 import 檢查不含 GameNetworkingSockets、fmt、OpenSSL 或 Protobuf。
+
+另以僅含 Tiny-Splatoon.exe、glfw3.dll 與 assets/reference 的獨立資料夾，在該資料夾作為工作目錄執行預設選圖與直接 Turf，各三幀均正常結束；實際 renderer 是 GTX 1650 Max-Q／OpenGL 4.5／NVIDIA 591.74。Halyard 地形 PNG、60-step 練習 PNG 與 GPU 墨回讀亦通過；276 個來源基準雜湊未變更。發佈流程改用 executable 旁由 vcpkg 部署的 runtime DLL，不直接打包整個套件庫目錄。
+
+依使用者要求，本輪未分派 agent 驗證；以上為主 agent 的建置／測試證據。批次刪除本機建置快取被工具政策拒絕，故保留 Git 忽略的既有快取，改用上述獨立資料夾檢查乾淨 runtime；來源程式／依賴／版本控制的清理已完成。

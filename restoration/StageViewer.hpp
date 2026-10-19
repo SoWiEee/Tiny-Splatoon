@@ -1,6 +1,6 @@
 #pragma once
 
 namespace restoration {
-// Opt-in stage tools plus native practice and offline Turf application entry.
+// Offline Turf application entry, with explicit stage/practice/benchmark tools.
 int RunStageViewer(int argc, char** argv);
 }

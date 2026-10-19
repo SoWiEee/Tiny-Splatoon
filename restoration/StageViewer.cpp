@@ -47,6 +47,7 @@ struct Options {
 
 Options ParseOptions(int argc, char** argv) {
     Options result;
+    bool stageTool = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--reference-match") {
@@ -57,7 +58,7 @@ Options ParseOptions(int argc, char** argv) {
         if (arg == "--native") { result.native = true; continue; }
         if (i + 1 >= argc) throw std::runtime_error("Missing value for " + arg);
         const std::string value = argv[++i];
-        if (arg == "--reference-stage") result.stage = value;
+        if (arg == "--reference-stage") { result.stage = value; stageTool = true; }
         else if (arg == "--reference-game") { result.stage = value; result.game = true; }
         else if (arg == "--reference-mode") result.mode = value;
         else if (arg == "--capture") { result.capture = value; result.captureSpecified = true; }
@@ -94,6 +95,7 @@ Options ParseOptions(int argc, char** argv) {
             else { result.height = number; result.heightSpecified = true; }
         } else throw std::runtime_error("Unknown stage lab option: " + arg);
     }
+    if (!stageTool && !result.game && !result.match) result.native = true;
     if (result.match) {
         if (!result.widthSpecified) result.width = 1920;
         if (!result.heightSpecified) result.height = 1080;
@@ -1101,7 +1103,7 @@ int RunStageViewer(int argc, char** argv) {
         const bool hidden=!options.capture.empty()||!options.benchmarkReport.empty();
         glfwWindowHint(GLFW_VISIBLE,hidden?GLFW_FALSE:GLFW_TRUE);
         if(!options.benchmarkReport.empty()) glfwWindowHint(GLFW_DECORATED,GLFW_FALSE);
-        window=glfwCreateWindow(options.width,options.height,"Tiny-Splatoon / OpenGL migration",nullptr,nullptr);
+        window=glfwCreateWindow(options.width,options.height,"Tiny-Splatoon",nullptr,nullptr);
         if (!window) throw std::runtime_error("OpenGL 4.5 window creation failed");
         glfwMakeContextCurrent(window);
         if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) throw std::runtime_error("GLAD initialization failed");

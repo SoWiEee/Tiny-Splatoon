@@ -22,24 +22,11 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED) 
 find_package(imgui CONFIG REQUIRED)
-find_package(GameNetworkingSockets CONFIG REQUIRED)
 
-file(GLOB_RECURSE MY_SOURCE_FILES CONFIGURE_DEPENDS
-    "components/*"
-    "engine/*"
-    "gameplay/*"
-    "splat/*"
-    "scene/*"
-    "network/*"
-    "gui/*"
-)
+add_executable(Tiny-Splatoon main.cpp)
 
-
-add_executable(Tiny-Splatoon main.cpp ${MY_SOURCE_FILES})
-
-add_library(reference_geometry STATIC
+add_library(restoration_core STATIC
     restoration/ReferenceData.cpp
     restoration/StageGeometry.cpp
     restoration/FacePaint.cpp
@@ -55,22 +42,21 @@ add_library(reference_geometry STATIC
     restoration/MatchSimulation.cpp
     restoration/WorldSpecials.cpp
 )
-target_link_libraries(reference_geometry PUBLIC glm::glm)
+target_link_libraries(restoration_core PUBLIC glm::glm)
 if(MSVC)
-    target_compile_options(reference_geometry PRIVATE /utf-8)
+    target_compile_options(restoration_core PRIVATE /utf-8)
 endif()
 target_sources(Tiny-Splatoon PRIVATE restoration/StageViewer.cpp
-    restoration/CharacterArt.cpp restoration/CharacterShader.cpp restoration/PerformanceCapture.cpp)
-target_link_libraries(Tiny-Splatoon PRIVATE reference_geometry)
+    restoration/CharacterArt.cpp restoration/CharacterShader.cpp restoration/PerformanceCapture.cpp
+    restoration/GpuPreference.cpp)
+target_link_libraries(Tiny-Splatoon PRIVATE restoration_core)
 
 target_link_libraries(Tiny-Splatoon PRIVATE 
     glad::glad
     glfw 
     OpenGL::GL
-    fmt::fmt
     imgui::imgui
     glm::glm
-    GameNetworkingSockets::shared
 )
 
 add_custom_command(TARGET Tiny-Splatoon POST_BUILD
@@ -81,103 +67,107 @@ add_custom_command(TARGET Tiny-Splatoon POST_BUILD
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME reference_native_entry_default COMMAND Tiny-Splatoon --frames 3)
+    set_tests_properties(reference_native_entry_default PROPERTIES
+        PASS_REGULAR_EXPRESSION "NATIVE_MENU state=stage-select" TIMEOUT 30)
+
     add_executable(stage_geometry_test tests/stage_geometry_test.cpp)
-    target_link_libraries(stage_geometry_test PRIVATE reference_geometry)
+    target_link_libraries(stage_geometry_test PRIVATE restoration_core)
     add_test(NAME reference_stage_geometry COMMAND stage_geometry_test)
 
     add_executable(face_paint_test tests/face_paint_test.cpp)
-    target_link_libraries(face_paint_test PRIVATE reference_geometry)
+    target_link_libraries(face_paint_test PRIVATE restoration_core)
     add_test(NAME reference_face_paint COMMAND face_paint_test)
 
     add_executable(controller_physics_test tests/controller_physics_test.cpp)
-    target_link_libraries(controller_physics_test PRIVATE reference_geometry)
+    target_link_libraries(controller_physics_test PRIVATE restoration_core)
     add_test(NAME reference_controller_physics COMMAND controller_physics_test)
 
     add_executable(player_simulation_test tests/player_simulation_test.cpp)
-    target_link_libraries(player_simulation_test PRIVATE reference_geometry)
+    target_link_libraries(player_simulation_test PRIVATE restoration_core)
     add_test(NAME reference_player_simulation COMMAND player_simulation_test)
 
     add_executable(player_pose_bridge_test tests/player_pose_bridge_test.cpp)
-    target_link_libraries(player_pose_bridge_test PRIVATE reference_geometry)
+    target_link_libraries(player_pose_bridge_test PRIVATE restoration_core)
     add_test(NAME reference_player_pose_bridge COMMAND player_pose_bridge_test)
 
     add_executable(follow_camera_test tests/follow_camera_test.cpp)
-    target_link_libraries(follow_camera_test PRIVATE reference_geometry)
+    target_link_libraries(follow_camera_test PRIVATE restoration_core)
     add_test(NAME reference_follow_camera COMMAND follow_camera_test)
 
     add_executable(ai_nav_test tests/ai_nav_test.cpp)
-    target_link_libraries(ai_nav_test PRIVATE reference_geometry)
+    target_link_libraries(ai_nav_test PRIVATE restoration_core)
     add_test(NAME reference_ai_nav COMMAND ai_nav_test)
 
     add_executable(match_simulation_test tests/match_simulation_test.cpp)
-    target_link_libraries(match_simulation_test PRIVATE reference_geometry)
+    target_link_libraries(match_simulation_test PRIVATE restoration_core)
     add_test(NAME reference_turf_match COMMAND match_simulation_test)
 
     add_executable(match_setup_test tests/match_setup_test.cpp)
-    target_link_libraries(match_setup_test PRIVATE reference_geometry)
+    target_link_libraries(match_setup_test PRIVATE restoration_core)
     add_test(NAME reference_match_setup COMMAND match_setup_test)
 
     add_executable(world_specials_test tests/world_specials_test.cpp)
-    target_link_libraries(world_specials_test PRIVATE reference_geometry)
+    target_link_libraries(world_specials_test PRIVATE restoration_core)
     add_test(NAME reference_world_specials COMMAND world_specials_test)
 
     add_executable(world_sonar_wail_test tests/world_sonar_wail_test.cpp)
-    target_link_libraries(world_sonar_wail_test PRIVATE reference_geometry)
+    target_link_libraries(world_sonar_wail_test PRIVATE restoration_core)
     add_test(NAME reference_world_sonar_wail COMMAND world_sonar_wail_test)
 
     add_executable(world_kraken_test tests/world_kraken_test.cpp)
-    target_link_libraries(world_kraken_test PRIVATE reference_geometry)
+    target_link_libraries(world_kraken_test PRIVATE restoration_core)
     add_test(NAME reference_world_kraken COMMAND world_kraken_test)
 
     add_executable(world_remaining_specials_test tests/world_remaining_specials_test.cpp)
-    target_link_libraries(world_remaining_specials_test PRIVATE reference_geometry)
+    target_link_libraries(world_remaining_specials_test PRIVATE restoration_core)
     add_test(NAME reference_world_remaining_specials COMMAND world_remaining_specials_test)
 
     add_executable(ai_bot_oracle_test tests/ai_bot_oracle_test.cpp)
-    target_link_libraries(ai_bot_oracle_test PRIVATE reference_geometry)
+    target_link_libraries(ai_bot_oracle_test PRIVATE restoration_core)
     add_test(NAME reference_ai_bot_oracle COMMAND ai_bot_oracle_test)
 
     add_executable(bot_special_control_test tests/bot_special_control_test.cpp)
-    target_link_libraries(bot_special_control_test PRIVATE reference_geometry)
+    target_link_libraries(bot_special_control_test PRIVATE restoration_core)
     add_test(NAME reference_bot_special_control COMMAND bot_special_control_test)
 
     add_executable(arsenal_data_test tests/arsenal_data_test.cpp)
-    target_link_libraries(arsenal_data_test PRIVATE reference_geometry)
+    target_link_libraries(arsenal_data_test PRIVATE restoration_core)
     add_test(NAME reference_arsenal_data COMMAND arsenal_data_test)
 
     add_executable(character_data_test tests/character_data_test.cpp)
-    target_link_libraries(character_data_test PRIVATE reference_geometry)
+    target_link_libraries(character_data_test PRIVATE restoration_core)
     add_test(NAME reference_character_data COMMAND character_data_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters")
 
     add_executable(character_pose_eval tests/character_pose_eval.cpp)
-    target_link_libraries(character_pose_eval PRIVATE reference_geometry)
+    target_link_libraries(character_pose_eval PRIVATE restoration_core)
 
     add_executable(character_weapon_animation_test tests/character_weapon_animation_test.cpp)
-    target_link_libraries(character_weapon_animation_test PRIVATE reference_geometry)
+    target_link_libraries(character_weapon_animation_test PRIVATE restoration_core)
     add_test(NAME reference_character_weapon_animation COMMAND character_weapon_animation_test)
 
     add_executable(combat_runner_test tests/combat_runner_test.cpp)
-    target_link_libraries(combat_runner_test PRIVATE reference_geometry)
+    target_link_libraries(combat_runner_test PRIVATE restoration_core)
     add_test(NAME reference_combat_runner COMMAND combat_runner_test)
 
     add_executable(combat_kit_test tests/combat_kit_test.cpp)
-    target_link_libraries(combat_kit_test PRIVATE reference_geometry)
+    target_link_libraries(combat_kit_test PRIVATE restoration_core)
     add_test(NAME reference_combat_kits COMMAND combat_kit_test)
 
     add_executable(combat_world_test tests/combat_world_test.cpp)
-    target_link_libraries(combat_world_test PRIVATE reference_geometry)
+    target_link_libraries(combat_world_test PRIVATE restoration_core)
     add_test(NAME reference_combat_world COMMAND combat_world_test)
 
     add_executable(combat_device_test tests/combat_device_test.cpp)
-    target_link_libraries(combat_device_test PRIVATE reference_geometry)
+    target_link_libraries(combat_device_test PRIVATE restoration_core)
     add_test(NAME reference_combat_devices COMMAND combat_device_test)
 
-    add_executable(character_pose_shader_test tests/character_pose_shader_test.cpp restoration/CharacterShader.cpp engine/core/GpuPreference.cpp)
+    add_executable(character_pose_shader_test tests/character_pose_shader_test.cpp restoration/CharacterShader.cpp restoration/GpuPreference.cpp)
     target_link_libraries(character_pose_shader_test PRIVATE glm::glm glad::glad glfw OpenGL::GL)
     add_test(NAME reference_character_shaders COMMAND character_pose_shader_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters/shaders")
 
-    add_executable(character_art_test tests/character_art_test.cpp restoration/CharacterArt.cpp restoration/CharacterShader.cpp engine/core/GpuPreference.cpp)
-    target_link_libraries(character_art_test PRIVATE reference_geometry glad::glad glfw OpenGL::GL)
+    add_executable(character_art_test tests/character_art_test.cpp restoration/CharacterArt.cpp restoration/CharacterShader.cpp restoration/GpuPreference.cpp)
+    target_link_libraries(character_art_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
     add_test(NAME reference_character_art COMMAND character_art_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters" "${CMAKE_BINARY_DIR}/captures/character")
 
     find_program(REFERENCE_NODE_EXECUTABLE node)

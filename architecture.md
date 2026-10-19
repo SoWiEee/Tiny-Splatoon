@@ -1,94 +1,27 @@
-# Architecture Notes
+# Native restoration architecture
 
-## GameWorld Responsibility Split
+`main.cpp` forwards every launch to `restoration::RunStageViewer`. With no explicit diagnostic selector, the application opens the native offline Turf stage-select menu. `--native` remains an alias; `--reference-stage`, `--reference-game`, and `--reference-match` select the existing diagnostic or direct-match paths. Unknown options fail during parsing before GLFW initialization.
 
-Current state after the `GameWorld.hpp -> GameWorld.hpp + GameWorld.cpp` refactor:
+## Build ownership
 
-- `GameWorld`
-  - Owns top-level match state, world resources, entities, and orchestration.
-  - Remains the integration point for scene update/render flow.
+- `restoration_core` is the C++17 static library for reference data, stage geometry, CPU paint, player/controller, weapons, combat world, specials, navigation, bots, match lifecycle, and live character poses. It depends on GLM and has no GLFW or network lifetime.
+- `Tiny-Splatoon` adds `StageViewer`, `CharacterArt`, `CharacterShader`, `PerformanceCapture`, and `GpuPreference`. GLFW／GLAD／OpenGL／ImGui own presentation; stb writes diagnostic PNGs.
+- Tests link the same core library. Source exporters operate on the locally supplied, hash-locked `splat-ref/`; native fixtures and application builds use committed data.
 
-- Match lifecycle
-  - `Update()`
-    - thin dispatcher by `WorldState`
-  - `UpdateActiveMatch()`
-    - main gameplay tick orchestration
-  - `UpdateFinishedMatch()`
-    - post-match countdown and frozen-player handling
-  - `EndGame()`
-    - authoritative match completion and final score broadcast
+## Runtime ownership
 
-- Local gameplay flow
-  - `HandleLocalAbilityRequests()`
-    - resolves queued local bomb / rocket / shark actions into spawned gameplay events
-  - `UpdateItems()`
-    - item respawn and pickup handling
-  - `UpdateRemotePlayers()`
-    - interpolation tick for replicated players
-  - `UpdateVisualEntities()`
-    - updates visual-only objects managed by the world
+`RunStageViewer` owns one GLFW window, OpenGL context and ImGui context. The native menu starts a `MatchLoop` in that same context. The match owns its stage geometry, `FacePaint`, navigation, `MatchSimulation`, `FollowCamera`, per-actor `CharacterPose`, and character GPU resources. Return/replay destroys these match objects before reopening the stage menu. All GL resources are destroyed before the context is released.
 
-- Networking
-  - `HandlePacket()`
-    - top-level packet dispatcher
-  - `HandleServerPacket()`
-    - server-only handling of client-originated packets
-  - `HandleSharedPacket()`
-    - shared client/server handling of replicated packets
-  - `UpdateNetworkSync()`
-    - periodic sync scheduling
-  - `SyncLocalPlayerState()`
-    - local player replication payload assembly
-  - `SyncAiState()`
-    - AI replication payload assembly
-  - `BroadcastScoreState()`
-    - authoritative score/time sync packet emission
+`MatchSimulation` owns eight actors and seven bots in offline Turf. `PlayerSimulation`, `WeaponRunner`, `CombatWorld` and `WorldSpecials` are the shared gameplay path. Pose trigger/frame callbacks consume those states; renderer and UI do not run a second combat implementation. Simulation and the match follow-camera advance at a fixed 60 Hz; rendering displays the latest pose at the window frame rate. Focus loss and pause stop match advancement, and resume resets mouse/fire input edges.
 
-- Combat / projectile path
-  - `CreateProjectile()`
-    - projectile construction
-  - `SendShootPacket()`
-    - outbound shoot replication
-  - `SpawnRemoteProjectile()`
-    - replicated projectile instantiation
-  - `UpdateProjectiles()`
-    - projectile physics, collision, explosion, and paint resolution
-  - `CheckCollision()`
-    - entity hit test helper
-  - `ProcessKillEvent()`
-    - kill attribution and broadcast
+## Paint and presentation
 
-- World presentation
-  - `Render()`
-    - world draw orchestration
-  - `CreateRemotePlayer()`
-    - replicated player visual/entity creation
-  - `SpawnDeathSplat()`
-    - death paint effect helper
+`StageGeometry` supplies collision and paintable/scoring faces. `FacePaint` stores logical ownership and versions changed atlas regions; the stage renderer uploads those changes. `CharacterArt` draws committed source meshes/shaders with live pose matrices and material state. Renderer diagnostics can also draw fixed source snapshots, but gameplay does not use them as animation.
 
-## Remaining High-Value Split Targets
+The current body renderer uses the game tier. Screen-size tier selection/dither transitions, final environment/shadows/postprocessing, complete projectile/special world effects, audio, saves, online, Zones and Boss remain spec work; removing the legacy implementation does not complete these requirements.
 
-- Extract `Render()` into smaller private helpers:
-  - terrain/obstacle rendering
-  - entity rendering
-  - shadow rendering
-  - particle rendering
+## Legacy retirement — 2026-10-20
 
-- Extract `UpdateProjectiles()` into a dedicated projectile/combat module or helper group:
-  - projectile target gathering
-  - direct-hit resolution
-  - rocket explosion resolution
-  - bomb explosion resolution
-  - floor/obstacle paint resolution
+The user authorized keeping only restoration. The old `engine`, `components`, `gameplay`, `splat`, `scene`, `gui`, and `network` implementations and their unreferenced audio/model/shader/texture assets were removed. The NVIDIA preference export moved into restoration. `fmt` is removed. `GameNetworkingSockets` stays declared in vcpkg for future native multiplayer integration, but current targets neither link nor initialize it; the legacy protocol/manager is removed. Historical code remains recoverable from Git before this retirement commit.
 
-- Extract match-state logic further:
-  - score/timer authority
-  - endgame transition
-  - final result computation
-
-## Non-Goals For This Refactor Stage
-
-- No gameplay rule changes
-- No protocol shape changes
-- No data-driven config system yet
-- No subsystem class explosion before helper boundaries are stable
+Shared CMake presets are portable; machine-specific user presets stay local. The executable deploys the current reference assets. Release packaging continues to use the same executable name and asset layout.
