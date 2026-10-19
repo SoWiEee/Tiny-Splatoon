@@ -1,5 +1,6 @@
 #include "PlayerSimulation.hpp"
 #include "FacePaint.hpp"
+#include "ArsenalData.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -18,13 +19,37 @@ double horizontalLength(glm::dvec3 v) { return std::hypot(v.x, v.z); }
 double angleDifference(double a, double b) { return std::remainder(b - a, 2.0 * pi); }
 }
 
-PlayerSimulation::PlayerSimulation(const StageData& stage, const StageGeometry& geometry, FacePaint& paint, int team)
-    : stage_(stage), geometry_(geometry), paint_(paint), team_(team) {
+PlayerSimulation::PlayerSimulation(const StageData& stage, const StageGeometry& geometry, FacePaint& paint, int team, CombatWorld* world)
+    : stage_(stage), geometry_(geometry), paint_(paint), team_(team),
+      ownWorld_(world ? nullptr : std::make_unique<CombatWorld>(stage, geometry, paint)),
+      world_(world ? world : ownWorld_.get()), runner_(*this) {
     if (team < 0 || team > 1) throw std::invalid_argument("player team must be 0 or 1");
+    world_->addActor(*this);
+    setLoadout("shooter");
     spawnAt(stage.spawnPads[team], team == 0 ? 0.0 : pi);
 }
 
+PlayerSimulation::~PlayerSimulation() { world_->removeActor(*this); }
+
+const EquipmentData& PlayerSimulation::weapon() const { return GetEquipment(EquipmentCategory::Main, mainId_); }
+const EquipmentData& PlayerSimulation::subWeapon() const { return GetEquipment(EquipmentCategory::Sub, subId_); }
+const EquipmentData& PlayerSimulation::specialWeapon() const { return GetEquipment(EquipmentCategory::Special, specialId_); }
+void PlayerSimulation::setLoadout(std::string main, std::string sub, std::string special) {
+    if(main=="dualies") main="twins";
+    if(main=="splatling") main="spinner";
+    if(main=="slosher") main="bucket";
+    const auto& w = GetEquipment(EquipmentCategory::Main, main);
+    if (sub.empty()) sub = w.sub;
+    if (special.empty()) special = w.special;
+    GetEquipment(EquipmentCategory::Sub, sub);
+    GetEquipment(EquipmentCategory::Special, special);
+    world_->cleanup(*this);
+    mainId_ = std::move(main); subId_ = std::move(sub); specialId_ = std::move(special);
+    runner_.reset();
+}
+
 void PlayerSimulation::spawnAt(glm::dvec3 pos, double yaw) {
+    superJump_.reset();
     state = {};
     state.pos = pos;
     state.yaw = yaw;
@@ -32,36 +57,182 @@ void PlayerSimulation::spawnAt(glm::dvec3 pos, double yaw) {
     input = {};
     input.aimYaw = yaw;
     lastDamage_ = lastFire_ = kidT_ = 99.0;
-    damageFromInk_ = coyote_ = jumpBuffer_ = fireBuffer_ = cooldown_ = bloom_ = hardLand_ = climbSpeed_ = climbExit_ = 0.0;
+    damageFromInk_ = coyote_ = jumpBuffer_ = fireBuffer_ = hardLand_ = climbSpeed_ = climbExit_ = 0.0;
     firePressT_ = squidPressT_ = -1.0;
     smoothYVelocity_ = 0.0;
     yawVelocity_ = 0.0; hasFaceTarget_ = false;
     firingT_=fireFacing_=roofT_=roofStall_=0.0;roofDirection_=glm::dvec3(0);
     prevJump_ = prevFire_ = prevSquid_ = false;
-    projectiles_.clear(); projectileTrail_.clear(); projectileSeed_.clear();
+    prevSub_ = prevSpecial_ = false;
+    world_->cleanup(*this); runner_.reset();
     ground_ = geometry_.groundProbe(pos.x, pos.y, pos.z, 0.3, 0.3, 0.24);
     if (ground_.hit && std::abs(ground_.y - pos.y) < 0.3) {
         state.pos.y = ground_.y;
         state.grounded = true;
     }
     surface();
+    triggerPose({"spawn"});
 }
 
+CombatPose PlayerSimulation::combatPose() const {
+    auto pose = runner_.pose();
+    const auto special = world_->specials_.pose(*this);
+    pose.special = special.active;
+    pose.specialKind = special.kind;
+    pose.specialTime = special.elapsed;
+    pose.specialThrown = special.thrown;
+    return pose;
+}
+
+SpecialPose PlayerSimulation::specialPose() const { return world_->specials_.pose(*this); }
+double PlayerSimulation::hitRadius() const { const auto special=specialPose();return special.hitRadius>0?special.hitRadius:0.38; }
+double PlayerSimulation::hitHeight() const { const auto special=specialPose();return special.hitHeight>0?special.hitHeight:(state.squid?0.55:1.45); }
+
 bool PlayerSimulation::damage(double amount) {
+    return damageFromCombat(amount, nullptr, "environment");
+}
+
+bool PlayerSimulation::damageFromCombat(double amount, PlayerSimulation* attacker, const std::string& source) {
     if (!state.alive || amount <= 0.0 || state.invuln > 0.0) return false;
+    amount = world_->specials_.filterDamage(*this, attacker, amount, source);
+    if (amount <= 0.0) return false;
+    amount = runner_.damageTaken(amount, attacker);
+    if (amount <= 0.0) return false;
     state.hp -= amount;
     lastDamage_ = 0.0;
+    state.hurtFlash=std::min(1.0,state.hurtFlash+amount/60.0);
+    if (source != "ink") {
+        glm::dvec3 direction = attacker && attacker != this ? attacker->state.pos - state.pos : glm::dvec3(0,0,1);
+        const double cy=std::cos(state.yaw), sy=std::sin(state.yaw);
+        direction={direction.x*cy-direction.z*sy,0,direction.x*sy+direction.z*cy};
+        const double length=std::hypot(direction.x,direction.z);
+        if(length>0) direction/=length;
+        CharacterTrigger event{"hit"}; event.amount=std::clamp(amount/60.0,0.4,1.2); event.direction=direction;event.hasDirection=true;
+        triggerPose(event);
+    }
     if (state.hp <= 0.0) { splat(); return true; }
     return false;
 }
 
 void PlayerSimulation::splat() {
+    superJump_.reset();
     state.alive = false;
     state.hp = 0.0;
     state.respawnTimer = 5.5;
-    state.specialCharge *= 0.5;
+    const bool activeSpecial = world_->specials_.pose(*this).active;
+    state.specialCharge = activeSpecial ? weapon().number("specialCost", 190.0) * 0.5 : state.specialCharge * 0.5;
     state.climbing = false;
-    projectiles_.clear();projectileTrail_.clear();projectileSeed_.clear();
+    world_->specials_.splat(*this);
+    world_->cleanup(*this); runner_.reset();
+}
+
+void PlayerSimulation::finishFrame(double dt) {
+    const double mh = std::hypot(input.move.x, input.move.z);
+    const double hs = horizontalLength(state.vel);
+    double target = state.yaw;
+    bool hasTarget=true;
+    double omega = 20.0, maxRate = 12.5, maxAcc = 170.0;
+    fireFacing_=std::max(0.0,fireFacing_-dt);
+    const auto special = world_->specials_.pose(*this);
+    if (special.faceYaw) {
+        target = *special.faceYaw; omega = 30.0; maxRate = 30.0; maxAcc = 400.0;
+    } else if (special.body || special.faceMove || superJump_) {
+        if (hs > 0.6) target = std::atan2(state.vel.x, state.vel.z);
+        else hasTarget = false;
+    } else if (runner_.pose().firing || fireFacing_>0.0 || input.sub || special.aimFace) {
+        target = input.aimYaw; omega = 36.0; maxRate = 24.0; maxAcc = 380.0;
+    } else if (state.climbing) {
+        target = std::atan2(-wallNormal_.x, -wallNormal_.z);
+        omega = 26.0; maxRate = 18.0;
+    } else {
+        if (mh > 0.2) target = std::atan2(input.move.x, input.move.z);
+        else if (hs > 0.6) target = std::atan2(state.vel.x, state.vel.z);
+        else hasTarget=false;
+        if (state.squid) { omega = 26.0; maxRate = state.submerged ? 14.0 : 17.0; maxAcc = 260.0; }
+    }
+    double targetRate = 0.0;
+    if (hasTarget && hasFaceTarget_) {
+        const double delta = angleDifference(faceTarget_, target);
+        if (std::abs(delta) < 0.12) targetRate = std::clamp(delta / dt, -maxRate, maxRate);
+    }
+    faceTarget_ = target; hasFaceTarget_ = hasTarget;
+    const double acceleration = hasTarget?omega * omega * angleDifference(state.yaw, target)
+        + 2.0 * omega * (targetRate - yawVelocity_):-2.0*omega*yawVelocity_;
+    yawVelocity_ = std::clamp(yawVelocity_ + std::clamp(acceleration, -maxAcc, maxAcc) * dt, -maxRate, maxRate);
+    if(std::abs(yawVelocity_)<1e-5) yawVelocity_=0.0;
+    state.yaw = std::remainder(state.yaw + yawVelocity_ * dt, 2.0 * pi);
+    const double acc = -24.0 * 24.0 * state.smoothY - 48.0 * smoothYVelocity_;
+    smoothYVelocity_ += acc * dt;
+    state.smoothY += smoothYVelocity_ * dt;
+    state.smoothY = std::clamp(state.smoothY, -0.7, 0.7);
+    if (std::abs(state.smoothY) < 1e-4 && std::abs(smoothYVelocity_) < 1e-3)
+        state.smoothY = smoothYVelocity_ = 0.0;
+    if (poseFrameSink_) poseFrameSink_(dt);
+    if (ownWorld_) world_->tick(dt);
+}
+
+bool PlayerSimulation::superJump(glm::dvec3 destination, bool instant, bool home) {
+    if (!std::isfinite(destination.x) || !std::isfinite(destination.y) || !std::isfinite(destination.z))
+        throw std::invalid_argument("Super jump destination must be finite");
+    if (!state.alive || superJump_ || world_->specials_.pose(*this).active || !canRespawn_) return false;
+    SuperJumpState jump;
+    jump.target = destination;
+    jump.elapsed = instant ? 0.75 : 0.0;
+    jump.home = home;
+    superJump_ = jump;
+    state.squid = true;
+    state.climbing = false;
+    climbSpeed_ = 0.0;
+    runner_.reset();
+    return true;
+}
+
+glm::dvec3 PlayerSimulation::jumpAnchor() const {
+    const auto special = world_->specials_.pose(*this);
+    if (special.jumpBack) return special.origin;
+    return superJump_ && superJump_->flight ? superJump_->to : state.pos;
+}
+
+void PlayerSimulation::updateSuperJump(double dt) {
+    auto& jump = *superJump_;
+    jump.elapsed += dt;
+    if (!jump.flight) {
+        state.vel = glm::dvec3(0.0);
+        state.squid = true;
+        ground_ = geometry_.groundProbe(state.pos.x, state.pos.y, state.pos.z, 0.4, 0.35, 0.24, true);
+        const int sample = ground_.hit && ground_.face >= 0 ? paint_.sample(ground_.face, ground_.u, ground_.v) : 0;
+        state.groundTeam = sample == 0 ? 0 : sample - 1 == team_ ? 1 : 2;
+        if (jump.elapsed > 0.75) {
+            jump.from = state.pos;
+            jump.to = jump.target;
+            jump.flight = true;
+            jump.elapsed = 0.0;
+            jump.duration = 1.15 + std::min(0.6, glm::length(jump.from - jump.to) / 80.0);
+            state.invuln = std::max(state.invuln, jump.duration + 0.2);
+        }
+        return;
+    }
+    const double k = std::min(1.0, jump.elapsed / jump.duration);
+    const double ease = k < 0.5 ? 2.0 * k * k : 1.0 - std::pow(-2.0 * k + 2.0, 2.0) / 2.0;
+    glm::dvec3 position = jump.from + (jump.to - jump.from) * ease;
+    position.y += std::sin(pi * std::pow(k, 0.86)) * (11.0 + glm::length(jump.from - jump.to) * 0.08);
+    state.vel = (position - state.pos) / std::max(dt, 1e-3);
+    state.pos = position;
+    state.squid = k <= 0.82;
+    if (k >= 1.0) {
+        superJump_.reset();
+        state.vel = {0.0, -12.0, 0.0};
+        state.squid = false;
+        kidT_ = 0.05;
+        state.grounded = false;
+        resolveMotion(state.pos.y + 0.4, false);
+        if (!state.grounded) {
+            state.grounded = true;
+            resolveMotion(state.pos.y, true);
+            if (!state.grounded) state.vel.y = -6.0;
+        }
+        world_->paint(*this, state.pos + glm::dvec3(0.0, 0.3, 0.0), 1.4, random());
+    }
 }
 
 glm::dvec3 PlayerSimulation::visualPos() const {
@@ -69,6 +240,7 @@ glm::dvec3 PlayerSimulation::visualPos() const {
 }
 
 double PlayerSimulation::random() {
+    if(randomSource_)return randomSource_();
     seed_ ^= seed_ << 13; seed_ ^= seed_ >> 17; seed_ ^= seed_ << 5;
     return static_cast<double>(seed_ & 0xffffffu) / 16777216.0;
 }
@@ -90,8 +262,11 @@ void PlayerSimulation::horizontal(double dt, bool enemy) {
     glm::dvec3 move(input.move.x, 0.0, input.move.z);
     const double mh = horizontalLength(move), mag = std::min(1.0, mh);
     const double sp = horizontalLength(state.vel);
+    const auto special = world_->specials_.pose(*this);
+    const double specialSpeed = special.moveSpeed;
+    const double kidSpeed = specialSpeed >= 0.0 ? specialSpeed : runner_.moveSpeed();
     if (!state.grounded) {
-        const double target = state.squid ? std::max(2.9, sp) : std::max(firingT_>0.0?4.6:6.0, 4.6);
+        const double target = state.squid ? std::max(2.9, sp) : std::max(kidSpeed, 4.6);
         const glm::dvec3 desired = mh > 0.01 ? move / mh * target * mag : glm::dvec3(0.0);
         const glm::dvec3 delta(desired.x - state.vel.x, 0.0, desired.z - state.vel.z);
         const double length = horizontalLength(delta);
@@ -100,7 +275,7 @@ void PlayerSimulation::horizontal(double dt, bool enemy) {
         else { state.vel.x += delta.x / length * rate; state.vel.z += delta.z / length * rate; }
         return;
     }
-    double vt = state.squid ? (state.submerged ? 11.8 : 2.9) : (firingT_>0.0 ? 4.6 : 6.0);
+    double vt = state.squid ? (state.submerged ? 11.8 : 2.9) : runner_.moveSpeed();
     double accel = state.squid ? (state.submerged ? 64.0 : 34.0) : 70.0;
     double aIn = state.squid ? (state.submerged ? 0.75 : 0.6) : 0.5;
     double inKnee = state.squid ? (state.submerged ? 3.0 : 1.0) : 1.6;
@@ -110,7 +285,13 @@ void PlayerSimulation::horizontal(double dt, bool enemy) {
     double dKnee = state.squid ? (state.submerged ? 4.0 : 2.0) : 2.2;
     double turn = state.squid ? (state.submerged ? 11.0 : 13.0) : 15.0;
     if (!state.squid && hardLand_ > 0) vt *= 1.0 - 0.28 * hardLand_;
+    if (specialSpeed >= 0.0) {
+        vt = specialSpeed;
+        if (special.accel > 0.0) { accel = special.accel; aIn = 1.0; decel = std::max(decel, special.accel); }
+    }
     if (enemy) { vt = std::min(vt, 1.9); accel = std::min(accel, 30.0); decel = 30.0; }
+    if(state.poison>0) vt*=GetEquipment(EquipmentCategory::Sub,"mist").number("slow");
+    if(state.reveal>0) vt*=GetEquipment(EquipmentCategory::Special,"sonar").number("slow");
     if (mh < 0.01) {
         if (sp < 1e-4) { state.vel.x = state.vel.z = 0.0; return; }
         const double d = decel * (dMin + (1.0 - dMin) * smooth(0.0, dKnee, sp)) * dt;
@@ -253,6 +434,9 @@ void PlayerSimulation::integrate(double dt, bool jumped) {
         state.grounded = false;
         return;
     }
+    if (world_->specials_.pose(*this).hang > 0.0) {
+        state.vel=glm::dvec3(0.0); state.grounded=false; return;
+    }
     const BlockData* support=stick && ground_.hit && ground_.block>=0?&stage_.blocks[ground_.block]:nullptr;
     if(support && support->roof) roofSlide(*support,dt);
     else roofT_=0.0;
@@ -274,6 +458,10 @@ void PlayerSimulation::integrate(double dt, bool jumped) {
         state.vel.y = std::max(-40.0, state.vel.y - g * dt);
     }
     state.pos += state.vel * dt;
+    resolveMotion(prevY,stick);
+}
+
+void PlayerSimulation::resolveMotion(double prevY,bool stick) {
     const bool squid = state.squid;
     const Contacts contacts = geometry_.collideBody(state.pos, 0.38, squid ? 0.16 : 0.35,
                                                     squid ? 0.55 : 1.45, stick, squid);
@@ -311,167 +499,83 @@ void PlayerSimulation::integrate(double dt, bool jumped) {
             state.landT = 0.0;
             if (state.landSpeed > 11.5)
                 hardLand_ = std::clamp((state.landSpeed - 11.5) / 6.0 + 0.5, 0.0, 1.0);
+            if (state.landSpeed > 3.0) triggerPose({"land", state.landSpeed});
         }
         state.vel.y = 0.0;
     }
     state.grounded = grounded;
 }
 
-void PlayerSimulation::shoot(double dt, bool fire) {
-    cooldown_ -= dt;
-    firingT_=std::max(0.0,firingT_-dt);
-    if (!fire) {
-        cooldown_ = std::max(0.0, cooldown_);
-        bloom_ = std::max(0.0, bloom_ - dt / 0.28);
-        return;
-    }
-    firingT_=0.35;fireFacing_=0.5;
-    int guard = 0;
-    while (cooldown_ <= 0.0 && guard++ < 3) {
-        if (state.ink < 0.95) { cooldown_ += 0.1; break; }
-        state.ink -= 0.95;
-        lastFire_ = 0.0;
-        glm::dvec3 dir = aimDir();
-        // shortcut: use the collision body's muzzle until the reference character's animated weapon rig is ported.
-        const glm::dvec3 muzzle = state.pos + glm::dvec3(0.0, 1.05, 0.0) + dir * 0.3;
-        if (input.hasAimPoint) {
-            const glm::dvec3 to = input.aimPoint - muzzle;
-            const double len = glm::length(to);
-            if (len >= 2.0 && glm::dot(to, dir) >= 0.0) dir = to / len;
-            const double hd = std::hypot(to.x, to.z);
-            if (hd >= 1.5 && hd <= 12.5) {
-                // Source ballistic correction uses its 60 Hz audit integrator.
-                auto endpointY = [&](double pitch) {
-                    double vh = std::cos(pitch) * 34.0, vy = std::sin(pitch) * 34.0, x = 0.0, y = 0.0;
-                    double age=0;
-                    for (int i = 1; i <= 90; ++i) {
-                        const double px = x, py = y;
-                        age+=1.0/60;
-                        if (age > 0.13) { vy -= 28.0 / 60.0; vh *= 1.0 - 0.8 / 60.0; vy *= 1.0 - 0.8 / 60.0; }
-                        x += vh / 60.0; y += vy / 60.0;
-                        if (x >= hd) return py + (y - py) * ((hd - px) / std::max(1e-6, x - px));
-                    }
-                    return -1000.0;
-                };
-                const double hdir = std::hypot(dir.x, dir.z), base = std::atan2(dir.y, hdir);
-                if (hdir > 1e-4) {
-                    double p0 = base, e0 = endpointY(p0) - to.y;
-                    double p1 = std::abs(e0)<0.01?p0:p0-std::atan2(e0,hd), e1 = endpointY(p1) - to.y;
-                    for (int i = 0; i < 4 && std::abs(e1) > 0.005; ++i) {
-                        const double diff = e1 - e0;
-                        if (std::abs(diff) < 1e-6) break;
-                        const double p2 = p1 - e1 * (p1 - p0) / diff;
-                        p0 = p1; e0 = e1; p1 = std::clamp(p2, -1.2, 1.2); e1 = endpointY(p1) - to.y;
-                    }
-                    if (std::abs(e1) <= 0.25 && std::abs(p1 - base) <= 0.35)
-                        dir = {dir.x / hdir * std::cos(p1), std::sin(p1), dir.z / hdir * std::cos(p1)};
-                }
-            }
-        }
-        const double spread = (state.grounded ? 5.5 : 11.0) * (0.45 + 0.55 * bloom_) * pi / 180.0;
-        const double radius = spread * std::sqrt(random()), angle = random() * 2.0 * pi;
-        glm::dvec3 side(-dir.z, 0.0, dir.x);
-        if (glm::length(side) < 1e-4) side = {1.0, 0.0, 0.0};
-        side = glm::normalize(side);
-        const glm::dvec3 up = glm::cross(dir, side);
-        dir = glm::normalize(dir + side * (std::cos(angle) * std::tan(radius))
-                             + up * (std::sin(angle) * std::tan(radius) * 0.55));
-        projectiles_.push_back({muzzle, dir * 34.0, 0.0});
-        ++shotsFired_;
-        projectileTrail_.push_back(-(2.5 - 1.05));
-        projectileSeed_.push_back(random());
-        bloom_ = std::min(1.0, bloom_ + 0.3);
-        cooldown_ += 0.1;
-    }
-}
-
-void PlayerSimulation::updateProjectiles(double dt) {
-    for (std::size_t i = 0; i < projectiles_.size();) {
-        auto& p = projectiles_[i];
-        const glm::dvec3 prev = p.pos;
-        p.age += dt;
-        if (p.age > 0.13) { p.vel.y -= 28.0 * dt; p.vel *= 1.0 - 0.8 * dt; }
-        p.pos += p.vel * dt;
-        bool done = false;
-        const glm::dvec3 path = p.pos - prev;
-        const double pathLength = glm::length(path);
-        if (pathLength > 0.0) {
-            const RayHit hit = geometry_.raycast(prev, path / pathLength, pathLength, true);
-            if (hit.hit) {
-                SplatOptions options;
-                options.stretch = glm::normalize(p.vel);
-                options.hasStretch = true;
-                options.stretchAmt = 0.7;
-                const double radius = 0.85 * (0.85 + random() * 0.3);
-                const double area = paint_.splat(hit.point + hit.normal * 0.14, radius, team_, projectileSeed_[i], options);
-                turfPainted_ += area;
-                state.specialCharge = std::min(190.0, state.specialCharge + area * 0.8);
-                done = true;
-            }
-        }
-        if (!done) {
-            projectileTrail_[i] += glm::length(p.vel) * dt;
-            if (projectileTrail_[i] > 1.05) {
-                projectileTrail_[i] = 0.0;
-                const RayHit hit = geometry_.raycast(p.pos, {0.0, -1.0, 0.0}, 4.0, true);
-                if (hit.hit) {
-                    const double area = paint_.splat(hit.point + hit.normal * 0.1,
-                                                     0.44 * (0.8 + random() * 0.4), team_, random());
-                    turfPainted_ += area;
-                    state.specialCharge = std::min(190.0, state.specialCharge + area * 0.8);
-                }
-            }
-        }
-        if (done || p.age > 1.2 || p.pos.y < -3.4) {
-            projectiles_.erase(projectiles_.begin() + i);
-            projectileTrail_.erase(projectileTrail_.begin() + i);
-            projectileSeed_.erase(projectileSeed_.begin() + i);
-        } else ++i;
-    }
-}
-
 void PlayerSimulation::tick(double dt) {
     if (!(dt > 0.0) || !std::isfinite(dt)) throw std::invalid_argument("player tick requires positive finite dt");
     time_ += dt;
-    updateProjectiles(dt);
+
     if (!state.alive) {
         state.respawnTimer -= dt;
-        if (state.respawnTimer <= 0.0) {
+        if (canRespawn_ && state.respawnTimer <= 0.0) {
             const double special = state.specialCharge;
             spawnAt(stage_.spawnPads[team_] + glm::dvec3(std::cos(0.6)*1.1,4.5,std::sin(0.6)*1.1), team_ == 0 ? 0.0 : pi);
             state.specialCharge = special;
             state.grounded = false;
             state.vel.y = -4.0;
         }
+        if (poseFrameSink_) poseFrameSink_(dt);
         return;
     }
     const bool firePressed = input.fire && !prevFire_;
     const bool jumpPressed = input.jump && !prevJump_;
+    const bool specialPressed = input.special && !prevSpecial_;
+    const bool subReleased = prevSub_ && !input.sub;
     if (input.squid && !prevSquid_) squidPressT_ = time_;
     if (firePressed) firePressT_ = time_;
     prevFire_ = input.fire; prevJump_ = input.jump; prevSquid_ = input.squid;
+    prevSub_ = input.sub; prevSpecial_ = input.special;
     state.invuln = std::max(0.0, state.invuln - dt);
+    state.hurtFlash=std::max(0.0,state.hurtFlash-dt*0.6);
     lastDamage_ += dt; lastFire_ += dt; state.landT += dt; kidT_ += dt;
     hardLand_ = std::max(0.0, hardLand_ - dt / 0.16);
     jumpBuffer_ = jumpPressed ? 0.13 : std::max(0.0, jumpBuffer_ - dt);
     fireBuffer_ = firePressed ? 0.16 : std::max(0.0, fireBuffer_ - dt);
+
+    if (superJump_) {
+        updateSuperJump(dt);
+        finishFrame(dt);
+        return;
+    }
+
+    // Source actor.js gives an already-running body special the frame before checking a new activation.
+    if (world_->specials_.body(*this, dt)) {
+        finishFrame(dt);
+        return;
+    }
+    if (specialPressed && !world_->specials_.pose(*this).active
+        && state.specialCharge >= weapon().number("specialCost", 190.0)
+        && world_->specials_.activate(*this, specialId_)) {
+        finishFrame(dt);
+        return;
+    }
+
     const bool fireWins = (input.fire || fireBuffer_ > 0.0) && firePressT_ >= squidPressT_;
-    const bool squid = input.squid && !fireWins;
+    const bool squid = input.squid && !fireWins && !runner_.busy() && !world_->specials_.pose(*this).noSquid;
     if (state.squid && !squid) kidT_ = 0.0;
     state.squid = squid;
     surface();
     state.submerged = state.squid && state.grounded && state.groundTeam == 1;
-    const bool enemy = state.grounded && state.groundTeam == 2 && !state.submerged;
-    climb(dt);
-    if (!state.climbing) horizontal(dt, enemy);
+    const bool enemy = state.grounded && state.groundTeam == 2 && !state.submerged && !world_->specials_.pose(*this).inkProof;
+    const bool dodged = jumpPressed && runner_.tryDodge();
+    const bool bodyOwned = runner_.bodyOverride(dt);
+    world_->specials_.move(*this, dt);
+    if(!bodyOwned) { climb(dt); if (!state.climbing) horizontal(dt, enemy); }
     coyote_ = state.grounded ? 0.12 : coyote_ - dt;
     bool jumped = false;
-    if (jumpBuffer_ > 0.0 && (state.grounded || coyote_ > 0.0) && !state.climbing) {
+    if (!bodyOwned && !dodged && jumpBuffer_ > 0.0 && (state.grounded || coyote_ > 0.0) && !state.climbing) {
         state.vel.y = (state.submerged ? 9.4 : 8.4) * (enemy ? 0.72 : 1.0);
         state.grounded = false; coyote_ = jumpBuffer_ = 0.0;
         jumped = true;
+        triggerPose({"jump"});
     }
-    integrate(dt, jumped);
+    if(!bodyOwned) integrate(dt, jumped);
+    world_->blockActor(*this);
     const auto pad=stage_.spawnPads[1-team_];const auto delta=state.pos-pad;
     const double distance=std::hypot(delta.x,delta.z);
     if(distance<stage_.spawnBarrier && state.pos.y>pad.y-1.0) {
@@ -481,57 +585,38 @@ void PlayerSimulation::tick(double dt) {
         if(vn<0) {state.vel.x-=delta.x/d*vn*1.6;state.vel.z-=delta.z/d*vn*1.6;}
     }
     if (enemy) {
-        if (damageFromInk_ < 40.0 && state.invuln <= 0.0) {
+        if (damageFromInk_ < 40.0 && state.invuln <= 0.0 && state.shield <= 0.0) {
             const double d = std::min(20.0 * dt, 40.0 - damageFromInk_);
             damageFromInk_ += d;
             state.hp = std::max(1.0, state.hp - d);
+            state.hurtFlash=std::min(1.0,state.hurtFlash+dt*0.5);
         }
         lastDamage_ = std::min(lastDamage_, 0.4);
     } else damageFromInk_ = std::max(0.0, damageFromInk_ - dt * 30.0);
     if (lastDamage_ > 1.3 && state.hp < 100.0)
         state.hp = std::min(100.0, state.hp + (state.submerged ? 60.0 : 22.0) * dt);
-    if (state.submerged || state.climbing) state.ink = std::min(100.0, state.ink + 42.0 * dt);
-    else if (!squid && lastFire_ > 0.9) state.ink = std::min(100.0, state.ink + 9.0 * dt);
+    state.track=std::max(0.0,state.track-dt);state.reveal=std::max(0.0,state.reveal-dt);
+    if(state.poison>0){state.poison=std::max(0.0,state.poison-dt);state.ink=std::max(0.0,state.ink-GetEquipment(EquipmentCategory::Sub,"mist").number("inkDrain")*dt);}
+    if (state.submerged || state.climbing) state.ink = std::min(100.0, state.ink + 42.0 * (state.poison>0?0.5:1.0) * dt);
+    else if(state.poison>0) {}
+    else if (!squid && lastFire_ > 0.9 && !runner_.busy()) state.ink = std::min(100.0, state.ink + 9.0 * dt);
     else if (squid) state.ink = std::min(100.0, state.ink + 4.5 * dt);
-    const bool firing = !squid && kidT_ >= 0.07 && (input.fire || fireBuffer_ > 0.0);
-    shoot(dt,firing);
-    if(!squid && kidT_>=0.07) fireBuffer_=0.0;
+    bool firing = false, weaponPressed = false;
+    if (!squid && kidT_ >= 0.07) {
+        firing = input.fire || fireBuffer_ > 0.0;
+        weaponPressed = firePressed || fireBuffer_ > 0.0;
+        fireBuffer_ = 0.0;
+    }
+    const double inkBefore=state.ink;
+    bool sub = input.sub && !squid;
+    bool specialSubReleased = subReleased && !squid;
+    const bool specialConsumed = world_->specials_.weapon(*this, dt, firing, weaponPressed, sub, specialSubReleased);
+    if (!specialConsumed) runner_.tick(dt, firing, weaponPressed, sub, specialSubReleased);
+    if(state.reveal>0 && state.ink<inkBefore)state.ink=std::max(0.0,state.ink-(inkBefore-state.ink)*(GetEquipment(EquipmentCategory::Special,"sonar").number("inkMul")-1));
+    world_->specials_.tickActor(*this, dt);
     if (state.pos.y < -1.45 && !std::isfinite(geometry_.groundHeight(state.pos.x, state.pos.z, state.pos.y + 0.6)))
         splat();
-    const double mh = std::hypot(input.move.x, input.move.z);
-    const double hs = horizontalLength(state.vel);
-    double target = state.yaw;
-    bool hasTarget=true;
-    double omega = 20.0, maxRate = 12.5, maxAcc = 170.0;
-    fireFacing_=std::max(0.0,fireFacing_-dt);
-    if (firingT_>0.0 || fireFacing_>0.0) {
-        target = input.aimYaw; omega = 36.0; maxRate = 24.0; maxAcc = 380.0;
-    } else if (state.climbing) {
-        target = std::atan2(-wallNormal_.x, -wallNormal_.z);
-        omega = 26.0; maxRate = 18.0;
-    } else {
-        if (mh > 0.2) target = std::atan2(input.move.x, input.move.z);
-        else if (hs > 0.6) target = std::atan2(state.vel.x, state.vel.z);
-        else hasTarget=false;
-        if (state.squid) { omega = 26.0; maxRate = state.submerged ? 14.0 : 17.0; maxAcc = 260.0; }
-    }
-    double targetRate = 0.0;
-    if (hasTarget && hasFaceTarget_) {
-        const double delta = angleDifference(faceTarget_, target);
-        if (std::abs(delta) < 0.12) targetRate = std::clamp(delta / dt, -maxRate, maxRate);
-    }
-    faceTarget_ = target; hasFaceTarget_ = hasTarget;
-    const double acceleration = hasTarget?omega * omega * angleDifference(state.yaw, target)
-        + 2.0 * omega * (targetRate - yawVelocity_):-2.0*omega*yawVelocity_;
-    yawVelocity_ = std::clamp(yawVelocity_ + std::clamp(acceleration, -maxAcc, maxAcc) * dt, -maxRate, maxRate);
-    if(std::abs(yawVelocity_)<1e-5) yawVelocity_=0.0;
-    state.yaw = std::remainder(state.yaw + yawVelocity_ * dt, 2.0 * pi);
-    const double acc = -24.0 * 24.0 * state.smoothY - 48.0 * smoothYVelocity_;
-    smoothYVelocity_ += acc * dt;
-    state.smoothY += smoothYVelocity_ * dt;
-    state.smoothY = std::clamp(state.smoothY, -0.7, 0.7);
-    if (std::abs(state.smoothY) < 1e-4 && std::abs(smoothYVelocity_) < 1e-3)
-        state.smoothY = smoothYVelocity_ = 0.0;
+    finishFrame(dt);
 }
 
 } // namespace restoration

@@ -62,20 +62,27 @@ int main() {
                 oracleStage->blocks.push_back(b);
             }
             oracleStage->spawnPads[1]={0,0,4};oracleStage->spawnBarrier=scenario=="barrier"?2.0:0.0;
-            if(scenario=="wall") oracleStage->faces[0].paintable=false;
+            // Dive oracles sample dry ground even when the native charger beam would paint it.
+            if(scenario=="wall" || scenario=="chargerDive" || scenario=="spinnerDive") oracleStage->faces[0].paintable=false;
             else oracleStage->faces[1].paintable=false;
             oracleGeometry=std::make_unique<StageGeometry>(*oracleStage);
             oraclePaint=std::make_unique<FacePaint>(*oracleStage,*oracleGeometry,2048);
-            if(scenario=="swim" || scenario=="enemy") oraclePaint->splat({0,0,0},60,scenario=="swim"?0:1,0.2);
+            if(scenario=="swim" || scenario=="enemy" || scenario=="enemyRevealed") oraclePaint->splat({0,0,0},60,scenario=="swim"?0:1,0.2);
             if(scenario=="wall") oraclePaint->splat({0,1,7.8},10,0,0.2);
             oracle=std::make_unique<PlayerSimulation>(*oracleStage,*oracleGeometry,*oraclePaint);
+            oracle->setLoadout(scenario=="chargerDive"?"charger":scenario=="spinnerDive"?"spinner":scenario=="rollerPop"?"roller":"shooter");
             oracle->spawnAt({scenario=="rail"?0.15:0.0,scenario=="rail"?0.56:0.0,scenario=="wall"?7.0:0.0},0);
             oracle->state.invuln=0;
+            if(scenario=="enemyRevealed") oracle->state.reveal=8;
+            if(scenario.rfind("returnJump",0)==0)
+                check(oracle->superJump({6,0,4},scenario=="returnJumpInstant",true),"Native return jump did not start");
         }
         while(oracleFrame<f.frame) {
             auto& in=oracle->input;in={};
+            if(scenario=="chargerDive") in.aimYaw=0.6;
             if(scenario=="run" || scenario=="squidDry" || scenario=="swim" || scenario=="enemy" || scenario=="fireMove" || scenario=="wall" || scenario=="airFire" || scenario=="step" || scenario=="rail" || scenario=="barrier") in.move={0,0,1};
             if(scenario=="fireRelease") in.move={1,0,0};
+            if(scenario=="enemyRevealed") in.move={0,0,1};
             if(scenario=="brake") in.move={0,0,oracleFrame<60?1.0:0.0};
             if(scenario=="reverse") in.move={0,0,oracleFrame<60?1.0:-1.0};
             if(scenario=="turn") in.move=oracleFrame<60?glm::dvec3(0,0,1):glm::dvec3(1,0,0);
@@ -83,14 +90,19 @@ int main() {
             in.jump=(scenario=="jump" || scenario=="air" || scenario=="airFire") && oracleFrame==0;
             in.squid=scenario=="squidDry" || scenario=="swim" || scenario=="wall" || scenario=="grate";
             in.fire=scenario=="fireMove" || scenario=="airFire" || (scenario=="fireRelease" && oracleFrame<30);
+            if(scenario=="chargerDive" || scenario=="spinnerDive") {in.fire=oracleFrame<30;in.squid=oracleFrame>=30;}
+            if(scenario=="rollerPop") {in.squid=oracleFrame<6;in.fire=oracleFrame==6;}
             oracle->tick(f.dt);++oracleFrame;
         }
         const auto& s=oracle->state;
         auto close=[](double a,double b){return std::abs(a-b)<1e-6;};
+        const auto& jump=oracle->superJumpState();
         const bool equal=close(s.pos.x,f.x)&&close(s.pos.y,f.y)&&close(s.pos.z,f.z)&&
             close(s.vel.x,f.vx)&&close(s.vel.y,f.vy)&&close(s.vel.z,f.vz)&&close(s.yaw,f.yaw)&&
             close(s.hp,f.hp)&&close(s.ink,f.ink)&&s.grounded==bool(f.ground)&&s.squid==bool(f.squid)&&
-            s.submerged==bool(f.submerged)&&s.climbing==bool(f.climbing);
+            s.submerged==bool(f.submerged)&&s.climbing==bool(f.climbing)&&
+            (jump?int(jump->flight):-1)==f.jumpPhase&&close(jump?jump->elapsed:0.0,f.jumpTime)&&
+            close(jump?jump->duration:0.0,f.jumpDuration)&&bool(jump&&jump->home)==bool(f.jumpHome);
         if(!equal) {
             if(oracleFailures++<12) std::cerr<<"Actor "<<scenario<<" frame "<<f.frame<<": pos "<<s.pos.x<<','<<s.pos.y<<','<<s.pos.z<<" expected "<<f.x<<','<<f.y<<','<<f.z
                 <<" vel "<<s.vel.x<<','<<s.vel.y<<','<<s.vel.z<<" expected "<<f.vx<<','<<f.vy<<','<<f.vz

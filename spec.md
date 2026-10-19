@@ -74,6 +74,8 @@
 
 可保留 `engine/`、`gameplay/`、`scene/`、`components/`、`splat/`、`gui/`、`network/`。模組拆分依耦合決定，不要求先重寫引擎。
 
+2026-10-19 架構決策：若既有主程式架構不適合來源契約，可在 `restoration/` 完成原生 application、輸入、場景與資源生命週期，再替換舊入口。玩家入口與驗收工具共用同一套 actor／runner／world／match／pose，不維護第二套玩法。每個視窗只建立一個 GLFW／OpenGL／ImGui 生命週期，GPU 資源須在 context 結束前釋放。舊檔案於呼叫與建置依賴移除、替代流程可運作且受影響驗收通過後才刪除；目錄重組與入口切換不改變本規格的完整還原要求。
+
 ## 3. 啟動、選單與完整流程
 
 來源：`splat-ref/src/main.js`、`src/ui/{menus,menu-art}.js`、`src/game/{showcase,lobbySet}.js`、`styles/`。

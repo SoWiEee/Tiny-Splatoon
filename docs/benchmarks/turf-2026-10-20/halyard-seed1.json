@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "scope": "native_live_turf_diagnostic",
+  "qa12_claim": false,
+  "limits": "Current diagnostic omits final environment, shadow, postprocess, projectile meshes, particles, special world props and special visual effects; Boss mode is not ported.",
+  "stage": "halyard",
+  "seed": 1,
+  "resolution": [
+    1920,
+    1080
+  ],
+  "warmup_frames": 120,
+  "measured_frames": 600,
+  "vsync": false,
+  "sim_step_hz": 60,
+  "cpu_model": "12th Gen Intel(R) Core(TM) i7-1280P",
+  "cpu_logical_processors": 20,
+  "gl_vendor": "NVIDIA Corporation",
+  "gl_renderer": "NVIDIA GeForce GTX 1650 with Max-Q Design/PCIe/SSE2",
+  "gl_version_driver": "4.5.0 NVIDIA 591.74",
+  "cpu_frame_ms_mean": 2.0624,
+  "cpu_frame_ms_p95": 2.583,
+  "gpu_frame_ms_mean": 0.989,
+  "gpu_frame_ms_p95": 1.1969,
+  "fps_mean": 484.8687,
+  "fps_p95_frame": 387.1467,
+  "draws_per_frame_mean": 70.5033,
+  "particles_per_frame_mean": 0.0,
+  "working_set_bytes_max": 182190080,
+  "gpu_available_kib_min": 3937608,
+  "frames_csv": "halyard-seed1.csv",
+  "nvidia_driver_version": "591.74"
+}

@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "scope": "native_live_turf_diagnostic",
+  "qa12_claim": false,
+  "limits": "Current diagnostic omits final environment, shadow, postprocess, projectile meshes, particles, special world props and special visual effects; Boss mode is not ported.",
+  "stage": "crossmarket",
+  "seed": 1,
+  "resolution": [
+    1920,
+    1080
+  ],
+  "warmup_frames": 120,
+  "measured_frames": 600,
+  "vsync": false,
+  "sim_step_hz": 60,
+  "cpu_model": "12th Gen Intel(R) Core(TM) i7-1280P",
+  "cpu_logical_processors": 20,
+  "gl_vendor": "NVIDIA Corporation",
+  "gl_renderer": "NVIDIA GeForce GTX 1650 with Max-Q Design/PCIe/SSE2",
+  "gl_version_driver": "4.5.0 NVIDIA 591.74",
+  "cpu_frame_ms_mean": 3.3135,
+  "cpu_frame_ms_p95": 4.2004,
+  "gpu_frame_ms_mean": 0.9434,
+  "gpu_frame_ms_p95": 1.1213,
+  "fps_mean": 301.7958,
+  "fps_p95_frame": 238.0726,
+  "draws_per_frame_mean": 80.02,
+  "particles_per_frame_mean": 0.0,
+  "working_set_bytes_max": 182947840,
+  "gpu_available_kib_min": 3937608,
+  "frames_csv": "crossmarket-seed1.csv",
+  "nvidia_driver_version": "591.74"
+}

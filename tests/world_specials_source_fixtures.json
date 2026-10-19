@@ -1,0 +1,288 @@
+{
+  "sources": [
+    {
+      "path": "../splat-ref/src/config.js",
+      "sha256": "76a1bc70f855e58343a1bc1d7a41c6b72dcd2da55b3e4c47b5a5908756180999"
+    },
+    {
+      "path": "../splat-ref/src/game/actor.js",
+      "sha256": "580d31316a26b2b58df592da0f6e3c3d042b3867dba27f823d5d9bb41afd048d"
+    },
+    {
+      "path": "../splat-ref/src/game/specials.js",
+      "sha256": "da71b549853c53ed70876c7e02ed12d55e18f9046df1d567998562bec22b39cc"
+    },
+    {
+      "path": "../splat-ref/src/game/weapons.js",
+      "sha256": "2ec02b036376fdab0fda3556374d92db945b0f0409b311fe2e80b64418b79298"
+    },
+    {
+      "path": "../splat-ref/src/game/subs.js",
+      "sha256": "8bb3f7da75a9361235c4ec1603a0987bf4d543db7ede1adf628d837e47719183"
+    }
+  ],
+  "rows": [
+    {
+      "id": "slam",
+      "activeAfterImpact": false,
+      "impact": {
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "radius": 5.2
+      },
+      "hit": {
+        "damage": 180,
+        "source": "slam",
+        "victimTeam": 1
+      },
+      "ticksUntilImpact": 56,
+      "armorDuringSpecial": true
+    },
+    {
+      "id": "storm",
+      "activeAfterThrow": false,
+      "bomb": {
+        "pos": [
+          2,
+          4.45,
+          -4
+        ],
+        "vel": [
+          4.791026640394366,
+          7.434727510607723,
+          13.994995400428378
+        ],
+        "dir": [
+          0.3238852716121465,
+          0,
+          0.9460963644538151
+        ]
+      },
+      "cloud": {
+        "pos": [
+          2,
+          4.6,
+          -4
+        ],
+        "afterOneTick": [
+          2.005937896646223,
+          4.6,
+          -3.9826548999850133
+        ],
+        "duration": 6.5,
+        "radius": 3.4,
+        "driftSpeed": 1.1,
+        "dps": 34
+      },
+      "rainDamage": 0.5666666666666667,
+      "specialPaintArea": 0.1,
+      "event": {
+        "pos": [
+          2,
+          4.6,
+          -4
+        ],
+        "team": 0,
+        "radius": 3.4
+      }
+    },
+    {
+      "id": "bubbler",
+      "active": "bubbler",
+      "elapsed": 0,
+      "duration": 6.5,
+      "shield": 6.5,
+      "ownerShield": true,
+      "filteredDamage": 0,
+      "knock": [
+        0,
+        1.6915999999999998,
+        -1.6199999999999999
+      ],
+      "eventTime": 6.5
+    },
+    {
+      "id": "zooka",
+      "duration": 6,
+      "interval": 1,
+      "cooldownAfterFirstShot": 1,
+      "consumed": true,
+      "twister": {
+        "kind": "twister",
+        "pos": [
+          0,
+          1.7566062770326392,
+          1.9744910042527406
+        ],
+        "vel": [
+          0,
+          -5.8678744593472105,
+          33.48982008505481
+        ],
+        "life": 1.2941176470588236,
+        "damage": 180,
+        "height": 2.8,
+        "radius": 0.55,
+        "paintEvery": 0.7,
+        "paintRadius": 0.95
+      },
+      "hitDamage": 180,
+      "event": {
+        "weapon": "zooka",
+        "muzzle": [
+          0,
+          2.05,
+          0.3
+        ],
+        "dir": [
+          0,
+          -0.17258454292197678,
+          0.984994708383965
+        ]
+      }
+    },
+    {
+      "id": "barrage",
+      "duration": 6.5,
+      "gap": 0.3,
+      "bombKind": "bomb",
+      "throw": {
+        "kind": "bomb",
+        "pos": [
+          2,
+          4.35,
+          -4
+        ],
+        "vel": [
+          4.104928727832746,
+          6.507426337075266,
+          11.777027369111444
+        ],
+        "fuse": -1,
+        "inkCost": 70,
+        "radius": 3.1,
+        "throwSpeed": 13.5
+      },
+      "firstAccepted": true,
+      "blockedBeforeGap": true,
+      "acceptedAtGap": true,
+      "acceptedThrows": 2,
+      "inkAfter": 100
+    },
+    {
+      "id": "barrage_sticky",
+      "duration": 6.5,
+      "gap": 0.4,
+      "bombKind": "sticky",
+      "throw": {
+        "kind": "sticky",
+        "pos": [
+          2,
+          4.35,
+          -4
+        ],
+        "vel": [
+          4.104928727832746,
+          6.507426337075266,
+          11.777027369111444
+        ],
+        "fuse": 2.4,
+        "inkCost": 70,
+        "radius": 4,
+        "throwSpeed": 13.5
+      },
+      "firstAccepted": true,
+      "blockedBeforeGap": true,
+      "acceptedAtGap": true,
+      "acceptedThrows": 2,
+      "inkAfter": 100
+    },
+    {
+      "id": "barrage_burst",
+      "duration": 6.5,
+      "gap": 0.2,
+      "bombKind": "burst",
+      "throw": {
+        "kind": "burst",
+        "pos": [
+          2,
+          4.35,
+          -4
+        ],
+        "vel": [
+          4.791026640394366,
+          7.434727510607723,
+          13.994995400428378
+        ],
+        "fuse": -1,
+        "inkCost": 40,
+        "radius": 2.1,
+        "throwSpeed": 16
+      },
+      "firstAccepted": true,
+      "blockedBeforeGap": true,
+      "acceptedAtGap": true,
+      "acceptedThrows": 2,
+      "inkAfter": 100
+    },
+    {
+      "id": "barrage_seeker",
+      "duration": 6.5,
+      "gap": 0.5,
+      "bombKind": "seeker",
+      "throw": {
+        "kind": "seeker",
+        "pos": [
+          2,
+          4.35,
+          -4
+        ],
+        "vel": [
+          2.8699524852218308,
+          4.838284224716844,
+          7.784684912740962
+        ],
+        "fuse": -1,
+        "inkCost": 65,
+        "radius": 2.8,
+        "throwSpeed": 9
+      },
+      "firstAccepted": true,
+      "blockedBeforeGap": true,
+      "acceptedAtGap": true,
+      "acceptedThrows": 2,
+      "inkAfter": 100
+    },
+    {
+      "id": "barrage_mist",
+      "duration": 6.5,
+      "gap": 0.45,
+      "bombKind": "mist",
+      "throw": {
+        "kind": "mist",
+        "pos": [
+          2,
+          4.35,
+          -4
+        ],
+        "vel": [
+          4.104928727832746,
+          6.507426337075266,
+          11.777027369111444
+        ],
+        "fuse": 1,
+        "inkCost": 60,
+        "radius": 3.3,
+        "throwSpeed": 13.5
+      },
+      "firstAccepted": true,
+      "blockedBeforeGap": true,
+      "acceptedAtGap": true,
+      "acceptedThrows": 2,
+      "inkAfter": 100
+    }
+  ]
+}

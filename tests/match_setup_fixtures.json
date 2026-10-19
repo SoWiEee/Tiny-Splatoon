@@ -1,0 +1,2017 @@
+{
+  "sources": [
+    {
+      "path": "src/config.js",
+      "sha256": "76a1bc70f855e58343a1bc1d7a41c6b72dcd2da55b3e4c47b5a5908756180999"
+    },
+    {
+      "path": "src/game/match.js",
+      "sha256": "92a2716417f4b29b2a87ef1a3beaa3fa3f5ca35effe66f80647a58a25020fcf4"
+    },
+    {
+      "path": "src/game/actor.js",
+      "sha256": "580d31316a26b2b58df592da0f6e3c3d042b3867dba27f823d5d9bb41afd048d"
+    },
+    {
+      "path": "src/game/bots.js",
+      "sha256": "9cd8ac748f67ca0829e684326a5d593ff9c96e971fc59ff8364f5e656da46b34"
+    },
+    {
+      "path": "src/game/character-style.js",
+      "sha256": "94399f1ce6887a7316885437307ef6e618f1c6d54b5937e03773683d6c148f5d"
+    }
+  ],
+  "rows": [
+    {
+      "seed": 1,
+      "mode": "turf",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "intro",
+      "bots": 7,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": false,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Inky Vee",
+          "team": 0,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "blade",
+          "sub": "shaker",
+          "special": "zipcaster",
+          "style": {
+            "hair": 4,
+            "skin": 7,
+            "outfit": 2,
+            "eyes": 1,
+            "hat": 0,
+            "brows": 2
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            -41.009597262108386
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Riptide",
+          "team": 0,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "burst",
+          "special": "jetpack",
+          "style": {
+            "hair": 1,
+            "skin": 6,
+            "outfit": 5,
+            "eyes": 1,
+            "hat": 1,
+            "brows": 2
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            -42.67757096807404
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Sprinkle",
+          "team": 0,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "brolly",
+          "sub": "mine",
+          "special": "barrage",
+          "style": {
+            "hair": 0,
+            "skin": 7,
+            "outfit": 2,
+            "eyes": 7,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            -42.990402737891614
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Drip",
+          "team": 1,
+          "slot": 0,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "burst",
+          "special": "booyah",
+          "style": {
+            "hair": 2,
+            "skin": 1,
+            "outfit": 3,
+            "eyes": 7,
+            "hat": 1,
+            "brows": 2
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            42.67757096807404
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Fizz",
+          "team": 1,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "brush",
+          "sub": "shaker",
+          "special": "barrage_burst",
+          "style": {
+            "hair": 7,
+            "skin": 8,
+            "outfit": 8,
+            "eyes": 0,
+            "hat": 1,
+            "brows": 3
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            42.990402737891614
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Nori",
+          "team": 1,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "bow",
+          "sub": "waddle",
+          "special": "strike",
+          "style": {
+            "hair": 4,
+            "skin": 2,
+            "outfit": 8,
+            "eyes": 2,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            41.32242903192596
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Marlo",
+          "team": 1,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "charger",
+          "sub": "mine",
+          "special": "sonar",
+          "style": {
+            "hair": 0,
+            "skin": 7,
+            "outfit": 3,
+            "eyes": 1,
+            "hat": 3,
+            "brows": 1
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            41.009597262108386
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.20862703607417643,
+        0.6317220472265035,
+        0.6459614059422165
+      ]
+    },
+    {
+      "seed": 1,
+      "mode": "practice",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "playing",
+      "bots": 0,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": false,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.042729709995910525,
+        0.42738195578567684,
+        0.590382493333891
+      ]
+    },
+    {
+      "seed": 1,
+      "mode": "autopilot",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "intro",
+      "bots": 8,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": true,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Inky Vee",
+          "team": 0,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "blade",
+          "sub": "torpedo",
+          "special": "crab",
+          "style": {
+            "hair": 1,
+            "skin": 6,
+            "outfit": 1,
+            "eyes": 2,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            -41.009597262108386
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Riptide",
+          "team": 0,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "torpedo",
+          "special": "jetpack",
+          "style": {
+            "hair": 5,
+            "skin": 8,
+            "outfit": 9,
+            "eyes": 5,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            -42.67757096807404
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Sprinkle",
+          "team": 0,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "brolly",
+          "sub": "mist",
+          "special": "bubbler",
+          "style": {
+            "hair": 7,
+            "skin": 1,
+            "outfit": 3,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 1
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            -42.990402737891614
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Drip",
+          "team": 1,
+          "slot": 0,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "burst",
+          "special": "jetpack",
+          "style": {
+            "hair": 1,
+            "skin": 0,
+            "outfit": 3,
+            "eyes": 5,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            42.67757096807404
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Fizz",
+          "team": 1,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "twins",
+          "sub": "seeker",
+          "special": "barrage_mist",
+          "style": {
+            "hair": 5,
+            "skin": 7,
+            "outfit": 0,
+            "eyes": 2,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            42.990402737891614
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Nori",
+          "team": 1,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "brush",
+          "sub": "scan",
+          "special": "barrage_burst",
+          "style": {
+            "hair": 3,
+            "skin": 2,
+            "outfit": 2,
+            "eyes": 2,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            41.32242903192596
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Marlo",
+          "team": 1,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "bow",
+          "sub": "tracer",
+          "special": "strike",
+          "style": {
+            "hair": 5,
+            "skin": 3,
+            "outfit": 2,
+            "eyes": 4,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            41.009597262108386
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.3545960686169565,
+        0.6012786321807653,
+        0.013600952457636595
+      ]
+    },
+    {
+      "seed": 7,
+      "mode": "turf",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "intro",
+      "bots": 7,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": false,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Zest",
+          "team": 0,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "bucket",
+          "sub": "sprinkler",
+          "special": "blower",
+          "style": {
+            "hair": 1,
+            "skin": 2,
+            "outfit": 5,
+            "eyes": 6,
+            "hat": 3,
+            "brows": 2
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            -41.009597262108386
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Loop",
+          "team": 0,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "burst",
+          "special": "jetpack",
+          "style": {
+            "hair": 6,
+            "skin": 3,
+            "outfit": 4,
+            "eyes": 3,
+            "hat": 0,
+            "brows": 2
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            -42.67757096807404
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Nori",
+          "team": 0,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "blade",
+          "sub": "shaker",
+          "special": "zipcaster",
+          "style": {
+            "hair": 4,
+            "skin": 7,
+            "outfit": 6,
+            "eyes": 7,
+            "hat": 2,
+            "brows": 2
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            -42.990402737891614
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Pip",
+          "team": 1,
+          "slot": 0,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "boomerang",
+          "special": "sonar",
+          "style": {
+            "hair": 5,
+            "skin": 6,
+            "outfit": 5,
+            "eyes": 2,
+            "hat": 1,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            42.67757096807404
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Coral",
+          "team": 1,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "brush",
+          "sub": "mine",
+          "special": "stamp",
+          "style": {
+            "hair": 1,
+            "skin": 8,
+            "outfit": 5,
+            "eyes": 4,
+            "hat": 2,
+            "brows": 0
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            42.990402737891614
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Kelp",
+          "team": 1,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "bow",
+          "sub": "sprinkler",
+          "special": "barrage_sticky",
+          "style": {
+            "hair": 4,
+            "skin": 4,
+            "outfit": 5,
+            "eyes": 1,
+            "hat": 2,
+            "brows": 1
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            41.32242903192596
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Tako",
+          "team": 1,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "blade",
+          "sub": "shaker",
+          "special": "barrage_mist",
+          "style": {
+            "hair": 2,
+            "skin": 7,
+            "outfit": 7,
+            "eyes": 6,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            41.009597262108386
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.4298298417124897,
+        0.35691197286359966,
+        0.9203263169620186
+      ]
+    },
+    {
+      "seed": 7,
+      "mode": "practice",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "playing",
+      "bots": 0,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": false,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.19079170934855938,
+        0.14365738607011735,
+        0.1546440301463008
+      ]
+    },
+    {
+      "seed": 7,
+      "mode": "autopilot",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "intro",
+      "bots": 8,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": true,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Zest",
+          "team": 0,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "bucket",
+          "sub": "mist",
+          "special": "zipcaster",
+          "style": {
+            "hair": 6,
+            "skin": 0,
+            "outfit": 1,
+            "eyes": 2,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            -41.009597262108386
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Loop",
+          "team": 0,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "burst",
+          "special": "jetpack",
+          "style": {
+            "hair": 7,
+            "skin": 2,
+            "outfit": 1,
+            "eyes": 5,
+            "hat": 1,
+            "brows": 2
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            -42.67757096807404
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Nori",
+          "team": 0,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "blade",
+          "sub": "boomerang",
+          "special": "crab",
+          "style": {
+            "hair": 4,
+            "skin": 7,
+            "outfit": 0,
+            "eyes": 4,
+            "hat": 3,
+            "brows": 2
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            -42.990402737891614
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Pip",
+          "team": 1,
+          "slot": 0,
+          "local": false,
+          "bot": true,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "wail",
+          "style": {
+            "hair": 5,
+            "skin": 8,
+            "outfit": 2,
+            "eyes": 7,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            42.67757096807404
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Coral",
+          "team": 1,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "twins",
+          "sub": "sprinkler",
+          "special": "crab",
+          "style": {
+            "hair": 4,
+            "skin": 6,
+            "outfit": 9,
+            "eyes": 3,
+            "hat": 2,
+            "brows": 3
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            42.990402737891614
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Kelp",
+          "team": 1,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "bucket",
+          "sub": "sprinkler",
+          "special": "blower",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 8,
+            "eyes": 7,
+            "hat": 1,
+            "brows": 1
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            41.32242903192596
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Tako",
+          "team": 1,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "blade",
+          "sub": "seeker",
+          "special": "jetpack",
+          "style": {
+            "hair": 0,
+            "skin": 2,
+            "outfit": 8,
+            "eyes": 6,
+            "hat": 0,
+            "brows": 1
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            41.009597262108386
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.33855957142077386,
+        0.5370406382717192,
+        0.2932547256350517
+      ]
+    },
+    {
+      "seed": 2026,
+      "mode": "turf",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "intro",
+      "bots": 7,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": false,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Riptide",
+          "team": 0,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "twins",
+          "sub": "mist",
+          "special": "jetpack",
+          "style": {
+            "hair": 2,
+            "skin": 2,
+            "outfit": 4,
+            "eyes": 2,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            -41.009597262108386
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Nori",
+          "team": 0,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "spinner",
+          "sub": "waddle",
+          "special": "crab",
+          "style": {
+            "hair": 7,
+            "skin": 1,
+            "outfit": 9,
+            "eyes": 6,
+            "hat": 2,
+            "brows": 0
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            -42.67757096807404
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Moxie",
+          "team": 0,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "charger",
+          "sub": "mist",
+          "special": "sonar",
+          "style": {
+            "hair": 0,
+            "skin": 1,
+            "outfit": 0,
+            "eyes": 7,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            -42.990402737891614
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Pip",
+          "team": 1,
+          "slot": 0,
+          "local": false,
+          "bot": true,
+          "main": "brolly",
+          "sub": "mine",
+          "special": "stamp",
+          "style": {
+            "hair": 0,
+            "skin": 8,
+            "outfit": 9,
+            "eyes": 3,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            42.67757096807404
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Suki",
+          "team": 1,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "roller",
+          "sub": "sticky",
+          "special": "booyah",
+          "style": {
+            "hair": 1,
+            "skin": 5,
+            "outfit": 9,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            42.990402737891614
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Blotch",
+          "team": 1,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "bow",
+          "sub": "waddle",
+          "special": "stamp",
+          "style": {
+            "hair": 5,
+            "skin": 6,
+            "outfit": 3,
+            "eyes": 1,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            41.32242903192596
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Sprinkle",
+          "team": 1,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "shooter",
+          "sub": "sticky",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 5,
+            "outfit": 5,
+            "eyes": 7,
+            "hat": 0,
+            "brows": 2
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            41.009597262108386
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.42477013100869954,
+        0.12369705154560506,
+        0.16858240170404315
+      ]
+    },
+    {
+      "seed": 2026,
+      "mode": "practice",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "playing",
+      "bots": 0,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": false,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.7780529276933521,
+        0.9534042535815388,
+        0.9422036779578775
+      ]
+    },
+    {
+      "seed": 2026,
+      "mode": "autopilot",
+      "weapon": "shooter",
+      "playerName": "You",
+      "style": {
+        "hair": 0,
+        "skin": 0,
+        "outfit": 0,
+        "eyes": 0,
+        "hat": 0,
+        "brows": 0
+      },
+      "phase": "intro",
+      "bots": 8,
+      "actors": [
+        {
+          "name": "You",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": true,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "zooka",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Riptide",
+          "team": 0,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "twins",
+          "sub": "seeker",
+          "special": "storm",
+          "style": {
+            "hair": 0,
+            "skin": 3,
+            "outfit": 7,
+            "eyes": 5,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            -41.009597262108386
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Nori",
+          "team": 0,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "spinner",
+          "sub": "curtain",
+          "special": "wail",
+          "style": {
+            "hair": 6,
+            "skin": 6,
+            "outfit": 5,
+            "eyes": 3,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            -42.67757096807404
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Moxie",
+          "team": 0,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "charger",
+          "sub": "mine",
+          "special": "sonar",
+          "style": {
+            "hair": 3,
+            "skin": 5,
+            "outfit": 2,
+            "eyes": 7,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            -42.990402737891614
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Pip",
+          "team": 1,
+          "slot": 0,
+          "local": false,
+          "bot": true,
+          "main": "blade",
+          "sub": "shaker",
+          "special": "zipcaster",
+          "style": {
+            "hair": 0,
+            "skin": 2,
+            "outfit": 8,
+            "eyes": 7,
+            "hat": 0,
+            "brows": 0
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            42.67757096807404
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Suki",
+          "team": 1,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "barrage",
+          "style": {
+            "hair": 5,
+            "skin": 5,
+            "outfit": 2,
+            "eyes": 1,
+            "hat": 1,
+            "brows": 3
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            42.990402737891614
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Blotch",
+          "team": 1,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "bucket",
+          "sub": "sprinkler",
+          "special": "blower",
+          "style": {
+            "hair": 0,
+            "skin": 0,
+            "outfit": 9,
+            "eyes": 1,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            41.32242903192596
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Sprinkle",
+          "team": 1,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "mitts",
+          "sub": "waddle",
+          "special": "wail",
+          "style": {
+            "hair": 5,
+            "skin": 7,
+            "outfit": 5,
+            "eyes": 3,
+            "hat": 0,
+            "brows": 2
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            41.009597262108386
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.17098764656111598,
+        0.21854435466229916,
+        0.26376585895195603
+      ]
+    },
+    {
+      "seed": 93,
+      "mode": "turf",
+      "weapon": "bow",
+      "sub": "mine",
+      "special": "storm",
+      "playerName": "MintIce",
+      "style": {
+        "hair": 6,
+        "skin": 5,
+        "outfit": 8,
+        "eyes": 2,
+        "hat": 3,
+        "brows": 1
+      },
+      "phase": "intro",
+      "bots": 7,
+      "actors": [
+        {
+          "name": "MintIce",
+          "team": 0,
+          "slot": 0,
+          "local": true,
+          "bot": false,
+          "main": "bow",
+          "sub": "mine",
+          "special": "storm",
+          "style": {
+            "hair": 6,
+            "skin": 5,
+            "outfit": 8,
+            "eyes": 2,
+            "hat": 3,
+            "brows": 1
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            -41.32242903192596
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Moxie",
+          "team": 0,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "waddle",
+          "special": "jetpack",
+          "style": {
+            "hair": 6,
+            "skin": 5,
+            "outfit": 3,
+            "eyes": 6,
+            "hat": 3,
+            "brows": 2
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            -41.009597262108386
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Bubbles",
+          "team": 0,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "shooter",
+          "sub": "bomb",
+          "special": "blower",
+          "style": {
+            "hair": 3,
+            "skin": 5,
+            "outfit": 1,
+            "eyes": 6,
+            "hat": 0,
+            "brows": 2
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            -42.67757096807404
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Inky Vee",
+          "team": 0,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "brolly",
+          "sub": "scan",
+          "special": "bubbler",
+          "style": {
+            "hair": 6,
+            "skin": 5,
+            "outfit": 5,
+            "eyes": 6,
+            "hat": 0,
+            "brows": 3
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            -42.990402737891614
+          ],
+          "yaw": 0,
+          "invuln": 0
+        },
+        {
+          "name": "Riptide",
+          "team": 1,
+          "slot": 0,
+          "local": false,
+          "bot": true,
+          "main": "twins",
+          "sub": "seeker",
+          "special": "bubbler",
+          "style": {
+            "hair": 7,
+            "skin": 0,
+            "outfit": 0,
+            "eyes": 0,
+            "hat": 2,
+            "brows": 3
+          },
+          "pos": [
+            0.9904027378916139,
+            2.3999999999999995,
+            42.67757096807404
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Zest",
+          "team": 1,
+          "slot": 1,
+          "local": false,
+          "bot": true,
+          "main": "bow",
+          "sub": "torpedo",
+          "special": "strike",
+          "style": {
+            "hair": 0,
+            "skin": 8,
+            "outfit": 6,
+            "eyes": 4,
+            "hat": 0,
+            "brows": 2
+          },
+          "pos": [
+            -0.6775709680740424,
+            2.3999999999999995,
+            42.990402737891614
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Fizz",
+          "team": 1,
+          "slot": 2,
+          "local": false,
+          "bot": true,
+          "main": "spinner",
+          "sub": "boomerang",
+          "special": "storm",
+          "style": {
+            "hair": 3,
+            "skin": 5,
+            "outfit": 2,
+            "eyes": 7,
+            "hat": 3,
+            "brows": 1
+          },
+          "pos": [
+            -0.9904027378916139,
+            2.3999999999999995,
+            41.32242903192596
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        },
+        {
+          "name": "Blotch",
+          "team": 1,
+          "slot": 3,
+          "local": false,
+          "bot": true,
+          "main": "blaster",
+          "sub": "burst",
+          "special": "sonar",
+          "style": {
+            "hair": 6,
+            "skin": 0,
+            "outfit": 5,
+            "eyes": 6,
+            "hat": 0,
+            "brows": 2
+          },
+          "pos": [
+            0.6775709680740419,
+            2.3999999999999995,
+            41.009597262108386
+          ],
+          "yaw": 3.141592653589793,
+          "invuln": 0
+        }
+      ],
+      "nextRandom": [
+        0.18740118225105107,
+        0.10550968302413821,
+        0.7641119782347232
+      ]
+    }
+  ],
+  "lifecycles": [
+    {
+      "seed": 1,
+      "paintTeam": -1,
+      "transitions": [
+        {
+          "frame": 0,
+          "phase": "intro",
+          "time": 180
+        },
+        {
+          "frame": 42,
+          "phase": "playing",
+          "time": 180
+        },
+        {
+          "frame": 100,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 109,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 110,
+          "phase": "playing",
+          "time": 174.20000000000033
+        },
+        {
+          "frame": 1853,
+          "phase": "finish",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "judge",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "results",
+          "time": 0
+        }
+      ],
+      "winner": 0
+    },
+    {
+      "seed": 7,
+      "paintTeam": -1,
+      "transitions": [
+        {
+          "frame": 0,
+          "phase": "intro",
+          "time": 180
+        },
+        {
+          "frame": 42,
+          "phase": "playing",
+          "time": 180
+        },
+        {
+          "frame": 100,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 109,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 110,
+          "phase": "playing",
+          "time": 174.20000000000033
+        },
+        {
+          "frame": 1853,
+          "phase": "finish",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "judge",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "results",
+          "time": 0
+        }
+      ],
+      "winner": 0
+    },
+    {
+      "seed": 2026,
+      "paintTeam": -1,
+      "transitions": [
+        {
+          "frame": 0,
+          "phase": "intro",
+          "time": 180
+        },
+        {
+          "frame": 42,
+          "phase": "playing",
+          "time": 180
+        },
+        {
+          "frame": 100,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 109,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 110,
+          "phase": "playing",
+          "time": 174.20000000000033
+        },
+        {
+          "frame": 1853,
+          "phase": "finish",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "judge",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "results",
+          "time": 0
+        }
+      ],
+      "winner": 0
+    },
+    {
+      "seed": 4,
+      "paintTeam": -1,
+      "transitions": [
+        {
+          "frame": 0,
+          "phase": "intro",
+          "time": 180
+        },
+        {
+          "frame": 42,
+          "phase": "playing",
+          "time": 180
+        },
+        {
+          "frame": 100,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 109,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 110,
+          "phase": "playing",
+          "time": 174.20000000000033
+        },
+        {
+          "frame": 1853,
+          "phase": "finish",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "judge",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "results",
+          "time": 0
+        }
+      ],
+      "winner": 1
+    },
+    {
+      "seed": 1,
+      "paintTeam": 0,
+      "transitions": [
+        {
+          "frame": 0,
+          "phase": "intro",
+          "time": 180
+        },
+        {
+          "frame": 42,
+          "phase": "playing",
+          "time": 180
+        },
+        {
+          "frame": 100,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 109,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 110,
+          "phase": "playing",
+          "time": 174.20000000000033
+        },
+        {
+          "frame": 1853,
+          "phase": "finish",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "judge",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "results",
+          "time": 0
+        }
+      ],
+      "winner": 0
+    },
+    {
+      "seed": 1,
+      "paintTeam": 1,
+      "transitions": [
+        {
+          "frame": 0,
+          "phase": "intro",
+          "time": 180
+        },
+        {
+          "frame": 42,
+          "phase": "playing",
+          "time": 180
+        },
+        {
+          "frame": 100,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 109,
+          "phase": "playing",
+          "time": 174.30000000000032
+        },
+        {
+          "frame": 110,
+          "phase": "playing",
+          "time": 174.20000000000033
+        },
+        {
+          "frame": 1853,
+          "phase": "finish",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "judge",
+          "time": 0
+        },
+        {
+          "frame": 1879,
+          "phase": "results",
+          "time": 0
+        }
+      ],
+      "winner": 1
+    }
+  ]
+}

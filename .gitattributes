@@ -2,6 +2,24 @@
 # Set default behavior to automatically normalize line endings.
 ###############################################################################
 * text=auto
+# Source-generated artifacts are compared byte for byte on Windows and Unix.
+/restoration/ReferenceData.cpp text eol=lf
+/restoration/ArsenalData.cpp text eol=lf
+/restoration/NavDirections.hpp text eol=lf
+/restoration/CharacterRenderData.hpp text eol=lf
+/restoration/CharacterWeaponData.hpp text eol=lf
+/restoration/SpecialPropData.hpp text eol=lf
+/tests/*fixtures.hpp text eol=lf
+/tests/*fixtures.json text eol=lf
+/docs/benchmarks/**/*.json text eol=lf
+/docs/benchmarks/**/*.csv text eol=lf
+/assets/reference/*.json text eol=lf
+/assets/reference/characters/**/*.json text eol=lf
+/assets/reference/characters/**/*.vert text eol=lf
+/assets/reference/characters/**/*.frag text eol=lf
+/assets/reference/characters/**/*.txt text eol=lf
+/assets/reference/characters/**/*.bin -text
+/assets/reference/characters/**/*.mesh -text
 /engine/audio/miniaudio.h linguist-vendored
 
 ###############################################################################

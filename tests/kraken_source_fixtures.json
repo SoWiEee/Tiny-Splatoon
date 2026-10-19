@@ -1,0 +1,993 @@
+{
+  "sources": [
+    {
+      "path": "../splat-ref/src/config.js",
+      "sha256": "76a1bc70f855e58343a1bc1d7a41c6b72dcd2da55b3e4c47b5a5908756180999"
+    },
+    {
+      "path": "../splat-ref/src/game/actor.js",
+      "sha256": "580d31316a26b2b58df592da0f6e3c3d042b3867dba27f823d5d9bb41afd048d"
+    },
+    {
+      "path": "../splat-ref/src/game/specials.js",
+      "sha256": "da71b549853c53ed70876c7e02ed12d55e18f9046df1d567998562bec22b39cc"
+    },
+    {
+      "path": "../splat-ref/src/game/special-props.js",
+      "sha256": "c8fd279ad5869e1738b886abb57046562b8a10dc70c3c15f2ad5ff680a6fbdbd"
+    },
+    {
+      "path": "../splat-ref/src/game/physics.js",
+      "sha256": "69cef214461935a77ec3a167b70d50fd0e35a953334cd837ab9b8c037da5bb48"
+    },
+    {
+      "path": "../splat-ref/src/game/weapons.js",
+      "sha256": "2ec02b036376fdab0fda3556374d92db945b0f0409b311fe2e80b64418b79298"
+    }
+  ],
+  "kraken": {
+    "sourceBehavior": "actual Actor / SpecialSystem execution with headless physics, Character, effects, and paint sinks",
+    "config": {
+      "duration": 7,
+      "speed": 7.2,
+      "hopVel": 10.5,
+      "attackVel": 8.5,
+      "attackFwd": 6.5,
+      "radius": 2.3,
+      "damage": 200,
+      "knockPerDamage": 0.02,
+      "cooldown": 0.65,
+      "paintRadius": 1.15
+    },
+    "activation": {
+      "activeId": "kraken",
+      "body": false,
+      "noSquid": true,
+      "inkProof": true,
+      "speed": 7.2,
+      "accel": 45,
+      "faceMove": true,
+      "formWhileSquidHeld": "kid",
+      "characterVisible": false,
+      "runnerResetCountAfterStart": 1,
+      "ownedObjects": 1,
+      "startEvents": [
+        {
+          "name": "special:use",
+          "actor": "kraken-activation",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:start",
+          "actor": "kraken-activation",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        }
+      ]
+    },
+    "movement": {
+      "samples": [
+        {
+          "frame": 1,
+          "pos": [
+            0.0125,
+            0,
+            0
+          ],
+          "vel": [
+            0.75,
+            0,
+            0
+          ],
+          "yaw": 0.0472222222222222,
+          "onEnemy": false,
+          "groundTeam": 2,
+          "hp": 100,
+          "damageFromInk": 0
+        },
+        {
+          "frame": 5,
+          "pos": [
+            0.1875,
+            0,
+            0
+          ],
+          "vel": [
+            3.75,
+            0,
+            0
+          ],
+          "yaw": 0.657248974582149,
+          "onEnemy": false,
+          "groundTeam": 2,
+          "hp": 100,
+          "damageFromInk": 0
+        },
+        {
+          "frame": 15,
+          "pos": [
+            1.26136731881836,
+            0,
+            0
+          ],
+          "vel": [
+            7.2,
+            0,
+            0
+          ],
+          "yaw": 1.45496229744588,
+          "onEnemy": false,
+          "groundTeam": 2,
+          "hp": 100,
+          "damageFromInk": 0
+        },
+        {
+          "frame": 30,
+          "pos": [
+            3.06136731881836,
+            0,
+            0
+          ],
+          "vel": [
+            7.2,
+            0,
+            0
+          ],
+          "yaw": 1.56575517766477,
+          "onEnemy": false,
+          "groundTeam": 2,
+          "hp": 100,
+          "damageFromInk": 0
+        },
+        {
+          "frame": 60,
+          "pos": [
+            6.66136731881836,
+            0,
+            0
+          ],
+          "vel": [
+            7.2,
+            0,
+            0
+          ],
+          "yaw": 1.57078677922152,
+          "onEnemy": false,
+          "groundTeam": 2,
+          "hp": 100,
+          "damageFromInk": 0
+        }
+      ],
+      "enemyInkSample": 2,
+      "endEvents": [
+        {
+          "name": "special:use",
+          "actor": "kraken-mover",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:start",
+          "actor": "kraken-mover",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        }
+      ]
+    },
+    "hop": {
+      "pos": [
+        0,
+        1.05972222222222,
+        0
+      ],
+      "vel": [
+        0,
+        10.5,
+        0
+      ],
+      "grounded": false,
+      "specialAir": true,
+      "attack": false,
+      "jumpEvents": [
+        {
+          "name": "special:use",
+          "actor": "kraken-hop",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:start",
+          "actor": "kraken-hop",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        }
+      ]
+    },
+    "groundAttack": {
+      "trigger": {
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "vel": [
+          0,
+          8.5,
+          3.25
+        ],
+        "grounded": false,
+        "attack": true,
+        "cooldown": 0.65,
+        "active": "kraken"
+      },
+      "framesToImpact": 41,
+      "landing": {
+        "name": "special:slam",
+        "actor": "kraken-ground-attack",
+        "victim": null,
+        "attacker": null,
+        "id": null,
+        "reason": null,
+        "form": null,
+        "on": null,
+        "pos": [
+          0,
+          0,
+          1.25555555555555
+        ],
+        "radius": 2.3,
+        "amount": null,
+        "source": null
+      },
+      "finalPos": [
+        0,
+        0,
+        1.25555555555555
+      ],
+      "remainingAttack": false,
+      "hitCalls": [
+        {
+          "owner": "kraken-ground-attack",
+          "victim": "kraken-victim-close",
+          "amount": 200,
+          "weaponId": "kraken"
+        },
+        {
+          "owner": "kraken-ground-attack",
+          "victim": "kraken-victim-edge",
+          "amount": 168.987546063013,
+          "weaponId": "kraken"
+        }
+      ],
+      "victims": [
+        {
+          "name": "kraken-victim-close",
+          "alive": false,
+          "hp": 0
+        },
+        {
+          "name": "kraken-victim-edge",
+          "alive": false,
+          "hp": 0
+        },
+        {
+          "name": "kraken-victim-blocked",
+          "alive": true,
+          "hp": 100
+        },
+        {
+          "name": "kraken-victim-outside",
+          "alive": true,
+          "hp": 100
+        },
+        {
+          "name": "kraken-ally",
+          "alive": true,
+          "hp": 100
+        },
+        {
+          "name": "kraken-dead-victim",
+          "alive": false,
+          "hp": 100
+        }
+      ],
+      "damageAreas": [
+        {
+          "pos": [
+            0,
+            0.4,
+            1.25555555555555
+          ],
+          "radius": 2.3,
+          "damage": 60,
+          "team": 0
+        }
+      ],
+      "paintCalls": [
+        {
+          "pos": [
+            0,
+            0.3,
+            1.25555555555555
+          ],
+          "radius": 1.84,
+          "team": 0,
+          "seed": 0.981021351180971
+        },
+        {
+          "pos": [
+            0,
+            0.35,
+            1.25555555555555
+          ],
+          "radius": 1.7,
+          "team": 0,
+          "seed": 0.58181333867833
+        },
+        {
+          "pos": [
+            2,
+            0.35,
+            1.25555555555555
+          ],
+          "radius": 1.7,
+          "team": 0,
+          "seed": 0.213734596967697
+        }
+      ],
+      "events": [
+        {
+          "name": "special:use",
+          "actor": "kraken-ground-attack",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:start",
+          "actor": "kraken-ground-attack",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "actor:land",
+          "actor": "kraken-ground-attack",
+          "victim": null,
+          "attacker": null,
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": [
+            0,
+            0,
+            1.25555555555555
+          ],
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:slam",
+          "actor": "kraken-ground-attack",
+          "victim": null,
+          "attacker": null,
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": [
+            0,
+            0,
+            1.25555555555555
+          ],
+          "radius": 2.3,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "damage",
+          "actor": null,
+          "victim": "kraken-victim-close",
+          "attacker": "kraken-ground-attack",
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": 200,
+          "source": "kraken"
+        },
+        {
+          "name": "splatted",
+          "actor": null,
+          "victim": "kraken-victim-close",
+          "attacker": "kraken-ground-attack",
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": "kraken"
+        },
+        {
+          "name": "damage",
+          "actor": null,
+          "victim": "kraken-victim-edge",
+          "attacker": "kraken-ground-attack",
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": 168.987546063013,
+          "source": "kraken"
+        },
+        {
+          "name": "splatted",
+          "actor": null,
+          "victim": "kraken-victim-edge",
+          "attacker": "kraken-ground-attack",
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": "kraken"
+        }
+      ]
+    },
+    "airDrop": {
+      "trigger": {
+        "pos": [
+          0,
+          2.99430555555556,
+          0
+        ],
+        "vel": [
+          0,
+          -16,
+          0
+        ],
+        "grounded": false,
+        "attack": true,
+        "cooldown": 0.65,
+        "active": "kraken"
+      },
+      "framesToImpact": 11,
+      "landing": {
+        "name": "special:slam",
+        "actor": "kraken-airdrop",
+        "victim": null,
+        "attacker": null,
+        "id": null,
+        "reason": null,
+        "form": null,
+        "on": null,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "radius": 2.3,
+        "amount": null,
+        "source": null
+      },
+      "finalPos": [
+        0,
+        0,
+        0
+      ],
+      "remainingAttack": false,
+      "hitCalls": [],
+      "victims": [],
+      "damageAreas": [
+        {
+          "pos": [
+            0,
+            0.4,
+            0
+          ],
+          "radius": 2.3,
+          "damage": 60,
+          "team": 0
+        }
+      ],
+      "paintCalls": [
+        {
+          "pos": [
+            0,
+            0.3,
+            0
+          ],
+          "radius": 1.84,
+          "team": 0,
+          "seed": 0.981021351180971
+        }
+      ],
+      "events": [
+        {
+          "name": "special:use",
+          "actor": "kraken-airdrop",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:start",
+          "actor": "kraken-airdrop",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "actor:land",
+          "actor": "kraken-airdrop",
+          "victim": null,
+          "attacker": null,
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:slam",
+          "actor": "kraken-airdrop",
+          "victim": null,
+          "attacker": null,
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": [
+            0,
+            0,
+            0
+          ],
+          "radius": 2.3,
+          "amount": null,
+          "source": null
+        }
+      ]
+    },
+    "trail": {
+      "elapsed": 1.5,
+      "pos": [
+        0,
+        0,
+        10.2613673188183
+      ],
+      "vel": [
+        0,
+        0,
+        7.2
+      ],
+      "onEnemy": false,
+      "hp": 100,
+      "damageFromInk": 0,
+      "paintCalls": [
+        {
+          "pos": [
+            0,
+            0.2,
+            0.556774265695862
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.981021351180971
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            1.14136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.58181333867833
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            1.74136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.213734596967697
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            2.34136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.0683546676300466
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            2.94136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.450418437831104
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            3.54136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.111953838029876
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            4.14136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.682270758552477
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            4.74136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.415381350321695
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            5.34136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.28332845796831
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            5.94136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.519009789219126
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            6.54136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.374591551721096
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            7.14136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.276721066562459
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            7.74136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.376070713857189
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            8.34136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.302041703136638
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            8.94136731881836
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.437600892269984
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            9.54136731881835
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.887083834270015
+        },
+        {
+          "pos": [
+            0,
+            0.2,
+            10.1413673188183
+          ],
+          "radius": 1.15,
+          "team": 0,
+          "seed": 0.337986921193078
+        }
+      ]
+    },
+    "damageFilter": {
+      "before": {
+        "hp": 100,
+        "pos": [
+          0,
+          0,
+          0
+        ],
+        "vel": [
+          0,
+          0,
+          0
+        ],
+        "grounded": true
+      },
+      "afterDamage": {
+        "hp": 100,
+        "vel": [
+          2,
+          1.76,
+          0
+        ],
+        "grounded": false,
+        "hurtFlash": 0.25
+      },
+      "expectedKnock": 2,
+      "invulnerability": {
+        "hp": 100,
+        "vel": [
+          0,
+          0,
+          0
+        ],
+        "grounded": true,
+        "hurtFlash": 0
+      }
+    },
+    "expiry": {
+      "frames": 421,
+      "elapsed": 7.01666666666667,
+      "duration": 7,
+      "activeAfter": false,
+      "lastSourceElapsed": 7.01666666666665,
+      "visible": true,
+      "ownedObjectsAfter": 0,
+      "events": [
+        {
+          "name": "special:use",
+          "actor": "kraken-expiry",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:start",
+          "actor": "kraken-expiry",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:end",
+          "actor": "kraken-expiry",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": "time",
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        }
+      ]
+    },
+    "ownerDeath": {
+      "objectsBeforeDeath": 1,
+      "objectsAfter": 0,
+      "activeAfter": false,
+      "visibleAfter": false,
+      "visibilityCalls": [
+        false,
+        true,
+        false
+      ],
+      "events": [
+        {
+          "name": "special:use",
+          "actor": "kraken-owner-death",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:start",
+          "actor": "kraken-owner-death",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "special:end",
+          "actor": "kraken-owner-death",
+          "victim": null,
+          "attacker": null,
+          "id": "kraken",
+          "reason": "splat",
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": null
+        },
+        {
+          "name": "splatted",
+          "actor": null,
+          "victim": "kraken-owner-death",
+          "attacker": null,
+          "id": null,
+          "reason": null,
+          "form": null,
+          "on": null,
+          "pos": null,
+          "radius": null,
+          "amount": null,
+          "source": "fixture-death"
+        }
+      ]
+    }
+  }
+}

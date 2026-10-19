@@ -41,7 +41,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 int main(int argc, char** argv) {
-    if (argc > 1 && (std::string(argv[1]) == "--reference-stage" || std::string(argv[1]) == "--reference-game")) {
+    if (argc > 1 && (std::string(argv[1]) == "--native" || std::string(argv[1]) == "--reference-stage" || std::string(argv[1]) == "--reference-game" ||
+                     std::string(argv[1]) == "--reference-match")) {
         return restoration::RunStageViewer(argc, argv);
     }
     // Network, Window, GUI Init

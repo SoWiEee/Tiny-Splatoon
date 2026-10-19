@@ -3,6 +3,11 @@
 #include "StageGeometry.hpp"
 #include "FacePaint.hpp"
 #include "PlayerSimulation.hpp"
+#include "MatchSimulation.hpp"
+#include "NavGraph.hpp"
+#include "CharacterArt.hpp"
+#include "ArsenalData.hpp"
+#include "PerformanceCapture.hpp"
 #include "FollowCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -16,10 +21,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -28,24 +35,54 @@ namespace restoration {
 namespace {
 struct Options {
     std::string stage = "tidewater", mode = "turf", capture;
+    std::string benchmarkReport;
     int frames = 0, width = 1600, height = 900;
-    bool paintProbe = false, game = false, playProbe = false;
+    int benchmarkWarmup = 120, benchmarkFrames = 600;
+    std::uint32_t benchmarkSeed = 1;
+    bool paintProbe = false, game = false, playProbe = false, match = false, native = false;
+    bool paintProbeSpecified = false, playProbeSpecified = false, captureSpecified = false, benchmarkReportSpecified = false;
+    bool benchmarkTuningSpecified = false;
+    bool widthSpecified = false, heightSpecified = false;
 };
 
 Options ParseOptions(int argc, char** argv) {
     Options result;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--reference-match") {
+            result.match = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') result.stage = argv[++i];
+            continue;
+        }
+        if (arg == "--native") { result.native = true; continue; }
         if (i + 1 >= argc) throw std::runtime_error("Missing value for " + arg);
         const std::string value = argv[++i];
         if (arg == "--reference-stage") result.stage = value;
         else if (arg == "--reference-game") { result.stage = value; result.game = true; }
         else if (arg == "--reference-mode") result.mode = value;
-        else if (arg == "--capture") result.capture = value;
+        else if (arg == "--capture") { result.capture = value; result.captureSpecified = true; }
+        else if (arg == "--benchmark-report") { result.benchmarkReport = value; result.benchmarkReportSpecified = true; }
+        else if (arg == "--benchmark-seed") {
+            result.benchmarkTuningSpecified = true;
+            std::size_t end = 0;
+            const auto seed = std::stoull(value, &end);
+            if (end != value.size() || seed > std::numeric_limits<std::uint32_t>::max())
+                throw std::runtime_error("Invalid unsigned seed for " + arg);
+            result.benchmarkSeed = static_cast<std::uint32_t>(seed);
+        }
+        else if (arg == "--benchmark-warmup" || arg == "--benchmark-frames") {
+            result.benchmarkTuningSpecified = true;
+            std::size_t end = 0;
+            const int number = std::stoi(value, &end);
+            if (end != value.size() || number < (arg == "--benchmark-warmup" ? 0 : 1) || number > 100000)
+                throw std::runtime_error("Invalid frame count for " + arg);
+            if (arg == "--benchmark-warmup") result.benchmarkWarmup = number;
+            else result.benchmarkFrames = number;
+        }
         else if (arg == "--paint-probe" || arg == "--play-probe") {
             if(value!="0" && value!="1") throw std::runtime_error(arg+" must be 0 or 1");
-            if(arg=="--paint-probe") result.paintProbe=value=="1";
-            else result.playProbe=value=="1";
+            if(arg=="--paint-probe") { result.paintProbe=value=="1"; result.paintProbeSpecified=true; }
+            else { result.playProbe=value=="1"; result.playProbeSpecified=true; }
         }
         else if (arg == "--frames" || arg == "--width" || arg == "--height") {
             std::size_t end = 0;
@@ -53,12 +90,25 @@ Options ParseOptions(int argc, char** argv) {
             if (end != value.size() || number <= 0 || number > 16384)
                 throw std::runtime_error("Invalid positive integer for " + arg);
             if (arg == "--frames") result.frames = number;
-            else if (arg == "--width") result.width = number;
-            else result.height = number;
+            else if (arg == "--width") { result.width = number; result.widthSpecified = true; }
+            else { result.height = number; result.heightSpecified = true; }
         } else throw std::runtime_error("Unknown stage lab option: " + arg);
+    }
+    if (result.match) {
+        if (!result.widthSpecified) result.width = 1920;
+        if (!result.heightSpecified) result.height = 1080;
     }
     if (!result.capture.empty() && !result.frames) result.frames = 3;
     if(result.playProbe && !result.game) throw std::runtime_error("--play-probe requires --reference-game");
+    if (result.native && (result.match || result.game || result.paintProbeSpecified || result.playProbeSpecified ||
+                          result.captureSpecified || result.benchmarkReportSpecified || result.benchmarkTuningSpecified))
+        throw std::runtime_error("--native cannot be combined with reference matches, practice probes, captures, or benchmark options");
+    if (!result.benchmarkReport.empty() && !result.match)
+        throw std::runtime_error("--benchmark-report requires --reference-match");
+    if (result.match && (!result.capture.empty() || result.game || result.paintProbe || result.playProbe))
+        throw std::runtime_error("--reference-match cannot be combined with practice probes or --capture");
+    if (!result.benchmarkReport.empty() && result.frames)
+        throw std::runtime_error("--frames cannot shorten a fixed-size benchmark capture");
     return result;
 }
 
@@ -261,7 +311,7 @@ void main(){
         }
         std::cout<<"INK_UPLOAD verified\n";
     }
-    void Draw(const glm::mat4& vp, const glm::vec3& eye, bool wireframe) {
+    int Draw(const glm::mat4& vp, const glm::vec3& eye, bool wireframe) {
         glUseProgram(program);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D,ink);
@@ -273,6 +323,7 @@ void main(){
         glDrawArrays(GL_TRIANGLES, 0, vertices);
         glBindVertexArray(0);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        return vertices > 0 ? 1 : 0;
     }
     void LoadActors(const PlayerSimulation& player) {
         std::vector<RenderVertex> data;
@@ -470,6 +521,426 @@ void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial
     captureMouse(false);
 }
 
+enum class MatchExit { Close, StageSelect };
+
+MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& stage,
+                    const std::filesystem::path& characterAssets,bool nativeApp=false) {
+    StageGeometry geometry(stage);
+    FacePaint paint(stage,geometry);
+    NavGraph nav(stage,geometry);
+    FollowCamera camera;
+    MatchOptions setup;
+    setup.seed=options.benchmarkSeed;
+    setup.autopilot=false;
+    MatchSimulation match(stage,geometry,paint,nav,setup);
+    if(match.actors().size()!=8) throw std::runtime_error("Reference Turf match did not create eight actors");
+    if(match.bots().size()!=7) throw std::runtime_error("Reference Turf match requires one local actor and seven bots");
+    match.startPlaying();
+    camera.yaw=match.local().state.yaw;
+    camera.pitch=-0.1;
+    camera.reset(CameraActor(match.local()));
+
+    StageRenderer renderer;
+    renderer.Load(stage,0,paint);
+    renderer.UploadInk(stage,paint);
+    CharacterArt art(characterAssets);
+    struct LiveCharacter {
+        std::unique_ptr<CharacterPose> pose;
+        CharacterStyle style;
+        CharacterSceneInput scene;
+    };
+    std::vector<std::unique_ptr<LiveCharacter>> characters;
+    characters.reserve(match.actors().size());
+    const std::array<glm::dvec3,2> teamColors={
+        glm::dvec3(1.0,0.258,0.0037),glm::dvec3(0.0258,0.102,1.0)};
+    const double dt=1.0/60.0;
+    double accumulator=0.0,previous=glfwGetTime();
+    int uploadedVersion=paint.version(),frame=0;
+    const glm::dvec3 target((stage.bounds.x+stage.bounds.y)*0.5,
+        (stage.spawnPads[0].y+stage.spawnPads[1].y)*0.5,
+        (stage.bounds.z+stage.bounds.w)*0.5);
+    const double span=std::max(stage.bounds.y-stage.bounds.x,stage.bounds.w-stage.bounds.z);
+    const glm::dvec3 overviewEye=target+glm::dvec3(span*0.82,span*1.15,span*0.82);
+    const bool benchmark=!options.benchmarkReport.empty();
+    bool paused=false,escapeWas=false,cheerWas=false,leftWas=false,fireBlocked=true,resultReported=false;
+    MatchExit matchExit=MatchExit::Close;
+    bool pauseSubWasHeld=false,pauseSpecialWasHeld=false,subResumeSync=false,specialResumeBlock=false;
+    double judgeElapsed=0.0;
+    double mouseX=0.0,mouseY=0.0;
+    auto captureMouse=[&](bool capture) {
+        fireBlocked=true;
+        glfwSetInputMode(window,GLFW_CURSOR,capture?GLFW_CURSOR_DISABLED:GLFW_CURSOR_NORMAL);
+        if(glfwRawMouseMotionSupported()) glfwSetInputMode(window,GLFW_RAW_MOUSE_MOTION,capture?GLFW_TRUE:GLFW_FALSE);
+        glfwGetCursorPos(window,&mouseX,&mouseY);
+    };
+    auto pauseMatch=[&] {
+        const auto& input=match.local().input;
+        pauseSubWasHeld=input.sub || glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS ||
+            glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS;
+        pauseSpecialWasHeld=input.special || glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS ||
+            glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS;
+        paused=true;match.paused=true;accumulator=0.0;captureMouse(false);
+    };
+    auto resumeMatch=[&] {
+        paused=false;match.paused=false;accumulator=0.0;
+        subResumeSync=pauseSubWasHeld;specialResumeBlock=pauseSpecialWasHeld;
+        captureMouse(true);
+    };
+    std::uint32_t simulationStep=0;
+    auto tick=[&] {
+        auto& local=match.local();
+        auto& input=local.input;
+        input={};
+        if(benchmark) {
+            const double phase=(static_cast<double>(simulationStep)+options.benchmarkSeed*31.0)/90.0;
+            const glm::dvec3 waypoint=target+glm::dvec3(std::sin(phase)*span*0.12,0.0,
+                std::cos(phase*0.73)*span*0.12);
+            glm::dvec3 direction=waypoint-local.state.pos;
+            direction.y=0.0;
+            const double distance=glm::length(direction);
+            if(distance>1e-6) input.move=direction/distance;
+            glm::dvec3 enemy=stage.spawnPads[1]-local.state.pos;
+            enemy.y=0.0;
+            input.aimYaw=std::atan2(enemy.x,enemy.z);
+            input.aimPitch=0.025*std::sin(phase*0.41);
+            input.aimPoint=stage.spawnPads[1]+glm::dvec3(0.0,1.0,0.0);
+            input.hasAimPoint=true;
+            const auto action=simulationStep%240;
+            input.fire=action<150;
+            input.squid=action>=160&&action<210;
+            input.jump=action>=72&&action<78;
+            ++simulationStep;
+        } else {
+            const auto& pose=camera.pose();
+            const glm::dvec3 forward(std::sin(camera.yaw),0,std::cos(camera.yaw));
+            const glm::dvec3 right(-std::cos(camera.yaw),0,std::sin(camera.yaw));
+            if(glfwGetKey(window,GLFW_KEY_W)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_UP)==GLFW_PRESS) input.move+=forward;
+            if(glfwGetKey(window,GLFW_KEY_S)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_DOWN)==GLFW_PRESS) input.move-=forward;
+            if(glfwGetKey(window,GLFW_KEY_D)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_RIGHT)==GLFW_PRESS) input.move+=right;
+            if(glfwGetKey(window,GLFW_KEY_A)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_LEFT)==GLFW_PRESS) input.move-=right;
+            if(glm::length(input.move)>1.0) input.move=glm::normalize(input.move);
+            input.jump=glfwGetKey(window,GLFW_KEY_SPACE)==GLFW_PRESS;
+            input.squid=glfwGetKey(window,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS;
+            const bool left=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS;
+            if(!left) fireBlocked=false;
+            input.fire=left&&!fireBlocked;
+            const bool sub=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS;
+            input.sub=sub;
+            if(subResumeSync) {
+                if(!sub) {
+                    input.sub=false;input.squid=true;input.move=glm::dvec3(0);input.fire=false;
+                    subResumeSync=false;
+                }
+            }
+            const bool special=glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS;
+            input.special=special&&!specialResumeBlock;
+            if(specialResumeBlock&&!special) specialResumeBlock=false;
+            const bool cheer=glfwGetKey(window,GLFW_KEY_C)==GLFW_PRESS;
+            input.cheer=cheer&&!cheerWas;
+            cheerWas=cheer;
+            const auto hit=geometry.raycast(pose.eye,pose.forward,90.0,true);
+            input.aimPoint=hit.hit?hit.point:pose.eye+pose.forward*90.0;
+            input.hasAimPoint=true;
+            input.aimYaw=camera.yaw;
+            input.aimPitch=camera.pitch;
+            const bool mapTarget=local.specialPose().mapTarget;
+            input.hasMapTarget=mapTarget;
+            if(mapTarget) input.mapTarget=input.aimPoint;
+            input.specialConfirm=mapTarget&&left&&!fireBlocked&&!leftWas;
+            leftWas=left;
+        }
+        match.tick(dt);
+        if(!benchmark) {
+            if(match.phase()==MatchPhase::Judge) {
+                judgeElapsed+=dt;
+                if(judgeElapsed>=2.6) match.finishJudging();
+            } else judgeElapsed=0.0;
+            if(match.phase()==MatchPhase::Results&&!resultReported) {
+                if(const auto& result=match.result())
+                    std::cout<<"MATCH_RESULT winner="<<(result->winner==0?"orange":"blue")
+                             <<" orange="<<result->coverage[0]*100.0<<" blue="<<result->coverage[1]*100.0<<'\n';
+                captureMouse(false);
+                resultReported=true;
+            }
+        }
+        if(!benchmark) camera.tick(dt,CameraActor(local),geometry);
+    };
+    CharacterLightState lighting;
+    lighting.ambient=glm::vec3(0.23f,0.25f,0.29f);
+    lighting.sunDirection=glm::normalize(glm::vec3(-0.4f,0.85f,0.35f));
+    lighting.sunColor=glm::vec3(1.0f,0.92f,0.82f);
+    lighting.skyDirection=glm::vec3(0.0f,1.0f,0.0f);
+    lighting.skyColor=glm::vec3(0.42f,0.56f,0.75f);
+    lighting.groundColor=glm::vec3(0.27f,0.22f,0.18f);
+    for(std::size_t i=0;i<match.actors().size();++i) {
+        auto* actor=match.actors()[i].get();
+        const auto& roster=match.roster()[i];
+        auto live=std::make_unique<LiveCharacter>();
+        live->style=roster.style;
+        live->pose=std::make_unique<CharacterPose>(art.data(),art.data().rig(
+            roster.style.hair,roster.style.hat,roster.style.brows),roster.name,actor->mainId());
+        live->pose->setStyle(roster.style);
+        live->pose->setSub(actor->subId());
+        live->pose->setColor(teamColors[static_cast<std::size_t>(actor->team())]);
+        live->pose->trigger(CharacterTrigger{"spawn"});
+        live->scene.inWorld=true;
+        live->scene.isLocal=roster.local;
+        live->scene.team=actor->team();
+        live->scene.lifeLevel=2;
+        live->scene.cameraPosition=overviewEye;
+        live->scene.actors.resize(match.actors().size());
+        live->scene.raycast=[&geometry](glm::dvec3 origin,glm::dvec3 direction,double distance) {
+            const auto hit=geometry.raycast(origin,direction,distance,true);
+            return CharacterGroundHit{hit.hit,hit.dist,hit.point,hit.normal};
+        };
+        auto* state=live.get();
+        auto* pose=live->pose.get();
+        characters.push_back(std::move(live));
+        actor->setPoseTriggerSink([pose](const CharacterTrigger& event) { pose->trigger(event); });
+        actor->setPoseFrameSink([&,actor,state,pose,i](double step) {
+            const auto& current=actor->state;
+            const auto combat=actor->combatPose();
+            const auto special=actor->specialPose();
+            CharacterAnimState animation;
+            animation.position=actor->visualPos();
+            if(special.kind=="crab"&&!special.roll) animation.position.y+=special.seat;
+            animation.yaw=current.yaw;
+            animation.aimPitch=actor->input.aimPitch;
+            animation.speed=glm::length(glm::dvec2(current.vel.x,current.vel.z));
+            const double c=std::cos(current.yaw),s=std::sin(current.yaw);
+            const double horizontalSpeed=std::hypot(current.vel.x,current.vel.z);
+            if(horizontalSpeed>0.1) {
+                animation.localMove={(-current.vel.x*c+current.vel.z*s)/horizontalSpeed,
+                                     (current.vel.x*s+current.vel.z*c)/horizontalSpeed};
+            }
+            animation.vy=current.vel.y;
+            animation.hp=std::clamp(current.hp/100.0,0.0,1.0);
+            animation.form=current.squid?(current.climbing?CharacterForm::Climb:
+                current.submerged?CharacterForm::Swim:CharacterForm::Squid):CharacterForm::Kid;
+            if(special.body||special.noSquid) animation.form=CharacterForm::Kid;
+            animation.grounded=current.grounded;
+            animation.firing=combat.firing||special.firing>0.0;
+            animation.rolling=combat.rolling;
+            animation.subAim=combat.subAim||special.raise;
+            animation.subPropHidden=special.kind=="booyah"&&special.active&&!special.thrown;
+            animation.lowInk=current.ink<18.0;
+            animation.inEnemyInk=current.grounded&&current.groundTeam==2&&!current.submerged&&!special.inkProof;
+            animation.invuln=current.invuln>0.0;
+            animation.visible=current.alive&&special.kind!="kraken"&&!(special.kind=="crab"&&special.roll);
+            animation.charge=combat.charge;
+            animation.ink=current.ink/100.0;
+            animation.special=special.active?std::clamp(special.remaining,0.0,1.0):
+                std::clamp(current.specialCharge/actor->weapon().number("specialCost",190.0),0.0,1.0);
+            const double hurt=std::clamp(std::max(current.hurtFlash,1.0-current.hp/100.0)*
+                (current.hp<100.0?1.0:0.0),0.0,1.0);
+            pose->setHurt(hurt,teamColors[static_cast<std::size_t>(1-actor->team())]);
+            CharacterRunnerState runner;
+            runner.charging=combat.charging;
+            runner.firing=combat.firing;
+            runner.streaming=combat.streaming;
+            runner.dodge=combat.dodgeTime>0.0;
+            runner.lockT=combat.lockTime;
+            runner.charge=combat.charge;
+            runner.streamT=combat.burstTime;
+            runner.hand=combat.hand;
+            runner.sinceHand=combat.sinceHand;runner.hasSinceHand=true;
+            runner.leaping=combat.leaping;
+            runner.open=runner.canopyOpen=combat.canopyOpen;
+            runner.canopyGrow=combat.canopyGrow;
+            runner.canopyHp=combat.canopyHp;runner.canopyHpMax=combat.canopyHpMax;
+            runner.canopyShake=combat.canopyShake;runner.canopyFlash=combat.canopyFlash;
+            runner.canopyRegrowK=combat.canopyRegrowK;runner.canopyOpening=combat.canopyOpening;
+            runner.canopyState=combat.canopyState;
+            runner.bladeFlashTime=combat.bladeFlashTime;
+            runner.mittsLandTime=combat.mittsLandTime;
+            animation.runner=runner;
+
+            auto& scene=state->scene;
+            scene.cameraPosition=options.benchmarkReport.empty() ? camera.pose().eye : overviewEye;
+            for(std::size_t j=0;j<match.actors().size();++j) {
+                const auto& other=*match.actors()[j];
+                scene.actors[j]={j+1,other.team(),j!=i&&other.state.alive,other.visualPos()};
+            }
+            pose->update(step,animation,scene);
+        });
+    }
+
+    std::unique_ptr<PerformanceCapture> capture;
+    if(!options.benchmarkReport.empty())
+        capture=std::make_unique<PerformanceCapture>(options.benchmarkReport,std::string(stage.id),options.benchmarkSeed,
+            options.width,options.height,options.benchmarkWarmup,options.benchmarkFrames);
+    if(!benchmark) captureMouse(true);
+    glEnable(GL_DEPTH_TEST);
+    while(!glfwWindowShouldClose(window)) {
+        if(capture) capture->beginFrame();
+        glfwPollEvents();
+        int width=0,height=0;
+        glfwGetFramebufferSize(window,&width,&height);
+        if(width<=0||height<=0) {if(capture)throw std::runtime_error("Benchmark framebuffer is unavailable");glfwWaitEventsTimeout(0.05);continue;}
+        if(capture && (width!=1920 || height!=1080)) throw std::runtime_error("Benchmark framebuffer must be exactly 1920x1080; got "+std::to_string(width)+"x"+std::to_string(height));
+        const double now=glfwGetTime();
+        if(!benchmark) {
+            const bool escape=glfwGetKey(window,GLFW_KEY_ESCAPE)==GLFW_PRESS;
+            if(match.phase()==MatchPhase::Playing && escape&&!escapeWas) {
+                if(paused) resumeMatch(); else pauseMatch();
+            }
+            escapeWas=escape;
+            if(!paused&&match.phase()==MatchPhase::Playing&&!glfwGetWindowAttrib(window,GLFW_FOCUSED)) pauseMatch();
+            if(!paused && match.phase()==MatchPhase::Playing) {
+                double x=0.0,y=0.0;
+                glfwGetCursorPos(window,&x,&y);
+                camera.yaw-=(x-mouseX)*0.0021;
+                camera.pitch=std::clamp(camera.pitch-(y-mouseY)*0.0021,-1.05,1.15);
+                mouseX=x;mouseY=y;
+            }
+        }
+        if(capture) tick();
+        else if(!paused) {
+            accumulator+=std::clamp(now-previous,0.0,0.1);
+            while(accumulator+1e-12>=dt) {tick();accumulator-=dt;}
+        }
+        previous=now;
+        if(uploadedVersion!=paint.version()) {renderer.UploadInk(stage,paint);uploadedVersion=paint.version();}
+        const glm::dvec3 renderEye=benchmark?overviewEye:camera.pose().eye;
+        const glm::dvec3 renderForward=benchmark?glm::normalize(target-overviewEye):camera.pose().forward;
+        glm::mat4 projection,view;
+        if(benchmark) {
+            projection=glm::perspective(glm::radians(48.0f),static_cast<float>(width)/height,0.15f,6500.0f);
+            view=glm::lookAt(glm::vec3(overviewEye),glm::vec3(target),glm::vec3(0,1,0));
+        } else {
+            projection=glm::perspective(glm::radians(static_cast<float>(camera.pose().verticalFovDegrees)),static_cast<float>(width)/height,0.15f,6500.0f);
+            view=glm::lookAt(glm::vec3(renderEye),glm::vec3(renderEye+renderForward),glm::vec3(0,1,0));
+        }
+        const auto vp=projection*view;
+        glViewport(0,0,width,height);
+        glClearColor(0.64f,0.81f,0.9f,1.0f);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        int draws=renderer.Draw(vp,glm::vec3(renderEye),false);
+        for(std::size_t i=0;i<characters.size();++i) {
+            const auto& actor=*match.actors()[i];
+            draws+=static_cast<int>(art.draw(characters[i]->pose->frame(),characters[i]->style,
+                actor.mainId(),actor.subId(),"game",glm::dmat4(view),glm::dmat4(projection),renderEye,lighting));
+        }
+        if(!capture) {
+            ImGui_ImplOpenGL3_NewFrame();ImGui_ImplGlfw_NewFrame();ImGui::NewFrame();
+            if(match.phase()==MatchPhase::Results) {
+                ImGui::SetNextWindowPos(ImVec2(width*0.5f,height*0.5f),ImGuiCond_Always,ImVec2(0.5f,0.5f));
+                ImGui::SetNextWindowSize(ImVec2(440,0));
+                ImGui::Begin("Turf results",nullptr,ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
+                if(const auto& result=match.result()) {
+                    ImGui::Text("Team %s wins",result->winner==0?"Orange":"Blue");
+                    ImGui::Text("Final turf  Orange %4.1f%%  /  Blue %4.1f%%",
+                        result->coverage[0]*100.0,result->coverage[1]*100.0);
+                }
+                if(nativeApp && ImGui::Button("Replay / choose stage",ImVec2(-1,36))) matchExit=MatchExit::StageSelect;
+                if(ImGui::Button(nativeApp?"Close game":"Close match",ImVec2(-1,36))) glfwSetWindowShouldClose(window,1);
+                ImGui::End();
+            } else if(paused) {
+                ImGui::SetNextWindowPos(ImVec2(width*0.5f,height*0.5f),ImGuiCond_Always,ImVec2(0.5f,0.5f));
+                ImGui::SetNextWindowSize(ImVec2(420,0));
+                ImGui::Begin("Paused",nullptr,ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
+                ImGui::TextUnformatted("The match clock and simulation are paused.");
+                if(ImGui::Button("Resume",ImVec2(-1,36))) resumeMatch();
+                if(nativeApp && ImGui::Button("Return to stage select",ImVec2(-1,36))) matchExit=MatchExit::StageSelect;
+                if(ImGui::Button(nativeApp?"Close game":"Close match",ImVec2(-1,36))) glfwSetWindowShouldClose(window,1);
+                ImGui::End();
+            } else if(match.phase()==MatchPhase::Finish || match.phase()==MatchPhase::Judge) {
+                ImGui::SetNextWindowPos(ImVec2(width*0.5f,height*0.5f),ImGuiCond_Always,ImVec2(0.5f,0.5f));
+                ImGui::SetNextWindowSize(ImVec2(440,0));
+                ImGui::Begin("Match tally",nullptr,ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoInputs);
+                const auto coverage=paint.coverage();
+                if(match.phase()==MatchPhase::Finish) ImGui::TextUnformatted("Time is up. Counting final turf...");
+                else if(const auto& result=match.result()) {
+                    ImGui::Text("Team %s wins",result->winner==0?"Orange":"Blue");
+                    ImGui::TextUnformatted("Final turf tally");
+                }
+                ImGui::Text("Orange %4.1f%%  /  Blue %4.1f%%",coverage[0]*100.0,coverage[1]*100.0);
+                ImGui::End();
+            } else {
+                ImGui::SetNextWindowPos(ImVec2(18,18));
+                ImGui::Begin("Turf Riot",nullptr,ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoInputs);
+                const auto coverage=paint.coverage();
+                const auto& local=match.local();
+                const int seconds=static_cast<int>(std::ceil(std::max(0.0,match.remaining())));
+                ImGui::Text("%s",std::string(stage.name).c_str());
+                ImGui::Text("%02d:%02d",seconds/60,seconds%60);
+                ImGui::Text("Turf  %4.1f%%  /  %4.1f%%",coverage[0]*100.0,coverage[1]*100.0);
+                ImGui::Text("HP %3.0f   Ink %3.0f   Special %3.0f / %.0f",local.state.hp,local.state.ink,
+                    local.state.specialCharge,local.weapon().number("specialCost",190.0));
+                if(!local.state.alive) ImGui::Text("Splatted - respawning in %.1f",local.state.respawnTimer);
+                ImGui::Text("WASD / Mouse   Fire LMB   Sub RMB or E   Special F or Q");
+                ImGui::Text("Shift squid   Space jump   C cheer   Esc pause");
+                if(local.specialPose().mapTarget)
+                    ImGui::TextUnformatted("Aim at a strike target; click to confirm after the ready delay.");
+                ImGui::End();
+                auto* draw=ImGui::GetForegroundDrawList();
+                const ImVec2 center(width*0.5f,height*0.5f);
+                draw->AddCircle(center,7,IM_COL32(255,255,255,230),24,1.5f);
+                draw->AddCircleFilled(center,1.5f,IM_COL32(255,255,255,255));
+            }
+            ImGui::Render();ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            if(matchExit==MatchExit::StageSelect) break;
+        }
+        if(options.frames&&++frame>=options.frames) break;
+        if(capture) capture->endGpu();
+        glfwSwapBuffers(window);
+        if(capture) {
+            const PerformanceCapture::FrameCounts counts{
+                static_cast<int>(match.actors().size()),draws,0,
+                static_cast<int>(match.world().projectiles().size())};
+            if(capture->endFrame(counts)) {capture->write();break;}
+        }
+    }
+    if(!benchmark) captureMouse(false);
+    return matchExit;
+}
+
+void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initial,
+                const std::filesystem::path& characterAssets) {
+    const StageData* selected=&initial;
+    int frame=0;
+    while(!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        int width=0,height=0;
+        glfwGetFramebufferSize(window,&width,&height);
+        if(width<=0||height<=0) {glfwWaitEventsTimeout(0.05);continue;}
+        ImGui_ImplOpenGL3_NewFrame();ImGui_ImplGlfw_NewFrame();ImGui::NewFrame();
+        ImGui::SetNextWindowPos(ImVec2(width*0.5f,height*0.5f),ImGuiCond_Always,ImVec2(0.5f,0.5f));
+        ImGui::SetNextWindowSize(ImVec2(460,0));
+        ImGui::Begin("INKWAVE / Turf Riot",nullptr,ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
+        ImGui::TextUnformatted("Select an offline Turf stage.");
+        if(ImGui::BeginCombo("Stage",std::string(selected->name).c_str())) {
+            for(const auto& candidate:ReferenceStages()) {
+                if(candidate.mode!="turf"||candidate.onlineOnly) continue;
+                if(ImGui::Selectable(std::string(candidate.name).c_str(),selected==&candidate)) selected=&candidate;
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::TextUnformatted("WASD / Mouse to play, Shift squid, Space jump.");
+        const bool start=ImGui::Button("Start Turf match",ImVec2(-1,38));
+        const bool close=ImGui::Button("Close",ImVec2(-1,32));
+        ImGui::End();
+        glViewport(0,0,width,height);
+        glClearColor(0.06f,0.11f,0.15f,1.0f);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        ImGui::Render();ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glfwSwapBuffers(window);
+        if(close) {glfwSetWindowShouldClose(window,1);break;}
+        if(options.frames&&++frame>=options.frames) {
+            std::cout<<"NATIVE_MENU state=stage-select stage="<<selected->id<<" frames="<<frame<<'\n';
+            break;
+        }
+        if(start) {
+            Options game=options;
+            game.stage=std::string(selected->id);
+            game.match=true;
+            game.native=false;
+            if(MatchLoop(window,game,*selected,characterAssets,true)==MatchExit::Close) break;
+            frame=0;
+        }
+    }
+}
+
 void Loop(GLFWwindow* window, const Options& options, const StageData& initial) {
     StageRenderer renderer;
     const StageData* stage = &initial;
@@ -620,14 +1091,16 @@ int RunStageViewer(int argc, char** argv) {
             return stage.id==options.stage && stage.mode==options.mode;
         });
         if (found==stages.end()) throw std::runtime_error("Unknown or unsupported stage/mode: "+options.stage+"/"+options.mode);
-        if(options.game && (found->onlineOnly || found->mode!="turf"))
+        if((options.game || options.match || options.native) && (found->onlineOnly || found->mode!="turf"))
             throw std::runtime_error("Native practice currently requires an offline Turf stage");
         if (!glfwInit()) throw std::runtime_error("GLFW initialization failed");
         glfw=true;
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);
         glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_VISIBLE,options.capture.empty()?GLFW_TRUE:GLFW_FALSE);
+        const bool hidden=!options.capture.empty()||!options.benchmarkReport.empty();
+        glfwWindowHint(GLFW_VISIBLE,hidden?GLFW_FALSE:GLFW_TRUE);
+        if(!options.benchmarkReport.empty()) glfwWindowHint(GLFW_DECORATED,GLFW_FALSE);
         window=glfwCreateWindow(options.width,options.height,"Tiny-Splatoon / OpenGL migration",nullptr,nullptr);
         if (!window) throw std::runtime_error("OpenGL 4.5 window creation failed");
         glfwMakeContextCurrent(window);
@@ -635,7 +1108,7 @@ int RunStageViewer(int argc, char** argv) {
         std::cout<<"GPU "<<glGetString(GL_RENDERER)<<" / "<<glGetString(GL_VERSION)<<'\n';
         std::cout<<"STAGE "<<found->id<<" MODE "<<found->mode<<" BLOCKS "<<found->blocks.size()<<" FACES "<<found->faces.size()
                  <<" PROP_COLLIDERS "<<found->propColliderCount<<'\n';
-        glfwSwapInterval(options.capture.empty()?1:0);
+        glfwSwapInterval(hidden?0:1);
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         gui=true;
@@ -643,7 +1116,17 @@ int RunStageViewer(int argc, char** argv) {
         ImGui::StyleColorsDark();
         ImGui_ImplGlfw_InitForOpenGL(window,true);
         ImGui_ImplOpenGL3_Init("#version 450 core");
-        if(options.game) PlayLoop(window,options,*found);
+        if(options.native) {
+            auto assets=std::filesystem::absolute(argv[0]).parent_path()/"assets"/"reference"/"characters";
+            if(!std::filesystem::exists(assets)) assets=std::filesystem::current_path()/"assets"/"reference"/"characters";
+            NativeMenu(window,options,*found,assets);
+        }
+        else if(options.match) {
+            auto assets=std::filesystem::absolute(argv[0]).parent_path()/"assets"/"reference"/"characters";
+            if(!std::filesystem::exists(assets)) assets=std::filesystem::current_path()/"assets"/"reference"/"characters";
+            MatchLoop(window,options,*found,assets);
+        }
+        else if(options.game) PlayLoop(window,options,*found);
         else Loop(window,options,*found);
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();

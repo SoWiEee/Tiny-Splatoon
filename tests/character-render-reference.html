@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Source character render comparison</title>
+<style>html,body{margin:0;background:#20262e}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"../splat-ref/vendor/three/build/three.module.js","three/addons/":"../splat-ref/vendor/three/jsm/"}}</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import '../splat-ref/src/game/kits/index.js';
+import { Character } from '../splat-ref/src/game/character.js';
+import { G } from '../splat-ref/src/core/ctx.js';
+import { WEAPON_ORDER, SUB_ORDER, SUBS } from '../splat-ref/src/config.js';
+import { PRESETS } from '../splat-ref/src/game/character-style.js';
+const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});
+renderer.setPixelRatio(1);renderer.setSize(1024,1200);renderer.autoClear=false;
+renderer.toneMapping=THREE.NeutralToneMapping;renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.setClearColor('#1f262e');document.body.append(renderer.domElement);renderer.clear();
+const camera=new THREE.PerspectiveCamera(40,256/300,0.05,50);camera.position.set(2.7,1.6,3.8);camera.lookAt(0,0.85,0);
+function transform(node,data){node.position.fromArray(data.position);node.quaternion.fromArray(data.quaternion);node.scale.fromArray(data.scale);node.visible=data.visible;if(data.authoredMatrix){node.matrixAutoUpdate=false;node.matrix.fromArray(data.authoredMatrix);}}
+function parts(c){
+ const out=new Map();function tree(node,path,descend=true){if(!node)return;out.set(path,node);if(descend)node.children.forEach((child,i)=>tree(child,`${path}/${i}`));}
+ for(const [side,w] of [['right',c.weapon],['left',c.weapon.left]])if(w){for(const key of ['pivot','off','body','ink','bodyFar','inkFar','glow','drum','spin','muzzle'])tree(w[key],`weapon/${side}/${key}`,key==='off');for(const [key,node]of Object.entries(w.parts))tree(node,`weapon/${side}/parts/${key}`);}
+ tree(c.weapon.pivotL,'weapon/mirror');tree(c.tank.group,'tank/group',false);tree(c.tank.fill,'tank/fill');tree(c.squidRoot,'squid');return out;
+}
+try{
+ const fixtures=await(await fetch('character_pose_fixtures.json')).json();
+ G.camera=null;G.actors=[];G.mode='match';
+ const presets=new URLSearchParams(location.search).has('presets');
+ const subs=new URLSearchParams(location.search).has('subs');
+ const defaultStyle={hair:0,skin:0,outfit:0,eyes:0};
+ const entries=presets?PRESETS.map(p=>({id:'shooter',style:p.style})):subs?SUB_ORDER.map(sub=>({id:'shooter',sub,style:defaultStyle})):WEAPON_ORDER.map(id=>({id,style:defaultStyle}));
+ for(const [index,{id,sub,style}]of entries.entries()){
+  const frame=presets?null:fixtures.scenarios.find(s=>s.definition.name===`weapon_${id}`).samples.at(-1);
+  const scene=new THREE.Scene();G.scene=scene;
+  const c=new Character({name:'pose-oracle',style,weapon:id});c.setLod('hero');scene.add(c.root);
+  c._animWeapon(0,{},c.weapon);
+  if(frame){
+  for(const key of ['root','model','kid'])transform(c[key],frame[key]);transform(c.squidRoot,frame.squid);
+  c.boneList.forEach((bone,i)=>transform(bone,frame.bones[i]));
+  const nodes=parts(c);for(const [name,data]of Object.entries(frame.parts)){const node=nodes.get(name);if(!node)throw new Error(`Missing source part ${name}`);transform(node,data);if(data.material&&node.material){if(data.material.color)node.material.color.fromArray(data.material.color);if(data.material.emissive)node.material.emissive.fromArray(data.material.emissive);if(data.material.emissiveIntensity!==undefined)node.material.emissiveIntensity=data.material.emissiveIntensity;for(const [key,value]of Object.entries(data.material.uniforms||{})){const u=(node.material.userData?.u||node.material.uniforms)[key];if(Array.isArray(value))u.value.fromArray(value);else u.value=value;}}}
+  for(const [key,value]of Object.entries(frame.uniforms)){if(Array.isArray(value))c.u[key].value.fromArray(value);else c.u[key].value=value;}
+  c.mats.fill.emissive.fromArray(frame.fillEmissive);c.mats.glow.emissiveIntensity=frame.coilEmissiveIntensity;
+  }
+  if(sub){c.setSub(SUBS[sub].kind);c.bomb.group.visible=true;}
+  c.root.updateMatrixWorld(true);c.skeleton.update();
+  scene.add(new THREE.AmbientLight(new THREE.Color(0.16,0.16,0.16),1));
+  const sun=new THREE.DirectionalLight(new THREE.Color(2.5,2.4,2.3),1);sun.position.set(-0.4,0.85,0.35);scene.add(sun);
+  scene.add(new THREE.HemisphereLight(new THREE.Color(0.65,0.75,1),new THREE.Color(0.2,0.15,0.1),1));
+  const x=index%4*256,y=(3-Math.floor(index/4))*300;renderer.setViewport(x,y,256,300);renderer.setScissor(x,y,256,300);renderer.setScissorTest(true);renderer.clear();renderer.setScissorTest(false);renderer.render(scene,camera);c.dispose();
+ }
+ const gl=renderer.getContext(),debug=gl.getExtension('WEBGL_debug_renderer_info');
+ window.renderEvidence={models:entries.length,renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)};
+ document.title='Source character render ready';
+}catch(error){document.title='Source character render failed';document.body.append(String(error));console.error(error);}
+</script></body></html>
