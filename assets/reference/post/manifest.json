@@ -1,0 +1,32 @@
+{
+  "source": "renderer.js / screenfx.js / Three.js r186 postprocessing",
+  "sourceHashes": {
+    "src/core/renderer.js": "ceee72d802a4314c64fc117d09bc33f6d609b820681c228bbd85bc79b5107b53",
+    "src/fx/screenfx.js": "a6304cf371bbf117528ca1e63b223651ef78b7c02ecc38709d0a9cb6b8f980f5",
+    "src/world/environment.js": "c359eeef59c83a9937ebf14e18a2d2711e59a17f6af97484af836cf9779c6bb5",
+    "node_modules/three/examples/jsm/shaders/GTAOShader.js": "cdea7be60452f61105375d2c18e4da2e8ce7b39a89246b1bb8fbf79319d58cfd",
+    "node_modules/three/examples/jsm/shaders/PoissonDenoiseShader.js": "61da074a9ad8b2139dd164c96b8b62c299f056ce06c216e1f707c5151d997602",
+    "node_modules/three/examples/jsm/shaders/OutputShader.js": "353479f77a8d7e2629d49ccac9fc2f5dbfdda5442e0adf867b00377a2fcb0cb2",
+    "node_modules/three/examples/jsm/postprocessing/UnrealBloomPass.js": "ba8f2fcadfa6588384c9473498f974d81d120f02f0e63a0e59c265202a006b5a"
+  },
+  "hashes": {
+    "THREE-LICENSE.txt": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc",
+    "grade.frag": "9f37bf10e6fba04bebf3a55f2a131e77b99b79f2058c35ffdbe044440f2f5930",
+    "screen.frag": "998f6dd4ea3c3e534394f109296d361e2ccba53171d65188999cab093e99645c",
+    "lens.vert": "bc35bf9b31411e147f0564a43910093a6eb5b59b4b73ba8fdf38cc567fb54e40",
+    "lens.frag": "c3aa7ec04fe050d218c9a42bfa37e72d979ac8e6397b3bcdfd39f68bac42cfe1",
+    "output.frag": "017d98e6855743ffb72e0aab6c4f72d4e191162c4b1551a70d3f17e1581a45af",
+    "gtao.frag": "c65d2dfaa955a6e0f2f3eb58995843b62455d73f6fe6cc19cc3e34dbe7ad3381",
+    "denoise.frag": "bc37b0334cec732a2ca231fa493c03a54cfad0b5f7ea37af002c61a9492cc252",
+    "highpass.frag": "bb143ebd69b0b2bef14cdff4f4c3969bcfb7e104d79ad8b603e145e69f7aaa28",
+    "bloom-composite.frag": "1ee5f145235ebedd3d508096fc23e6c31b54a9ec4f2afa7ada540327bcef2909",
+    "blur-0.frag": "dcefc3257a7ee5939a3ef8873144ff78713dd2abe6fb7ee4debd26fa5d23db0c",
+    "blur-1.frag": "7b7747ea296ee823b3d1142401cd6bd5f2085624b69a8451b0c8893c4f6c8d0b",
+    "blur-2.frag": "76887ec7a8e758dd2192ce81b1b6a4a0c6029467644c8441c03e56bf986ac448",
+    "blur-3.frag": "9a446ab416df0a8c5d22f118b1cb2b9bc76f9dacf8c13296aef89c1812a25ef5",
+    "blur-4.frag": "0f33a52975c77749cddf39199b497cebcbcafaf43d56c174fbaeb7d2f37aa22e",
+    "gtao-noise.bin": "0cca9ba7c3de8a8eb4edbd722198218526f77648b4d66b236cd665bc11655f77",
+    "denoise-noise.bin": "3d99ac8e9f080c7d578c93728654ee536a7a310c375d402c8327913b39c4e9a4",
+    "bloom-kernels.json": "a6fed95bd63734c6b2c627a951c7a039356e3aa53b319a10e1b37d0f2ce8db16"
+  }
+}

@@ -40,6 +40,6 @@ try{
  }
 }finally{character.dispose();}
 out+='}};\ninline const CharacterWeaponHold& GetCharacterWeaponHold(std::string_view id) {\n    for(const auto& hold:CharacterWeaponHolds)if(hold.id==id||hold.kind==id)return hold;\n    throw std::invalid_argument("Unknown source weapon hold: "+std::string(id));\n}\n}\n';
-const target=resolve(root,'restoration/CharacterWeaponData.hpp');
+const target=resolve(root,'src/game/CharacterWeaponData.hpp');
 if(check){if(await readFile(target,'utf8')!==out)throw new Error('Stale source weapon grip data');}else await writeFile(target,out);
 console.log(`${check?'Verified':'Exported'} 12 exact source weapon grip, hand and muzzle definitions`);

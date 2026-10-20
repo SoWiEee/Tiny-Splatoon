@@ -1,6 +1,6 @@
-#include "../restoration/CharacterData.hpp"
-#include "../restoration/ArsenalData.hpp"
-#include "../restoration/CharacterWeaponData.hpp"
+#include "../src/game/CharacterData.hpp"
+#include "../src/game/ArsenalData.hpp"
+#include "../src/game/CharacterWeaponData.hpp"
 #include <fstream>
 #include <iostream>
 #include <set>

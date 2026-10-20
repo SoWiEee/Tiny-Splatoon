@@ -2,7 +2,7 @@
 #undef NDEBUG
 #endif
 #include <cassert>
-#include "../restoration/CharacterWeaponAnimation.hpp"
+#include "../src/game/CharacterWeaponAnimation.hpp"
 #include <cmath>
 #include <iostream>
 

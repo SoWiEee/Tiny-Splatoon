@@ -1,4 +1,4 @@
-#include "../restoration/FollowCamera.hpp"
+#include "../src/game/FollowCamera.hpp"
 #include "camera_fixtures.hpp"
 
 #include <cmath>

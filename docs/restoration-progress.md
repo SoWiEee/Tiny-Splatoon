@@ -28,7 +28,7 @@ P0 仍缺固定條件的參考視聽 captures；P1/P2 的基礎碰撞、邏輯�
 
 ## 需求追蹤
 
-所有 ID 的來源及完整驗收契約見 spec.md 同 ID。以下「實作中」僅代表有基礎接點，不代表整項通過；原生實作集中在 restoration/，對照測試在 tests/。
+所有 ID 的來源及完整驗收契約見 spec.md 同 ID。以下「實作中」僅代表有基礎接點，不代表整項通過；原生實作按職責位於 src/app、src/game、src/world、src/render 與 src/gui，對照測試在 tests/。
 
 | 需求 ID | 狀態 | 本次證據／限制 |
 |---|---|---|
@@ -292,3 +292,25 @@ P11 live pose 接受：32 基本場景與 19 外觀／形態／LOD 代表場景�
 另以僅含 Tiny-Splatoon.exe、glfw3.dll 與 assets/reference 的獨立資料夾，在該資料夾作為工作目錄執行預設選圖與直接 Turf，各三幀均正常結束；實際 renderer 是 GTX 1650 Max-Q／OpenGL 4.5／NVIDIA 591.74。Halyard 地形 PNG、60-step 練習 PNG 與 GPU 墨回讀亦通過；276 個來源基準雜湊未變更。發佈流程改用 executable 旁由 vcpkg 部署的 runtime DLL，不直接打包整個套件庫目錄。
 
 依使用者要求，本輪未分派 agent 驗證；以上為主 agent 的建置／測試證據。批次刪除本機建置快取被工具政策拒絕，故保留 Git 忽略的既有快取，改用上述獨立資料夾檢查乾淨 runtime；來源程式／依賴／版本控制的清理已完成。
+
+### 2026-10-20 LOD／渲染／Boss 與原生分層接續
+
+使用者授權移除 `restoration/` 實體目錄，按職責分層並接續 LOD 漸變、陰影／後製／特殊視效及 Boss。42 個原有檔案已搬至 src/app、src/game、src/world、src/render、src/gui；StageRenderer 與 MatchHud 從應用流程抽離，main／CMake／測試／匯出器路徑同步。搬移後 Release 建置成功，原 32/32 CTest 通過（77.40 秒）；這是功能新增前的遷移回歸。
+
+- LOD：來源 kid 高度 1.32 m、fade 0.3 秒、遲滯 ±12%，依品質與本機／遠端投影尺寸選 hero／game／far。2,288 次 source oracle 更新通過；body 互補 dither 與裝備淡變中點接線，GPU 前／中／後三圖已檢查角色輪廓未消失。
+- HDR／陰影元件：來源 GLSL 匯出重建、MSAA HDR/depth resolve、GTAO／Poisson、五層 bloom、grade、screen composite、Neutral/sRGB 的原生 GPU targeted checks 通過。DirectionalShadow 的來源場地 fit／bias／normal bias／radius、3×3 PCF 照亮／遮蔽及 viewport 恢復檢查通過。具體來源與限制見 [渲染契約](render-pipeline-source-contract.md)。場景實際陰影與全工作量效能仍需整合驗收。
+- Screen FX：24 個實際來源場景／2,160 次更新，以及 144 份完整 lens 粒子快照，以 uniform 1e-6、粒子數值 1e-8 對照通過；包含低血心跳、swim／emerge、敵墨、蓄力、特殊、跳躍、damage、kill、flood／reveal、blast、urgency、pause／reduced motion、近鏡 impact／友方與 roller 排除、reset／GO。實際 lens metaball texture 經 HDR composite 的 GPU 檢查、220 容量與 20 秒完整清空亦通過。遊戲事件接線仍在整合，不能以元件對照代替完整對戰驗收。
+- BossNav：七張合法圖的 381 個 floor／clearance／pose／turn／cast／path 來源觀測通過；A* 採來源 Float32 cost 與相同 MinHeap tie 行為。Boss 本體、六招、模型、HUD／結果與 AI 正在接續，尚未列完成。
+- 世界特殊視效：共用邏輯狀態的唯讀 view 與有上限的 visual event queue 已加入；來源世界模型、shader、pool recipe 與遊戲接線仍在實作。FX 不新增傷害或計分墨。
+
+本節記錄開發檢查點；七圖最終負載與完整玩家流程驗收仍未完成。本輪未分派驗證 agent；實作 agent 依使用者最新指示改用 Luna／xhigh。
+
+### 2026-10-20 本輪提交前整合檢查
+
+- MSVC x64 Release 全目標建置成功，完整 46/46 CTest 通過（205.47 秒，`build/checkpoint-ctest.log`）。包含既有 51 角色 pose 場景、裝備／AI／特殊／GPU／來源重建，以及新增 LOD、HDR／陰影、Screen FX、World FX recipe、Boss nav／模型／生命週期。276 個來源基準 SHA-256 未變。
+- 隨後補上近鏡 `reference_worldfx_gpu`：真實玩家輸入產生龍捲風、泡泡、音箱與 beam，實際編譯 source shader／讀取 mesh／draw／像素回讀，檢查非背景像素與 GL_NO_ERROR，通過。應用入口與 CLI 隨最後擷取／報告修正再驗通過（3/3，5.45 秒）；加上 framebuffer 像素斷言後該 GPU 測試再次通過（6.57 秒）。目前共註冊 47 項測試，本輪涵蓋全部項目；最後新增項未冒稱已在先前 46 項的整批執行中。
+- Boss lifecycle assertion 通過八人同隊、normal 93,600 HP、本機權重、fixed-step CPU pose sink／pause、180 秒 timeout freeze／失敗與 weakpoint 擊破勝利。Boss 完整 source 動畫另行實跑嚴格 oracle，**0/16 場景通過**；保留原 0.001 門檻與[失敗報告](boss-pose-checkpoint-report.json)。現在僅 rest rig／static sockets，clip／IK／springs／secondary chains／材質 uniform 未完成，MODE-B06 未驗收。Boss AI／六招 state 與視覺接點存在，未宣稱完整來源對照。
+- 隱藏 `--frames` 對戰擷取改用固定 60 Hz，避免沒有焦點時立即暫停且未推進攝影機。Turf 120 tick 與 Boss 900 tick 擷取已檢視，確認角色／場地／HUD 與 Boss 本體可繪製，不是視覺相似度驗收。
+- 效能報告 schema 2 區分 Turf／Boss、計入 shadow draw calls，暖機結束先同步 GPU，FPS 以測量起點到最後 GPU query 完成的 wall time 計算；另保留 CPU 提交換算值。GTX 1650／1920×1080／seed 1，Tidewater Turf 120+600 為 210.7129 FPS，Boss 480+600 為 192.3630 FPS。數據與限制見[本輪量測](benchmarks/render-checkpoint-2026-10-20/README.md)。俯視距離剔除使 Turf 平均 particles 為 0，不能以此宣稱特殊視效滿負載；QA-12 保持 false。
+
+此提交是可建置的分層／渲染／Boss 開發檢查點，並非 100% 還原完成。尚未 push。

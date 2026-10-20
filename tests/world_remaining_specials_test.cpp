@@ -1,7 +1,7 @@
-#include "../restoration/ArsenalData.hpp"
-#include "../restoration/CombatWorld.hpp"
-#include "../restoration/FacePaint.hpp"
-#include "../restoration/PlayerSimulation.hpp"
+#include "../src/game/ArsenalData.hpp"
+#include "../src/game/CombatWorld.hpp"
+#include "../src/world/FacePaint.hpp"
+#include "../src/game/PlayerSimulation.hpp"
 #include "remaining_specials_source_fixtures.hpp"
 
 #include <algorithm>

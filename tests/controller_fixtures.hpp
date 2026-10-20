@@ -1,6 +1,6 @@
 // Generated from actual splat-ref Physics by tools/export-controller-fixtures.mjs.
 #pragma once
-#include "../restoration/ReferenceData.hpp"
+#include "../src/world/ReferenceData.hpp"
 #include <array>
 namespace restoration::controller_fixtures {
 inline const std::array<BlockData, 6> syntheticBlocks = {{

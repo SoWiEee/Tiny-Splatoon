@@ -1,9 +1,9 @@
-#include "../restoration/BotSimulation.hpp"
-#include "../restoration/ArsenalData.hpp"
-#include "../restoration/CombatWorld.hpp"
-#include "../restoration/FacePaint.hpp"
-#include "../restoration/NavGraph.hpp"
-#include "../restoration/StageGeometry.hpp"
+#include "../src/game/BotSimulation.hpp"
+#include "../src/game/ArsenalData.hpp"
+#include "../src/game/CombatWorld.hpp"
+#include "../src/world/FacePaint.hpp"
+#include "../src/game/NavGraph.hpp"
+#include "../src/world/StageGeometry.hpp"
 #include "ai_bot_oracle_fixtures.hpp"
 
 #include <algorithm>

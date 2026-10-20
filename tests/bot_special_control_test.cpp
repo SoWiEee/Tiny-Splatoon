@@ -1,10 +1,10 @@
-#include "../restoration/ArsenalData.hpp"
-#include "../restoration/BotSimulation.hpp"
-#include "../restoration/CombatWorld.hpp"
-#include "../restoration/FacePaint.hpp"
-#include "../restoration/NavGraph.hpp"
-#include "../restoration/PlayerSimulation.hpp"
-#include "../restoration/StageGeometry.hpp"
+#include "../src/game/ArsenalData.hpp"
+#include "../src/game/BotSimulation.hpp"
+#include "../src/game/CombatWorld.hpp"
+#include "../src/world/FacePaint.hpp"
+#include "../src/game/NavGraph.hpp"
+#include "../src/game/PlayerSimulation.hpp"
+#include "../src/world/StageGeometry.hpp"
 #include "bot_special_control_fixtures.hpp"
 
 #include <algorithm>

@@ -2,7 +2,7 @@
 #pragma once
 #include <vector>
 #include <string>
-#include "../restoration/MatchSimulation.hpp"
+#include "../src/game/MatchSimulation.hpp"
 namespace restoration::test {
 struct SetupActor { std::string name,main,sub,special; CharacterStyle style; int team,slot; bool local,bot; glm::dvec3 pos; double yaw,invuln; };
 struct SetupCase { unsigned seed; bool practice,autopilot; std::string main,sub,special,name; CharacterStyle style; int bots; std::vector<SetupActor> actors; double nextRandom[3]; };

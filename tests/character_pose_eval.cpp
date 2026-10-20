@@ -1,5 +1,5 @@
-#include "../restoration/CharacterData.hpp"
-#include "../restoration/CharacterRenderData.hpp"
+#include "../src/game/CharacterData.hpp"
+#include "../src/render/CharacterRenderData.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>

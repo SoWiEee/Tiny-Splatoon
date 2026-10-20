@@ -1,4 +1,4 @@
-#include "../restoration/StageGeometry.hpp"
+#include "../src/world/StageGeometry.hpp"
 #include "controller_fixtures.hpp"
 
 #include <cmath>

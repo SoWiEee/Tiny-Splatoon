@@ -20,11 +20,20 @@ function plain(value) {
   return null;
 }
 
-function expand(source, stack = []) {
+function stableShadowFilter(chunk) {
+  const pattern=/shadow = \(\s*texture\( shadowMap, vec3\( shadowCoord\.xy \+ vogelDiskSample\( 0, 5, phi \) \* radius, shadowCoord\.z \) \)[\s\S]*?\) \* 0\.2;/;
+  if(!pattern.test(chunk))throw new Error('Source PCF shadow chunk changed');
+  return chunk.replace(pattern,`vec2 ts = texelSize * max( shadowRadius * 0.55, 0.6 );
+    float s9 = 0.0;
+    for ( int sx = -1; sx <= 1; sx ++ ) for ( int sy = -1; sy <= 1; sy ++ ) s9 += texture( shadowMap, vec3( shadowCoord.xy + vec2( float( sx ), float( sy ) ) * ts, shadowCoord.z ) );
+    shadow = s9 * ( 1.0 / 9.0 );`);
+}
+function expand(source, stack = [], shadows = false) {
   return source.replace(/#include\s+<([\w\d_]+)>/g, (_, name) => {
     if (!(name in THREE.ShaderChunk)) throw new Error(`Missing source shader chunk ${name}`);
     if (stack.includes(name)) throw new Error(`Recursive shader chunk ${name}`);
-    return `\n// source chunk: ${name}\n${expand(THREE.ShaderChunk[name], [...stack, name])}\n`;
+    const chunk=shadows&&name==='shadowmap_pars_fragment'?stableShadowFilter(THREE.ShaderChunk[name]):THREE.ShaderChunk[name];
+    return `\n// source chunk: ${name}\n${expand(chunk, [...stack, name],shadows)}\n`;
   });
 }
 
@@ -55,6 +64,7 @@ function defines(material, options) {
   if (options.skinned) names.push('USE_SKINNING');
   if (options.toneMapping !== false && material.toneMapped) names.push('TONE_MAPPING');
   if (options.environment) names.push('USE_ENVMAP', 'ENVMAP_TYPE_CUBE_UV');
+  if (options.shadows) names.push('USE_SHADOWMAP','SHADOWMAP_TYPE_PCF');
   return names.map(name => `#define ${name}`).join('\n') + '\n' +
     Object.entries(material.defines ?? {}).map(([name, v]) => `#define ${name} ${v}`).join('\n') + '\n';
 }
@@ -72,7 +82,7 @@ export function buildCharacterShader(material, options = {}) {
   for (const k of ['roughness', 'metalness', 'opacity', 'ior', 'clearcoat', 'clearcoatRoughness', 'specularIntensity', 'specularColor', 'sheenRoughness', 'envMapIntensity']) put(k, material[k]);
   if (material.sheenColor) put('sheenColor', material.sheenColor.clone().multiplyScalar(material.sheen));
   put('toneMappingExposure', 1.0);
-  const lighting = { NUM_DIR_LIGHTS: 1, NUM_HEMI_LIGHTS: 1, ...options.lighting };
+  const lighting = { NUM_DIR_LIGHTS: 1, NUM_HEMI_LIGHTS: 1, ...(options.shadows?{NUM_DIR_LIGHT_SHADOWS:1}:{}), ...options.lighting };
   const featureDefines = defines(material, options);
   const matrices = 'uniform mat4 modelMatrix; uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix; uniform mat4 viewMatrix; uniform mat3 normalMatrix; uniform vec3 cameraPosition; uniform bool isOrthographic;\n';
   const commonPrefix = `#version 450 core\n${featureDefines}#define texture2D texture\n#define textureCube texture\n#define texture2DLodEXT textureLod\n#define textureCubeLodEXT textureLod\n#define texture2DGradEXT textureGrad\n${matrices}`;
@@ -86,8 +96,8 @@ export function buildCharacterShader(material, options = {}) {
     if (![texelWidth, texelHeight, maxMip].every(Number.isFinite)) throw new Error('CubeUV environment requires finite texelWidth, texelHeight, maxMip');
     environmentDefines = `#define CUBEUV_TEXEL_WIDTH ${texelWidth.toPrecision(12)}\n#define CUBEUV_TEXEL_HEIGHT ${texelHeight.toPrecision(12)}\n#define CUBEUV_MAX_MIP ${maxMip.toFixed(1)}\n`;
   }
-  const vertex = vertexPrefix + environmentDefines + unroll(counts(expand(shader.vertexShader), lighting));
-  fragment = fragmentPrefix + environmentDefines + unroll(counts(expand(fragment), lighting));
+  const vertex = vertexPrefix + environmentDefines + unroll(counts(expand(shader.vertexShader,[],options.shadows), lighting));
+  fragment = fragmentPrefix + environmentDefines + unroll(counts(expand(fragment,[],options.shadows), lighting));
   if (/unroll_loop_start|#include\s*</.test(vertex + fragment)) throw new Error('Shader preprocessing left an unresolved directive');
   const uniforms = Object.fromEntries(Object.entries(u).map(([k, item]) => [k, plain(item.value)]).filter(([, v]) => v !== null));
   return {
@@ -104,13 +114,14 @@ function buildCustomShader(material,options){
   const featureDefines=defines(material,options);
   const common=`#version 450 core\n${featureDefines}#define texture2D texture\nuniform mat4 modelMatrix,modelViewMatrix,projectionMatrix,viewMatrix;uniform mat3 normalMatrix;uniform vec3 cameraPosition;\n`;
   const vertex=common+'#define varying out\n#define attribute in\nin vec3 position,normal;in vec2 uv;\n'+expand(material.vertexShader);
-  const fragment=common+'#define varying in\nlayout(location=0)out vec4 iwFragColor;\n#define gl_FragColor iwFragColor\n'+expand(THREE.ShaderChunk.common)+'\n'+expand(THREE.ShaderChunk.tonemapping_pars_fragment)+'\n'+expand(THREE.ShaderChunk.colorspace_pars_fragment)+'\nvec3 toneMapping(vec3 color){return NeutralToneMapping(color);}\nvec4 linearToOutputTexel(vec4 color){return sRGBTransferOETF(color);}\n'+expand(material.fragmentShader);
+  let fragment=common+'#define varying in\nlayout(location=0)out vec4 iwFragColor;\n#define gl_FragColor iwFragColor\n'+expand(THREE.ShaderChunk.common)+'\n'+expand(THREE.ShaderChunk.tonemapping_pars_fragment)+'\n'+expand(THREE.ShaderChunk.colorspace_pars_fragment)+'\nvec3 toneMapping(vec3 color){return NeutralToneMapping(color);}\nvec4 linearToOutputTexel(vec4 color){return sRGBTransferOETF(color);}\n'+expand(material.fragmentShader);
+  if(options.linearOutput)fragment=fragment.replace('return sRGBTransferOETF(color);','return LinearTransferOETF(color);');
   return {vertex,fragment,uniforms:Object.fromEntries(Object.entries(material.uniforms).map(([key,u])=>[key,plain(u.value)])),sourceKey:material.customProgramCacheKey(),
     renderState:{transparent:material.transparent,opacity:material.opacity,depthWrite:material.depthWrite,depthTest:material.depthTest,depthFunc:material.depthFunc,side:material.side,blending:material.blending,premultipliedAlpha:material.premultipliedAlpha},
     skinned:false,lighting:{},digest:createHash('sha256').update(vertex).update(fragment).digest('hex')};
 }
 
-export async function exportCharacterShaders(output,check=false) {
+export async function exportCharacterShaders(output,check=false,options={}) {
   await mkdir(output, { recursive: true });
   async function artifact(name,content){const path=resolve(output,name);if(check){if(await readFile(path,'utf8')!==content)throw new Error(`Stale source character shader: ${name}`);}else await writeFile(path,content);}
   const character = new Character({ name: 'pose-oracle', style: { hair: 0, skin: 0, outfit: 0, eyes: 0 } });
@@ -128,7 +139,7 @@ export async function exportCharacterShaders(output,check=false) {
       const variants = [{ key, skinned }];
       if (key === 'dark' || key === 'eye') variants.push({ key: `${key}_plain`, skinned: false });
       for (const variant of variants) {
-        const data = buildCharacterShader(material, { skinned: variant.skinned });
+        const data = buildCharacterShader(material, { ...options,skinned: variant.skinned });
         await artifact(`${variant.key}.vert`, data.vertex);
         await artifact(`${variant.key}.frag`, data.fragment);
         entries.push({ key: variant.key, ...data, vertex: `${variant.key}.vert`, fragment: `${variant.key}.frag` });

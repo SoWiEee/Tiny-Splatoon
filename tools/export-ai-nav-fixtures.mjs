@@ -92,7 +92,7 @@ lines.push('}};', '} // namespace restoration::ai_fixtures', '');
 if (rayReport) process.exit(0);
 const file = resolve(root, 'tests/ai_nav_fixtures.hpp');
 const output = lines.join('\n');
-const directionFile = resolve(root, 'restoration/NavDirections.hpp');
+const directionFile = resolve(root, 'src/game/NavDirections.hpp');
 const directionOutput = [
   '#pragma once',
   '// Generated from the source Math.cos/sin radial samples in src/game/nav.js.',

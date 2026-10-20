@@ -1,5 +1,5 @@
-#include "../restoration/PlayerSimulation.hpp"
-#include "../restoration/FacePaint.hpp"
+#include "../src/game/PlayerSimulation.hpp"
+#include "../src/world/FacePaint.hpp"
 #include "player_fixtures.hpp"
 
 #include <cmath>

@@ -1,0 +1,13 @@
+# Boss pose source contract
+
+`tools/export-boss-pose-fixtures.mjs` executes the real locked `BossModel.update` and `BossAnimator` in Node. It exports 16 scenarios, 3,925 updates and 280 complete snapshots into `tests/boss_pose_fixtures.json`. The exporter also checks source hashes; `--check` must reproduce the committed file exactly. It does not substitute native animation output as an expected value.
+
+The scenarios cover idle, measured root translation and turning, aim, intro, roar, phase changes, hurt/weak flash, stun/recovery, death, and all six moves through telegraph/action/recovery. Each sample contains all 100 skin matrices, ten world-space hit spheres including radius/weak/active flags, and every numeric material uniform. The headless source uses its documented no-canvas stencil path; this test does not certify stencil texture rendering or terrain queries.
+
+`src/game/BossPoseInput.hpp` carries the source animation state independently of OpenGL and match ownership. Gameplay maps its current state to that input. Pose calculation and hit-shape publication belong between the fixed-step boss update and combat queries; rendering a different number of frames must not change hit shapes or HP.
+
+`tests/boss_pose_eval.cpp` advances the native pose through the identical input stream. `tests/boss_pose_oracle.test.mjs` compares all sampled skin-matrix elements, hit-shape fields and material uniform components with an absolute 0.001 threshold. Its optional third argument writes per-scenario failure counts, maximum error and first difference to a JSON report. Missing output fields fail the comparison. Asset triangle/bone counts and an ability to draw the mesh do not satisfy this contract.
+
+At this checkpoint the native adapter publishes the exported 100-bone rest rig and the ten source socket definitions through `BossPoseInput`, and updates those CPU results from the fixed-step simulation sink. It does not yet port source animation: all skin matrices remain in rest pose, source hit sockets do not follow animated bones, and the material-uniform snapshot is empty. Float32 clip blending, springs, planted-foot gait, leg/claw IK and secondary-chain simulation remain unimplemented. The strict native oracle is deliberately not registered as passing; MODE-B06 remains unaccepted.
+
+The strict native oracle was run at its original 0.001 threshold: **0 of 16 scenarios passed** across 3,925 updates and 280 snapshots. The committed report is [boss-pose-checkpoint-report.json](boss-pose-checkpoint-report.json). This is a known failed acceptance check, separate from the registered lifecycle/model/nav regression tests.

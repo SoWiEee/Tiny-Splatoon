@@ -1,5 +1,5 @@
-#include "../restoration/CharacterArt.hpp"
-#include "../restoration/ArsenalData.hpp"
+#include "../src/render/CharacterArt.hpp"
+#include "../src/game/ArsenalData.hpp"
 #include "character_render_fixtures.hpp"
 #include "character_tank_fixtures.hpp"
 #include <glad/glad.h>
@@ -77,6 +77,25 @@ int main(int argc,char** argv){
             float up[3],height;glGetUniformfv(program,upLocation,up);glGetUniformfv(program,heightLocation,&height);
             for(int axis=0;axis<3;++axis)if(!std::isfinite(up[axis])||std::abs(up[axis]-expected.up[axis])>2e-5)throw std::runtime_error("Tank world-up differs from source onBeforeRender");
             if(!std::isfinite(height)||std::abs(height-expected.sy)>2e-5)throw std::runtime_error("Tank surface height differs from source onBeforeRender");
+        }
+        for(const auto& [name,fade]:{std::pair{"lod-start.png",1e-4},
+                                     std::pair{"lod-middle.png",0.5},
+                                     std::pair{"lod-end.png",0.9999}}){
+            glViewport(0,0,256,300);glEnable(GL_SCISSOR_TEST);glScissor(0,0,256,300);
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glDisable(GL_SCISSOR_TEST);
+            const auto frame=test::RenderFixture("preset/rookie");
+            const auto style=CharacterPresets.front().style;
+            art.draw(frame,style,"shooter","bomb","hero",view,projection,eye,light,{fade,1.0,true});
+            art.draw(frame,style,"shooter","bomb","game",view,projection,eye,light,{fade,-1.0,false});
+            if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Character LOD dither draw failed");
+            std::vector<unsigned char> pixels(256*300*3);glPixelStorei(GL_PACK_ALIGNMENT,1);
+            glReadPixels(0,0,256,300,GL_RGB,GL_UNSIGNED_BYTE,pixels.data());
+            int covered=0;for(std::size_t p=0;p<pixels.size();p+=3)
+                if(std::abs(int(pixels[p])-31)>3||std::abs(int(pixels[p+1])-38)>3||std::abs(int(pixels[p+2])-46)>3)++covered;
+            if(covered<200)throw std::runtime_error("Character LOD transition dropped the body");
+            stbi_flip_vertically_on_write(1);
+            if(!stbi_write_png((captures/name).string().c_str(),256,300,3,pixels.data(),256*3))
+                throw std::runtime_error("Cannot save character LOD capture");
         }
         std::cout<<"12 main, 15 sub and 10 preset source models drawn; "<<totalDraws<<" draws on "<<glGetString(GL_RENDERER)<<" / "<<glGetString(GL_VERSION)<<'\n';
         glDeleteRenderbuffers(1,&depth);glDeleteTextures(1,&color);glDeleteFramebuffers(1,&fbo);

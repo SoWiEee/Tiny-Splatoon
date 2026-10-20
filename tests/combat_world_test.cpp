@@ -1,5 +1,5 @@
-#include "../restoration/PlayerSimulation.hpp"
-#include "../restoration/ArsenalData.hpp"
+#include "../src/game/PlayerSimulation.hpp"
+#include "../src/game/ArsenalData.hpp"
 #include "world_specials_source_fixtures.hpp"
 #include <cmath>
 #include <iostream>

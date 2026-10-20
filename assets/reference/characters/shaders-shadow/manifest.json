@@ -1,0 +1,8453 @@
+{
+  "version": 1,
+  "generator": "source material.onBeforeCompile + source ShaderChunk expansion",
+  "entries": [
+    {
+      "key": "skin",
+      "vertex": "skin.vert",
+      "fragment": "skin.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          0.6938717612856897,
+          0.5394794890033748
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.6,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 0.01,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.5,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          1,
+          0.6444796819634361,
+          0.5271151256969157
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.85,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 0.32,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uHurt": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uHurtSeed": 138.38,
+        "uFlash": [
+          0,
+          0,
+          0
+        ],
+        "uMouth": [
+          0.75,
+          1,
+          0,
+          0
+        ],
+        "uTeam": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "uFreckle": 0,
+        "uLid": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uMouth2": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uSkinLum": 0.7687270829489281,
+        "uSSSW": [
+          0.46,
+          0.22,
+          0.15
+        ],
+        "uSSSTint": [
+          1,
+          0.38,
+          0.26
+        ],
+        "uEyeC": [
+          [
+            0.05486992999558099,
+            1.2382718731055273,
+            0.12844966036537908
+          ],
+          [
+            -0.05486992999558099,
+            1.2382718731055273,
+            0.12844966036537908
+          ]
+        ],
+        "uEyeM": [
+          [
+            0.05070885701449442,
+            0.005191337665635063,
+            -0.01027919420601236,
+            -0.00591952539793897,
+            0.06019775199932055,
+            0.0011999472036106973,
+            0.006953426577827143,
+            0,
+            0.03430233022444346
+          ],
+          [
+            -0.05070885701449442,
+            0.005191337665635063,
+            -0.01027919420601236,
+            0.00591952539793897,
+            0.06019775199932055,
+            0.0011999472036106973,
+            -0.006953426577827143,
+            0,
+            0.03430233022444346
+          ]
+        ],
+        "uEyeMi": [
+          [
+            18.753275523111842,
+            -1.6172461984670363,
+            5.676266594144604,
+            1.9198733970543873,
+            16.446349839306208,
+            -6.154085530864046e-17,
+            -3.8014771471939195,
+            0.3278320343175185,
+            28.001902224035465
+          ],
+          [
+            -18.753275523111842,
+            1.6172461984670363,
+            -5.676266594144604,
+            1.9198733970543873,
+            16.446349839306208,
+            -6.154085530864046e-17,
+            -3.8014771471939195,
+            0.3278320343175185,
+            28.001902224035465
+          ]
+        ],
+        "uEyeAp": [
+          0.5,
+          0.6,
+          0.57,
+          0
+        ],
+        "uEyeLid": [
+          0.22,
+          0.035,
+          1.075,
+          1.05
+        ],
+        "uMouthC": [
+          0,
+          1.1429364566231268,
+          0.1648162273257634
+        ],
+        "uMouthU": [
+          -0.012824610486148339,
+          0.8850796119429959,
+          0.46526294704039595
+        ],
+        "uMouthF": [
+          -0.024387266832294554,
+          -0.46543966367600825,
+          0.8847435677605207
+        ],
+        "uMouthHW": 0.01842529434371356,
+        "uIwRim": [
+          0,
+          0,
+          0,
+          3
+        ],
+        "uIwRimL": [
+          0,
+          0,
+          1
+        ],
+        "uIwFill": [
+          0,
+          0,
+          0
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-skin4|iwRim",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": true,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "9bd61530db32513f128a900129736e6ea9dc70744737d50152d47c736792ba0f"
+    },
+    {
+      "key": "cloth",
+      "vertex": "cloth.vert",
+      "fragment": "cloth.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.82,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.3,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          1,
+          1,
+          1
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.6,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uHurt": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uHurtSeed": 138.38,
+        "uFlash": [
+          0,
+          0,
+          0
+        ],
+        "uTeam": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "uShirt": [
+          0.9046611743890203,
+          0.8879231178794775,
+          0.8387990117372213
+        ],
+        "uShorts": [
+          0.02028856305209031,
+          0.02955683443236377,
+          0.06847816983662762
+        ],
+        "uShoe": [
+          0.02028856305209031,
+          0.024157632443547246,
+          0.0343398068028541
+        ],
+        "uSole": [
+          0.9046611743890203,
+          0.8879231178794775,
+          0.8387990117372213
+        ],
+        "uSock": [
+          0.9301108583738498,
+          0.9301108583738498,
+          0.9046611743890203
+        ],
+        "uStrap": [
+          0.02955683443236377,
+          0.0343398068028541,
+          0.04666508633021928
+        ],
+        "uPattern": 0,
+        "uIwRim": [
+          0,
+          0,
+          0,
+          3
+        ],
+        "uIwRimL": [
+          0,
+          0,
+          1
+        ],
+        "uIwFill": [
+          0,
+          0,
+          0
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-cloth4|iwRim",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": true,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "ccc53614e48887035dcdc6ddcf7da50ff0a89f0a8a539fdac073e0c30aa0b331"
+    },
+    {
+      "key": "hair",
+      "vertex": "hair.vert",
+      "fragment": "hair.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.34,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.05,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          1,
+          1,
+          1
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.4,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uHurt": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uHurtSeed": 138.38,
+        "uFlash": [
+          0,
+          0,
+          0
+        ],
+        "uTeam": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "uGlow": [
+          0,
+          0,
+          0
+        ],
+        "uShirt": [
+          0.9046611743890203,
+          0.8879231178794775,
+          0.8387990117372213
+        ],
+        "uShorts": [
+          0.02028856305209031,
+          0.02955683443236377,
+          0.06847816983662762
+        ],
+        "uStrap": [
+          0.02955683443236377,
+          0.0343398068028541,
+          0.04666508633021928
+        ],
+        "uIwRim": [
+          0,
+          0,
+          0,
+          3
+        ],
+        "uIwRimL": [
+          0,
+          0,
+          1
+        ],
+        "uIwFill": [
+          0,
+          0,
+          0
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-hair4|iwRim",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": true,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "f7e9894034c8dec93decc00387089a9617066f976a1357d9258200c10f68a6fd"
+    },
+    {
+      "key": "dark",
+      "vertex": "dark.vert",
+      "fragment": "dark.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.25,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.03,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0,
+          0,
+          0
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 1,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": true,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "31a523d26253a6d1aa95ad33b06de182206086ae5754439b8b80646326529340"
+    },
+    {
+      "key": "dark_plain",
+      "vertex": "dark_plain.vert",
+      "fragment": "dark_plain.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.25,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.03,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0,
+          0,
+          0
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 1,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "b70ce27dc6b275ee3dd477ae60e912b9c92d5ced5da7ea4874ea82aacecccad9"
+    },
+    {
+      "key": "eye",
+      "vertex": "eye.vert",
+      "fragment": "eye.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.14,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.03,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0,
+          0,
+          0
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 1,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 0.5,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uLook": [
+          0,
+          0
+        ],
+        "uIris": [
+          1,
+          0.623960391667596,
+          0.04231141061442144
+        ],
+        "uIris2": [
+          1,
+          0.19461783043107173,
+          0
+        ],
+        "uFlash": [
+          0,
+          0,
+          0
+        ],
+        "uGaze": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uLid": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uPupil": 0.5,
+        "uEyeRest": -0.06,
+        "uIrisR": 0.37,
+        "uEyeC": [
+          [
+            0.05486992999558099,
+            1.2382718731055273,
+            0.12844966036537908
+          ],
+          [
+            -0.05486992999558099,
+            1.2382718731055273,
+            0.12844966036537908
+          ]
+        ],
+        "uEyeM": [
+          [
+            0.05070885701449442,
+            0.005191337665635063,
+            -0.01027919420601236,
+            -0.00591952539793897,
+            0.06019775199932055,
+            0.0011999472036106973,
+            0.006953426577827143,
+            0,
+            0.03430233022444346
+          ],
+          [
+            -0.05070885701449442,
+            0.005191337665635063,
+            -0.01027919420601236,
+            0.00591952539793897,
+            0.06019775199932055,
+            0.0011999472036106973,
+            -0.006953426577827143,
+            0,
+            0.03430233022444346
+          ]
+        ],
+        "uEyeMi": [
+          [
+            18.753275523111842,
+            -1.6172461984670363,
+            5.676266594144604,
+            1.9198733970543873,
+            16.446349839306208,
+            -6.154085530864046e-17,
+            -3.8014771471939195,
+            0.3278320343175185,
+            28.001902224035465
+          ],
+          [
+            -18.753275523111842,
+            1.6172461984670363,
+            -5.676266594144604,
+            1.9198733970543873,
+            16.446349839306208,
+            -6.154085530864046e-17,
+            -3.8014771471939195,
+            0.3278320343175185,
+            28.001902224035465
+          ]
+        ],
+        "uEyeAp": [
+          0.5,
+          0.6,
+          0.57,
+          0
+        ],
+        "uEyeLid": [
+          0.22,
+          0.035,
+          1.075,
+          1.05
+        ],
+        "uMouthC": [
+          0,
+          1.1429364566231268,
+          0.1648162273257634
+        ],
+        "uMouthU": [
+          -0.012824610486148339,
+          0.8850796119429959,
+          0.46526294704039595
+        ],
+        "uMouthF": [
+          -0.024387266832294554,
+          -0.46543966367600825,
+          0.8847435677605207
+        ],
+        "uMouthHW": 0.01842529434371356,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-eye4",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": true,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "52ef27d17f3b70eefe3210df73f0e53d644918621dfb34b66558afc07a4b9635"
+    },
+    {
+      "key": "eye_plain",
+      "vertex": "eye_plain.vert",
+      "fragment": "eye_plain.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.14,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.03,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0,
+          0,
+          0
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 1,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 0.5,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uLook": [
+          0,
+          0
+        ],
+        "uIris": [
+          1,
+          0.623960391667596,
+          0.04231141061442144
+        ],
+        "uIris2": [
+          1,
+          0.19461783043107173,
+          0
+        ],
+        "uFlash": [
+          0,
+          0,
+          0
+        ],
+        "uGaze": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uLid": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "uPupil": 0.5,
+        "uEyeRest": -0.06,
+        "uIrisR": 0.37,
+        "uEyeC": [
+          [
+            0.05486992999558099,
+            1.2382718731055273,
+            0.12844966036537908
+          ],
+          [
+            -0.05486992999558099,
+            1.2382718731055273,
+            0.12844966036537908
+          ]
+        ],
+        "uEyeM": [
+          [
+            0.05070885701449442,
+            0.005191337665635063,
+            -0.01027919420601236,
+            -0.00591952539793897,
+            0.06019775199932055,
+            0.0011999472036106973,
+            0.006953426577827143,
+            0,
+            0.03430233022444346
+          ],
+          [
+            -0.05070885701449442,
+            0.005191337665635063,
+            -0.01027919420601236,
+            0.00591952539793897,
+            0.06019775199932055,
+            0.0011999472036106973,
+            -0.006953426577827143,
+            0,
+            0.03430233022444346
+          ]
+        ],
+        "uEyeMi": [
+          [
+            18.753275523111842,
+            -1.6172461984670363,
+            5.676266594144604,
+            1.9198733970543873,
+            16.446349839306208,
+            -6.154085530864046e-17,
+            -3.8014771471939195,
+            0.3278320343175185,
+            28.001902224035465
+          ],
+          [
+            -18.753275523111842,
+            1.6172461984670363,
+            -5.676266594144604,
+            1.9198733970543873,
+            16.446349839306208,
+            -6.154085530864046e-17,
+            -3.8014771471939195,
+            0.3278320343175185,
+            28.001902224035465
+          ]
+        ],
+        "uEyeAp": [
+          0.5,
+          0.6,
+          0.57,
+          0
+        ],
+        "uEyeLid": [
+          0.22,
+          0.035,
+          1.075,
+          1.05
+        ],
+        "uMouthC": [
+          0,
+          1.1429364566231268,
+          0.1648162273257634
+        ],
+        "uMouthU": [
+          -0.012824610486148339,
+          0.8850796119429959,
+          0.46526294704039595
+        ],
+        "uMouthF": [
+          -0.024387266832294554,
+          -0.46543966367600825,
+          0.8847435677605207
+        ],
+        "uMouthHW": 0.01842529434371356,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-eye4",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "89bdb5ee4da6f057c6489688ae2537af0fc3629d0a7761e4777d63a1cf298c25"
+    },
+    {
+      "key": "fill",
+      "vertex": "fill.vert",
+      "fragment": "fill.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.16,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.05,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0,
+          0,
+          0
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 1,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uUpL": [
+          0,
+          1,
+          0
+        ],
+        "uSY": 0.1,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-fill3",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "8d8b41530567c845a7a0d7157c8aae160a15c5ea2053c639c34c4ec935613d0e"
+    },
+    {
+      "key": "squid",
+      "vertex": "squid.vert",
+      "fragment": "squid.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.3,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.05,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          1,
+          1,
+          1
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.4,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uFlash": [
+          0,
+          0,
+          0
+        ],
+        "uTeam": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "uGlow": [
+          0,
+          0,
+          0
+        ],
+        "uTime": 0,
+        "uWig": [
+          0.012,
+          9,
+          0
+        ],
+        "uOpacity": 1,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-squid4",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "afd2d7e226291563c0f277b09c4452ada2a4425e49f1bd33d18e49da53495d82"
+    },
+    {
+      "key": "squidGhost",
+      "vertex": "squidGhost.vert",
+      "fragment": "squidGhost.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 0.42,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.3,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.05,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          1,
+          1,
+          1
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.4,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uFlash": [
+          0,
+          0,
+          0
+        ],
+        "uTeam": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "uGlow": [
+          0,
+          0,
+          0
+        ],
+        "uTime": 0,
+        "uWig": [
+          0.012,
+          9,
+          0
+        ],
+        "uOpacity": 1,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-squid-ghost5",
+      "renderState": {
+        "transparent": true,
+        "opacity": 0.42,
+        "depthWrite": false,
+        "depthTest": true,
+        "depthFunc": 6,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "93cbdec02cad6c9c053c103ab2f818843eaad44c52f224bf62c88337e860431c"
+    },
+    {
+      "key": "glow",
+      "vertex": "glow.vert",
+      "fragment": "glow.frag",
+      "uniforms": {
+        "diffuse": [
+          0.3,
+          0.07624562829600888,
+          0.002098623055379518
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0.4,
+          0.10166083772801185,
+          0.0027981640738393575
+        ],
+        "roughness": 0.3,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "8ae9e6457af4061822eb1590485f874e7a137c1daf65bd75613c1c440b83ab67"
+    },
+    {
+      "key": "glass",
+      "vertex": "glass.vert",
+      "fragment": "glass.frag",
+      "uniforms": {
+        "diffuse": [
+          0.8879231178794775,
+          0.9646862478936612,
+          1
+        ],
+        "opacity": 0.14,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.04,
+        "metalness": 0,
+        "envMapIntensity": 1.5,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.02,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0,
+          0,
+          0
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 1,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-glass3",
+      "renderState": {
+        "transparent": true,
+        "opacity": 0.14,
+        "depthWrite": false,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "f5bcd205d5dac4e68a35622f573a53bb20ec399b604f22bac9e23016a3981e9d"
+    },
+    {
+      "key": "plastic",
+      "vertex": "plastic.vert",
+      "fragment": "plastic.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.4,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.1,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0,
+          0,
+          0
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 1,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-plastic3",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "d738ea86b2e2c52ffefbde0d55d03e99c0d6198400bed0e1ea010498450580ce"
+    },
+    {
+      "key": "ink",
+      "vertex": "ink.vert",
+      "fragment": "ink.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.16,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 1,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.04,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0.4,
+          0.2508304188640059,
+          0.2013990820369197
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.3,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "25c36a05c9101f2673cab868b075c1fbb200ab5329323930fb2c74aee3425ebf"
+    },
+    {
+      "key": "coil",
+      "vertex": "coil.vert",
+      "fragment": "coil.frag",
+      "uniforms": {
+        "diffuse": [
+          0.010960094003125918,
+          0.011612245176281512,
+          0.015996293361446288
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          1,
+          1,
+          1
+        ],
+        "roughness": 0.3,
+        "metalness": 0.25,
+        "envMapIntensity": 1,
+        "uCharge": 0,
+        "uFull": 0,
+        "uFlash": 0,
+        "uTime": 0,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-coil-1",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "17b72e1ec698457de51aac8e61a99c0b8e4678419353156abd35ccc643c4466f"
+    },
+    {
+      "key": "lamp",
+      "vertex": "lamp.vert",
+      "fragment": "lamp.frag",
+      "uniforms": {
+        "diffuse": [
+          0.015996293361446288,
+          0.015996293361446288,
+          0.015996293361446288
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          1,
+          1,
+          1
+        ],
+        "roughness": 0.25,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "8ae9e6457af4061822eb1590485f874e7a137c1daf65bd75613c1c440b83ab67"
+    },
+    {
+      "key": "brollyInk",
+      "vertex": "brollyInk.vert",
+      "fragment": "brollyInk.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.32,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 0.7,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.12,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0.5,
+          0.3135380235800074,
+          0.2517488525461496
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.45,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "3a5750577a369b4726960b70d0c1b69f98cdad7e790e1637d54008bdbe18e9e0"
+    },
+    {
+      "key": "brollyCream",
+      "vertex": "brollyCream.vert",
+      "fragment": "brollyCream.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 0.25,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.12,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.45,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "3a5750577a369b4726960b70d0c1b69f98cdad7e790e1637d54008bdbe18e9e0"
+    },
+    {
+      "key": "brollyInk_local",
+      "vertex": "brollyInk_local.vert",
+      "fragment": "brollyInk_local.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.32,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 0.7,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.12,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0.5,
+          0.3135380235800074,
+          0.2517488525461496
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.45,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": true,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "ae9ec6e4302705b7b3c0ec93e4be7068d70feedcbfb4d1d8bfa45f6d46aa5f24"
+    },
+    {
+      "key": "brollyCream_local",
+      "vertex": "brollyCream_local.vert",
+      "fragment": "brollyCream_local.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          1,
+          1
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 0.25,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.12,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.45,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": true,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "ae9ec6e4302705b7b3c0ec93e4be7068d70feedcbfb4d1d8bfa45f6d46aa5f24"
+    },
+    {
+      "key": "bladeEdge",
+      "vertex": "bladeEdge.vert",
+      "fragment": "bladeEdge.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "roughness": 0.16,
+        "metalness": 0.05,
+        "envMapIntensity": 1,
+        "uCharge": 0,
+        "uFull": 0,
+        "uFlash": 0,
+        "uTime": 0,
+        "uIdle": 0.22,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-blade-edge-1",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "f7527b645f3d99f5992c0a42a6ed0ce45b9a9ce6f92249dcc7a93b298b3e4122"
+    },
+    {
+      "key": "bladeAura",
+      "vertex": "bladeAura.vert",
+      "fragment": "bladeAura.frag",
+      "uniforms": {
+        "uColor": [
+          1,
+          1,
+          1
+        ],
+        "uCharge": 0,
+        "uFull": 0,
+        "uFlash": 0,
+        "uTime": 0
+      },
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "renderState": {
+        "transparent": true,
+        "opacity": 1,
+        "depthWrite": false,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 2,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {},
+      "digest": "68700c22a4e2e2436f81cb6b56efe0abd7e11cb1f9cfe7ce909a324a2c22a19a"
+    },
+    {
+      "key": "sponge",
+      "vertex": "sponge.vert",
+      "fragment": "sponge.frag",
+      "uniforms": {
+        "diffuse": [
+          1,
+          0.2541520943200296,
+          0.0069954101845983935
+        ],
+        "opacity": 1,
+        "mapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "alphaTest": 0,
+        "envMapRotation": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "reflectivity": 1,
+        "ior": 1.5,
+        "refractionRatio": 0.98,
+        "aoMapIntensity": 1,
+        "aoMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "lightMapIntensity": 1,
+        "lightMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "emissiveMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "bumpScale": 1,
+        "normalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "normalScale": [
+          1,
+          1
+        ],
+        "displacementMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "displacementScale": 1,
+        "displacementBias": 0,
+        "roughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "metalnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "fogDensity": 0.00025,
+        "fogNear": 1,
+        "fogFar": 2000,
+        "fogColor": [
+          1,
+          1,
+          1
+        ],
+        "ambientLightColor": [],
+        "lightProbe": [],
+        "sunLights": [],
+        "sunLightShadows": [],
+        "sunShadowMatrix": [],
+        "sunShadowCascade": [],
+        "directionalLights": [],
+        "directionalLightShadows": [],
+        "directionalShadowMatrix": [],
+        "spotLights": [],
+        "spotLightShadows": [],
+        "spotLightMap": [],
+        "spotLightMatrix": [],
+        "pointLights": [],
+        "pointLightShadows": [],
+        "pointShadowMatrix": [],
+        "hemisphereLights": [],
+        "rectAreaLights": [],
+        "probesMin": [
+          0,
+          0,
+          0
+        ],
+        "probesMax": [
+          0,
+          0,
+          0
+        ],
+        "probesResolution": [
+          0,
+          0,
+          0
+        ],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "roughness": 0.34,
+        "metalness": 0,
+        "envMapIntensity": 1,
+        "clearcoat": 0.7,
+        "clearcoatMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "clearcoatNormalScale": [
+          1,
+          1
+        ],
+        "clearcoatRoughness": 0.18,
+        "clearcoatRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "dispersion": 0,
+        "retroreflectivity": 0,
+        "iridescence": 0,
+        "iridescenceMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "iridescenceIOR": 1.3,
+        "iridescenceThicknessMinimum": 100,
+        "iridescenceThicknessMaximum": 400,
+        "iridescenceThicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheen": 0,
+        "sheenColor": [
+          0.5,
+          0.3135380235800074,
+          0.2517488525461496
+        ],
+        "sheenColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "sheenRoughness": 0.45,
+        "sheenRoughnessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmission": 0,
+        "transmissionMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "transmissionSamplerSize": [
+          0,
+          0
+        ],
+        "thickness": 0,
+        "thicknessMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "attenuationDistance": 0,
+        "attenuationColor": [
+          0,
+          0,
+          0
+        ],
+        "specularColor": [
+          1,
+          1,
+          1
+        ],
+        "specularColorMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "specularIntensity": 1,
+        "specularIntensityMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "anisotropyVector": [
+          0,
+          0
+        ],
+        "anisotropyMapTransform": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        "uGlow": 0,
+        "uSoak": 1,
+        "toneMappingExposure": 1
+      },
+      "sourceKey": "iw-sponge-1",
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false
+      },
+      "skinned": false,
+      "lighting": {
+        "NUM_DIR_LIGHTS": 1,
+        "NUM_HEMI_LIGHTS": 1,
+        "NUM_DIR_LIGHT_SHADOWS": 1
+      },
+      "digest": "3d8f8be0ee83ddcd9af5c3c14813404759f7721819e7e414957d7f1a90515dd1"
+    }
+  ]
+}

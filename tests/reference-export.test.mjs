@@ -35,7 +35,7 @@ test('reference export matches locked source and generated artifacts', () => {
   assert.equal(content.config.SPECIAL_ORDER.length, 19);
   assert.match(content.config.weaponRange.$function, /weaponRange/);
   assert.match(content.config.PROGRESSION.xpForLevel.$function, /800 \+ lvl \* 350/);
-  const cpp = readFileSync(resolve(root, 'restoration/ReferenceData.cpp'), 'utf8');
+  const cpp = readFileSync(resolve(root, 'src/world/ReferenceData.cpp'), 'utf8');
   assert.equal((cpp.match(/static const BlockData stage\d+Blocks\[\]/g) || []).length, content.stages.length);
   assert.equal((cpp.match(/static const FaceData stage\d+Faces\[\]/g) || []).length, content.stages.length);
   assert.match(cpp, /std::vector<BlockData>\(std::begin\(stage0Blocks\), std::end\(stage0Blocks\)\)/);

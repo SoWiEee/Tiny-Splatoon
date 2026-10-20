@@ -1,0 +1,31 @@
+#pragma once
+
+#include <array>
+#include <filesystem>
+#include <memory>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+
+namespace restoration {
+class BossSimulation;
+class StageGeometry;
+class BossModelData;
+
+// Renders the source-built HULLBREAKER mesh and its telegraphed attack geometry.
+class BossRenderer {
+public:
+    explicit BossRenderer(std::filesystem::path assets="assets/reference/boss");
+    ~BossRenderer();
+    BossRenderer(const BossRenderer&)=delete;
+    BossRenderer& operator=(const BossRenderer&)=delete;
+    void Update(BossSimulation& boss);
+    int DrawShadow(const BossSimulation& boss,const glm::mat4& lightViewProjection);
+    int Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,
+             const glm::vec3& camera,const glm::vec3& squadColor);
+    int DrawHazards(const BossSimulation& boss,const StageGeometry& geometry,
+                    const glm::mat4& viewProjection,const glm::vec3& squadColor);
+private:
+    struct State;
+    std::unique_ptr<State> state_;
+};
+} // namespace restoration

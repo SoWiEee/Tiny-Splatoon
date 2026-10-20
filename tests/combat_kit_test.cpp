@@ -1,4 +1,4 @@
-#include "../restoration/PlayerSimulation.hpp"
+#include "../src/game/PlayerSimulation.hpp"
 #include "combat_kit_fixtures.hpp"
 #include <algorithm>
 #include <cmath>

@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "source": {
+    "bossModelGeo.js": "f2a8f0ded37a8239f7242ca0a76a747b5d6a9ca444a4d03c25a39de9cba44c4c",
+    "bossModel.js": "2b6da652e8aaac4ac55b4e061a0392301fb829b3db6c13521e1d15eec1c3c0db"
+  },
+  "binary": "d7216ffdfa717f0c432ddafce5a2a2bba063a962c27220bfe47a36c2ce021b9b",
+  "poseRig": "8247a0f186f4fc491f50f1857883433f5d6593e25ccc0fa2a5c0465fb02ecffc",
+  "models": [
+    {
+      "name": "hullbreaker",
+      "bones": [
+        "base",
+        "body",
+        "shell",
+        "abdomen",
+        "hatchA",
+        "hatchB",
+        "hatchC",
+        "doorR",
+        "tearL",
+        "tearR",
+        "head",
+        "belly0",
+        "belly1",
+        "stalkL0",
+        "stalkL1",
+        "eyeL",
+        "antL0",
+        "antL1",
+        "antL2",
+        "antL3",
+        "mandL",
+        "stalkR0",
+        "stalkR1",
+        "eyeR",
+        "antR0",
+        "antR1",
+        "antR2",
+        "antR3",
+        "mandR",
+        "siphon",
+        "nozzle",
+        "armL0",
+        "armL1",
+        "clawL",
+        "dactL",
+        "armR0",
+        "armR1",
+        "clawR",
+        "dactR",
+        "leg0c",
+        "leg0m",
+        "leg0t",
+        "leg0d",
+        "leg1c",
+        "leg1m",
+        "leg1t",
+        "leg1d",
+        "leg2c",
+        "leg2m",
+        "leg2t",
+        "leg2d",
+        "leg3c",
+        "leg3m",
+        "leg3t",
+        "leg3d",
+        "leg4c",
+        "leg4m",
+        "leg4t",
+        "leg4d",
+        "leg5c",
+        "leg5m",
+        "leg5t",
+        "leg5d",
+        "tyre0",
+        "tyre1",
+        "buoy0",
+        "buoy1",
+        "buoy2",
+        "anch0",
+        "anch1",
+        "anch2",
+        "anch3",
+        "chnL0",
+        "chnL1",
+        "chnL2",
+        "chnL3",
+        "chnR0",
+        "chnR1",
+        "chnR2",
+        "kelp00",
+        "kelp01",
+        "kelp02",
+        "kelp10",
+        "kelp11",
+        "kelp12",
+        "kelp20",
+        "kelp21",
+        "kelp22",
+        "kelp30",
+        "kelp31",
+        "kelp32",
+        "kelp40",
+        "kelp41",
+        "kelp42",
+        "kelp50",
+        "kelp51",
+        "kelp52",
+        "flag0",
+        "flag1",
+        "flag2"
+      ],
+      "meshes": [
+        {
+          "name": "steel",
+          "vertices": 24082,
+          "triangles": 25326
+        },
+        {
+          "name": "cara",
+          "vertices": 12528,
+          "triangles": 18540
+        },
+        {
+          "name": "flesh",
+          "vertices": 5631,
+          "triangles": 10944
+        },
+        {
+          "name": "eye",
+          "vertices": 630,
+          "triangles": 1040
+        },
+        {
+          "name": "junk",
+          "vertices": 2066,
+          "triangles": 3160
+        }
+      ],
+      "sockets": [
+        {
+          "name": "shellF",
+          "bone": 2,
+          "offset": [
+            0,
+            -0.12992787914068593,
+            1.4951985641452454
+          ],
+          "radius": 1.8,
+          "weak": false,
+          "active": true
+        },
+        {
+          "name": "shellR",
+          "bone": 2,
+          "offset": [
+            0,
+            0.2848347848832118,
+            -1.5268821648446005
+          ],
+          "radius": 1.8,
+          "weak": false,
+          "active": true
+        },
+        {
+          "name": "body",
+          "bone": 10,
+          "offset": [
+            0,
+            -0.04999999999999982,
+            0.7499999999999998
+          ],
+          "radius": 1.05,
+          "weak": false,
+          "active": true
+        },
+        {
+          "name": "clawL",
+          "bone": 33,
+          "offset": [
+            0.06166993834531942,
+            -0.20556646115106547,
+            1.027832305755327
+          ],
+          "radius": 0.85,
+          "weak": false,
+          "active": true
+        },
+        {
+          "name": "clawR",
+          "bone": 37,
+          "offset": [
+            -0.02693945426539801,
+            -0.05387890853079602,
+            0.897981808846601
+          ],
+          "radius": 0.55,
+          "weak": false,
+          "active": true
+        },
+        {
+          "name": "eyeL",
+          "bone": 15,
+          "offset": [
+            0,
+            0.10000000000000009,
+            0
+          ],
+          "radius": 0.4,
+          "weak": true,
+          "active": true
+        },
+        {
+          "name": "eyeR",
+          "bone": 23,
+          "offset": [
+            0,
+            0.10000000000000009,
+            0
+          ],
+          "radius": 0.4,
+          "weak": true,
+          "active": true
+        },
+        {
+          "name": "belly",
+          "bone": 11,
+          "offset": [
+            0,
+            -0.1200000000000001,
+            0.1299999999999999
+          ],
+          "radius": 0.8,
+          "weak": true,
+          "active": false
+        },
+        {
+          "name": "crackL",
+          "bone": 3,
+          "offset": [
+            1.1199999999999999,
+            0.5998349745352236,
+            0.4550802163622667
+          ],
+          "radius": 0.7,
+          "weak": true,
+          "active": false
+        },
+        {
+          "name": "crackR",
+          "bone": 3,
+          "offset": [
+            -1.1199999999999999,
+            0.5998349745352236,
+            0.4550802163622667
+          ],
+          "radius": 0.7,
+          "weak": true,
+          "active": false
+        }
+      ]
+    },
+    {
+      "name": "crablet",
+      "bones": [
+        "base",
+        "body",
+        "lid",
+        "eyeL",
+        "eyeR",
+        "clawL",
+        "clawR",
+        "legL0",
+        "legL1",
+        "legL2",
+        "legR0",
+        "legR1",
+        "legR2"
+      ],
+      "meshes": [
+        {
+          "name": "crablet",
+          "vertices": 1304,
+          "triangles": 1840
+        }
+      ],
+      "sockets": []
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-#include "../restoration/PlayerSimulation.hpp"
+#include "../src/game/PlayerSimulation.hpp"
 #include "combat_runner_fixtures.hpp"
 #include <cmath>
 #include <exception>

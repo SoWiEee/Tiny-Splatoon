@@ -1,0 +1,106 @@
+{
+  "scenarios": 16,
+  "updates": 3925,
+  "snapshots": 280,
+  "bones": 100,
+  "tolerance": 0.001,
+  "passed": 0,
+  "results": [
+    {
+      "scenario": "idle",
+      "failures": 10346,
+      "maxError": 8.169046400456079,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "walk",
+      "failures": 13412,
+      "maxError": 9.498517415445335,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "turn",
+      "failures": 13138,
+      "maxError": 7.751481414553564,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "aim",
+      "failures": 10978,
+      "maxError": 8.169046400456079,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "intro",
+      "failures": 15838,
+      "maxError": 11.521929341993292,
+      "first": "frame 0 bone/1/13: 0 != -6.498966693878174"
+    },
+    {
+      "scenario": "roar",
+      "failures": 10936,
+      "maxError": 11.695332879317462,
+      "first": "frame 0 bone/3/0: 1 != 0.9838225082843942"
+    },
+    {
+      "scenario": "phase_change",
+      "failures": 21088,
+      "maxError": 11.938203957152762,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "hurt",
+      "failures": 10775,
+      "maxError": 8.169046400456079,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "stun_recovery",
+      "failures": 17297,
+      "maxError": 11.131738173925278,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "death",
+      "failures": 32284,
+      "maxError": 9.049320311858917,
+      "first": "frame 0 bone/3/0: 1 != 0.9838225082843942"
+    },
+    {
+      "scenario": "slam",
+      "failures": 22284,
+      "maxError": 10.13761529421766,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "barrage",
+      "failures": 16882,
+      "maxError": 10.240523194003131,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "sweep",
+      "failures": 21911,
+      "maxError": 7.751524549760455,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "charge",
+      "failures": 19300,
+      "maxError": 10.172129841679366,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "crablets",
+      "failures": 13736,
+      "maxError": 10.278343638838585,
+      "first": "frame 0 bone/3/0: 1 != 0.9834553207843942"
+    },
+    {
+      "scenario": "frenzy",
+      "failures": 29446,
+      "maxError": 12.795620380811386,
+      "first": "frame 0 bone/3/0: 1 != 0.9838225082843942"
+    }
+  ]
+}

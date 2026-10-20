@@ -1,5 +1,5 @@
-#include "../restoration/CharacterShader.hpp"
-#include "../restoration/CharacterRenderData.hpp"
+#include "../src/render/CharacterShader.hpp"
+#include "../src/render/CharacterRenderData.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <filesystem>

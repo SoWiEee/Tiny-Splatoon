@@ -1,5 +1,5 @@
-#include "../restoration/PlayerSimulation.hpp"
-#include "../restoration/ArsenalData.hpp"
+#include "../src/game/PlayerSimulation.hpp"
+#include "../src/game/ArsenalData.hpp"
 #include "controller_fixtures.hpp"
 #include "brolly_source_fixtures.hpp"
 #include "main_kit_source_fixtures.hpp"

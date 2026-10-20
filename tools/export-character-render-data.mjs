@@ -54,7 +54,7 @@ for(const skin of styles.skin){
 out+='}};\n';
 out+=`// Three.js DFG LUT (MIT), copied as half-float bits from the bundled reference renderer.\ninline constexpr std::array<std::uint16_t,512> CharacterDfg={{${dfg.join(',')}}};\n}\n`;
 out=out.replace('#include <map>','#include <map>\n#include <stdexcept>');
-const path=resolve(root,'restoration/CharacterRenderData.hpp');
+const path=resolve(root,'src/render/CharacterRenderData.hpp');
 if(check){if(await readFile(path,'utf8')!==out)throw new Error('Stale native character render data');}
 else await writeFile(path,out);
 console.log(`${check?'Verified':'Exported'} ${manifest.entries.length} native materials, 9 skin, 10 outfit, 8 iris, 10 preset palettes`);

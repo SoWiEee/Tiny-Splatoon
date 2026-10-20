@@ -1,5 +1,5 @@
-#include "../restoration/NavGraph.hpp"
-#include "../restoration/NavDirections.hpp"
+#include "../src/game/NavGraph.hpp"
+#include "../src/game/NavDirections.hpp"
 #include "ai_nav_fixtures.hpp"
 
 #include <iostream>

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 const executable = resolve(process.argv[2] ?? 'build/Tiny-Splatoon.exe');
 for (const args of [
   ['--reference-match', 'tidewater'],
+  ['--reference-boss', 'tidewater'],
   ['--reference-game', 'tidewater'],
   ['--paint-probe', '0'],
   ['--play-probe', '0'],
@@ -19,6 +20,21 @@ for (const args of [
     assert.ifError(result.error);
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.match(result.stderr, /--native cannot be combined/);
+    assert.doesNotMatch(result.stdout, /GPU /);
+  });
+}
+
+for (const [args, message] of [
+  [['--reference-boss', 'tidewater', '--duration', '120'], /Boss duration must be/],
+  [['--reference-boss', 'tidewater', '--duration', '240junk'], /Boss duration must be/],
+  [['--reference-match', 'tidewater', '--duration', '240'], /--duration requires a Boss match/],
+  [['--reference-boss', 'tidewater', '--capture', 'unused.png'], /cannot be combined/],
+]) {
+  test(`invalid Boss options fail before creating a window: ${args.join(' ')}`, () => {
+    const result = spawnSync(executable, args, { encoding: 'utf8', timeout: 10000 });
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, message);
     assert.doesNotMatch(result.stdout, /GPU /);
   });
 }
