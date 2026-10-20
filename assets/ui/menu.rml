@@ -1,0 +1,54 @@
+<rml>
+<head><title>INKWAVE</title><link type="text/rcss" href="game.rcss" /></head>
+<body id="menu" class="menu">
+  <div class="menu-shell">
+    <div class="menu-header"><div class="wordmark">INKWAVE</div><div class="muted">離線遊玩</div></div>
+    <div class="menu-layout">
+      <div class="navigation">
+        <button id="nav-play" class="nav selected">遊玩</button>
+        <button id="nav-loadout" class="nav">裝備</button>
+        <button id="nav-settings" class="nav">設定</button>
+        <button id="nav-controls" class="nav">操作說明</button>
+        <div class="nav-space"></div><button id="close" class="nav exit">離開遊戲</button>
+      </div>
+      <div class="content">
+        <div id="panel-play" class="panel">
+          <h1>開始對戰</h1><p class="intro">選擇模式與場地，準備出發。</p>
+          <div class="mode-row"><button id="mode-turf" class="mode selected">塗地對戰</button><button id="mode-boss" class="mode">Boss 協力</button></div>
+          <p id="mode-description" class="description"></p>
+          <div class="field"><label for="stage">場地</label><select id="stage"></select></div>
+          <div class="field"><label for="difficulty">Bot 難度</label><select id="difficulty"><option value="easy">輕鬆</option><option value="normal" selected="selected">標準</option><option value="hard">挑戰</option></select></div>
+          <div id="duration-row" class="field hidden"><label for="duration">挑戰時間</label><select id="duration"><option value="180">3 分鐘</option><option value="240" selected="selected">4 分鐘</option><option value="300">5 分鐘</option></select></div>
+          <div class="start-row"><button id="start" class="primary"><span id="start-label">開始塗地對戰</span></button><span class="muted">1 位玩家 · 7 名 Bot</span></div>
+        </div>
+        <div id="panel-loadout" class="panel hidden">
+          <h1>裝備</h1><p class="intro">選擇主武器，再搭配副武器與特殊技能。</p>
+          <div class="field"><label for="main">主武器</label><select id="main"></select></div>
+          <div class="field"><label for="sub">副武器</label><select id="sub"></select></div>
+          <div class="field"><label for="special">特殊技能</label><select id="special"></select></div>
+          <p class="description">變更主武器時，會先套用該武器的預設搭配。你仍可自由調整。</p>
+        </div>
+        <div id="panel-settings" class="panel hidden">
+          <h1>設定</h1><p class="intro">調整聲音與介面偏好。</p>
+          <div class="volume-row"><label for="master">主音量</label><input id="master" type="range" min="0" max="100" step="5" value="80" /><span id="master-value">80%</span></div>
+          <div class="volume-row"><label for="music">音樂</label><input id="music" type="range" min="0" max="100" step="5" value="60" /><span id="music-value">60%</span></div>
+          <div class="volume-row"><label for="sfx">音效</label><input id="sfx" type="range" min="0" max="100" step="5" value="85" /><span id="sfx-value">85%</span></div>
+          <div class="setting-option"><input id="reduced-motion" type="checkbox" /><label for="reduced-motion">減少畫面動態</label></div>
+        </div>
+        <div id="panel-controls" class="panel hidden">
+          <h1>操作說明</h1><p class="intro">鍵盤與滑鼠</p>
+          <div class="control-row"><span>移動</span><strong>W A S D ／方向鍵</strong></div>
+          <div class="control-row"><span>瞄準</span><strong>滑鼠</strong></div>
+          <div class="control-row"><span>主武器</span><strong>滑鼠左鍵</strong></div>
+          <div class="control-row"><span>副武器</span><strong>滑鼠右鍵 ／ E</strong></div>
+          <div class="control-row"><span>變形與游泳</span><strong>Shift</strong></div>
+          <div class="control-row"><span>跳躍</span><strong>Space</strong></div>
+          <div class="control-row"><span>特殊技能</span><strong>F ／ Q</strong></div>
+          <div class="control-row"><span>暫停與繼續</span><strong>Esc</strong></div>
+        </div>
+      </div>
+    </div>
+    <div class="menu-footer"><span>INKWAVE · Turf Riot</span><span>Tab 切換焦點　Enter 選擇</span></div>
+  </div>
+</body>
+</rml>

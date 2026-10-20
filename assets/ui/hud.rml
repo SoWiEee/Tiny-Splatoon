@@ -1,0 +1,12 @@
+<rml>
+<head><title>Match</title><link type="text/rcss" href="game.rcss" /></head>
+<body id="hud" class="hud">
+  <div class="hud-top"><span id="stage-name" class="stage-name"></span><div id="clock" class="clock">03:00</div><span class="pause-hint">Esc 暫停</span></div>
+  <div id="team-score" class="team-score"><span id="score-a" class="team-a">0.0%</span><span class="score-divider">／</span><span id="score-b" class="team-b">0.0%</span></div>
+  <div id="boss" class="boss hidden"><div class="boss-heading"><strong>HULLBREAKER</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-hp"></span></div></div>
+  <div class="player-info"><div class="player-bars"><span>HP <strong id="hp">100</strong></span><span>墨量 <strong id="ink">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
+  <div id="player-status" class="player-status"></div><div id="reticle" class="reticle"></div>
+  <div id="pause" class="overlay hidden"><div class="dialog pause-dialog"><h1>已暫停</h1><p class="intro">準備好後，繼續這場對戰。</p><button id="resume" class="primary">繼續遊戲</button><button id="return-menu">返回選單</button><button id="pause-close" class="quiet">離開遊戲</button></div></div>
+  <div id="results" class="overlay hidden"><div class="dialog results-dialog"><h1 id="result-title">對戰結束</h1><p id="result-detail" class="intro"></p><div id="result-score" class="result-score"></div><table id="results-table"></table><div class="result-actions"><button id="results-menu" class="primary">返回選單</button><button id="results-close">離開遊戲</button></div></div></div>
+</body>
+</rml>

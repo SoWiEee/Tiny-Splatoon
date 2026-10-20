@@ -6,11 +6,11 @@
 
 目前可玩的是一名玩家與七名 Bot 的 4v4 Turf：選圖、移動／瞄準／射擊、變形／游泳／跳躍、副武器／特殊技能、暫停／返回、判分／結果與重開。模擬採固定 60 Hz，角色使用來源幾何與即時計算的骨架／程序動畫。
 
-完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。陰影／後製、世界特殊視效與 Boss 正在整合及驗收；正式 hub／Locker／設定、音效、保存、線上與 Zones 仍須依 [spec.md](spec.md) 開發。舊版登入／大廳、GameNetworkingSockets 連線與引擎程式已移除，不能當成這些功能已完成。
+完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，可選離線 Turf／Boss、地圖、裝備與難度，並調整音量和減少動態效果。miniaudio 已接入 20 個來源音效；完整音樂／世界音效、正式 hub／Locker、設定保存、線上與 Zones 仍須依 [spec.md](spec.md) 開發。Boss 動畫仍未通過來源驗收。
 
 ## 建置與執行
 
-需求：Windows、支援 OpenGL 4.5 的顯卡、C++17 編譯器（已驗證 MSVC x64）、CMake、Ninja 與 vcpkg。相依套件由 [vcpkg.json](vcpkg.json) 宣告：GLFW、GLAD、GLM、Dear ImGui、OpenGL 與 stb。GameNetworkingSockets 仍列於 vcpkg 供後續原生多人連線接入，但目前 target 不連結或初始化它。
+需求：Windows、支援 OpenGL 4.5 的顯卡、C++17 編譯器（已驗證 MSVC x64）、CMake、Ninja 與 vcpkg。相依套件由 [vcpkg.json](vcpkg.json) 宣告：GLFW、GLAD、GLM、RmlUi、miniaudio、Dear ImGui、OpenGL 與 stb。Dear ImGui 用於開發診斷介面；GameNetworkingSockets 留供後續原生多人連線接入，目前 target 不連結或初始化它。
 
 在 Visual Studio x64 Native Tools 命令環境中執行：
 
@@ -28,7 +28,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="
 cmake --build build --parallel 4
 ```
 
-`assets/reference/` 會複製到執行檔旁。一般建置／遊玩使用已提交的原生資料，不需要瀏覽器、Node.js 或 `splat-ref/`。個人的 `CMakeUserPresets.json` 保留在本機並由 Git 忽略。
+`assets/` 會複製到執行檔旁，包含來源匯出資料、UI、字體與音效。一般建置／遊玩使用已提交的原生資料，不需要瀏覽器、Node.js 或 `splat-ref/`。Inter 與 Noto Sans TC 的授權檔位於 `assets/fonts/`。個人的 `CMakeUserPresets.json` 保留在本機並由 Git 忽略。
 
 Optimus 筆電會透過 `NvOptimusEnablement` 請求 NVIDIA；啟動紀錄中的 `GPU` 行顯示實際 renderer。Windows／驅動的個別程式偏好仍可能覆寫它。
 
@@ -79,6 +79,10 @@ src/game/                 Actor、武器、戰鬥、AI、模式與角色姿勢�
 src/world/                地圖資料、碰撞幾何與邏輯墨色
 src/render/               角色／場地繪製、LOD、陰影、HDR／FX與GPU資源
 src/gui/                  HUD與玩家介面繪製
+src/audio/                miniaudio播放、PCM快取與音量群組
+assets/ui/                RmlUi文件與樣式
+assets/fonts/             Inter、Noto Sans TC與OFL授權
+assets/audio/             20個來源渲染WAV與來源manifest
 assets/reference/         已提交的來源匯出資料與角色資產
 tests/                    原生行為、來源 oracle、GPU 與 CLI 驗證
 tools/                    來源匯出器、擷取與效能腳本
@@ -89,6 +93,8 @@ docs/                     來源基準、驗收進度與量測紀錄
 - [原生入口遷移紀錄](docs/native-application-migration.md)
 - [工程規格](spec.md)
 - [逐項還原進度](docs/restoration-progress.md)
+- [音效來源與目前限制](docs/audio-source-contract.md)
+- [手動清理清單](docs/cleanup-checklist.md)
 
 ## 舊版展示
 

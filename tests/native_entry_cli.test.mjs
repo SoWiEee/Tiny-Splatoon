@@ -29,6 +29,7 @@ for (const [args, message] of [
   [['--reference-boss', 'tidewater', '--duration', '240junk'], /Boss duration must be/],
   [['--reference-match', 'tidewater', '--duration', '240'], /--duration requires a Boss match/],
   [['--reference-boss', 'tidewater', '--capture', 'unused.png'], /cannot be combined/],
+  [['--reference-match', 'tidewater', '--ui-capture', 'unused.png'], /--ui-capture requires the native menu/],
 ]) {
   test(`invalid Boss options fail before creating a window: ${args.join(' ')}`, () => {
     const result = spawnSync(executable, args, { encoding: 'utf8', timeout: 10000 });

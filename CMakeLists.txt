@@ -19,13 +19,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # The source layers share public domain types without a second forwarding-header tree.
-include_directories(src/world src/game src/render src/gui src/app)
+include_directories(src/world src/game src/render src/gui src/app src/audio)
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
 
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(RmlUi CONFIG REQUIRED)
+find_path(MINIAUDIO_INCLUDE_DIR miniaudio.h)
+if(NOT MINIAUDIO_INCLUDE_DIR)
+    message(FATAL_ERROR "miniaudio headers were not found")
+endif()
 
 add_executable(Tiny-Splatoon main.cpp)
 
@@ -53,12 +61,18 @@ target_link_libraries(restoration_core PUBLIC glm::glm)
 if(MSVC)
     target_compile_options(restoration_core PRIVATE /utf-8)
 endif()
-target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/gui/MatchHud.cpp
+add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/RmlRenderer.cpp)
+target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
+add_library(game_audio STATIC src/audio/AudioEngine.cpp)
+target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
+find_package(Threads REQUIRED)
+target_link_libraries(game_audio PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp
     src/app/GpuPreference.cpp)
-target_link_libraries(Tiny-Splatoon PRIVATE restoration_core)
+target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio)
 
 target_link_libraries(Tiny-Splatoon PRIVATE 
     glad::glad
@@ -73,9 +87,23 @@ add_custom_command(TARGET Tiny-Splatoon POST_BUILD
     "${CMAKE_CURRENT_SOURCE_DIR}/assets"
     "$<TARGET_FILE_DIR:Tiny-Splatoon>/assets"
 )
+# Asset edits must deploy even when only RML, RCSS, fonts or sound data changed.
+file(GLOB_RECURSE TINY_RUNTIME_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
+set_property(TARGET Tiny-Splatoon APPEND PROPERTY LINK_DEPENDS ${TINY_RUNTIME_ASSETS})
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(rml_renderer_test tests/rml_renderer_test.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(rml_renderer_test PRIVATE player_ui)
+    add_test(NAME reference_player_ui_renderer COMMAND rml_renderer_test "${CMAKE_CURRENT_SOURCE_DIR}")
+
+    add_executable(game_ui_test tests/game_ui_test.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(game_ui_test PRIVATE player_ui)
+    add_test(NAME reference_player_ui_interactions COMMAND game_ui_test "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/captures/ui")
+
+    add_executable(audio_engine_test tests/audio_engine_test.cpp)
+    target_link_libraries(audio_engine_test PRIVATE game_audio)
+    add_test(NAME reference_audio_engine COMMAND audio_engine_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/audio")
     add_test(NAME reference_native_entry_default COMMAND Tiny-Splatoon --frames 3)
     set_tests_properties(reference_native_entry_default PROPERTIES
         PASS_REGULAR_EXPRESSION "NATIVE_MENU state=stage-select" TIMEOUT 30)
@@ -236,6 +264,8 @@ if(BUILD_TESTING)
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/native_entry_cli.test.mjs "$<TARGET_FILE:Tiny-Splatoon>")
         set_tests_properties(reference_native_entry_cli PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/splat-ref/src/config.js")
+            add_test(NAME reference_audio_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/audio_source_render.test.mjs)
+            set_tests_properties(reference_audio_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" TIMEOUT 180)
             add_test(NAME reference_boss_nav_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-boss-nav-fixtures.mjs --check)
             set_tests_properties(reference_boss_nav_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_boss_pose_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-boss-pose-fixtures.mjs --check)

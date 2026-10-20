@@ -361,7 +361,7 @@ ID、順序、名稱、預設 kit、數值、動畫／音效／UI／網路均屬
 | HUD-05 | jump0.75 s蓄力、飛行弧線／落點警告／目標有效性／beacon消耗；死亡可預排隊友／beacon jump，復活執行，失效取消依來源。 |
 | HUD-06 | ready/go／末分鐘／十秒／timesup／judge／模式事件動畫與音效，不重複觸發。 |
 | HUD-07 | results姓名／隊伍／武器／turf/splats/deaths、self/bot、獎章、模式統計／XP／升級、rematch/back全流程。 |
-| HUD-08 | Titan One display／Rubik UI或其轉製原生字型、墨形圖案、版型／色彩、focus/hover/press音效及spring轉場；預設debug面板不通過。 |
+| HUD-08 | 依 2026-10-20 使用者更新：UI 採整潔簡約風格，減少原版裝飾；繁體中文用 Noto Sans TC，英文／數字搭配 Inter。保留功能、資訊層級、focus／hover／press 音效與可辨識轉場；不要求照搬墨漬、傾斜卡片或大量裝飾動畫。預設 debug 面板不通過。 |
 
 ## 13. 音訊、設定與進度
 

@@ -5,7 +5,9 @@
 ## Build ownership
 
 - `restoration_core` is the C++17 static library for reference data, stage geometry, CPU paint, player/controller, weapons, combat world, specials, navigation, bots, match lifecycle, and live character poses. It depends on GLM and has no GLFW or network lifetime.
-- `Tiny-Splatoon` adds `StageViewer`, `CharacterArt`, `CharacterShader`, `PerformanceCapture`, and `GpuPreference`. GLFW／GLAD／OpenGL／ImGui own presentation; stb writes diagnostic PNGs.
+- `Tiny-Splatoon` adds `StageViewer`, `CharacterArt`, `CharacterShader`, `PerformanceCapture`, and `GpuPreference`. GLFW／GLAD／OpenGL own the window and graphics; ImGui remains for diagnostics and stb writes diagnostic PNGs.
+- `player_ui` owns `GameUi` and the RmlUi OpenGL renderer. RML/RCSS assets describe the menu and HUD; UI emits actions and settings rather than mutating the simulation directly. Inter and Noto Sans TC are bundled under OFL.
+- `game_audio` owns the miniaudio implementation, immutable WAV cache, 48 one-shot voices and SFX/music sound groups. The public interface has no platform audio types. Source-rendered cue assets and remaining limits are documented in [the audio contract](docs/audio-source-contract.md).
 - Tests link the same core library. Source exporters operate on the locally supplied, hash-locked `splat-ref/`; native fixtures and application builds use committed data.
 
 ## Source layers
@@ -16,13 +18,14 @@
 | `src/game` | Fixed-step actor, weapons, combat, AI, modes and procedural character poses | `MatchSimulation`, `PlayerSimulation`, `CombatWorld`, `WorldSpecials`, `BossSimulation` |
 | `src/world` | Committed map data, geometry queries, logical ink and scoring | `ReferenceData`, `StageGeometry`, `FacePaint` |
 | `src/render` | Context-local drawing, LOD, shadows, HDR postprocessing and visual state | `CharacterArt`, `CharacterLod`, `StageRenderer`, `DirectionalShadow`, `RenderPipeline`, `WorldEffects`, `ScreenEffectsController`, `LensField` |
-| `src/gui` | Presentation of match/HUD state and player actions | `MatchHud` |
+| `src/gui` | Presentation of match/HUD state and player actions | `GameUi`, `RmlRenderer` |
+| `src/audio` | Cached PCM, bounded playback and volume buses | `AudioEngine` |
 
 The physical `restoration/` directory is retired. The existing C++ namespace and library/test names remain compatible; they are not paths. The actor/controller and world already have explicit ownership, so this reorganization does not introduce a second entity/component registry. Render snapshots and one-shot visual events form the boundary between gameplay and presentation.
 
 ## Runtime ownership
 
-`RunStageViewer` owns one GLFW window, OpenGL context and ImGui context. The native menu starts a `MatchLoop` in that same context. The match owns its stage geometry, `FacePaint`, navigation, `MatchSimulation`, `FollowCamera`, per-actor `CharacterPose`, and character GPU resources. Return/replay destroys these match objects before reopening the stage menu. All GL resources are destroyed before the context is released.
+`RunStageViewer` owns one GLFW window, OpenGL context, diagnostic ImGui context, `GameUi` and `AudioEngine`. The native menu starts a `MatchLoop` in that same context. The match owns its stage geometry, `FacePaint`, navigation, `MatchSimulation`, `FollowCamera`, per-actor `CharacterPose`, and character GPU resources. Return/replay destroys these match objects and clears active sounds before reopening the stage menu. All UI and GL resources are destroyed before the context is released; audio sounds release their borrowed PCM cursors before the engine and cache are destroyed.
 
 `MatchSimulation` owns eight actors and seven bots in offline Turf. `PlayerSimulation`, `WeaponRunner`, `CombatWorld` and `WorldSpecials` are the shared gameplay path. Pose trigger/frame callbacks consume those states; renderer and UI do not run a second combat implementation. Simulation and the match follow-camera advance at a fixed 60 Hz; rendering displays the latest pose at the window frame rate. Focus loss and pause stop match advancement, and resume resets mouse/fire input edges.
 

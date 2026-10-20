@@ -16,7 +16,8 @@
 #include "LensField.hpp"
 #include "WorldEffects.hpp"
 #include "BossRenderer.hpp"
-#include "MatchHud.hpp"
+#include "GameUi.hpp"
+#include "AudioEngine.hpp"
 #include "FollowCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -43,8 +44,9 @@
 namespace restoration {
 namespace {
 struct Options {
-    std::string stage = "tidewater", mode = "turf", capture,matchCapture;
+    std::string stage = "tidewater", mode = "turf", capture,matchCapture,uiCapture;
     std::string benchmarkReport;
+    std::string main="shooter",sub,special,difficulty="normal";
     int duration = 0;
     int frames = 0, width = 1600, height = 900;
     int benchmarkWarmup = 120, benchmarkFrames = 600;
@@ -83,6 +85,7 @@ Options ParseOptions(int argc, char** argv) {
         }
         else if (arg == "--capture") { result.capture = value; result.captureSpecified = true; }
         else if (arg == "--match-capture") result.matchCapture = value;
+        else if (arg == "--ui-capture") result.uiCapture = value;
         else if (arg == "--benchmark-report") { result.benchmarkReport = value; result.benchmarkReportSpecified = true; }
         else if (arg == "--benchmark-seed") {
             result.benchmarkTuningSpecified = true;
@@ -123,6 +126,8 @@ Options ParseOptions(int argc, char** argv) {
     }
     if (!result.capture.empty() && !result.frames) result.frames = 3;
     if (!result.matchCapture.empty() && !result.frames) result.frames = 3;
+    if (!result.uiCapture.empty() && !result.frames) result.frames = 3;
+    if (!result.uiCapture.empty() && !result.native) throw std::runtime_error("--ui-capture requires the native menu");
     if(result.playProbe && !result.game) throw std::runtime_error("--play-probe requires --reference-game");
     if (result.native && (result.match || result.game || result.paintProbeSpecified || result.playProbeSpecified ||
                           result.captureSpecified || !result.matchCapture.empty() || result.benchmarkReportSpecified || result.benchmarkTuningSpecified))
@@ -315,7 +320,8 @@ void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial
 enum class MatchExit { Close, StageSelect };
 
 MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& stage,
-                    const std::filesystem::path& characterAssets,bool nativeApp=false) {
+                    const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,bool nativeApp=false) {
+    audio.Clear();
     StageGeometry geometry(stage);
     FacePaint paint(stage,geometry);
     NavGraph nav(stage,geometry);
@@ -325,10 +331,12 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     setup.autopilot=false;
     setup.mode=options.mode;
     setup.duration=options.duration;
+    setup.main=options.main;setup.sub=options.sub;setup.special=options.special;setup.difficulty=options.difficulty;
     MatchSimulation match(stage,geometry,paint,nav,setup);
     if(match.actors().size()!=8) throw std::runtime_error("Reference match did not create eight actors");
     if(match.bots().size()!=7) throw std::runtime_error("Reference match requires one local actor and seven bots");
     if(options.mode!="boss")match.startPlaying();
+    audio.Play(options.mode=="boss"?"ready":"go_horn");
     camera.yaw=match.local().state.yaw;
     camera.pitch=-0.1;
     camera.reset(CameraActor(match.local()));
@@ -348,7 +356,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         bossRenderer=std::make_unique<BossRenderer>();
         match.setBossPoseSink([&](BossSimulation& boss){bossRenderer->Update(boss);});
     }
-    match.local().setDamageSink([&screenController](double amount,const glm::dvec3* attacker){screenController.Damage(amount,attacker);});
+    match.local().setDamageSink([&screenController,&audio](double amount,const glm::dvec3* attacker){screenController.Damage(amount,attacker);audio.Play("hurt");});
     match.local().setSplatSink([&screenController](bool water){screenController.Splat(water);});
     std::vector<WorldVisualEvent> pendingVisualEvents;
     screenController.MatchState("intro");
@@ -398,6 +406,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     std::uint32_t simulationStep=0;
     MatchPhase previousPhase=match.phase();
     bool previousAlive=match.local().state.alive,previousSpecial=false,previousJump=false;
+    bool previousSquid=match.local().state.squid;
     int previousCountdown=std::numeric_limits<int>::max();
     auto tick=[&] {
         auto& local=match.local();
@@ -463,6 +472,12 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
         match.tick(dt);
         if(match.phase()!=previousPhase){
+            if(match.phase()==MatchPhase::Playing)audio.Play("go_horn");
+            else if(match.phase()==MatchPhase::Finish)audio.Play("times_up");
+            else if(match.phase()==MatchPhase::Results&&match.result()){
+                const auto& result=*match.result();const bool win=result.boss?result.boss->win:result.winner==match.local().team();
+                audio.Play(win?"victory_fanfare":"defeat_jingle");
+            }
             switch(match.phase()){
             case MatchPhase::Intro:screenController.MatchState("intro");break;
             case MatchPhase::Playing:screenController.MatchState("playing");break;
@@ -473,6 +488,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             previousPhase=match.phase();
         }
         auto& player=match.local();
+        if(player.state.squid!=previousSquid){audio.Play(player.state.squid?"squid_in":"squid_out");previousSquid=player.state.squid;}
         if(!previousAlive&&player.state.alive)screenController.Respawn();
         previousAlive=player.state.alive;
         const auto special=player.specialPose();
@@ -484,7 +500,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         previousJump=flight;
         if(match.phase()==MatchPhase::Playing){
             const int count=static_cast<int>(std::ceil(match.remaining()));
-            if(count<=10&&count<previousCountdown)screenController.Countdown(count);
+            if(count<=10&&count<previousCountdown){screenController.Countdown(count);audio.Play("final_count");}
             previousCountdown=count;
         }
         if(!benchmark) {
@@ -537,7 +553,13 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         auto* state=live.get();
         auto* pose=live->pose.get();
         characters.push_back(std::move(live));
-        actor->setPoseTriggerSink([pose](const CharacterTrigger& event) { pose->trigger(event); });
+        actor->setPoseTriggerSink([pose,actor,&audio](const CharacterTrigger& event) {
+            pose->trigger(event);
+            if(!actor->isLocal())return;
+            if(event.name=="shoot"&&actor->mainId()=="shooter")audio.Play("shoot_shooter");
+            else if(event.name=="jump")audio.Play("jump");
+            else if(event.name=="land")audio.Play("land");
+        });
         actor->setPoseFrameSink([&,actor,state,pose,i](double step) {
             const auto& current=actor->state;
             const auto combat=actor->combatPose();
@@ -693,6 +715,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         const auto& local=match.local();const auto& player=local.state;const auto combat=local.combatPose();const auto special=local.specialPose();
         ScreenEffectsInput screenInput;screenInput.alive=player.alive;screenInput.paused=paused;screenInput.onEnemy=player.groundTeam==2;
         screenInput.specialActive=special.active;screenInput.charging=combat.charging;screenInput.hp=player.hp;
+        screenInput.reducedMotion=ui.setup().reducedMotion;
         screenInput.horizontalSpeed=glm::length(glm::dvec2(player.vel.x,player.vel.z));screenInput.verticalSpeed=player.vel.y;
         screenInput.charge=combat.charge;screenInput.invulnerability=player.invuln;screenInput.remaining=match.remaining();
         screenInput.width=width;screenInput.height=height;screenInput.ownColor=teamColors[static_cast<std::size_t>(local.team())];
@@ -738,12 +761,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         screen.lensTexture=lensField.texture();screen.lensTexel=lensField.texel();
         draws+=pipeline.End(GradeSettings::Theme(std::string(stage.theme)),screen);
         if(!capture) {
-            ImGui_ImplOpenGL3_NewFrame();ImGui_ImplGlfw_NewFrame();ImGui::NewFrame();
-            const auto hudAction=DrawTurfHud(stage,paint,match,width,height,paused,nativeApp);
-            if(hudAction==MatchHudAction::Resume)resumeMatch();
-            else if(hudAction==MatchHudAction::StageSelect)matchExit=MatchExit::StageSelect;
-            else if(hudAction==MatchHudAction::Close)glfwSetWindowShouldClose(window,1);
-            ImGui::Render();ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            const auto hudAction=ui.RenderHud(stage,paint,match,width,height,paused,nativeApp);
+            if(hudAction==UiAction::Resume)resumeMatch();
+            else if(hudAction==UiAction::StageSelect)matchExit=MatchExit::StageSelect;
+            else if(hudAction==UiAction::Close)glfwSetWindowShouldClose(window,1);
             if(matchExit==MatchExit::StageSelect) break;
         }
         if(options.frames&&++frame>=options.frames) {
@@ -761,57 +782,42 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
     }
     if(!benchmark) captureMouse(false);
+    audio.Clear();
     return matchExit;
 }
 
 void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initial,
-                const std::filesystem::path& characterAssets) {
+                const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio) {
     const StageData* selected=&initial;
-    int bossDuration=240;
+    ui.ShowMenu(std::string(initial.id));
     int frame=0;
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         int width=0,height=0;
         glfwGetFramebufferSize(window,&width,&height);
         if(width<=0||height<=0) {glfwWaitEventsTimeout(0.05);continue;}
-        ImGui_ImplOpenGL3_NewFrame();ImGui_ImplGlfw_NewFrame();ImGui::NewFrame();
-        ImGui::SetNextWindowPos(ImVec2(width*0.5f,height*0.5f),ImGuiCond_Always,ImVec2(0.5f,0.5f));
-        ImGui::SetNextWindowSize(ImVec2(460,0));
-        ImGui::Begin("INKWAVE / Turf Riot",nullptr,ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
-        ImGui::TextUnformatted("Select an offline Turf stage.");
-        if(ImGui::BeginCombo("Stage",std::string(selected->name).c_str())) {
-            for(const auto& candidate:ReferenceStages()) {
-                if(candidate.mode!="turf"||candidate.onlineOnly) continue;
-                if(ImGui::Selectable(std::string(candidate.name).c_str(),selected==&candidate)) selected=&candidate;
-            }
-            ImGui::EndCombo();
-        }
-        const char* durations[]={"180 seconds","240 seconds","300 seconds"};
-        int durationIndex=bossDuration==180?0:bossDuration==300?2:1;
-        if(ImGui::Combo("Boss duration",&durationIndex,durations,3))bossDuration=180+durationIndex*60;
-        ImGui::TextUnformatted("WASD / Mouse to play, Shift squid, Space jump.");
-        const bool start=ImGui::Button("Start Turf match",ImVec2(-1,38));
-        const bool bossStart=ImGui::Button("Start Boss Battle",ImVec2(-1,38));
-        const bool close=ImGui::Button("Close",ImVec2(-1,32));
-        ImGui::End();
         glViewport(0,0,width,height);
-        glClearColor(0.06f,0.11f,0.15f,1.0f);
+        glClearColor(.96f,.97f,.95f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        ImGui::Render();ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        glfwSwapBuffers(window);
-        if(close) {glfwSetWindowShouldClose(window,1);break;}
+        const auto action=ui.RenderMenu(width,height);
+        const auto& selection=ui.setup();
+        for(const auto& candidate:ReferenceStages())if(candidate.mode=="turf"&&!candidate.onlineOnly&&candidate.id==selection.stage)selected=&candidate;
+        if(action==UiAction::Close) {glfwSetWindowShouldClose(window,1);break;}
         if(options.frames&&++frame>=options.frames) {
+            if(!options.uiCapture.empty())Capture(options.uiCapture,width,height);
             std::cout<<"NATIVE_MENU state=stage-select stage="<<selected->id<<" frames="<<frame<<'\n';
             break;
         }
-        if(start||bossStart) {
+        glfwSwapBuffers(window);
+        if(action==UiAction::Start) {
             Options game=options;
             game.stage=std::string(selected->id);
-            game.mode=bossStart?"boss":"turf";
-            game.duration=bossStart?bossDuration:0;
+            game.mode=selection.mode;game.main=selection.main;game.sub=selection.sub;game.special=selection.special;game.difficulty=selection.difficulty;
+            game.duration=selection.mode=="boss"?selection.duration:0;
             game.match=true;
             game.native=false;
-            if(MatchLoop(window,game,*selected,characterAssets,true)==MatchExit::Close) break;
+            if(MatchLoop(window,game,*selected,characterAssets,ui,audio,true)==MatchExit::Close) break;
+            ui.ShowMenu(std::string(selected->id));
             frame=0;
         }
     }
@@ -992,15 +998,17 @@ int RunStageViewer(int argc, char** argv) {
         ImGui::StyleColorsDark();
         ImGui_ImplGlfw_InitForOpenGL(window,true);
         ImGui_ImplOpenGL3_Init("#version 450 core");
-        if(options.native) {
+        if(options.native||options.match) {
             auto assets=std::filesystem::absolute(argv[0]).parent_path()/"assets"/"reference"/"characters";
             if(!std::filesystem::exists(assets)) assets=std::filesystem::current_path()/"assets"/"reference"/"characters";
-            NativeMenu(window,options,*found,assets);
-        }
-        else if(options.match) {
-            auto assets=std::filesystem::absolute(argv[0]).parent_path()/"assets"/"reference"/"characters";
-            if(!std::filesystem::exists(assets)) assets=std::filesystem::current_path()/"assets"/"reference"/"characters";
-            MatchLoop(window,options,*found,assets);
+            const auto assetRoot=assets.parent_path().parent_path();
+            AudioEngine audio(assetRoot/"audio");
+            if(!audio.Initialize())std::cerr<<"AUDIO unavailable: "<<audio.lastError()<<'\n';
+            GameUi ui(window,assetRoot);
+            ui.SetSoundSink([&](const std::string& name){audio.Play(name);});
+            ui.SetVolumeSink([&](float master,float music,float sfx){audio.SetVolumes(master,music,sfx);});
+            if(options.native)NativeMenu(window,options,*found,assets,ui,audio);
+            else MatchLoop(window,options,*found,assets,ui,audio);
         }
         else if(options.game) PlayLoop(window,options,*found);
         else Loop(window,options,*found);
