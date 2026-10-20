@@ -124,7 +124,10 @@ void CharacterShader::uniform(const std::string& name, const std::vector<double>
     case GL_FLOAT_VEC4: glUniform4fv(u.location, count, f.data()); break;
     case GL_FLOAT_MAT3: glUniformMatrix3fv(u.location, count, GL_FALSE, f.data()); break;
     case GL_FLOAT_MAT4: glUniformMatrix4fv(u.location, count, GL_FALSE, f.data()); break;
-    case GL_BOOL: case GL_INT: case GL_SAMPLER_2D: case GL_SAMPLER_CUBE: case GL_SAMPLER_2D_SHADOW: {
+    case GL_BOOL: case GL_INT:
+    case GL_SAMPLER_2D: case GL_SAMPLER_CUBE: case GL_SAMPLER_2D_SHADOW: case GL_SAMPLER_2D_ARRAY:
+    case GL_INT_SAMPLER_2D: case GL_INT_SAMPLER_2D_ARRAY: case GL_UNSIGNED_INT_SAMPLER_2D:
+    case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY: {
         const std::vector<int> integers(values.begin(), values.end());
         glUniform1iv(u.location, count, integers.data()); break;
     }

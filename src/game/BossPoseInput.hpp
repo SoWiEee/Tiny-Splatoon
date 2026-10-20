@@ -20,6 +20,7 @@ struct BossPoseInput {
     std::vector<std::array<double,4>> barrels;
     double flash=0;
     bool weakFlash=false;
+    double weakFlashAmount=0;
     std::string trigger;
 };
 }

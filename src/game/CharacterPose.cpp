@@ -622,7 +622,7 @@ struct CharacterPose::State {
         foot.duration=mode==Catch?0.13:(1.0-duty)/cadence;
     }
 
-    void touchDown(Foot& foot) {
+    void touchDown(Foot& foot,double loud,bool audible) {
         foot.plantedPosition=foot.to; foot.normal=foot.targetNormal; foot.yaw=foot.toYaw;
         foot.planted=true; foot.swinging=false; foot.stanceU=0.0; foot.swingU=0.0; foot.stanceTime=0.0;
         if(moving&&foot.mode==Catch) {
@@ -630,6 +630,8 @@ struct CharacterPose::State {
             auto& other=feet[static_cast<std::size_t>(1-foot.index)]; other.inStance=0.5<duty;
         }
         settleCooldown=0.045;
+        if(audible&&kidScale>0.5&&activeScene&&activeScene->footstep)
+            activeScene->footstep(foot.index,foot.plantedPosition,loud*std::max(gv,0.6));
     }
 
     double footError(Foot& foot, const glm::dvec3& rootPosition, double rootYaw) {
@@ -712,11 +714,11 @@ struct CharacterPose::State {
                         f.toYaw=gaitTarget(f,remain,target,input);
                         const double k=f.swingU>0.82?1.0:1.0-std::exp(-dt*28.0);
                         f.to=glm::mix(f.to,target,k);
-                        if(f.swingU>=1.0) touchDown(f);
+                        if(f.swingU>=1.0) touchDown(f,1.0,input.visible&&input.form==CharacterForm::Kid);
                     } else {
                         f.swingU=std::min(1.0,f.swingU+dt/f.duration);
                         f.toYaw=gaitTarget(f,(1.0-f.swingU)*f.duration,f.to,input);
-                        if(f.swingU>=1.0) touchDown(f);
+                        if(f.swingU>=1.0) touchDown(f,0.8,input.visible&&input.form==CharacterForm::Kid);
                     }
                 }
             }
@@ -730,7 +732,7 @@ struct CharacterPose::State {
                 }
                 f.swingU=std::min(1.0,f.swingU+dt/f.duration);
                 f.toYaw=idealFoot(f,f.to,root,yaw); f.to.y=ground(f.to.x,f.to.z,&f.targetNormal,scene,root);
-                if(f.swingU>=1.0) touchDown(f); else ++swinging;
+                if(f.swingU>=1.0) touchDown(f,0.45,input.visible&&input.form==CharacterForm::Kid); else ++swinging;
             }
             settleCooldown-=dt;
             if(swinging==0&&settleCooldown<=0.0) {

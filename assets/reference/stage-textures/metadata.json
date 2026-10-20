@@ -1,0 +1,2196 @@
+{
+  "schema": 1,
+  "format": "TSTEX001 + uint32LE width,height,layers,sRGB + bottom-up RGBA8; zlib compressed",
+  "texlib": {
+    "size": 512,
+    "names": [
+      "concrete",
+      "pavers",
+      "tiles",
+      "asphalt",
+      "boardwalk",
+      "metalpanel",
+      "corrugated",
+      "hazard",
+      "grate",
+      "brick",
+      "rubber",
+      "glasstile",
+      "planks",
+      "hullpaint",
+      "nonslip",
+      "gelcoat",
+      "yard",
+      "weatherboard",
+      "render",
+      "treads",
+      "stonestep",
+      "rampboard",
+      "gangdeck",
+      "detail",
+      "gel",
+      "tidewater:herringbone",
+      "tidewater:terrazzo",
+      "tidewater:stucco",
+      "kelpline:tarmac",
+      "kelpline:quay",
+      "kelpline:chequer",
+      "saltpan:saltcrust",
+      "saltpan:drymud",
+      "saltpan:saltboard",
+      "crossmarket:setts",
+      "crossmarket:ashlar",
+      "crossmarket:tramway",
+      "lockgate:setts",
+      "lockgate:engbrick",
+      "lockgate:hoofsteps",
+      "terraces:calce",
+      "terraces:cotto",
+      "terraces:pebble",
+      "cargo:tarmac",
+      "cargo:quay",
+      "cargo:chequer"
+    ],
+    "layers": {
+      "concrete": 0,
+      "pavers": 1,
+      "tiles": 2,
+      "asphalt": 3,
+      "boardwalk": 4,
+      "metalpanel": 5,
+      "corrugated": 6,
+      "hazard": 7,
+      "grate": 8,
+      "brick": 9,
+      "rubber": 10,
+      "glasstile": 11,
+      "planks": 12,
+      "hullpaint": 13,
+      "nonslip": 14,
+      "gelcoat": 15,
+      "yard": 16,
+      "weatherboard": 17,
+      "render": 18,
+      "treads": 19,
+      "stonestep": 20,
+      "rampboard": 21,
+      "gangdeck": 22,
+      "detail": 23,
+      "gel": 24,
+      "tidewater:herringbone": 25,
+      "tidewater:terrazzo": 26,
+      "tidewater:stucco": 27,
+      "kelpline:tarmac": 28,
+      "kelpline:quay": 29,
+      "kelpline:chequer": 30,
+      "saltpan:saltcrust": 31,
+      "saltpan:drymud": 32,
+      "saltpan:saltboard": 33,
+      "crossmarket:setts": 34,
+      "crossmarket:ashlar": 35,
+      "crossmarket:tramway": 36,
+      "lockgate:setts": 37,
+      "lockgate:engbrick": 38,
+      "lockgate:hoofsteps": 39,
+      "terraces:calce": 40,
+      "terraces:cotto": 41,
+      "terraces:pebble": 42,
+      "cargo:tarmac": 43,
+      "cargo:quay": 44,
+      "cargo:chequer": 45
+    },
+    "meta": {
+      "concrete": {
+        "scale": 4,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 1,
+        "depth": 0.0048
+      },
+      "pavers": {
+        "scale": 4,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.9,
+        "depth": 0.009
+      },
+      "tiles": {
+        "scale": 2,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.15,
+        "depth": 0.0036
+      },
+      "asphalt": {
+        "scale": 2,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 2,
+        "sym": 7,
+        "detail": 0.4,
+        "depth": 0.0022
+      },
+      "boardwalk": {
+        "scale": 2,
+        "tint": false,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.3,
+        "depth": 0.0162
+      },
+      "metalpanel": {
+        "scale": 2,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 3,
+        "detail": 0.2,
+        "depth": 0.009
+      },
+      "corrugated": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 0,
+        "sym": 0,
+        "detail": 0.2,
+        "depth": 0.031
+      },
+      "hazard": {
+        "scale": 2,
+        "tint": false,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 0,
+        "sym": 0,
+        "detail": 0.5,
+        "depth": 0.0008
+      },
+      "grate": {
+        "scale": 1.2,
+        "tint": false,
+        "mask": false,
+        "stair": null,
+        "alpha": true,
+        "mode": 1,
+        "sym": 3,
+        "detail": 0.3,
+        "depth": 0.0096
+      },
+      "brick": {
+        "scale": 2,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.7,
+        "depth": 0.0078
+      },
+      "rubber": {
+        "scale": 2,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 2,
+        "sym": 7,
+        "detail": 0.35,
+        "depth": 0.0014
+      },
+      "glasstile": {
+        "scale": 1.2,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0,
+        "depth": 0.0058
+      },
+      "planks": {
+        "scale": 2.24,
+        "tint": false,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.35,
+        "depth": 0.0236
+      },
+      "hullpaint": {
+        "scale": 3.2,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.25,
+        "depth": 0.007
+      },
+      "nonslip": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.5,
+        "depth": 0.0135
+      },
+      "gelcoat": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.1,
+        "depth": 0.0021
+      },
+      "yard": {
+        "scale": 3.2,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.9,
+        "depth": 0.0112
+      },
+      "weatherboard": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.3,
+        "depth": 0.0166
+      },
+      "render": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 2,
+        "sym": 7,
+        "detail": 0.8,
+        "depth": 0.0028
+      },
+      "treads": {
+        "scale": 1.12,
+        "tint": true,
+        "mask": true,
+        "stair": [
+          0.28,
+          4,
+          0.5,
+          1
+        ],
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.25,
+        "depth": 0.102
+      },
+      "stonestep": {
+        "scale": 1.92,
+        "tint": true,
+        "mask": true,
+        "stair": [
+          0.32,
+          6,
+          0.5,
+          2
+        ],
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.6,
+        "depth": 0.117
+      },
+      "rampboard": {
+        "scale": 1.6,
+        "tint": false,
+        "mask": false,
+        "stair": [
+          0.4,
+          4,
+          0.45,
+          3
+        ],
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.35,
+        "depth": 0.052
+      },
+      "gangdeck": {
+        "scale": 1.2,
+        "tint": false,
+        "mask": false,
+        "stair": [
+          0.3,
+          4,
+          0.4,
+          4
+        ],
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.3,
+        "depth": 0.024
+      },
+      "detail": {
+        "scale": 0.5,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 0,
+        "sym": 0,
+        "detail": 0,
+        "depth": 0.0005
+      },
+      "gel": {
+        "scale": 1,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 0,
+        "sym": 0,
+        "detail": 0,
+        "depth": 0.012
+      },
+      "tidewater:herringbone": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 0,
+        "sym": 0,
+        "detail": 0.6,
+        "depth": 0.0134
+      },
+      "tidewater:terrazzo": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 4,
+        "detail": 0.3,
+        "depth": 0.0022
+      },
+      "tidewater:stucco": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.6,
+        "depth": 0.0092
+      },
+      "kelpline:tarmac": {
+        "scale": 4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 2,
+        "sym": 7,
+        "detail": 0.6,
+        "depth": 0.0052
+      },
+      "kelpline:quay": {
+        "scale": 4.8,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.9,
+        "depth": 0.009
+      },
+      "kelpline:chequer": {
+        "scale": 1.2,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 3,
+        "detail": 0.3,
+        "depth": 0.007
+      },
+      "saltpan:saltcrust": {
+        "scale": 3.2,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.45,
+        "depth": 0.008
+      },
+      "saltpan:drymud": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.9,
+        "depth": 0.019
+      },
+      "saltpan:saltboard": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.35,
+        "depth": 0.0215
+      },
+      "crossmarket:setts": {
+        "scale": 1.92,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 3,
+        "detail": 0.55,
+        "depth": 0.026
+      },
+      "crossmarket:ashlar": {
+        "scale": 2.88,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.8,
+        "depth": 0.0115
+      },
+      "crossmarket:tramway": {
+        "scale": 2.5,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 0,
+        "sym": 0,
+        "detail": 0.5,
+        "depth": 0.034
+      },
+      "lockgate:setts": {
+        "scale": 2,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.6,
+        "depth": 0.022
+      },
+      "lockgate:engbrick": {
+        "scale": 1.8,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.55,
+        "depth": 0.01
+      },
+      "lockgate:hoofsteps": {
+        "scale": 1.8,
+        "tint": true,
+        "mask": true,
+        "stair": [
+          0.45,
+          4,
+          0.55,
+          3
+        ],
+        "alpha": false,
+        "mode": 1,
+        "sym": 1,
+        "detail": 0.5,
+        "depth": 0.046
+      },
+      "terraces:calce": {
+        "scale": 3.6,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 0,
+        "sym": 0,
+        "detail": 0.7,
+        "depth": 0.006
+      },
+      "terraces:cotto": {
+        "scale": 1.2,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.35,
+        "depth": 0.0052
+      },
+      "terraces:pebble": {
+        "scale": 2.4,
+        "tint": true,
+        "mask": false,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.5,
+        "depth": 0.01
+      },
+      "cargo:tarmac": {
+        "scale": 4,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 2,
+        "sym": 7,
+        "detail": 0.6,
+        "depth": 0.0052
+      },
+      "cargo:quay": {
+        "scale": 4.8,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 7,
+        "detail": 0.9,
+        "depth": 0.009
+      },
+      "cargo:chequer": {
+        "scale": 1.2,
+        "tint": true,
+        "mask": true,
+        "stair": null,
+        "alpha": false,
+        "mode": 1,
+        "sym": 3,
+        "detail": 0.3,
+        "depth": 0.007
+      }
+    },
+    "renderer": "WebKit WebGL",
+    "textures": {
+      "albedo": {
+        "file": "texlib-albedo.tex.z",
+        "width": 512,
+        "height": 512,
+        "layers": 46,
+        "srgb": true,
+        "sha256": "2df0e4dbfbcad2e0bda71ba43b2eb53ebb0721b4a193cf1b3273855870af20bf",
+        "bytes": 9179772
+      },
+      "normal": {
+        "file": "texlib-normal.tex.z",
+        "width": 512,
+        "height": 512,
+        "layers": 46,
+        "srgb": false,
+        "sha256": "586e9e78b1ebd59e81cecea08dd37607bd4b351f5b3967d877115fb129970be4",
+        "bytes": 9424844
+      },
+      "orm": {
+        "file": "texlib-orm.tex.z",
+        "width": 512,
+        "height": 512,
+        "layers": 46,
+        "srgb": false,
+        "sha256": "2ed08c74940a707aed1f24dc8fa41dd094d0e5f6370afa493d806134ba2b0d2d",
+        "bytes": 12131912
+      }
+    }
+  },
+  "props": {
+    "atlas": {
+      "file": "props-atlas.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "700686837b66db6a382b897cc1e0645549e87acbf5d11a5e95ef0ace73762719",
+      "bytes": 1275321
+    },
+    "chain": {
+      "file": "props-chain.tex.z",
+      "width": 128,
+      "height": 128,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "32a5e3b093b244299dd04168e1a0e83178bbd3d9d04fdaffeedf54d7dfd47cc1",
+      "bytes": 473
+    },
+    "blob": {
+      "file": "props-blob.tex.z",
+      "width": 64,
+      "height": 64,
+      "layers": 1,
+      "srgb": false,
+      "sha256": "1e4bd92631fa271cb9731a6575be1345072d5e8a02e7096393013574dd0f5725",
+      "bytes": 4134
+    }
+  },
+  "murals": {
+    "tidewater": {
+      "file": "murals-tidewater.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "4deaec90e3ce7ace848d3cd10353d8162900f4810989f39dfcdd1746f5044542",
+      "bytes": 751252,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.25,
+            0.2421875,
+            0.25
+          ],
+          "place": [
+            10,
+            10,
+            1,
+            10
+          ],
+          "fx": [
+            0.55,
+            0.25
+          ]
+        },
+        {
+          "rect": [
+            0.25,
+            0.1875,
+            0.3046875,
+            0.1875
+          ],
+          "place": [
+            1.8,
+            8,
+            1.8,
+            8
+          ],
+          "fx": [
+            0.55,
+            0.25
+          ]
+        },
+        {
+          "rect": [
+            0.4375,
+            0.5,
+            0.435546875,
+            0.056640625
+          ],
+          "place": [
+            8.6,
+            7.8,
+            0.2,
+            0.8
+          ],
+          "fx": [
+            0.7,
+            0.5
+          ]
+        },
+        {
+          "rect": [
+            0.4375,
+            0.21875,
+            0.2763671875,
+            0.1533203125
+          ],
+          "place": [
+            0,
+            4.5,
+            0,
+            3.15
+          ],
+          "fx": [
+            0.8,
+            0.9
+          ]
+        },
+        {
+          "rect": [
+            0.65625,
+            0.125,
+            0.3095703125,
+            0.1201171875
+          ],
+          "place": [
+            0,
+            2.6,
+            0,
+            2.5
+          ],
+          "fx": [
+            0.8,
+            0.9
+          ]
+        },
+        {
+          "rect": [
+            0.78125,
+            0.109375,
+            0.30224609375,
+            0.12744140625
+          ],
+          "place": [
+            0,
+            3,
+            0,
+            3.5
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.5,
+            0.181640625,
+            0.056640625
+          ],
+          "place": [
+            5.5,
+            7,
+            0.2,
+            0.8
+          ],
+          "fx": [
+            0.7,
+            0.5
+          ]
+        },
+        {
+          "rect": [
+            0.5,
+            0.146484375,
+            0.111328125,
+            0.126953125
+          ],
+          "place": [
+            0,
+            3,
+            0,
+            2.6
+          ],
+          "fx": [
+            0.8,
+            0.9
+          ]
+        }
+      ]
+    },
+    "kelpline": {
+      "file": "murals-kelpline.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "3535923ef1950342b0ffb2ea5c0b72d3f1f4bfb7ce32d161e9ffc470d399ed54",
+      "bytes": 483738,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.15625,
+            0.11376953125,
+            0.37841796875
+          ],
+          "place": [
+            0,
+            10.16,
+            0,
+            24.6
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.3125,
+            0.185546875,
+            0.111328125,
+            0.380859375
+          ],
+          "place": [
+            0,
+            12,
+            0,
+            24.6
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.498046875,
+            0.08203125,
+            0.00390625,
+            0.48828125
+          ],
+          "place": [
+            0,
+            7.84,
+            0,
+            41
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5810546875,
+            0.41015625,
+            0.2919921875,
+            0.2001953125
+          ],
+          "place": [
+            0,
+            32.32,
+            0,
+            15.8
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.15625,
+            0.15625,
+            0.11376953125,
+            0.37841796875
+          ],
+          "place": [
+            0,
+            10.16,
+            0,
+            24.6
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5810546875,
+            0.29296875,
+            0.2138671875,
+            0.0732421875
+          ],
+          "place": [
+            2.3,
+            7.6,
+            0.6,
+            1.9
+          ],
+          "fx": [
+            0.8,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5810546875,
+            0.29296875,
+            0.1357421875,
+            0.0732421875
+          ],
+          "place": [
+            2.3,
+            7.6,
+            0.55,
+            1.9
+          ],
+          "fx": [
+            0.8,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.498046875,
+            0.00146484375,
+            0.107421875
+          ],
+          "place": [
+            0,
+            32.32,
+            0,
+            14
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        }
+      ]
+    },
+    "halyard": {
+      "file": "murals-halyard.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "a7f437397f769b0cb9ffbe2bbbb51ec4e7cfa9e2378df9bc48e9f1834f4bfdcc",
+      "bytes": 236183,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.1796875,
+            0.3125
+          ],
+          "place": [
+            0,
+            32,
+            0,
+            10
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.609375,
+            0.0546875,
+            0.1171875
+          ],
+          "place": [
+            0,
+            13,
+            0,
+            2.5
+          ],
+          "fx": [
+            0.85,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.6171875,
+            0.27197265625,
+            0.0546875,
+            0.1171875
+          ],
+          "place": [
+            0,
+            5.8,
+            0,
+            2.5
+          ],
+          "fx": [
+            0.85,
+            1
+          ]
+        }
+      ]
+    },
+    "saltpan": {
+      "file": "murals-saltpan.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "e8d7933baa067a723758cece8a2cfb6abe22c3130395d7a39ff96b1e865ea071",
+      "bytes": 212246,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.537109375,
+            0.28515625,
+            0.20703125
+          ],
+          "place": [
+            0,
+            11,
+            0,
+            4.24
+          ],
+          "fx": [
+            0.95,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.537109375,
+            0.0703125,
+            0.20703125
+          ],
+          "place": [
+            0,
+            11,
+            0,
+            4.24
+          ],
+          "fx": [
+            0.95,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.546875,
+            0.44921875,
+            0.4609375,
+            0.03125
+          ],
+          "place": [
+            1,
+            12,
+            6,
+            0.8
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.546875,
+            0.341796875,
+            0.1064453125,
+            0.341796875
+          ],
+          "place": [
+            0,
+            7.2,
+            0,
+            7.2
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        }
+      ]
+    },
+    "crossmarket": {
+      "file": "murals-crossmarket.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "2e3ac6329fea2c547952c538dac77143d1ebf1c0919bb503d973507154fded9a",
+      "bytes": 289435,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.234375,
+            0.208984375,
+            0.283203125
+          ],
+          "place": [
+            0.35,
+            3.8,
+            0.55,
+            4.6
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.244140625,
+            0.244140625,
+            0.23828125,
+            0.25390625
+          ],
+          "place": [
+            0.4,
+            4.2,
+            0.7,
+            4.4
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.498046875,
+            0.234375,
+            0.208984375,
+            0.283203125
+          ],
+          "place": [
+            0.35,
+            3.8,
+            0.55,
+            4.6
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.25,
+            0.15234375,
+            0.046875
+          ],
+          "place": [
+            0,
+            4.5,
+            0.12,
+            0.85
+          ],
+          "fx": [
+            0.5,
+            0.2
+          ]
+        }
+      ]
+    },
+    "lockgate": {
+      "file": "murals-lockgate.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "da61e1152eef7b6cae7108454fe46a9f2e4d9d95be7ead8cbef429a3dab2ed88",
+      "bytes": 288792,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.6796875,
+            0.380859375,
+            0.111328125
+          ],
+          "place": [
+            0,
+            5.8,
+            0,
+            0.95
+          ],
+          "fx": [
+            0.35,
+            0.3
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.7421875,
+            0.296875,
+            0.078125
+          ],
+          "place": [
+            0.2,
+            9.6,
+            3.66,
+            1
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5029296875,
+            0.49609375,
+            0.109375,
+            0.1826171875
+          ],
+          "place": [
+            0.3,
+            6.8,
+            1.3,
+            2.5
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.49609375,
+            0.0576171875,
+            0.0927734375
+          ],
+          "place": [
+            2.7,
+            13.2,
+            1.65,
+            2.35
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    "terraces": {
+      "file": "murals-terraces.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "7232304fad1f9a6f7652fad85f55da3bdb52bb10ea2db2692ca2317aebf950d7",
+      "bytes": 705619,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.2001953125,
+            0.2919921875,
+            0.2001953125
+          ],
+          "place": [
+            0,
+            7.07,
+            0,
+            7.07
+          ],
+          "fx": [
+            1,
+            0.5
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.375,
+            0.056640625,
+            0.234375
+          ],
+          "place": [
+            0,
+            16,
+            0,
+            10
+          ],
+          "fx": [
+            1,
+            0.5
+          ]
+        },
+        {
+          "rect": [
+            0.3759765625,
+            0.6240234375,
+            0.244140625,
+            0.046875
+          ],
+          "place": [
+            0,
+            16,
+            0,
+            1.2
+          ],
+          "fx": [
+            0.6,
+            0.5
+          ]
+        },
+        {
+          "rect": [
+            0.3759765625,
+            0.126953125,
+            0.095703125,
+            0.146484375
+          ],
+          "place": [
+            0,
+            2.6,
+            0,
+            3
+          ],
+          "fx": [
+            1,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5625,
+            0.0703125,
+            0.16015625,
+            0.08203125
+          ],
+          "place": [
+            0,
+            2.4,
+            0,
+            2.8
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.732421875,
+            0.244140625,
+            0,
+            0.244140625
+          ],
+          "place": [
+            -0.5,
+            5,
+            -0.5,
+            5
+          ],
+          "fx": [
+            1,
+            0.5
+          ]
+        },
+        {
+          "rect": [
+            0.2021484375,
+            0.265625,
+            0.29296875,
+            0.19921875
+          ],
+          "place": [
+            0,
+            16,
+            0,
+            12
+          ],
+          "fx": [
+            1,
+            0.5
+          ]
+        }
+      ]
+    },
+    "cargo": {
+      "file": "murals-cargo.tex.z",
+      "width": 2048,
+      "height": 2048,
+      "layers": 1,
+      "srgb": true,
+      "sha256": "3535923ef1950342b0ffb2ea5c0b72d3f1f4bfb7ce32d161e9ffc470d399ed54",
+      "bytes": 483738,
+      "murals": [
+        {
+          "rect": [
+            0,
+            1,
+            0.875,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.75,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.625,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            1,
+            0.5,
+            0.125
+          ],
+          "place": [
+            0,
+            -8,
+            0,
+            0
+          ],
+          "fx": [
+            0,
+            0
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.15625,
+            0.11376953125,
+            0.37841796875
+          ],
+          "place": [
+            0,
+            10.16,
+            0,
+            24.6
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.3125,
+            0.185546875,
+            0.111328125,
+            0.380859375
+          ],
+          "place": [
+            0,
+            12,
+            0,
+            24.6
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.498046875,
+            0.08203125,
+            0.00390625,
+            0.48828125
+          ],
+          "place": [
+            0,
+            7.84,
+            0,
+            41
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5810546875,
+            0.41015625,
+            0.2919921875,
+            0.2001953125
+          ],
+          "place": [
+            0,
+            32.32,
+            0,
+            15.8
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.15625,
+            0.15625,
+            0.11376953125,
+            0.37841796875
+          ],
+          "place": [
+            0,
+            10.16,
+            0,
+            24.6
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5810546875,
+            0.29296875,
+            0.2138671875,
+            0.0732421875
+          ],
+          "place": [
+            2.3,
+            7.6,
+            0.6,
+            1.9
+          ],
+          "fx": [
+            0.8,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0.5810546875,
+            0.29296875,
+            0.1357421875,
+            0.0732421875
+          ],
+          "place": [
+            2.3,
+            7.6,
+            0.55,
+            1.9
+          ],
+          "fx": [
+            0.8,
+            1
+          ]
+        },
+        {
+          "rect": [
+            0,
+            0.498046875,
+            0.00146484375,
+            0.107421875
+          ],
+          "place": [
+            0,
+            32.32,
+            0,
+            14
+          ],
+          "fx": [
+            0.9,
+            1
+          ]
+        }
+      ]
+    }
+  },
+  "sourceHashes": {
+    "src/world/texlib.js": "14d39c645a02f10be999412b6238632250ec93508a9329487db4505ca4e5c0dd",
+    "src/world/props.js": "894f3b0c9bb8112208f9b6c8c7cc5c276f583ca3efc0d6c8e9ad8cfa966e5a37",
+    "src/world/murals.js": "67dd37e825b7108a335b0c7d55494f1650e5124806396be46c2c6f435d8a44af",
+    "assets/fonts/TitanOne-latin.woff2": "f5f3f60e9246f7e78242697ef18f1fa78467dc4135312208b693e33678e78c4c",
+    "assets/fonts/Rubik-latin.woff2": "99ec7ccb40cf143f977c893649deece6cc2dcc7c0ff82ebf84b6584090f207ea"
+  }
+}

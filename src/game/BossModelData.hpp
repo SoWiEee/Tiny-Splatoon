@@ -6,12 +6,14 @@
 #include <string>
 #include <vector>
 #include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
 namespace restoration {
 struct BossModelVertex {
     glm::vec3 position{0}, normal{0};
+    glm::vec2 uv{0};
     std::array<std::uint8_t,4> joints{};
     glm::vec4 weights{0}, material{0};
 };
@@ -49,15 +51,18 @@ struct BossPoseArmData {
 };
 struct BossPoseChainData {
     std::string name,parent;
+    glm::dvec3 parentRest{0};
     std::vector<glm::dvec3> points;
     std::vector<std::string> bones;
     glm::dvec4 plane{0};
     double damp=0.98,stiff=0,gravity=1;
     bool hasPlane=false,flag=false,kelp=false;
 };
+struct BossPoseBoneData { std::string name; glm::dvec3 position{0}; };
 struct BossPoseRigData {
     glm::dvec3 bodyPivot{0},containerPosition{0},nozzle{0},nozzleTip{0};
     glm::dmat4 containerMatrix{1};
+    std::vector<BossPoseBoneData> boneRest;
     double containerPitch=0,halfLength=0,halfWidth=0,halfHeight=0;
     std::vector<BossPoseLegData> legs;
     std::vector<BossPoseArmData> arms;

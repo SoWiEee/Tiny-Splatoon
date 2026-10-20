@@ -7,7 +7,7 @@
 - `restoration_core` is the C++17 static library for reference data, stage geometry, CPU paint, player/controller, weapons, combat world, specials, navigation, bots, match lifecycle, and live character poses. It depends on GLM and has no GLFW or network lifetime.
 - `Tiny-Splatoon` adds `StageViewer`, `CharacterArt`, `CharacterShader`, `PerformanceCapture`, and `GpuPreference`. GLFW／GLAD／OpenGL own the window and graphics; ImGui remains for diagnostics and stb writes diagnostic PNGs.
 - `player_ui` owns `GameUi` and the RmlUi OpenGL renderer. RML/RCSS assets describe the menu and HUD; UI emits actions and settings rather than mutating the simulation directly. Inter and Noto Sans TC are bundled under OFL.
-- `game_audio` owns the miniaudio implementation, immutable WAV cache, 48 one-shot voices and SFX/music sound groups. The public interface has no platform audio types. Source-rendered cue assets and remaining limits are documented in [the audio contract](docs/audio-source-contract.md).
+- `game_audio` owns miniaudio playback, source cue metadata, bounded one-shot voices, positional loops and streamed source music. `GameAudio` maps actor, world, match and Boss state to that playback interface. Source-rendered assets and remaining limits are documented in [the audio contract](docs/audio-source-contract.md).
 - Tests link the same core library. Source exporters operate on the locally supplied, hash-locked `splat-ref/`; native fixtures and application builds use committed data.
 
 ## Source layers
@@ -19,7 +19,7 @@
 | `src/world` | Committed map data, geometry queries, logical ink and scoring | `ReferenceData`, `StageGeometry`, `FacePaint` |
 | `src/render` | Context-local drawing, LOD, shadows, HDR postprocessing and visual state | `CharacterArt`, `CharacterLod`, `StageRenderer`, `DirectionalShadow`, `RenderPipeline`, `WorldEffects`, `ScreenEffectsController`, `LensField` |
 | `src/gui` | Presentation of match/HUD state and player actions | `GameUi`, `RmlRenderer` |
-| `src/audio` | Cached PCM, bounded playback and volume buses | `AudioEngine` |
+| `src/audio` | Cached PCM, bounded playback, volume buses and gameplay audio routing | `AudioEngine`, `GameAudio` |
 
 The physical `restoration/` directory is retired. The existing C++ namespace and library/test names remain compatible; they are not paths. The actor/controller and world already have explicit ownership, so this reorganization does not introduce a second entity/component registry. Render snapshots and one-shot visual events form the boundary between gameplay and presentation.
 
@@ -31,15 +31,17 @@ The physical `restoration/` directory is retired. The existing C++ namespace and
 
 ## Paint and presentation
 
-`StageGeometry` supplies collision and paintable/scoring faces. `FacePaint` stores logical ownership and versions changed atlas regions; the stage renderer uploads those changes. `CharacterArt` draws committed source meshes/shaders with live pose matrices and material state. Renderer diagnostics can also draw fixed source snapshots, but gameplay does not use them as animation.
+`StageGeometry` supplies collision and paintable/scoring faces. `FacePaint` stores logical ownership for gameplay and queues visual splats separately. `StageRenderer` draws exported source bevel/PropKit geometry and materials, using captured source texture arrays, atlases and murals; its source paint shaders grow splats and dry wet ink independently of the ownership grid. `CharacterArt` draws committed source meshes/shaders with live pose matrices and material state. Renderer diagnostics can also draw fixed source snapshots, but gameplay does not use them as animation.
+
+`ProjectileRenderer` reads live combat rounds and drained visual events. Source deformed spheres, satellites, bow arrows, mitts fists, blade waves and charger ribbons are presentation only; collision, paint and damage remain in `CombatWorld`. It shares the existing source material shader path and DFG table. See [the projectile contract](docs/projectile-source-contract.md) for fixture and GPU checks and remaining limits.
 
 `CharacterLod` selects hero/game/far using projected 1.32 m character height, local/remote and quality thresholds, ±12% hysteresis and a 0.3 s transition. Body tiers use complementary source screen-door masks; equipment changes at the transition midpoint. A source oracle covers all four qualities and both local/remote selection, with GPU transition checks.
 
 `RenderPipeline` resolves a half-float MSAA scene and depth into optional source GTAO/Poisson denoising, source five-mip bloom, theme grade, screen FX, Neutral tone mapping and sRGB output. GUI is drawn afterward. `DirectionalShadow` owns the fitted light camera/depth texture and exposes the reference stable 3×3 PCF sampler. `ScreenEffectsController` and `LensInk` keep temporal presentation state separate from combat; `LensField` renders bounded metaball instances to the HDR lens texture. Exact port choices and targeted evidence are recorded in [the rendering contract](docs/render-pipeline-source-contract.md).
 
-The match submits stage, character and Boss shadow casters before the HDR scene. Character receivers use exported source shadow shaders; the stage uses a local lit material. World FX share the character mesh cache and consume a bounded visual-event queue once per simulation tick. Screen FX read that drained snapshot and receive local damage/splat/match events. Source recipes and known visual differences are recorded in [the World FX contract](docs/worldfx-source-contract.md).
+The match submits stage, character and Boss shadow casters before the HDR scene. Character and stage receivers use exported source material/shadow shaders. World FX share the character mesh cache and consume a bounded visual-event queue once per simulation tick. Screen FX and projectile presentation read that drained snapshot; local damage/splat/match events also reach the screen controller. Source recipes and known visual differences are recorded in [the World FX contract](docs/worldfx-source-contract.md).
 
-Offline Boss adds an eight-member friendly squad, source navigation, move/hazard state, hit queries and mode-specific HUD/results. Its CPU pose sink runs after the fixed-step Boss update and before combat queries. The current pose publishes a rest rig with static sockets; source animation and material uniforms remain unimplemented and fail the strict native pose oracle. See [the Boss pose contract](docs/boss-pose-source-contract.md). Complete environment/ink materials, audio, saves, online and Zones remain separate spec requirements. Having a shader, state machine or source fixture is not whole-scene acceptance.
+Offline Boss adds an eight-member friendly squad, source navigation, move/hazard state, hit queries and mode-specific HUD/results. Its CPU pose sink runs after the fixed-step Boss update and before combat queries. The pose evaluates source clips, gait, IK, springs and secondary chains; its 100-bone/socket/material oracle passes all 16 scenarios at the original 0.001 threshold. The renderer uses six source material shaders, UVs, stencil, DFG and live pose uniforms. See [the Boss pose contract](docs/boss-pose-source-contract.md) and [material contract](docs/boss-material-source-contract.md). Environment lighting, remaining device/audio details, saves, online and Zones remain separate spec requirements. Having a shader, state machine or source fixture is not whole-scene acceptance.
 
 ## Legacy retirement — 2026-10-20
 

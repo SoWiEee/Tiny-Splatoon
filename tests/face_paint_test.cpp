@@ -72,6 +72,7 @@ int main() {
             for (int k = 0; k < static_cast<int>(paint.grid().size()); ++k)
                 if (paint.grid()[k] != beforeGrid[k]) changed.emplace_back(k, paint.grid()[k]);
             check(changed == e.changed, prefix + "reference grid cells step " + std::to_string(i));
+            paint.takeVisualSplats();
         }
         const auto before = paint.version();
         const auto unchanged = paint.splat(expected.steps.front().center, 0.2, 0, 0.3,
@@ -84,6 +85,25 @@ int main() {
         check(paint.sample(-1, 0, 0) == 0, prefix + "invalid face sample");
         try { paint.splat({0, 0, 0}, -1, 0, 0.5); check(false, prefix + "negative radius accepted"); }
         catch (const std::invalid_argument&) {}
+    }
+    {
+        const auto& stage = ReferenceStages().front();
+        StageGeometry geometry(stage);
+        FacePaint paint(stage, geometry, 2048);
+        const auto grid = paint.grid();
+        const auto counts = paint.counts();
+        const int version = paint.version();
+        SplatOptions cosmetic; cosmetic.cosmetic = true;
+        check(paint.splat(stage.spawnPads[0], 0.12, 0, 0.25, cosmetic) == 0,
+              "cosmetic splat does not claim gameplay ink");
+        const auto visual = paint.takeVisualSplats();
+        check(visual.size() == 1 && visual[0].cosmetic && visual[0].kind == SplatKind::Speck,
+              "cosmetic splat is queued for visual ink");
+        check(paint.grid() == grid && paint.counts() == counts && paint.version() == version,
+              "visual splat leaves gameplay grid unchanged");
+        paint.clear();
+        check(paint.takeVisualClear(), "clear queues a visual atlas reset");
+        check(!paint.takeVisualClear(), "visual atlas reset is consumed once");
     }
     if (failures) return 1;
     std::cout << "Reference face paint layout and splats passed\n";

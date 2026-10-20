@@ -38,6 +38,7 @@ public:
     const std::vector<std::unique_ptr<PlayerSimulation>>& actors() const { return actors_; }
     const std::vector<std::unique_ptr<BotSimulation>>& bots() const { return bots_; }
     const std::vector<MatchRosterEntry>& roster() const { return roster_; }
+    const StageData& stage() const { return stage_; }
     CombatWorld& world() { return world_; }
     BossSimulation* boss() { return boss_.get(); }
     const BossSimulation* boss() const { return boss_.get(); }

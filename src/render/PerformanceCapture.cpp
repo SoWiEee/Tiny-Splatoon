@@ -205,7 +205,7 @@ void PerformanceCapture::write() {
          << "{\n  \"schema\": 2,\n  \"scope\": " << JsonString("native_live_" + mode_ + "_diagnostic")
          << ",\n  \"mode\": " << JsonString(mode_) << ",\n"
          << "  \"qa12_claim\": false,\n"
-         << "  \"limits\": \"Diagnostic includes live source-skinned characters, LOD, a directional shadow map, HDR postprocess, screen lens ink, and pooled world/special FX. Stage environment shading is locally approximated and weapon projectile/device meshes are not rendered. Boss mode renders source-exported geometry, but its animation and material response remain an approximation; QA12 is not claimed.\",\n"
+         << "  \"limits\": \"Component integration diagnostic. Whole-scene reference image parity, complete device materials and the full QA12 workload are not accepted. The distant overview camera can cull nearby FX; this report alone does not validate player-view visual quality or worst-case effects performance.\",\n"
          << "  \"stage\": " << JsonString(stage_) << ",\n  \"seed\": " << seed_
          << ",\n  \"resolution\": [" << width_ << ", " << height_ << "],\n"
          << "  \"warmup_frames\": " << warmupFrames_ << ",\n  \"measured_frames\": " << measuredFrames_ << ",\n"

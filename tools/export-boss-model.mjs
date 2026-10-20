@@ -18,15 +18,16 @@ const text = (value) => Buffer.from(value, 'ascii');
 const string = (value) => Buffer.concat([Buffer.from([text(value).length]), text(value)]);
 const number = (value) => { if (!Number.isFinite(value)) throw new Error('Non-finite boss model value'); return Math.fround(value); };
 
-function packMesh(name, positions, normals, joints, weights, material, indices) {
+function packMesh(name, positions, normals, uv, joints, weights, material, indices) {
   const count = positions.length / 3;
-  if (normals.length !== count * 3 || joints.length !== count * 4 || weights.length !== count * 4 || material.length !== count * 4)
+  if (normals.length !== count * 3 || uv.length !== count * 2 || joints.length !== count * 4 || weights.length !== count * 4 || material.length !== count * 4)
     throw new Error(`Incomplete source attributes in ${name}`);
-  const vertices = Buffer.alloc(count * 60);
+  const vertices = Buffer.alloc(count * 68);
   let offset = 0;
   for (let i = 0; i < count; i++) {
     for (let j = 0; j < 3; j++) { vertices.writeFloatLE(number(positions[i * 3 + j]), offset); offset += 4; }
     for (let j = 0; j < 3; j++) { vertices.writeFloatLE(number(normals[i * 3 + j]), offset); offset += 4; }
+    for (let j = 0; j < 2; j++) { vertices.writeFloatLE(number(uv[i * 2 + j]), offset); offset += 4; }
     for (let j = 0; j < 4; j++) { const bone = joints[i * 4 + j]; if (bone > 255) throw new Error(`Boss rig exceeds byte index: ${bone}`); vertices.writeUInt8(bone, offset++); }
     for (let j = 0; j < 4; j++) { vertices.writeFloatLE(number(weights[i * 4 + j]), offset); offset += 4; }
     for (let j = 0; j < 4; j++) { vertices.writeFloatLE(number(material[i * 4 + j]), offset); offset += 4; }
@@ -53,11 +54,13 @@ function u16(value) { const out = Buffer.alloc(2); out.writeUInt16LE(value); ret
 function u8(value) { return Buffer.from([value ? 1 : 0]); }
 function f32(value) { const out = Buffer.alloc(4); out.writeFloatLE(number(value)); return out; }
 function v3(value) { return value.toArray().map(f32); }
+function f64(value) { if (!Number.isFinite(value)) throw new Error('Non-finite boss pose-rig value'); const out = Buffer.alloc(8); out.writeDoubleLE(value); return out; }
+function v3d(value) { return value.toArray().map(f64); }
 
 const rig = buildRig();
 const parts = buildParts(rig, 'high');
 const hullMeshes = Object.entries(parts.buckets).map(([name, bucket]) => packMesh(name,
-  bucket.P, bucket.N, bucket.SI, bucket.SW, bucket.M, bucket.I));
+  bucket.P, bucket.N, bucket.UV, bucket.SI, bucket.SW, bucket.M, bucket.I));
 const sourceModel = await readFile(resolve(root, 'splat-ref/src/boss/bossModel.js'), 'utf8');
 const hitSource = sourceModel.match(/const HIT = \[([\s\S]*?)\];/);
 if (!hitSource) throw new Error('Source BossModel hit shapes not found');
@@ -84,23 +87,24 @@ const hull = rigData('hullbreaker', rig, hullMeshes, hitSockets);
 const crab = buildCrablet('high');
 const geo = crab.geo;
 const attr = (name) => [...geo.attributes[name].array];
-const crabMesh = packMesh('crablet', attr('position'), attr('normal'), attr('skinIndex'), attr('skinWeight'), attr('aM'), [...geo.index.array]);
+const crabMesh = packMesh('crablet', attr('position'), attr('normal'), attr('uv'), attr('skinIndex'), attr('skinWeight'), attr('aM'), [...geo.index.array]);
 const crablet = rigData('crablet', crab, [crabMesh]);
 
 const models = [hull, crablet];
-const binary = Buffer.concat([text('IBOS'), u32(1), u32(models.length), ...models.map((model) => model.data)]);
+const binary = Buffer.concat([text('IBOS'), u32(2), u32(models.length), ...models.map((model) => model.data)]);
 const poseRig = Buffer.concat([
-  text('IBPR'), u32(1), ...v3(BODY.pivot), ...v3(CONT.pos), f32(CONT.pitch), f32(CONT.hl), f32(CONT.hw), f32(CONT.hh),
-  ...MC.toArray().map(f32), ...v3(HEAD.nozzle), ...v3(HEAD.nozzleTip), u32(LEGS.length),
-  ...LEGS.flatMap((leg) => [...v3(leg.hip), ...v3(leg.cox), ...v3(leg.knee), ...v3(leg.ankle), ...v3(leg.foot), ...v3(leg.out), f32(leg.ld), f32(leg.l1), f32(leg.l2), f32(leg.side)]),
-  u32(ARMS.length), ...ARMS.flatMap((arm) => [...v3(arm.S), ...v3(arm.E), ...v3(arm.W), ...v3(arm.D), ...v3(arm.U), ...v3(arm.pole), ...v3(arm.hinge), f32(arm.lu), f32(arm.lf), u8(arm.crusher)]),
+  text('IBPR'), u32(2), u32(rig.bones.length), ...rig.bones.flatMap((bone) => [string(bone.name), ...v3d(bone.position)]),
+  ...v3d(BODY.pivot), ...v3d(CONT.pos), f64(CONT.pitch), f64(CONT.hl), f64(CONT.hw), f64(CONT.hh),
+  ...MC.toArray().map(f64), ...v3d(HEAD.nozzle), ...v3d(HEAD.nozzleTip), u32(LEGS.length),
+  ...LEGS.flatMap((leg) => [...v3d(leg.hip), ...v3d(leg.cox), ...v3d(leg.knee), ...v3d(leg.ankle), ...v3d(leg.foot), ...v3d(leg.out), f64(leg.ld), f64(leg.l1), f64(leg.l2), f64(leg.side)]),
+  u32(ARMS.length), ...ARMS.flatMap((arm) => [...v3d(arm.S), ...v3d(arm.E), ...v3d(arm.W), ...v3d(arm.D), ...v3d(arm.U), ...v3d(arm.pole), ...v3d(arm.hinge), f64(arm.lu), f64(arm.lf), u8(arm.crusher)]),
   u32(rig.chains.length), ...rig.chains.flatMap((chain) => [
-    string(chain.name), string(chain.parent), u16(chain.pts.length), ...chain.pts.flatMap(v3), u16(chain.bones.length), ...chain.bones.map(string),
-    u8(!!chain.plane), ...(chain.plane || [0, 0, 0, 0]).map(f32), f32(chain.damp ?? 0.98), f32(chain.stiff || 0), f32(chain.grav ?? 1), u8(!!chain.flag), u8(!!chain.kelp),
+    string(chain.name), string(chain.parent), ...v3d(rig.rest[chain.parent]), u16(chain.pts.length), ...chain.pts.flatMap(v3d), u16(chain.bones.length), ...chain.bones.map(string),
+    u8(!!chain.plane), ...(chain.plane || [0, 0, 0, 0]).map(f64), f64(chain.damp ?? 0.98), f64(chain.stiff || 0), f64(chain.grav ?? 1), u8(!!chain.flag), u8(!!chain.kelp),
   ]),
 ]);
 const manifest = Buffer.from(`${JSON.stringify({
-  version: 1,
+  version: 3,
   source: Object.fromEntries(await Promise.all(['bossModelGeo.js', 'bossModel.js'].map(async (file) => [
     file, hash(await readFile(resolve(root, 'splat-ref/src/boss', file))),
   ]))),

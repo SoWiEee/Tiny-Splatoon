@@ -14,12 +14,14 @@ int main(int argc,char** argv){
         const auto poseRig=LoadBossPoseRig(std::filesystem::path(argv[1]).parent_path()/"pose-rig.bin");
         const auto& hull=models.at(0);const auto& crab=models.at(1);
         if(hull.bones.size()!=100||hull.meshes.size()!=5||hull.sockets.size()!=10)throw std::runtime_error("Source HULLBREAKER rig/model/socket set is incomplete");
-        std::size_t triangles=0;glm::vec3 lo(1e9f),hi(-1e9f);
+        std::size_t triangles=0;glm::vec3 lo(1e9f),hi(-1e9f);bool hasUvSpan=false;
         for(const auto& mesh:hull.meshes){
             triangles+=mesh.indices.size()/3;
-            for(const auto& vertex:mesh.vertices){lo=glm::min(lo,vertex.position);hi=glm::max(hi,vertex.position);}
+            glm::vec2 uvLo(1e9f),uvHi(-1e9f);
+            for(const auto& vertex:mesh.vertices){lo=glm::min(lo,vertex.position);hi=glm::max(hi,vertex.position);uvLo=glm::min(uvLo,vertex.uv);uvHi=glm::max(uvHi,vertex.uv);}
+            hasUvSpan|=uvHi.x-uvLo.x>.5f&&uvHi.y-uvLo.y>.5f;
         }
-        if(triangles!=59010||hi.x-lo.x<7.0f||hi.y-lo.y<4.0f||hi.z-lo.z<10.0f)throw std::runtime_error("Boss asset lost its source-scale articulated geometry");
+        if(triangles!=59010||hi.x-lo.x<7.0f||hi.y-lo.y<4.0f||hi.z-lo.z<10.0f||!hasUvSpan)throw std::runtime_error("Boss asset lost its source-scale geometry or material UVs");
         if(crab.name!="crablet"||crab.bones.size()<10||crab.meshes.size()!=1||crab.meshes.front().indices.size()/3!=1840)throw std::runtime_error("Source crablet model is incomplete");
         const std::array<const char*,10> names={"shellF","shellR","body","clawL","clawR","eyeL","eyeR","belly","crackL","crackR"};
         for(std::size_t i=0;i<names.size();++i)if(hull.sockets[i].name!=names[i])throw std::runtime_error("Boss hit socket order differs from source");

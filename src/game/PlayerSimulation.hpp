@@ -90,6 +90,8 @@ public:
     double turfPainted() const { return turfPainted_; }
     int deaths() const { return deaths_; }
     int shotsFired() const { return shotsFired_; }
+    glm::dvec3 muzzle(int side=0) const { return runner_.muzzle(side); }
+    void setMuzzleSource(std::function<glm::dvec3(int)> source) { muzzleSource_=std::move(source); }
 
     PlayerState state;
     PlayerInput input;
@@ -144,6 +146,7 @@ private:
     std::function<void(double)> poseFrameSink_;
     std::function<void(double,const glm::dvec3*)> damageSink_;
     std::function<void(bool)> splatSink_;
+    std::function<glm::dvec3(int)> muzzleSource_;
 };
 
 } // namespace restoration

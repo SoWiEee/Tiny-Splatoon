@@ -50,6 +50,7 @@ struct BossThreat {
     double level=0,ax=0,az=0,ringIn=-1;
     bool cover=false,beam=false,lane=false;
 };
+struct BossPoseHitPulse { double flash=0,weakFlash=0,hurt=0; };
 struct BossState {
     glm::dvec3 pos{0},vel{0};
     double yaw=0,turn=0,clock=0,hp=0,maxHp=0;
@@ -67,6 +68,8 @@ public:
     void tick(double dt,bool playing);
     void finish();
     const BossState& state() const {return state_;}
+    std::optional<glm::dvec3> poseAim() const;
+    BossPoseHitPulse takePoseHitPulse();
     const BossNav& nav() const {return nav_;}
     const std::optional<BossMove>& move() const {return move_;}
     const std::vector<BossMove>& moves() const {return moves_;}
@@ -132,5 +135,6 @@ private:
     std::array<double,8> attention_{},damageBy_{},totalDamageBy_{};
     std::array<int,8> weakHitsBy_{},splatsBy_{};
     std::vector<std::string> oneShotHits_;
+    BossPoseHitPulse poseHitPulse_;
 };
 } // namespace restoration

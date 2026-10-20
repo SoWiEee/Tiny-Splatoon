@@ -54,6 +54,7 @@ double BossSimulation::random(){
 double BossSimulation::pace()const{return difficulty_=="easy"?1.25:difficulty_=="hard"?.85:1;}
 void BossSimulation::reset(){
     seed_=initialSeed_;state_={};move_.reset();moves_.clear();crabs_.clear();oneShotHits_.clear();
+    poseHitPulse_={};
     forcedMove_.reset();lastMove_.reset();attention_.fill(0);damageBy_.fill(0);totalDamageBy_.fill(0);weakHitsBy_.fill(0);splatsBy_.fill(0);
     externalHitShapes_=false;spawnedCrabs_=false;finished_=false;pendingPhase_=0;crabSeq_=1;
     cool_=2.4;retarget_=goalTime_=stuckTime_=speed_=crabletCooldown_=frenzyCooldown_=0;
@@ -80,6 +81,22 @@ void BossSimulation::forceMove(BossMoveId id){forcedMove_=id;cool_=0;}
 PlayerSimulation* BossSimulation::targetActor()const{
     return state_.target>=0&&state_.target<static_cast<int>(squad_.size())&&squad_[state_.target]->state.alive?squad_[state_.target]:nullptr;
 }
+std::optional<glm::dvec3> BossSimulation::poseAim()const{
+    if(state_.dead)return std::nullopt;
+    if(state_.anim==0&&move_&&move_->phase(state_.clock)!=BossMovePhase::None){
+        const auto& m=*move_;const double u=state_.clock-m.t0;
+        switch(m.id){
+        case BossMoveId::Slam:return m.point;
+        case BossMoveId::Sweep:{const double a=u<m.tele?m.a0:beamAngle(m,state_.clock);return glm::dvec3(m.origin.x+std::sin(a)*12,m.point.y,m.origin.z+std::cos(a)*12);}
+        case BossMoveId::Charge:return m.point+glm::dvec3(std::sin(m.yaw)*(m.length+3),1,std::cos(m.yaw)*(m.length+3));
+        case BossMoveId::Barrage:if(!m.barrels.empty()){const auto it=std::find_if(m.barrels.begin(),m.barrels.end(),[u](const auto& b){return b.throwAt+.2>u;});const auto& b=it==m.barrels.end()?m.barrels.back():*it;return glm::dvec3(b.x,b.y,b.z);}break;
+        default:break;
+        }
+    }
+    if(const auto* target=targetActor())return target->state.pos+glm::dvec3(0,1,0);
+    return std::nullopt;
+}
+BossPoseHitPulse BossSimulation::takePoseHitPulse(){const auto pulse=poseHitPulse_;poseHitPulse_={};return pulse;}
 void BossSimulation::chooseTarget(){
     retarget_=3+random()*2.5;
     int best=-1;double score=-std::numeric_limits<double>::infinity();
@@ -577,6 +594,9 @@ std::optional<BossSegmentHit> BossSimulation::segmentHit(glm::dvec3 from,glm::dv
 }
 double BossSimulation::applyDamage(PlayerSimulation& attacker,double amount,bool weak){
     if(state_.dead||state_.invulnerable||!state_.visible||finished_)return 0;
+    poseHitPulse_.flash=std::max(poseHitPulse_.flash,std::clamp(amount/90.0,.25,1.0));
+    if(weak)poseHitPulse_.weakFlash=std::max(poseHitPulse_.weakFlash,std::clamp(amount/90.0,.25,1.0));
+    if(amount>=60)poseHitPulse_.hurt=std::max(poseHitPulse_.hurt,std::clamp(amount/160.0,.3,1.0));
     const double landed=std::min(amount,state_.hp);state_.hp-=landed;
     const int index=static_cast<int>(std::distance(squad_.begin(),std::find(squad_.begin(),squad_.end(),&attacker)));
     if(index>=0&&index<static_cast<int>(damageBy_.size())){

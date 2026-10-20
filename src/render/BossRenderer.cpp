@@ -2,15 +2,23 @@
 #include "BossPose.hpp"
 #include "BossSimulation.hpp"
 #include "StageGeometry.hpp"
+#include "CharacterShader.hpp"
+#include "CharacterRenderData.hpp"
 #include <glad/glad.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <fstream>
+#include <iterator>
+#include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <glm/gtc/type_ptr.hpp>
+#include <zlib.h>
 
 namespace restoration {
 namespace {
@@ -24,114 +32,104 @@ GLuint link(const char* vertex,const char* fragment){
     const GLuint program=glCreateProgram();glAttachShader(program,vs);glAttachShader(program,fs);glLinkProgram(program);glDeleteShader(vs);glDeleteShader(fs);
     GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok){char log[4096]{};glGetProgramInfoLog(program,sizeof(log),nullptr,log);glDeleteProgram(program);throw std::runtime_error(std::string("Boss program: ")+log);}return program;
 }
-struct Vertex {float position[3],normal[3];std::uint8_t joints[4];float weights[4],material[4];};
+struct Vertex {float position[3],normal[3],uv[2];std::uint8_t joints[4];float weights[4],material[4];};
 struct LineVertex {glm::vec3 position;glm::vec4 color;};
-struct GpuMesh {GLuint vao=0,vbo=0,ebo=0;GLsizei count=0;int material=0;};
+struct GpuMesh {GLuint vao=0,vbo=0,ebo=0;GLsizei count=0;std::string material;};
 struct GpuModel {std::vector<GpuMesh> meshes;};
-glm::mat4 fmat(const glm::dmat4& matrix){return glm::mat4(matrix);}
-const char* bossVertex=R"GLSL(#version 450 core
-layout(location=0) in vec3 position;
-layout(location=1) in vec3 normal;
-layout(location=2) in uvec4 joints;
-layout(location=3) in vec4 weights;
-layout(location=4) in vec4 material;
-uniform mat4 uModel,uView,uProjection;
-uniform mat4 uBones[100];
-out vec3 vNormal;out vec3 vWorld;out vec3 vBind;out vec4 vMaterial;
-void main(){
-    mat4 skin=uBones[joints.x]*weights.x+uBones[joints.y]*weights.y+
-              uBones[joints.z]*weights.z+uBones[joints.w]*weights.w;
-    vec4 p=skin*vec4(position,1.0);vec4 world=uModel*p;
-    vWorld=world.xyz;vBind=position;vMaterial=material;
-    vNormal=normalize(mat3(uModel)*mat3(skin)*normal);
-    gl_Position=uProjection*uView*world;
-})GLSL";
-const char* bossFragment=R"GLSL(#version 450 core
-in vec3 vNormal;in vec3 vWorld;in vec3 vBind;in vec4 vMaterial;
-uniform int uMaterial;uniform int uPhase;uniform bool uDead;uniform float uTime;uniform vec3 uInk,uWeak;
-out vec4 outColor;
-vec3 linear(vec3 c){return pow(c,vec3(2.2));}
-float noise(vec3 p){return fract(sin(dot(floor(p),vec3(127.1,311.7,74.7)))*43758.5453);}
-void main(){
-    float cls=floor(vMaterial.x+.5),param=floor(vMaterial.y+.5),ao=clamp(vMaterial.z,.18,1.0),extra=floor(vMaterial.w+.5);
-    vec3 c;float emissive=0.0,rough=.72;
-    if(uMaterial==0){
-        if(cls<.5){float corr=.92+.08*sin(vBind.x*34.0);float wear=smoothstep(.62,.94,noise(vBind*5.0));c=mix(vec3(.025,.245,.215),vec3(.28,.105,.045),wear*.62)*corr;rough=.76;}
-        else if(cls<1.5){c=vec3(.18,.21,.205);rough=.54;}
-        else if(cls<2.5){c=vec3(.3,.24,.12);rough=.64;}
-        else if(cls<5.5){c=vec3(.26,.11,.055);}
-        else if(cls<6.5){c=vec3(.22,.13,.075);}
-        else if(cls<7.5){c=linear(uInk)*.75;rough=.27;}
-        else c=vec3(.105,.11,.115);
-    }else if(uMaterial==1){
-        float tone=clamp(param,0.0,1.0);c=mix(vec3(.10,.18,.16),vec3(.42,.34,.22),tone);c*=.88+.12*noise(vBind*8.0);rough=.49;
-    }else if(uMaterial==2){c=cls<1.5?vec3(.33,.18,.13):vec3(.25,.13,.105);rough=.68;}
-    else if(uMaterial==3){c=linear(uPhase>=2?uWeak:uInk)*1.35;emissive=1.4;rough=.2;}
-    else if(uMaterial==4){
-        if(cls<.5)c=vec3(.055,.06,.055);else if(cls<1.5)c=vec3(.30,.27,.19);else if(cls<3.5)c=vec3(.20,.22,.21);else if(cls<4.5)c=vec3(.13,.23,.1);else if(cls<5.5)c=mix(vec3(.12,.22,.1),linear(uInk),.3);else c=linear(uInk);rough=.78;
-    }else{
-        if(cls<.5)c=mix(vec3(.06,.22,.20),vec3(.19,.28,.25),clamp(param,0.0,1.0));
-        else if(cls<1.5)c=linear(uWeak)*.8;else c=linear(uInk)*1.4;emissive=cls>=2.0?1.2:0.0;rough=.52;
-    }
-    float rust=smoothstep(.74,.97,noise(vBind*3.2+4.0));
-    if(uMaterial==0&&cls<2.5)c=mix(c,vec3(.23,.072,.025),rust*.38);
-    vec3 n=normalize(vNormal),l=normalize(vec3(-.4,.85,.35)),v=normalize(vec3(0,0,1));
-    float diffuse=.28+.72*max(dot(n,l),0.0);float spec=pow(max(dot(reflect(-l,n),v),0.0),mix(48.0,10.0,rough))*mix(.12,.38,1.0-rough);
-    vec3 color=c*(diffuse*ao)+(spec+emissive)*linear((uMaterial==3||cls>=6.0)?uInk:vec3(1.0));
-    if(!uDead&&uPhase>=2&&cls<.5&&extra>1.0){float glow=.15+.12*sin(uTime*4.0);color+=linear(uWeak)*glow;}
-    outColor=vec4(color,1.0);
-})GLSL";
 const char* lineVertex=R"GLSL(#version 450 core
 layout(location=0) in vec3 position;layout(location=1) in vec4 color;uniform mat4 vp;out vec4 vColor;
 void main(){vColor=color;gl_Position=vp*vec4(position,1.0);})GLSL";
 const char* lineFragment=R"GLSL(#version 450 core
 in vec4 vColor;out vec4 outColor;void main(){outColor=vColor;})GLSL";
-int materialIndex(const std::string& name){if(name=="steel")return 0;if(name=="cara")return 1;if(name=="flesh")return 2;if(name=="eye")return 3;if(name=="junk")return 4;return 5;}
 }
 
 struct BossRenderer::State {
-    explicit State(std::filesystem::path path):pose(path/"model.bin"){}
+    explicit State(std::filesystem::path path):assets(std::move(path)),pose(assets/"model.bin"){}
+    std::filesystem::path assets;
     BossPose pose;
-    GLuint program=0,lineProgram=0,lineVao=0,lineVbo=0;
+    GLuint lineProgram=0,lineVao=0,lineVbo=0,boneTexture=0,dfgTexture=0,stencilTexture=0;
+    std::map<std::string,std::unique_ptr<CharacterShader>> shaders;
     GpuModel hull,crablet;
     bool ready=false;
     ~State(){
         for(auto* model:{&hull,&crablet})for(auto& mesh:model->meshes){if(mesh.ebo)glDeleteBuffers(1,&mesh.ebo);if(mesh.vbo)glDeleteBuffers(1,&mesh.vbo);if(mesh.vao)glDeleteVertexArrays(1,&mesh.vao);}
-        if(lineVbo)glDeleteBuffers(1,&lineVbo);if(lineVao)glDeleteVertexArrays(1,&lineVao);if(program)glDeleteProgram(program);if(lineProgram)glDeleteProgram(lineProgram);
+        if(lineVbo)glDeleteBuffers(1,&lineVbo);if(lineVao)glDeleteVertexArrays(1,&lineVao);if(lineProgram)glDeleteProgram(lineProgram);
+        const GLuint textures[]={boneTexture,dfgTexture,stencilTexture};glDeleteTextures(3,textures);
+    }
+    GLuint readStencil(){
+        std::ifstream file(assets/"shaders"/"stencil.tex.z",std::ios::binary);
+        std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)),{});
+        if(bytes.size()<24||std::string(bytes.begin(),bytes.begin()+8)!="TSTEX001")throw std::runtime_error("Invalid source Boss stencil header");
+        const auto u32=[&](std::size_t at){return std::uint32_t(bytes[at])|(std::uint32_t(bytes[at+1])<<8)|(std::uint32_t(bytes[at+2])<<16)|(std::uint32_t(bytes[at+3])<<24);};
+        const auto width=u32(8),height=u32(12),layers=u32(16),srgb=u32(20);
+        if(width!=1024||height!=1024||layers!=1||srgb!=0)throw std::runtime_error("Invalid source Boss stencil dimensions");
+        std::vector<unsigned char> pixels(std::size_t(width)*height*4);uLongf size=static_cast<uLongf>(pixels.size());
+        if(uncompress(pixels.data(),&size,bytes.data()+24,static_cast<uLong>(bytes.size()-24))!=Z_OK||size!=pixels.size())throw std::runtime_error("Invalid compressed source Boss stencil");
+        GLuint texture=0;glGenTextures(1,&texture);glBindTexture(GL_TEXTURE_2D,texture);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());glGenerateMipmap(GL_TEXTURE_2D);return texture;
+    }
+    void loadShader(const std::string& name){
+        const auto directory=assets/"shaders";
+        auto shader=std::make_unique<CharacterShader>(CharacterShader::readSource(directory/(name+".vert")),CharacterShader::readSource(directory/(name+".frag")),true);
+        shader->use();std::ifstream defaults(directory/(name+".uniforms"));std::string key;std::size_t count;
+        if(!defaults)throw std::runtime_error("Missing source Boss material defaults: "+name);
+        while(defaults>>key>>count){if(!count||count>64)throw std::runtime_error("Invalid source Boss uniform shape: "+key);std::vector<double> values(count);for(auto& value:values)if(!(defaults>>value))throw std::runtime_error("Truncated source Boss material defaults: "+key);shader->uniform(key,values);}
+        shader->uniform("uStencil",8);shader->uniform("dfgLUT",6);shader->uniform("boneTexture",7);
+        shaders.emplace(name,std::move(shader));
     }
     void ensureGpu(){
-        if(ready)return;program=link(bossVertex,bossFragment);lineProgram=link(lineVertex,lineFragment);
+        if(ready)return;
+        GLint previousProgram=0,previousVao=0,previousBuffer=0,previousActive=0,previousTexture=0;
+        glGetIntegerv(GL_CURRENT_PROGRAM,&previousProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&previousVao);glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&previousBuffer);
+        glGetIntegerv(GL_ACTIVE_TEXTURE,&previousActive);glGetIntegerv(GL_TEXTURE_BINDING_2D,&previousTexture);
+        for(const auto* name:{"steel","cara","flesh","eye","junk","crablet"})loadShader(name);
+        lineProgram=link(lineVertex,lineFragment);
+        glGenTextures(1,&boneTexture);glBindTexture(GL_TEXTURE_2D,boneTexture);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        const std::array<float,100*16> identity=[](){std::array<float,100*16> data{};for(std::size_t i=0;i<100;++i)for(std::size_t d=0;d<4;++d)data[i*16+d*5]=1;return data;}();
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA32F,4,100,0,GL_RGBA,GL_FLOAT,identity.data());
+        glGenTextures(1,&dfgTexture);glBindTexture(GL_TEXTURE_2D,dfgTexture);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RG16F,16,16,0,GL_RG,GL_HALF_FLOAT,CharacterDfg.data());
+        stencilTexture=readStencil();
         const auto upload=[&](const BossModelAsset& source,GpuModel& target){
             for(const auto& mesh:source.meshes){
                 std::vector<Vertex> vertices;vertices.reserve(mesh.vertices.size());
-                for(const auto& v:mesh.vertices){Vertex out{};for(int i=0;i<3;++i){out.position[i]=v.position[i];out.normal[i]=v.normal[i];}for(int i=0;i<4;++i){out.joints[i]=v.joints[i];out.weights[i]=v.weights[i];out.material[i]=v.material[i];}vertices.push_back(out);}
-                GpuMesh gpu;gpu.count=static_cast<GLsizei>(mesh.indices.size());gpu.material=materialIndex(mesh.name);
+                for(const auto& v:mesh.vertices){Vertex out{};for(int i=0;i<3;++i){out.position[i]=v.position[i];out.normal[i]=v.normal[i];}for(int i=0;i<2;++i)out.uv[i]=v.uv[i];for(int i=0;i<4;++i){out.joints[i]=v.joints[i];out.weights[i]=v.weights[i];out.material[i]=v.material[i];}vertices.push_back(out);}
+                GpuMesh gpu;gpu.count=static_cast<GLsizei>(mesh.indices.size());gpu.material=mesh.name;
+                const auto& shader=*shaders.at(mesh.name);
                 glGenVertexArrays(1,&gpu.vao);glGenBuffers(1,&gpu.vbo);glGenBuffers(1,&gpu.ebo);glBindVertexArray(gpu.vao);
                 glBindBuffer(GL_ARRAY_BUFFER,gpu.vbo);glBufferData(GL_ARRAY_BUFFER,vertices.size()*sizeof(Vertex),vertices.data(),GL_STATIC_DRAW);
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,gpu.ebo);glBufferData(GL_ELEMENT_ARRAY_BUFFER,mesh.indices.size()*sizeof(std::uint32_t),mesh.indices.data(),GL_STATIC_DRAW);
-                glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(offsetof(Vertex,position)));
-                glEnableVertexAttribArray(1);glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(offsetof(Vertex,normal)));
-                glEnableVertexAttribArray(2);glVertexAttribIPointer(2,4,GL_UNSIGNED_BYTE,sizeof(Vertex),reinterpret_cast<void*>(offsetof(Vertex,joints)));
-                glEnableVertexAttribArray(3);glVertexAttribPointer(3,4,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(offsetof(Vertex,weights)));
-                glEnableVertexAttribArray(4);glVertexAttribPointer(4,4,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(offsetof(Vertex,material)));
+                const auto attribute=[&](const char* name,GLint size,GLenum type,std::size_t offset){const GLint location=shader.attribute(name);if(location<0)return;glEnableVertexAttribArray(static_cast<GLuint>(location));glVertexAttribPointer(static_cast<GLuint>(location),size,type,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(offset));};
+                attribute("position",3,GL_FLOAT,offsetof(Vertex,position));attribute("normal",3,GL_FLOAT,offsetof(Vertex,normal));attribute("uv",2,GL_FLOAT,offsetof(Vertex,uv));
+                attribute("skinIndex",4,GL_UNSIGNED_BYTE,offsetof(Vertex,joints));attribute("skinWeight",4,GL_FLOAT,offsetof(Vertex,weights));attribute("aM",4,GL_FLOAT,offsetof(Vertex,material));
                 glBindVertexArray(0);target.meshes.push_back(gpu);
             }
         };
         upload(pose.hullAsset(),hull);upload(pose.crabletAsset(),crablet);
         glGenVertexArrays(1,&lineVao);glGenBuffers(1,&lineVbo);glBindVertexArray(lineVao);glBindBuffer(GL_ARRAY_BUFFER,lineVbo);
         glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(LineVertex),reinterpret_cast<void*>(offsetof(LineVertex,position)));
-        glEnableVertexAttribArray(1);glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,sizeof(LineVertex),reinterpret_cast<void*>(offsetof(LineVertex,color)));glBindVertexArray(0);ready=true;
+        glEnableVertexAttribArray(1);glVertexAttribPointer(1,4,GL_FLOAT,GL_FALSE,sizeof(LineVertex),reinterpret_cast<void*>(offsetof(LineVertex,color)));
+        glBindVertexArray(static_cast<GLuint>(previousVao));glBindBuffer(GL_ARRAY_BUFFER,static_cast<GLuint>(previousBuffer));glUseProgram(static_cast<GLuint>(previousProgram));
+        glActiveTexture(static_cast<GLenum>(previousActive));glBindTexture(GL_TEXTURE_2D,static_cast<GLuint>(previousTexture));ready=true;
     }
-    void drawModel(const GpuModel& model,const BossRigPose& rig,const glm::mat4& view,const glm::mat4& projection,
-                   const glm::vec3& ink,const glm::vec3& weak,int phase,bool dead,float time){
-        std::array<glm::mat4,100> bones;bones.fill(glm::mat4(1.0f));
-        for(std::size_t i=0;i<std::min(bones.size(),rig.skin.size());++i)bones[i]=fmat(rig.skin[i]);
-        const auto root=fmat(rig.root);glUniformMatrix4fv(glGetUniformLocation(program,"uBones[0]"),static_cast<GLsizei>(bones.size()),GL_FALSE,glm::value_ptr(bones[0]));
-        glUniformMatrix4fv(glGetUniformLocation(program,"uModel"),1,GL_FALSE,glm::value_ptr(root));
-        glUniformMatrix4fv(glGetUniformLocation(program,"uView"),1,GL_FALSE,&view[0][0]);glUniformMatrix4fv(glGetUniformLocation(program,"uProjection"),1,GL_FALSE,&projection[0][0]);
-        glUniform3fv(glGetUniformLocation(program,"uInk"),1,&ink[0]);glUniform3fv(glGetUniformLocation(program,"uWeak"),1,&weak[0]);
-        glUniform1i(glGetUniformLocation(program,"uPhase"),phase);glUniform1i(glGetUniformLocation(program,"uDead"),dead);glUniform1f(glGetUniformLocation(program,"uTime"),time);
-        for(const auto& mesh:model.meshes){glUniform1i(glGetUniformLocation(program,"uMaterial"),mesh.material);glBindVertexArray(mesh.vao);glDrawElements(GL_TRIANGLES,mesh.count,GL_UNSIGNED_INT,nullptr);}
+    void drawModel(const GpuModel& model,const BossRigPose& rig,const glm::dmat4& view,const glm::dmat4& projection,
+                   glm::dvec3 camera,const CharacterLightState& lights){
+        if(rig.skin.size()>100)throw std::runtime_error("Boss skin palette exceeds source material limit");
+        std::array<float,100*16> bones{};for(std::size_t i=0;i<100;++i)for(std::size_t d=0;d<4;++d)bones[i*16+d*5]=1;
+        for(std::size_t i=0;i<rig.skin.size();++i){const auto* matrix=glm::value_ptr(rig.skin[i]);for(std::size_t j=0;j<16;++j)bones[i*16+j]=static_cast<float>(matrix[j]);}
+        glActiveTexture(GL_TEXTURE7);glBindTexture(GL_TEXTURE_2D,boneTexture);glTexSubImage2D(GL_TEXTURE_2D,0,0,0,4,100,GL_RGBA,GL_FLOAT,bones.data());
+        glActiveTexture(GL_TEXTURE6);glBindTexture(GL_TEXTURE_2D,dfgTexture);glActiveTexture(GL_TEXTURE8);glBindTexture(GL_TEXTURE_2D,stencilTexture);
+        static const std::vector<double> identityMatrix={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+        for(const auto& mesh:model.meshes){
+            auto& shader=*shaders.at(mesh.material);shader.use();
+            shader.matrices(rig.root,view,projection,camera);shader.lights(lights,view);
+            shader.uniform("boneTexture",7);shader.uniform("bindMatrix",identityMatrix);shader.uniform("bindMatrixInverse",identityMatrix);
+            shader.uniform("dfgLUT",6);shader.uniform("uStencil",8);
+            for(const auto& [name,values]:pose.materialUniforms())shader.uniform(name,values);
+            glBindVertexArray(mesh.vao);glDrawElements(GL_TRIANGLES,mesh.count,GL_UNSIGNED_INT,nullptr);
+        }
     }
 };
 
@@ -141,23 +139,29 @@ void BossRenderer::Update(BossSimulation& boss){state_->pose.Update(boss);}
 int BossRenderer::DrawShadow(const BossSimulation& boss,const glm::mat4& lightViewProjection){
     if(!boss.state().visible)return 0;
     state_->ensureGpu();
-    GLint oldProgram=0;glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);
+    GLint oldProgram=0,oldVao=0,oldActive=0,textures[3]{};glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&oldVao);glGetIntegerv(GL_ACTIVE_TEXTURE,&oldActive);
+    for(int i=0;i<3;++i){glActiveTexture(GL_TEXTURE6+i);glGetIntegerv(GL_TEXTURE_BINDING_2D,&textures[i]);}glActiveTexture(oldActive);
     const GLboolean depth=glIsEnabled(GL_DEPTH_TEST),cull=glIsEnabled(GL_CULL_FACE),blend=glIsEnabled(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDepthFunc(GL_LESS);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);glUseProgram(state_->program);
-    const glm::mat4 identity(1.0f);const glm::vec3 ink(.0258f,.102f,1.0f),weak(1.0f,.258f,.0037f);
-    state_->drawModel(state_->hull,state_->pose.hullbreaker(),identity,lightViewProjection,ink,weak,boss.state().phase,boss.state().dead,static_cast<float>(boss.state().clock));
-    for(const auto& crab:state_->pose.crablets()){BossRigPose pose;pose.root=crab.root;pose.skin=crab.skin;state_->drawModel(state_->crablet,pose,identity,lightViewProjection,ink,weak,boss.state().phase,false,static_cast<float>(boss.state().clock));}
-    glBindVertexArray(0);glUseProgram(static_cast<GLuint>(oldProgram));if(depth)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);if(blend)glEnable(GL_BLEND);else glDisable(GL_BLEND);glDepthFunc(GL_LESS);glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDepthFunc(GL_LESS);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);
+    const glm::dmat4 identity(1.0),projection(lightViewProjection);CharacterLightState lights;lights.ambient={.22f,.22f,.22f};lights.sunDirection=glm::normalize(glm::vec3(-.4f,.85f,.35f));lights.sunColor={1.0f,.92f,.82f};lights.skyDirection={0,1,0};lights.skyColor={.32f,.42f,.5f};lights.groundColor={.18f,.15f,.12f};
+    state_->drawModel(state_->hull,state_->pose.hullbreaker(),identity,projection,glm::dvec3(0),lights);
+    for(const auto& crab:state_->pose.crablets()){BossRigPose pose;pose.root=crab.root;pose.skin=crab.skin;state_->drawModel(state_->crablet,pose,identity,projection,glm::dvec3(0),lights);}
+    glBindVertexArray(static_cast<GLuint>(oldVao));glUseProgram(static_cast<GLuint>(oldProgram));for(int i=0;i<3;++i){glActiveTexture(GL_TEXTURE6+i);glBindTexture(GL_TEXTURE_2D,static_cast<GLuint>(textures[i]));}glActiveTexture(oldActive);
+    if(depth)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);if(blend)glEnable(GL_BLEND);else glDisable(GL_BLEND);glDepthFunc(GL_LESS);glDepthMask(GL_TRUE);
     return static_cast<int>(state_->hull.meshes.size()+state_->crablet.meshes.size()*state_->pose.crablets().size());
 }
-int BossRenderer::Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,const glm::vec3&,const glm::vec3& squadColor){
-    if(!boss.state().visible)return 0;state_->ensureGpu();const GLboolean depth=glIsEnabled(GL_DEPTH_TEST),cull=glIsEnabled(GL_CULL_FACE),blend=glIsEnabled(GL_BLEND);GLint oldProgram=0;glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);
-    glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDepthFunc(GL_LEQUAL);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);glUseProgram(state_->program);
-    const glm::vec3 bossInk(.0258f,.102f,1.0f),weak=glm::vec3(squadColor);state_->drawModel(state_->hull,state_->pose.hullbreaker(),view,projection,bossInk,weak,boss.state().phase,boss.state().dead,static_cast<float>(boss.state().clock));
+int BossRenderer::Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const glm::vec3& squadColor){
+    if(!boss.state().visible)return 0;state_->ensureGpu();const GLboolean depth=glIsEnabled(GL_DEPTH_TEST),cull=glIsEnabled(GL_CULL_FACE),blend=glIsEnabled(GL_BLEND);GLint oldProgram=0,oldVao=0,oldActive=0,textures[3]{};glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&oldVao);glGetIntegerv(GL_ACTIVE_TEXTURE,&oldActive);
+    for(int i=0;i<3;++i){glActiveTexture(GL_TEXTURE6+i);glGetIntegerv(GL_TEXTURE_BINDING_2D,&textures[i]);}glActiveTexture(oldActive);
+    glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDepthFunc(GL_LEQUAL);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);
+    CharacterLightState lights;lights.ambient={.22f,.22f,.22f};lights.sunDirection=glm::normalize(glm::vec3(-.4f,.85f,.35f));lights.sunColor={1.0f,.92f,.82f};lights.skyDirection={0,1,0};lights.skyColor={.32f,.42f,.5f};lights.groundColor={.18f,.15f,.12f};
+    (void)squadColor;const glm::dmat4 viewD(view),projectionD(projection);const glm::dvec3 cameraD(camera);
+    state_->drawModel(state_->hull,state_->pose.hullbreaker(),viewD,projectionD,cameraD,lights);
     for(const auto& crab:state_->pose.crablets()){
-        BossRigPose pose;pose.root=crab.root;pose.skin=crab.skin;state_->drawModel(state_->crablet,pose,view,projection,bossInk,weak,boss.state().phase,false,static_cast<float>(boss.state().clock));
+        BossRigPose pose;pose.root=crab.root;pose.skin=crab.skin;state_->drawModel(state_->crablet,pose,viewD,projectionD,cameraD,lights);
     }
-    glBindVertexArray(0);glUseProgram(static_cast<GLuint>(oldProgram));if(depth)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);if(blend)glEnable(GL_BLEND);else glDisable(GL_BLEND);glDepthFunc(GL_LESS);glDepthMask(GL_TRUE);
+    glBindVertexArray(static_cast<GLuint>(oldVao));glUseProgram(static_cast<GLuint>(oldProgram));for(int i=0;i<3;++i){glActiveTexture(GL_TEXTURE6+i);glBindTexture(GL_TEXTURE_2D,static_cast<GLuint>(textures[i]));}glActiveTexture(oldActive);
+    if(depth)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);if(blend)glEnable(GL_BLEND);else glDisable(GL_BLEND);glDepthFunc(GL_LESS);glDepthMask(GL_TRUE);
     return static_cast<int>(state_->hull.meshes.size()+state_->crablet.meshes.size()*state_->pose.crablets().size());
 }
 

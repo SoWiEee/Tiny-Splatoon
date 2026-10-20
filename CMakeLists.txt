@@ -30,6 +30,7 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(RmlUi CONFIG REQUIRED)
+find_package(ZLIB REQUIRED)
 find_path(MINIAUDIO_INCLUDE_DIR miniaudio.h)
 if(NOT MINIAUDIO_INCLUDE_DIR)
     message(FATAL_ERROR "miniaudio headers were not found")
@@ -63,16 +64,18 @@ if(MSVC)
 endif()
 add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/RmlRenderer.cpp)
 target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
-add_library(game_audio STATIC src/audio/AudioEngine.cpp)
+add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp)
 target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
 find_package(Threads REQUIRED)
-target_link_libraries(game_audio PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(game_audio PUBLIC restoration_core Threads::Threads ${CMAKE_DL_LIBS})
+add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp)
+target_link_libraries(projectile_visuals PUBLIC restoration_core)
 target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp
-    src/app/GpuPreference.cpp)
-target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio)
+    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp)
+target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals)
 
 target_link_libraries(Tiny-Splatoon PRIVATE 
     glad::glad
@@ -80,6 +83,7 @@ target_link_libraries(Tiny-Splatoon PRIVATE
     OpenGL::GL
     imgui::imgui
     glm::glm
+    ZLIB::ZLIB
 )
 
 add_custom_command(TARGET Tiny-Splatoon POST_BUILD
@@ -93,6 +97,21 @@ set_property(TARGET Tiny-Splatoon APPEND PROPERTY LINK_DEPENDS ${TINY_RUNTIME_AS
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(character_footstep_test tests/character_footstep_test.cpp)
+    target_link_libraries(character_footstep_test PRIVATE restoration_core)
+    add_test(NAME reference_character_footstep COMMAND character_footstep_test)
+    add_executable(boss_material_gpu_test tests/boss_material_gpu_test.cpp src/render/BossRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(boss_material_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
+    add_test(NAME reference_boss_material_gpu COMMAND boss_material_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/boss")
+    add_executable(stage_visual_gpu_test tests/stage_visual_gpu_test.cpp src/render/StageRenderer.cpp src/render/CharacterShader.cpp src/render/DirectionalShadow.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(stage_visual_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
+    add_test(NAME reference_stage_visual_gpu COMMAND stage_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/stages" "${CMAKE_BINARY_DIR}/captures/stage-visual")
+    add_executable(projectile_visual_test tests/projectile_visual_test.cpp)
+    target_link_libraries(projectile_visual_test PRIVATE projectile_visuals)
+    add_test(NAME reference_projectile_visuals COMMAND projectile_visual_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/projectiles/blob-fixtures.txt")
+    add_executable(projectile_gpu_test tests/projectile_gpu_test.cpp src/render/ProjectileRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(projectile_gpu_test PRIVATE projectile_visuals glad::glad glfw OpenGL::GL)
+    add_test(NAME reference_projectile_gpu COMMAND projectile_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/projectiles" "${CMAKE_BINARY_DIR}/captures/projectile-teardrops.png")
     add_executable(rml_renderer_test tests/rml_renderer_test.cpp src/app/GpuPreference.cpp)
     target_link_libraries(rml_renderer_test PRIVATE player_ui)
     add_test(NAME reference_player_ui_renderer COMMAND rml_renderer_test "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -242,6 +261,9 @@ if(BUILD_TESTING)
 
     find_program(REFERENCE_NODE_EXECUTABLE node)
     if(REFERENCE_NODE_EXECUTABLE)
+        add_test(NAME reference_boss_pose
+            COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/boss_pose_oracle.test.mjs "$<TARGET_FILE:boss_pose_eval>")
+        set_tests_properties(reference_boss_pose PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         add_test(NAME reference_character_lod
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/character_lod_oracle.test.mjs "$<TARGET_FILE:character_lod_eval>")
         set_tests_properties(reference_character_lod PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -264,6 +286,14 @@ if(BUILD_TESTING)
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/native_entry_cli.test.mjs "$<TARGET_FILE:Tiny-Splatoon>")
         set_tests_properties(reference_native_entry_cli PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/splat-ref/src/config.js")
+            add_test(NAME reference_boss_material_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-boss-materials.mjs --check)
+            set_tests_properties(reference_boss_material_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_test(NAME reference_stage_visual_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/stage_visual_export.test.mjs)
+            set_tests_properties(reference_stage_visual_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_test(NAME reference_stage_texture_data COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/stage_texture_data.test.mjs)
+            set_tests_properties(reference_stage_texture_data PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_test(NAME reference_projectile_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-projectile-visuals.mjs --check)
+            set_tests_properties(reference_projectile_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_audio_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/audio_source_render.test.mjs)
             set_tests_properties(reference_audio_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" TIMEOUT 180)
             add_test(NAME reference_boss_nav_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-boss-nav-fixtures.mjs --check)

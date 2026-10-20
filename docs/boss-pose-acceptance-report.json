@@ -1,0 +1,106 @@
+{
+  "scenarios": 16,
+  "updates": 3925,
+  "snapshots": 280,
+  "bones": 100,
+  "tolerance": 0.001,
+  "passed": 16,
+  "results": [
+    {
+      "scenario": "idle",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "walk",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "turn",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "aim",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "intro",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "roar",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "phase_change",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "hurt",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "stun_recovery",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "death",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "slam",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "barrage",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "sweep",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "charge",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "crablets",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    },
+    {
+      "scenario": "frenzy",
+      "failures": 0,
+      "maxError": 4.768371586472142e-8,
+      "first": null
+    }
+  ]
+}

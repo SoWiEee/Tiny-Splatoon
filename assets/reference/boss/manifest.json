@@ -1,11 +1,11 @@
 {
-  "version": 1,
+  "version": 3,
   "source": {
     "bossModelGeo.js": "f2a8f0ded37a8239f7242ca0a76a747b5d6a9ca444a4d03c25a39de9cba44c4c",
     "bossModel.js": "2b6da652e8aaac4ac55b4e061a0392301fb829b3db6c13521e1d15eec1c3c0db"
   },
-  "binary": "d7216ffdfa717f0c432ddafce5a2a2bba063a962c27220bfe47a36c2ce021b9b",
-  "poseRig": "8247a0f186f4fc491f50f1857883433f5d6593e25ccc0fa2a5c0465fb02ecffc",
+  "binary": "fccebdfe98b3541142a224dfbe528573d979f62583b67dd6a6aafe9c1c0a1c43",
+  "poseRig": "243eeb12d12d1c16ede9607069e185bc97816b40269dff041ccbdf37b17a4db5",
   "models": [
     {
       "name": "hullbreaker",

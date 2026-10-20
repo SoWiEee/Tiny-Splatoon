@@ -283,6 +283,7 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
 
     lastEvents_=combat.takeVisualEvents();
     for(const auto& event:lastEvents_) {
+        if(event.kind=="beam")continue; // Source charger ribbons are owned by ProjectileRenderer.
         if(!near(event.pos,65))continue;
         emitSpecial(event.kind.c_str(),glm::vec3(event.pos),glm::vec3(event.normal),ink(event.team),float(event.radius),glm::vec3(camera));
     }
@@ -430,11 +431,6 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
             add({Shape::Orb,pos,{},{0,1,0},col,0.5f,0,0,1,1,0,0});
             add({Shape::Bubble,pos,{},{0,1,0},col,0.85f,0,0,1,0.6f,0,0});
         } else if(object.kind=="jetpackShot")add({Shape::Orb,pos,{},{0,1,0},col,0.28f,0,0,1,1,0,0});
-    }
-    for(const auto& shot:combat.projectiles()) {
-        if(!shot.owner||!near(shot.pos,65))continue;
-        add({Shape::Drop,glm::vec3(shot.pos),glm::vec3(shot.vel),unit(glm::vec3(shot.vel)),ink(shot.owner->team()),
-             float(std::max(shot.size,0.025)),0,0,1,1,0,0});
     }
     for(const auto& device:combat.devices()) {
         if(!device.live||!near(device.pos,65))continue;

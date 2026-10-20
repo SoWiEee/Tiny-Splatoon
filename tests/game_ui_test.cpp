@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -59,9 +60,10 @@ int main(int argc,char** argv){
         volume->SetValue("25");volume->DispatchEvent("change",{});Check(master==.25f,"Volume control did not reach the audio bus sink");
         render();Capture(std::filesystem::path(argv[2])/"settings.png",1600,900);
         element("nav-play")->Click();render();Check(element("start")->Focus(),"Start must accept keyboard focus");
+        sounds.clear();
         context->ProcessKeyDown(Rml::Input::KI_RETURN,0);context->ProcessKeyUp(Rml::Input::KI_RETURN,0);
         Check(render()==UiAction::Start,"Enter must activate the selected start action");
-        Check(!sounds.empty()&&sounds.back()=="ui_confirm","Start must emit the source confirm cue");
+        Check(std::count(sounds.begin(),sounds.end(),"ui_confirm")==1,"Start must emit exactly one source confirm cue");
         const StageData* stage=nullptr;
         for(const auto& row:ReferenceStages())if(row.id=="tidewater"&&row.mode=="turf"&&!row.onlineOnly)stage=&row;
         Check(stage!=nullptr,"Missing UI test stage");

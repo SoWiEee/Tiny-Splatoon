@@ -3,12 +3,12 @@
 ###############################################################################
 * text=auto
 # Source-generated artifacts are compared byte for byte on Windows and Unix.
-/restoration/ReferenceData.cpp text eol=lf
-/restoration/ArsenalData.cpp text eol=lf
-/restoration/NavDirections.hpp text eol=lf
-/restoration/CharacterRenderData.hpp text eol=lf
-/restoration/CharacterWeaponData.hpp text eol=lf
-/restoration/SpecialPropData.hpp text eol=lf
+/src/world/ReferenceData.cpp text eol=lf
+/src/game/ArsenalData.cpp text eol=lf
+/src/game/NavDirections.hpp text eol=lf
+/src/render/CharacterRenderData.hpp text eol=lf
+/src/game/CharacterWeaponData.hpp text eol=lf
+/src/game/SpecialPropData.hpp text eol=lf
 /tests/*fixtures.hpp text eol=lf
 /tests/*fixtures.json text eol=lf
 /docs/benchmarks/**/*.json text eol=lf
@@ -20,6 +20,20 @@
 /assets/reference/characters/**/*.txt text eol=lf
 /assets/reference/characters/**/*.bin -text
 /assets/reference/characters/**/*.mesh -text
+/assets/reference/stages/** text eol=lf
+/assets/reference/stages/**/*.z -text
+/assets/reference/stages/**/*.tl -text
+/assets/reference/projectiles/** text eol=lf
+/assets/reference/projectiles/**/*.bin -text
+/assets/reference/boss/**/*.vert text eol=lf
+/assets/reference/boss/**/*.frag text eol=lf
+/assets/reference/boss/**/*.uniforms text eol=lf
+/assets/reference/boss/**/*.bin -text
+/assets/reference/boss/**/*.z -text
+/assets/reference/**/*.json text eol=lf
+/assets/reference/stage-textures/**/*.z -text
+/assets/audio/*.tsv text eol=lf
+/assets/audio/*.json text eol=lf
 
 ###############################################################################
 # Set default behavior for command prompt diff.

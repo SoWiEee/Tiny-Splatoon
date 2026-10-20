@@ -95,6 +95,8 @@ void FacePaint::clear() {
     if (std::any_of(grid_.begin(), grid_.end(), [](std::uint8_t v) { return v != 0; })) ++version_;
     std::fill(grid_.begin(), grid_.end(), 0);
     counts_ = {0, 0};
+    visualSplats_.clear();
+    visualClear_ = true;
 }
 
 double FacePaint::splat(const glm::dvec3& center, double radius, int team, double seed, const SplatOptions& options) {
@@ -102,11 +104,16 @@ double FacePaint::splat(const glm::dvec3& center, double radius, int team, doubl
         || !std::isfinite(options.stretchAmt) || options.stretchAmt < 0
         || (options.hasStretch && !finite(options.stretch)))
         throw std::invalid_argument("invalid paint splat");
-    if (radius == 0 || options.cosmetic) return 0;
+    if (radius == 0) return 0;
     if (options.kind == SplatKind::Roll && !options.hasStretch)
         throw std::invalid_argument("roller splat requires stretch direction");
     const int kindIndex = static_cast<int>(options.kind);
     if (kindIndex < 0 || kindIndex >= 8) throw std::invalid_argument("invalid paint kind");
+    auto visualKind = options.kind;
+    if (options.cosmetic && visualKind == SplatKind::Shot) visualKind = SplatKind::Speck;
+    visualSplats_.push_back({center, options.stretch, radius, seed, options.stretchAmt, team,
+                             visualKind, options.hasStretch, options.cosmetic});
+    if (options.cosmetic) return 0;
     const double sAmt = options.hasStretch && options.kind != SplatKind::Roll ? options.stretchAmt : 0.0;
     const double extReach = radius * std::max(3.2, kReach[kindIndex] + 1.4 * sAmt + 0.3);
     double claimed = 0;
@@ -139,6 +146,18 @@ double FacePaint::splat(const glm::dvec3& center, double radius, int team, doubl
         claimed += splatFace(id, lu, lv, rr, team, seed, sdu, sdv, sa, options.kind);
     }
     return claimed;
+}
+
+std::vector<VisualSplat> FacePaint::takeVisualSplats() {
+    std::vector<VisualSplat> result;
+    result.swap(visualSplats_);
+    return result;
+}
+
+bool FacePaint::takeVisualClear() {
+    const bool result = visualClear_;
+    visualClear_ = false;
+    return result;
 }
 
 double FacePaint::splatFace(int id, double lu, double lv, double r, int team, double seed,

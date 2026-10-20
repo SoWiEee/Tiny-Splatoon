@@ -60,6 +60,13 @@ CombatPose WeaponRunner::pose() const {
 }
 
 glm::dvec3 WeaponRunner::muzzle(int side) const {
+    // shortcut: use the live socket until CharacterPose exposes the source predictive aimReady blend.
+    if(actor_.muzzleSource_) {
+        const auto point=actor_.muzzleSource_(side);
+        const auto center=actor_.state.pos+glm::dvec3(0,actor_.state.squid?0.4:1.05,0);
+        if(std::isfinite(point.x)&&std::isfinite(point.y)&&std::isfinite(point.z)&&
+           glm::length(point-center)<=std::sqrt(2.5)&&actor_.geometry_.los(center,point))return point;
+    }
     auto m=actor_.state.pos+glm::dvec3(0,1.05,0)+actor_.aimDir()*0.3;
     if(side) {auto right=glm::dvec3(actor_.aimDir().z,0,-actor_.aimDir().x);if(glm::length(right)>1e-6) m+=glm::normalize(right)*(side>0?0.085:-0.085);}
     return m;
@@ -117,6 +124,7 @@ void WeaponRunner::fireRound(double cone,const std::string& kind,double power,in
     if(w.kind=="twins") {if(!side){speed=w.number("turretProjSpeed");p.straight=w.number("turretStraight");range=w.number("turretRange");}p.size=0.13;}
     p.trail=-( (w.kind=="spinner"?2.2:w.kind=="twins"?2.4:2.5)-p.trailEvery );
     if(kind=="blast") {p.life=range/speed;p.straight=99;p.gravity=p.drag=0;p.size=0.26;p.trail=-1.5;p.trailEvery=2.2;p.trailRadius=0.45;}
+    if(w.kind=="twins")p.look={side?.088:.086,side?.8:.9,side?1.3:1.5,side?.03:.025,side?28.0:30.0,side?.3:.35,2};
     auto dir=direction(p.pos);if(kind!="blast")dir=ballistic(p.pos,dir,speed,p.straight,p.gravity,p.drag,range);
     p.vel=scatter(dir,cone)*speed;p.seed=actor_.random();actor_.world_->launch(std::move(p));++actor_.shotsFired_;
     CharacterTrigger event{w.kind=="spinner"?"stream":"shoot"}; event.hand=w.kind=="twins"?(twinSide_>0?1:0):0;

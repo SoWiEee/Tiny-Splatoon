@@ -90,6 +90,17 @@ void CombatWorld::clear() {
 }
 void CombatWorld::launch(ShooterProjectile p) {
     if(!p.owner || !p.owner->state.alive) return;
+    // shortcut: reuse the shot seed for cosmetic variation until the browser's separate visual RNG is ported.
+    if(p.look.size==0) {
+        if(p.kind=="blast")p.look={p.special?p.size*.77:.2,.5,.9,.085,17,.15,p.special?3:4};
+        else if(p.kind=="slosh")p.look={p.size*.86,.7,1.5,.12,15,.1,p.size>=.2?2:1};
+        else if(p.weaponId=="spinner")p.look={.08,.9,1.6,.025,30,.35,2};
+        else if(p.weaponId=="brolly")p.look={.068,.55,1.1,.06,24,.2,1};
+        else if(p.weaponId=="brush")p.look={.07+p.seed*.025,.4,1,.1,19,0,1};
+        else if(p.weaponId=="blade")p.look={.044+p.seed*.04,.8,1.7,.07,22,.15,1};
+        else if(p.kind=="drop")p.look={p.size,.4,1,.09,20,0,1};
+        else p.look={p.special?p.size*.68:.1+p.seed*.012,.8,1.3,.035,26,.3,p.special?2:3};
+    }
     if(!p.id)p.id=allocateId();
     (ticking_ ? pendingProjectiles_ : projectiles_).push_back(std::move(p));
 }
@@ -539,7 +550,6 @@ void CombatWorld::beam(PlayerSimulation& owner,glm::dvec3 from,glm::dvec3 dir,do
     const double blocked=blockRay(from,dir,length,owner.team(),damage,&owner);
     const auto hit=geometry_.raycast(from,dir,blocked,true); length=hit.hit?hit.dist:blocked;
     const auto end=from+dir*length;
-    emitVisual({"beam",from,dir,length,owner.team()});
     if(boss_&&owner.team()==0){
         if(const auto bossHit=boss_->segmentHit(from,end,radius)){
             boss_->hit(owner,damage,*bossHit,id);
@@ -557,6 +567,8 @@ void CombatWorld::beam(PlayerSimulation& owner,glm::dvec3 from,glm::dvec3 dir,do
         if(floor.hit) paint(owner,floor.point+floor.normal*0.1,paintRadius,owner.random());
     }
     if(hit.hit) paint(owner,hit.point+hit.normal*0.1,paintRadius,owner.random());
+    const double charge=std::max(.12,owner.combatPose().charge);
+    emitVisual({"beam",from,dir,length,owner.team(),charge,(.035+charge*.05)*2.3,time_*17});
 }
 void CombatWorld::updateCanopies(double dt) {
     for(auto& d:devices_) {

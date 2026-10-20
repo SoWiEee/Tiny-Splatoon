@@ -53,8 +53,12 @@ function unroll(source) {
 
 function defines(material, options) {
   const names = ['HIGH_PRECISION'];
+  const uvDefines = [];
   if (material.isMeshPhysicalMaterial) names.push('PHYSICAL');
   if (material.vertexColors) names.push('USE_COLOR');
+  if(options.materialMaps&&material.map){names.push('USE_MAP');uvDefines.push(`#define MAP_UV ${material.map.channel===0?'uv':`uv${material.map.channel}`}`);}
+  if(options.materialMaps&&material.alphaMap){names.push('USE_ALPHAMAP');uvDefines.push(`#define ALPHAMAP_UV ${material.alphaMap.channel===0?'uv':`uv${material.alphaMap.channel}`}`);}
+  if(options.materialMaps&&material.alphaTest>0)names.push('USE_ALPHATEST');
   if (material.clearcoat > 0) names.push('USE_CLEARCOAT');
   if (material.sheen > 0) names.push('USE_SHEEN');
   if (material.side === THREE.DoubleSide) names.push('DOUBLE_SIDED');
@@ -65,20 +69,23 @@ function defines(material, options) {
   if (options.toneMapping !== false && material.toneMapped) names.push('TONE_MAPPING');
   if (options.environment) names.push('USE_ENVMAP', 'ENVMAP_TYPE_CUBE_UV');
   if (options.shadows) names.push('USE_SHADOWMAP','SHADOWMAP_TYPE_PCF');
-  return names.map(name => `#define ${name}`).join('\n') + '\n' +
+  return names.map(name => `#define ${name}`).join('\n') + '\n' + (uvDefines.length ? uvDefines.join('\n') + '\n' : '') +
     Object.entries(material.defines ?? {}).map(([name, v]) => `#define ${name} ${v}`).join('\n') + '\n';
 }
 
-/** Expand the real material hooks and physical shader chunks. Only the API prefix changes for desktop GL. */
-export function buildCharacterShader(material, options = {}) {
+/** Expand a source material's real hooks and shader chunks for desktop GL. */
+export function buildSourceMaterialShader(material, options = {}) {
   if(material.isShaderMaterial)return buildCustomShader(material,options);
-  if (!material.isMeshStandardMaterial) throw new Error(`Unsupported source character material ${material.type}`);
-  const lib = material.isMeshPhysicalMaterial ? THREE.ShaderLib.physical : THREE.ShaderLib.standard;
+  const lib = material.isMeshPhysicalMaterial ? THREE.ShaderLib.physical
+    : material.isMeshStandardMaterial ? THREE.ShaderLib.standard
+      : material.isMeshBasicMaterial ? THREE.ShaderLib.basic : null;
+  if (!lib) throw new Error(`Unsupported source material ${material.type}`);
   const shader = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: THREE.UniformsUtils.clone(lib.uniforms) };
   material.onBeforeCompile(shader, null);
   const u = shader.uniforms;
   const put = (name, v) => { if (v !== undefined) u[name] = { value: v }; };
-  put('diffuse', material.color); put('emissive', material.emissive.clone().multiplyScalar(material.emissiveIntensity));
+  put('diffuse', material.color);
+  if (material.emissive) put('emissive', material.emissive.clone().multiplyScalar(material.emissiveIntensity));
   for (const k of ['roughness', 'metalness', 'opacity', 'ior', 'clearcoat', 'clearcoatRoughness', 'specularIntensity', 'specularColor', 'sheenRoughness', 'envMapIntensity']) put(k, material[k]);
   if (material.sheenColor) put('sheenColor', material.sheenColor.clone().multiplyScalar(material.sheen));
   put('toneMappingExposure', 1.0);
@@ -108,6 +115,10 @@ export function buildCharacterShader(material, options = {}) {
     skinned: !!options.skinned, lighting,
     digest: createHash('sha256').update(vertex).update(fragment).digest('hex'),
   };
+}
+
+export function buildCharacterShader(material, options = {}) {
+  return buildSourceMaterialShader(material, options);
 }
 
 function buildCustomShader(material,options){

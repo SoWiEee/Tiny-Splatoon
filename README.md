@@ -6,11 +6,11 @@
 
 目前可玩的是一名玩家與七名 Bot 的 4v4 Turf：選圖、移動／瞄準／射擊、變形／游泳／跳躍、副武器／特殊技能、暫停／返回、判分／結果與重開。模擬採固定 60 Hz，角色使用來源幾何與即時計算的骨架／程序動畫。
 
-完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，可選離線 Turf／Boss、地圖、裝備與難度，並調整音量和減少動態效果。miniaudio 已接入 20 個來源音效；完整音樂／世界音效、正式 hub／Locker、設定保存、線上與 Zones 仍須依 [spec.md](spec.md) 開發。Boss 動畫仍未通過來源驗收。
+完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，可選離線 Turf／Boss、地圖、裝備與難度，並調整音量和減少動態效果。場景已接入來源 bevel／PropKit 幾何、46 層程序材質與連續墨水；投射物使用來源墨滴、弓箭、拳套、刀波與蓄力光帶。miniaudio 的來源資料已擴充為 201 個音效及九首曲目，整合驗收進度見 [還原紀錄](docs/restoration-progress.md)。正式 hub／Locker、設定保存、線上與 Zones 仍須依 [spec.md](spec.md) 開發。Boss 的 100 骨架／命中 socket／材質數值已通過 16 組來源姿勢比對，完整模式與材質畫面仍在驗收。
 
 ## 建置與執行
 
-需求：Windows、支援 OpenGL 4.5 的顯卡、C++17 編譯器（已驗證 MSVC x64）、CMake、Ninja 與 vcpkg。相依套件由 [vcpkg.json](vcpkg.json) 宣告：GLFW、GLAD、GLM、RmlUi、miniaudio、Dear ImGui、OpenGL 與 stb。Dear ImGui 用於開發診斷介面；GameNetworkingSockets 留供後續原生多人連線接入，目前 target 不連結或初始化它。
+需求：Windows、支援 OpenGL 4.5 的顯卡、C++17 編譯器（已驗證 MSVC x64）、CMake、Ninja 與 vcpkg。相依套件由 [vcpkg.json](vcpkg.json) 宣告：GLFW、GLAD、GLM、RmlUi、miniaudio、Dear ImGui、OpenGL、zlib 與 stb。Dear ImGui 用於開發診斷介面；GameNetworkingSockets 留供後續原生多人連線接入，目前 target 不連結或初始化它。
 
 在 Visual Studio x64 Native Tools 命令環境中執行：
 
@@ -82,7 +82,7 @@ src/gui/                  HUD與玩家介面繪製
 src/audio/                miniaudio播放、PCM快取與音量群組
 assets/ui/                RmlUi文件與樣式
 assets/fonts/             Inter、Noto Sans TC與OFL授權
-assets/audio/             20個來源渲染WAV與來源manifest
+assets/audio/             來源渲染WAV、FLAC音樂、播放名冊與manifest
 assets/reference/         已提交的來源匯出資料與角色資產
 tests/                    原生行為、來源 oracle、GPU 與 CLI 驗證
 tools/                    來源匯出器、擷取與效能腳本
@@ -94,6 +94,10 @@ docs/                     來源基準、驗收進度與量測紀錄
 - [工程規格](spec.md)
 - [逐項還原進度](docs/restoration-progress.md)
 - [音效來源與目前限制](docs/audio-source-contract.md)
+- [場景／連續墨水來源契約](docs/stage-visual-source-contract.md)
+- [投射物來源契約](docs/projectile-source-contract.md)
+- [Boss 姿勢來源契約](docs/boss-pose-source-contract.md)
+- [下一輪候選工作](docs/next-round-backlog.md)
 - [手動清理清單](docs/cleanup-checklist.md)
 
 ## 舊版展示

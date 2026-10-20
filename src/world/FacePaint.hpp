@@ -20,6 +20,14 @@ struct SplatOptions {
     SplatKind kind = SplatKind::Shot;
 };
 
+struct VisualSplat {
+    glm::dvec3 center, stretch;
+    double radius = 0.0, seed = 0.0, stretchAmt = 1.0;
+    int team = 0;
+    SplatKind kind = SplatKind::Shot;
+    bool hasStretch = false, cosmetic = false;
+};
+
 struct AtlasRect {
     int x = -1, y = -1, width = 0, height = 0, pad = 8;
     double ppm = 0.0;
@@ -36,6 +44,8 @@ public:
     FacePaint(const StageData& stage, const StageGeometry& geometry, int atlasSize = 4096);
 
     double splat(const glm::dvec3& center, double radius, int team, double seed, const SplatOptions& options = {});
+    std::vector<VisualSplat> takeVisualSplats();
+    bool takeVisualClear();
     int sample(int faceId, double u, double v) const;
     std::array<double, 2> coverage() const;
     void clear();
@@ -48,6 +58,7 @@ public:
     int turfTotal() const { return turfTotal_; }
     double turfArea() const { return turfArea_; }
     double pixelsPerMetre() const { return ppm_; }
+    int atlasSize() const { return atlasSize_; }
     int usedHeight() const { return usedHeight_; }
     int version() const { return version_; }
 
@@ -62,6 +73,8 @@ private:
     std::vector<AtlasRect> atlas_;
     std::vector<FaceGrid> faces_;
     std::vector<std::uint8_t> grid_, dead_;
+    std::vector<VisualSplat> visualSplats_;
+    bool visualClear_ = false;
     std::array<int, 2> counts_{0, 0};
     int turfTotal_ = 0, usedHeight_ = 0, version_ = 0;
     double turfArea_ = 0.0, ppm_ = 0.0;

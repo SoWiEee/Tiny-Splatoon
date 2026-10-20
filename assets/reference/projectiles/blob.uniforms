@@ -1,0 +1,67 @@
+diffuse 3 1 1 1
+opacity 1 1
+mapTransform 9 1 0 0 0 1 0 0 0 1
+alphaMapTransform 9 1 0 0 0 1 0 0 0 1
+alphaTest 1 0
+envMapRotation 9 1 0 0 0 1 0 0 0 1
+reflectivity 1 1
+ior 1 1.5
+refractionRatio 1 0.98
+aoMapIntensity 1 1
+aoMapTransform 9 1 0 0 0 1 0 0 0 1
+lightMapIntensity 1 1
+lightMapTransform 9 1 0 0 0 1 0 0 0 1
+emissiveMapTransform 9 1 0 0 0 1 0 0 0 1
+bumpMapTransform 9 1 0 0 0 1 0 0 0 1
+bumpScale 1 1
+normalMapTransform 9 1 0 0 0 1 0 0 0 1
+normalScale 2 1 1
+displacementMapTransform 9 1 0 0 0 1 0 0 0 1
+displacementScale 1 1
+displacementBias 1 0
+roughnessMapTransform 9 1 0 0 0 1 0 0 0 1
+metalnessMapTransform 9 1 0 0 0 1 0 0 0 1
+fogDensity 1 0.00025
+fogNear 1 1
+fogFar 1 2000
+fogColor 3 1 1 1
+probesMin 3 0 0 0
+probesMax 3 0 0 0
+probesResolution 3 0 0 0
+emissive 3 0 0 0
+roughness 1 0.12
+metalness 1 0
+envMapIntensity 1 1.15
+clearcoat 1 1
+clearcoatMapTransform 9 1 0 0 0 1 0 0 0 1
+clearcoatNormalMapTransform 9 1 0 0 0 1 0 0 0 1
+clearcoatNormalScale 2 1 1
+clearcoatRoughness 1 0.04
+clearcoatRoughnessMapTransform 9 1 0 0 0 1 0 0 0 1
+dispersion 1 0
+retroreflectivity 1 0
+iridescence 1 0
+iridescenceMapTransform 9 1 0 0 0 1 0 0 0 1
+iridescenceIOR 1 1.3
+iridescenceThicknessMinimum 1 100
+iridescenceThicknessMaximum 1 400
+iridescenceThicknessMapTransform 9 1 0 0 0 1 0 0 0 1
+sheen 1 0
+sheenColor 3 0 0 0
+sheenColorMapTransform 9 1 0 0 0 1 0 0 0 1
+sheenRoughness 1 1
+sheenRoughnessMapTransform 9 1 0 0 0 1 0 0 0 1
+transmission 1 0
+transmissionMapTransform 9 1 0 0 0 1 0 0 0 1
+transmissionSamplerSize 2 0 0
+thickness 1 0
+thicknessMapTransform 9 1 0 0 0 1 0 0 0 1
+attenuationDistance 1 0
+attenuationColor 3 0 0 0
+specularColor 3 1 1 1
+specularColorMapTransform 9 1 0 0 0 1 0 0 0 1
+specularIntensity 1 1
+specularIntensityMapTransform 9 1 0 0 0 1 0 0 0 1
+anisotropyVector 2 0 0
+anisotropyMapTransform 9 1 0 0 0 1 0 0 0 1
+toneMappingExposure 1 1

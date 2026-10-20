@@ -1,0 +1,14 @@
+albedo ../stage-textures/texlib-albedo.tex.z 512 512 46 1
+normal ../stage-textures/texlib-normal.tex.z 512 512 46 0
+orm ../stage-textures/texlib-orm.tex.z 512 512 46 0
+props-atlas ../stage-textures/props-atlas.tex.z 2048 2048 1 1
+props-chain ../stage-textures/props-chain.tex.z 128 128 1 1
+props-blob ../stage-textures/props-blob.tex.z 64 64 1 0
+mural-cargo ../stage-textures/murals-cargo.tex.z 2048 2048 1 1
+mural-crossmarket ../stage-textures/murals-crossmarket.tex.z 2048 2048 1 1
+mural-halyard ../stage-textures/murals-halyard.tex.z 2048 2048 1 1
+mural-kelpline ../stage-textures/murals-kelpline.tex.z 2048 2048 1 1
+mural-lockgate ../stage-textures/murals-lockgate.tex.z 2048 2048 1 1
+mural-saltpan ../stage-textures/murals-saltpan.tex.z 2048 2048 1 1
+mural-terraces ../stage-textures/murals-terraces.tex.z 2048 2048 1 1
+mural-tidewater ../stage-textures/murals-tidewater.tex.z 2048 2048 1 1

@@ -15,6 +15,10 @@ class NavGraph;
 class WorldSpecials;
 class BossSimulation;
 
+struct ProjectileLook {
+    double size=0, tail0=1, tailK=1.2, wobble=0.04, frequency=20, nose=0;
+    int satellites=0;
+};
 struct ShooterProjectile {
     std::uint64_t id = 0;
     glm::dvec3 pos{0.0}, vel{0.0};
@@ -34,6 +38,7 @@ struct ShooterProjectile {
     glm::dvec3 hitPoint{0.0}, hitNormal{0.0,1.0,0.0}, flightDir{0.0,0.0,1.0};
     std::string state;
     std::vector<PlayerSimulation*> tagged;
+    ProjectileLook look;
 };
 
 struct CombatDevice {
@@ -97,6 +102,7 @@ struct WorldVisualEvent {
     glm::dvec3 pos{0.0}, normal{0.0,1.0,0.0};
     double radius = 0.0;
     int team = 0;
+    double charge = 0, width = 0.08, seed = 0;
 };
 
 // Match owns actors; this owns attacks and applies hit/paint/credit exactly once.

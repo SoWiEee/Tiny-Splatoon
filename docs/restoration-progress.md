@@ -1,8 +1,20 @@
 # OpenGL 還原進度
 
-基準：2026-10-17，依 [spec.md](../spec.md) 與 [來源雜湊](reference-baseline.sha256)。最近驗證：2026-10-20。本文保留分階段紀錄；較早段落的「目前」是當時狀態，最新整合狀態見以下摘要與文末驗證紀錄。
+基準：2026-10-17，依 [spec.md](../spec.md) 與 [來源雜湊](reference-baseline.sha256)。最近驗證：2026-10-21。本文保留分階段紀錄；較早段落的「目前」是當時狀態，最新整合狀態見以下摘要與文末驗證紀錄。
 
-## 最新整合狀態 — 2026-10-20 UI／音訊
+## 最新整合狀態 — 2026-10-21 場景／墨水／投射物／音樂／Boss
+
+- 場景改用來源 bevel 與高品質 PropKit 幾何，共 23 個合法地圖／模式 pack；載入來源 WebGL 產生的 46 層 albedo／normal／ORM、真實 Canvas 招牌／圍網／壁畫，共 14 個壓縮貼圖 pack。來源貼圖完整重建 `--check` 與尺寸／內容／雜湊檢查通過；未改寫 `splat-ref/`。詳見 [場景契約](stage-visual-source-contract.md)。
+- 對戰改用來源 GPU paint shader 的連續墨水外觀，保留 CPU ownership grid 作計分與玩法；兩者不再共用方格顯示。GPU 測試已確認濕度隨時間下降且覆蓋保留；無遮擋的測試區域有 603 個可見像素改變，通過加強後的門檻。
+- 對戰接入來源墨滴變形／衛星滴、弓箭、拳套、刀波與 Charger ribbon；使用 live rig 槍口並保留遮擋／距離防護。24 組真實 JavaScript `_draw` fixture 與獨立 GPU 可見像素驗證通過，詳見 [投射物契約](projectile-source-contract.md)。
+- miniaudio 的來源資料已擴充為 201 個 cue、31 組循環音效及九首 FLAC 曲目，接入 actor／世界／對局／Boss 導演；包含實際落腳、港口／海鷗／Halyard／船笛、游泳／攀牆／敵墨持續音，以及暫停與離場清理。原生播放／轉場／清理測試已通過；最後來源重建的所有音效、loop 與九首曲目波形通過，但隨後 manifest 比對失敗。已修正 loop 使用新渲染 hash 而非等價已包裝 WAV hash 的問題；修正後語法、全資產 hash／索引與比對器正反控制檢查通過，未再重跑完整來源渲染指令。實際曲目數值與限制見 [音訊契約](audio-source-contract.md)，未宣稱 AUDIO-01–04 全數通過。
+- Boss 動態姿勢已直接移植；修正匯出 rig 雙精度資料及 Float32 讀取後的雙精度混合運算，原始 0.001 容差 oracle 已通過 16/16、3,925 更新／280 完整快照，並註冊為 reference_boss_pose。下方 rest-rig／0/16 是前一階段的歷史紀錄。六組來源 Boss 材質、UV／stencil／DFG 與動態受擊 GPU 檢查已通過；完整模式與全場景視聽相似度仍須獨立驗收。
+- MSVC x64 Release 全目標建置成功；完整 CTest **61/61 通過，258.25 秒**。音訊 canonical 資產更新後，原生音訊／音訊匯出／預設入口重驗 **3/3 通過，8.13 秒**。GTX 1650 已完成 1280×720、240 固定步的實際 Turf 擷取及 900 步 Boss 擷取，場景材質、道具、角色、連續墨水與 Boss 來源材質已接入遊戲。
+- 最終 GTX 1650 Max-Q／1920×1080／VSync off 順序量測，各 600 幀含 GPU 完成等待：Tidewater Turf **81.78 FPS**，Boss **67.35 FPS**；GPU 平均分別 12.16／14.63 ms。原始 JSON／CSV 與硬體、暖機、限制見 [本輪效能紀錄](benchmarks/source-scene-2026-10-20/README.md)。這是無玩家 HUD 的遠距 overview，不能代表近鏡最壞特效負載或完整 QA-12。來源 Environment 天空／海水／PMREM／遠景尚未遷移，不能將此批資料視為全場景 100% 驗收。
+
+下一輪候選範圍與未驗收項目見 [待辦清單](next-round-backlog.md)。依使用者指示，本輪驗證完成後先提交，再決定下一輪。
+
+## 前次整合狀態 — 2026-10-20 UI／音訊
 
 - 預設啟動已是原生選單；目前程式分層於 `src/`，舊 `restoration/` 與舊 OpenGL 入口已移除。角色、全裝備、AI、LOD、陰影／後製／特殊視效的證據與限制見本文後段及各來源契約。
 - 玩家介面改為 RmlUi／OpenGL，Inter + Noto Sans TC，依使用者授權減少裝飾。可選 Turf／Boss、七張離線地圖、難度、12 主武器／15 副武器／19 特殊技能；可用鍵盤焦點、Enter、滑鼠操作，包含 HUD、暫停與結果畫面。設定提供三路音量及減少動態效果，尚未保存至磁碟。

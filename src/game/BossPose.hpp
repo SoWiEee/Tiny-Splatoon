@@ -39,12 +39,17 @@ public:
     const BossModelAsset& crabletAsset() const { return assets_.at(1); }
 private:
     struct Rig;
+    struct Animator;
     void AnimateHull(Rig& rig,const BossPoseInput& input);
-    static void AnimateCrablet(Rig& rig,double age,double speed);
+    void AnimateCrablet(Rig& rig,const BossCrablet& crab,double dt);
     static void Evaluate(Rig& rig);
     std::vector<BossModelAsset> assets_;
     BossPoseRigData sourceRig_;
     std::vector<Rig> rigs_;
+    std::unique_ptr<Animator> animator_;
+    std::map<int,double> simulationAges_;
+    double simulationClock_=0;
+    bool hasSimulationClock_=false;
     BossRigPose hull_;
     std::vector<BossCrabletPose> crablets_;
     std::array<BossHitShape,10> hitShapes_{};

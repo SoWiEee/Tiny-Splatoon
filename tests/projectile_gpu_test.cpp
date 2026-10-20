@@ -1,0 +1,54 @@
+#include "ProjectileRenderer.hpp"
+#include "CharacterShader.hpp"
+#include "CombatWorld.hpp"
+#include "PlayerSimulation.hpp"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
+#include <stdexcept>
+#include <vector>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
+int main(int argc,char** argv){
+    if(!glfwInit())return 1;
+    glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+    auto* window=glfwCreateWindow(256,256,"Source projectile pixels",nullptr,nullptr);
+    if(!window){glfwTerminate();return 1;}glfwMakeContextCurrent(window);
+    if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))return 1;
+    int result=0;
+    try{
+        using namespace restoration;
+        StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+        StageGeometry geometry(stage);FacePaint paint(stage,geometry);CombatWorld world(stage,geometry,paint);PlayerSimulation actor(stage,geometry,paint,0,&world);actor.state.alive=true;
+        ShooterProjectile shot;shot.owner=&actor;shot.pos={0,0,0};shot.start={-3,0,0};shot.vel={28,0,2};shot.age=.12;shot.seed=.31;shot.look={.19,.8,1.3,.035,26,.3,3};world.launch(shot);
+        ProjectileRenderer renderer(argc>1?argv[1]:"assets/reference/projectiles");renderer.Update(1.0/60,world,{});
+        if(renderer.blobs().size()!=4)throw std::runtime_error("Shot plus satellite draw instances missing");
+        CharacterLightState lights;lights.ambient={.3,.3,.3};lights.sunDirection=glm::normalize(glm::vec3(-.4,.85,.35));lights.sunColor={1,.92,.82};
+        const glm::dvec3 eye(0,.5,4);const auto view=glm::lookAt(eye,glm::dvec3(0),glm::dvec3(0,1,0));const auto projection=glm::perspective(glm::radians(45.0),1.0,.05,50.0);
+        glViewport(0,0,256,256);glEnable(GL_DEPTH_TEST);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("No source instanced projectile draw");
+        std::vector<unsigned char> pixels(256*256*4);glReadPixels(0,0,256,256,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+        std::size_t colored=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++colored;
+        const auto drawError=glGetError();
+        if(drawError!=GL_NO_ERROR)throw std::runtime_error("Source projectile draw GL error "+std::to_string(drawError));
+        if(colored<60)throw std::runtime_error("Source projectile draw changed too few pixels: "+std::to_string(colored));
+        if(argc>2){std::filesystem::create_directories(std::filesystem::path(argv[2]).parent_path());stbi_flip_vertically_on_write(1);if(!stbi_write_png(argv[2],256,256,4,pixels.data(),256*4))throw std::runtime_error("Cannot save projectile evidence");}
+        renderer.Update(.01,world,{{"beam",{-1,0,0},{1,0,0},2,0,.8,.17,.4}});
+        if(renderer.ribbons()!=1||renderer.Draw(view,projection,eye,lights)!=2)throw std::runtime_error("Source charger ribbon absent");
+        renderer.Update(1,world,{});if(renderer.ribbons()!=0)throw std::runtime_error("Charger ribbon did not expire");
+        for(const auto* kind:{"arrow","fist","bladewave"}){
+            world.clear();auto custom=shot;custom.kind=kind;custom.weaponId=kind;custom.flightDir=glm::normalize(custom.vel);custom.distance=3;custom.tier=2;
+            world.launch(custom);renderer.Update(0,world,{});
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);const auto calls=renderer.Draw(view,projection,eye,lights);
+            glReadPixels(0,0,256,256,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+            std::size_t visible=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++visible;
+            if(calls<1||visible<8||glGetError()!=GL_NO_ERROR)throw std::runtime_error(std::string("Source kit projectile invisible or invalid: ")+kind);
+            if(argc>2){const auto path=std::filesystem::path(argv[2]).parent_path()/(std::string("projectile-")+kind+".png");stbi_write_png(path.string().c_str(),256,256,4,pixels.data(),256*4);}
+        }
+        if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Source projectile renderer GL error");
+        std::cout<<"PROJECTILE_GPU source_teardrop=4 visible_pixels="<<colored<<" ribbon_lifecycle=pass renderer="<<glGetString(GL_RENDERER)<<'\n';
+    }catch(const std::exception& e){std::cerr<<e.what()<<'\n';result=1;}
+    glfwDestroyWindow(window);glfwTerminate();return result;
+}

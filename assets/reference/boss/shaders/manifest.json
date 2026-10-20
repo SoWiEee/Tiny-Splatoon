@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "source": {
+    "splat-ref/src/boss/bossMats.js": "c20add43b9744f70b4cbf3c53d07968156821e370b956e7c1ba14931c0daa982",
+    "tools/export-character-shaders.mjs": "d35cc5579f9ce3d48d9f1ace816acfc254322a02663581595c30af74cc841f2a"
+  },
+  "stencil": {
+    "file": "stencil.tex.z",
+    "width": 1024,
+    "height": 1024,
+    "sha256": "ce9aea42b858b2994b6709930150cadfcb8f71328c06201449fa2e39a0fb209a"
+  },
+  "materials": [
+    {
+      "name": "steel",
+      "sourceKey": "hullbreaker-steel",
+      "digest": "5b43cf9212f8c2f2ab15b0815c72e6cd6f29990b23c408a4800ac7870361687d",
+      "vertex": "steel.vert",
+      "fragment": "steel.frag",
+      "uniforms": "steel.uniforms"
+    },
+    {
+      "name": "cara",
+      "sourceKey": "hullbreaker-cara",
+      "digest": "19e4e7bc138e103a52f495df2904be8830e0d70c739c378ba878f42f1c8c4f37",
+      "vertex": "cara.vert",
+      "fragment": "cara.frag",
+      "uniforms": "cara.uniforms"
+    },
+    {
+      "name": "flesh",
+      "sourceKey": "hullbreaker-flesh",
+      "digest": "5657dc2dc7314ec62309ff958faa9eefc5c27cd94722951df21524c2c0753ee8",
+      "vertex": "flesh.vert",
+      "fragment": "flesh.frag",
+      "uniforms": "flesh.uniforms"
+    },
+    {
+      "name": "eye",
+      "sourceKey": "hullbreaker-eye",
+      "digest": "c794b5a384f9e5476e4cfad8ddffe4d40c7e01ffa284deb934e3c56b67c518bb",
+      "vertex": "eye.vert",
+      "fragment": "eye.frag",
+      "uniforms": "eye.uniforms"
+    },
+    {
+      "name": "junk",
+      "sourceKey": "hullbreaker-junk",
+      "digest": "d0128b6c99cfdc8a4004557a29ff92ad12f3834942b35aa9b7577e87f714f697",
+      "vertex": "junk.vert",
+      "fragment": "junk.frag",
+      "uniforms": "junk.uniforms"
+    },
+    {
+      "name": "crablet",
+      "sourceKey": "hullbreaker-crablet",
+      "digest": "54febf0530a9f7ec454b50c59d5a587e083f09abc8345d47b0006941264ce2fe",
+      "vertex": "crablet.vert",
+      "fragment": "crablet.frag",
+      "uniforms": "crablet.uniforms"
+    }
+  ]
+}

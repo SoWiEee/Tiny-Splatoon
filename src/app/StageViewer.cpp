@@ -15,9 +15,11 @@
 #include "ScreenEffectsController.hpp"
 #include "LensField.hpp"
 #include "WorldEffects.hpp"
+#include "ProjectileRenderer.hpp"
 #include "BossRenderer.hpp"
 #include "GameUi.hpp"
 #include "AudioEngine.hpp"
+#include "GameAudio.hpp"
 #include "FollowCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -167,16 +169,16 @@ CameraTarget CameraActor(const PlayerSimulation& player) {
     return target;
 }
 
-void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial) {
+void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial,const std::filesystem::path& stageAssets) {
     const StageData* stage=&initial;
     std::unique_ptr<StageGeometry> geometry;
     std::unique_ptr<FacePaint> paint;
     std::unique_ptr<PlayerSimulation> player;
     FollowCamera camera;
-    StageRenderer renderer,actors;
+    StageRenderer renderer(stageAssets),actors(stageAssets);
     bool playing=!options.capture.empty() || options.playProbe, paused=false;
     double accumulator=0, previous=glfwGetTime(), mx=0,my=0;
-    int frame=0, steps=0, uploadedVersion=-1;
+    int frame=0, steps=0;
     bool escapeWas=false;
     bool fireBlocked=true;
     auto captureMouse=[&](bool capture) {
@@ -193,7 +195,7 @@ void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial
         player->spawnAt(stage->spawnPads[0],0);
         camera.yaw=0; camera.pitch=-0.1; camera.reset(CameraActor(*player));
         renderer.Load(*stage,0,*paint); renderer.UploadInk(*stage,*paint);
-        uploadedVersion=paint->version(); accumulator=0; steps=0;
+        accumulator=0; steps=0;
     };
     reset(); captureMouse(playing && options.capture.empty());
     while(!glfwWindowShouldClose(window)) {
@@ -270,7 +272,7 @@ void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial
                 accumulator-=1.0/60;++steps;
             }
         }
-        if(uploadedVersion!=paint->version()) {renderer.UploadInk(*stage,*paint);uploadedVersion=paint->version();}
+        renderer.UploadInk(*stage,*paint,playing?realDt:0.0);
         const auto& pose=camera.pose();
         const glm::vec3 eye(pose.eye), direction(pose.forward);
         const auto vp=glm::perspective(glm::radians(static_cast<float>(pose.verticalFovDegrees)),static_cast<float>(width)/height,0.15f,6500.0f)*
@@ -320,7 +322,7 @@ void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial
 enum class MatchExit { Close, StageSelect };
 
 MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& stage,
-                    const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,bool nativeApp=false) {
+                    const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio,bool nativeApp=false) {
     audio.Clear();
     StageGeometry geometry(stage);
     FacePaint paint(stage,geometry);
@@ -336,27 +338,28 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     if(match.actors().size()!=8) throw std::runtime_error("Reference match did not create eight actors");
     if(match.bots().size()!=7) throw std::runtime_error("Reference match requires one local actor and seven bots");
     if(options.mode!="boss")match.startPlaying();
-    audio.Play(options.mode=="boss"?"ready":"go_horn");
+    gameAudio.BeginMatch(match);
     camera.yaw=match.local().state.yaw;
     camera.pitch=-0.1;
     camera.reset(CameraActor(match.local()));
 
-    StageRenderer renderer;
+    StageRenderer renderer(characterAssets.parent_path()/"stages");
     renderer.Load(stage,0,paint);
     renderer.UploadInk(stage,paint);
     RenderPipeline pipeline;
     pipeline.Configure(4,true,true);
     CharacterArt art(characterAssets,true);
     WorldEffects worldEffects(art.data());
+    ProjectileRenderer projectileRenderer(characterAssets.parent_path()/"projectiles");
     ScreenEffectsController screenController;
     LensField lensField;
     DirectionalShadow directionalShadow;
     std::unique_ptr<BossRenderer> bossRenderer;
     if(match.boss()){
-        bossRenderer=std::make_unique<BossRenderer>();
+        bossRenderer=std::make_unique<BossRenderer>(characterAssets.parent_path()/"boss");
         match.setBossPoseSink([&](BossSimulation& boss){bossRenderer->Update(boss);});
     }
-    match.local().setDamageSink([&screenController,&audio](double amount,const glm::dvec3* attacker){screenController.Damage(amount,attacker);audio.Play("hurt");});
+    match.local().setDamageSink([&screenController](double amount,const glm::dvec3* attacker){screenController.Damage(amount,attacker);});
     match.local().setSplatSink([&screenController](bool water){screenController.Splat(water);});
     std::vector<WorldVisualEvent> pendingVisualEvents;
     screenController.MatchState("intro");
@@ -369,10 +372,11 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     std::vector<std::unique_ptr<LiveCharacter>> characters;
     characters.reserve(match.actors().size());
     const std::array<glm::dvec3,2> teamColors={
-        glm::dvec3(1.0,0.258,0.0037),glm::dvec3(0.0258,0.102,1.0)};
+        glm::dvec3(1.0,0.2541520943200296,0.0069954101845983935),
+        glm::dvec3(0.028426039499072558,0.10461648408208657,1.0)};
     const double dt=1.0/60.0;
     double accumulator=0.0,previous=glfwGetTime();
-    int uploadedVersion=paint.version(),frame=0;
+    int frame=0;
     const glm::dvec3 target((stage.bounds.x+stage.bounds.y)*0.5,
         (stage.spawnPads[0].y+stage.spawnPads[1].y)*0.5,
         (stage.bounds.z+stage.bounds.w)*0.5);
@@ -396,7 +400,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS;
         pauseSpecialWasHeld=input.special || glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS ||
             glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS;
-        paused=true;match.paused=true;accumulator=0.0;captureMouse(false);
+        paused=true;match.paused=true;accumulator=0.0;captureMouse(false);gameAudio.Pause();
     };
     auto resumeMatch=[&] {
         paused=false;match.paused=false;accumulator=0.0;
@@ -406,7 +410,6 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     std::uint32_t simulationStep=0;
     MatchPhase previousPhase=match.phase();
     bool previousAlive=match.local().state.alive,previousSpecial=false,previousJump=false;
-    bool previousSquid=match.local().state.squid;
     int previousCountdown=std::numeric_limits<int>::max();
     auto tick=[&] {
         auto& local=match.local();
@@ -472,12 +475,6 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
         match.tick(dt);
         if(match.phase()!=previousPhase){
-            if(match.phase()==MatchPhase::Playing)audio.Play("go_horn");
-            else if(match.phase()==MatchPhase::Finish)audio.Play("times_up");
-            else if(match.phase()==MatchPhase::Results&&match.result()){
-                const auto& result=*match.result();const bool win=result.boss?result.boss->win:result.winner==match.local().team();
-                audio.Play(win?"victory_fanfare":"defeat_jingle");
-            }
             switch(match.phase()){
             case MatchPhase::Intro:screenController.MatchState("intro");break;
             case MatchPhase::Playing:screenController.MatchState("playing");break;
@@ -488,7 +485,6 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             previousPhase=match.phase();
         }
         auto& player=match.local();
-        if(player.state.squid!=previousSquid){audio.Play(player.state.squid?"squid_in":"squid_out");previousSquid=player.state.squid;}
         if(!previousAlive&&player.state.alive)screenController.Respawn();
         previousAlive=player.state.alive;
         const auto special=player.specialPose();
@@ -500,7 +496,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         previousJump=flight;
         if(match.phase()==MatchPhase::Playing){
             const int count=static_cast<int>(std::ceil(match.remaining()));
-            if(count<=10&&count<previousCountdown){screenController.Countdown(count);audio.Play("final_count");}
+            if(count<=10&&count<previousCountdown)screenController.Countdown(count);
             previousCountdown=count;
         }
         if(!benchmark) {
@@ -520,6 +516,9 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         const auto fxCamera=benchmark?overviewEye:camera.pose().eye;
         worldEffects.Update(dt,match.world(),fxCamera);
         const auto& events=worldEffects.lastEvents();
+        projectileRenderer.Update(dt,match.world(),events);
+        const auto forward=benchmark?glm::normalize(target-fxCamera):camera.pose().forward;
+        gameAudio.Update(dt,match,events,{fxCamera.x,fxCamera.y,fxCamera.z},{forward.x,forward.y,forward.z});
         pendingVisualEvents.insert(pendingVisualEvents.end(),events.begin(),events.end());
     };
     CharacterLightState lighting;
@@ -545,6 +544,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         live->scene.team=actor->team();
         live->scene.lifeLevel=2;
         live->scene.cameraPosition=overviewEye;
+        live->scene.footstep=[actor,&gameAudio](int,glm::dvec3 position,double speed){gameAudio.Footstep(*actor,{position.x,position.y,position.z},speed);};
         live->scene.actors.resize(match.actors().size());
         live->scene.raycast=[&geometry](glm::dvec3 origin,glm::dvec3 direction,double distance) {
             const auto hit=geometry.raycast(origin,direction,distance,true);
@@ -552,13 +552,11 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         };
         auto* state=live.get();
         auto* pose=live->pose.get();
+        actor->setMuzzleSource([pose](int side){return side>0?pose->frame().muzzleLeft:pose->frame().muzzle;});
         characters.push_back(std::move(live));
-        actor->setPoseTriggerSink([pose,actor,&audio](const CharacterTrigger& event) {
+        actor->setPoseTriggerSink([pose,actor,&gameAudio](const CharacterTrigger& event) {
             pose->trigger(event);
-            if(!actor->isLocal())return;
-            if(event.name=="shoot"&&actor->mainId()=="shooter")audio.Play("shoot_shooter");
-            else if(event.name=="jump")audio.Play("jump");
-            else if(event.name=="land")audio.Play("land");
+            gameAudio.ActorTrigger(*actor,event);
         });
         actor->setPoseFrameSink([&,actor,state,pose,i](double step) {
             const auto& current=actor->state;
@@ -643,6 +641,8 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         if(width<=0||height<=0) {if(capture)throw std::runtime_error("Benchmark framebuffer is unavailable");glfwWaitEventsTimeout(0.05);continue;}
         if(capture && (width!=1920 || height!=1080)) throw std::runtime_error("Benchmark framebuffer must be exactly 1920x1080; got "+std::to_string(width)+"x"+std::to_string(height));
         const double now=glfwGetTime();
+        const double visualDt=paused?0.0:(capture||options.frames)?dt:std::clamp(now-previous,0.0,0.1);
+        audio.Update();
         if(!benchmark&&!options.frames) {
             const bool escape=glfwGetKey(window,GLFW_KEY_ESCAPE)==GLFW_PRESS;
             if(match.phase()==MatchPhase::Playing && escape&&!escapeWas) {
@@ -664,7 +664,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             while(accumulator+1e-12>=dt) {tick();accumulator-=dt;}
         }
         previous=now;
-        if(uploadedVersion!=paint.version()) {renderer.UploadInk(stage,paint);uploadedVersion=paint.version();}
+        renderer.UploadInk(stage,paint,visualDt);
         const glm::dvec3 renderEye=benchmark?overviewEye:camera.pose().eye;
         const glm::dvec3 renderForward=benchmark?glm::normalize(target-overviewEye):camera.pose().forward;
         glm::mat4 projection,view;
@@ -733,7 +733,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         glViewport(0,0,width,height);
         glClearColor(0.64f,0.81f,0.9f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        int draws=shadowDraws+renderer.Draw(vp,glm::vec3(renderEye),false,true,&directionalShadow);
+        int draws=shadowDraws+renderer.Draw(glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,false,&directionalShadow);
         CharacterShadowState receiver{false,directionalShadow.texture(),directionalShadow.matrix(),1.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
         for(std::size_t i=0;i<characters.size();++i) {
@@ -757,6 +757,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             draws+=bossRenderer->DrawHazards(*match.boss(),geometry,vp,glm::vec3(teamColors[0]));
         }
         draws+=worldEffects.Draw(view,projection,glm::vec3(renderEye));
+        draws+=projectileRenderer.Draw(view,projection,renderEye,lighting);
         draws+=lensField.Render(screenController.lens(),width,height);
         screen.lensTexture=lensField.texture();screen.lensTexel=lensField.texel();
         draws+=pipeline.End(GradeSettings::Theme(std::string(stage.theme)),screen);
@@ -782,17 +783,20 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
     }
     if(!benchmark) captureMouse(false);
+    gameAudio.EndMatch();
     audio.Clear();
     return matchExit;
 }
 
 void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initial,
-                const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio) {
+                const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio) {
     const StageData* selected=&initial;
     ui.ShowMenu(std::string(initial.id));
+    gameAudio.Menu(true);
     int frame=0;
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        audio.Update();
         int width=0,height=0;
         glfwGetFramebufferSize(window,&width,&height);
         if(width<=0||height<=0) {glfwWaitEventsTimeout(0.05);continue;}
@@ -816,15 +820,17 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
             game.duration=selection.mode=="boss"?selection.duration:0;
             game.match=true;
             game.native=false;
-            if(MatchLoop(window,game,*selected,characterAssets,ui,audio,true)==MatchExit::Close) break;
+            gameAudio.Menu(false);
+            if(MatchLoop(window,game,*selected,characterAssets,ui,audio,gameAudio,true)==MatchExit::Close) break;
             ui.ShowMenu(std::string(selected->id));
+            gameAudio.Menu(true);
             frame=0;
         }
     }
 }
 
-void Loop(GLFWwindow* window, const Options& options, const StageData& initial) {
-    StageRenderer renderer;
+void Loop(GLFWwindow* window, const Options& options, const StageData& initial,const std::filesystem::path& stageAssets) {
+    StageRenderer renderer(stageAssets);
     const StageData* stage = &initial;
     auto geometry=std::make_unique<StageGeometry>(*stage);
     auto paint=std::make_unique<FacePaint>(*stage,*geometry);
@@ -998,20 +1004,21 @@ int RunStageViewer(int argc, char** argv) {
         ImGui::StyleColorsDark();
         ImGui_ImplGlfw_InitForOpenGL(window,true);
         ImGui_ImplOpenGL3_Init("#version 450 core");
+        auto assetRoot=std::filesystem::absolute(argv[0]).parent_path()/"assets";
+        if(!std::filesystem::exists(assetRoot/"reference/characters"))assetRoot=std::filesystem::current_path()/"assets";
         if(options.native||options.match) {
-            auto assets=std::filesystem::absolute(argv[0]).parent_path()/"assets"/"reference"/"characters";
-            if(!std::filesystem::exists(assets)) assets=std::filesystem::current_path()/"assets"/"reference"/"characters";
-            const auto assetRoot=assets.parent_path().parent_path();
+            const auto assets=assetRoot/"reference/characters";
             AudioEngine audio(assetRoot/"audio");
+            GameAudio gameAudio(audio);
             if(!audio.Initialize())std::cerr<<"AUDIO unavailable: "<<audio.lastError()<<'\n';
             GameUi ui(window,assetRoot);
             ui.SetSoundSink([&](const std::string& name){audio.Play(name);});
             ui.SetVolumeSink([&](float master,float music,float sfx){audio.SetVolumes(master,music,sfx);});
-            if(options.native)NativeMenu(window,options,*found,assets,ui,audio);
-            else MatchLoop(window,options,*found,assets,ui,audio);
+            if(options.native)NativeMenu(window,options,*found,assets,ui,audio,gameAudio);
+            else MatchLoop(window,options,*found,assets,ui,audio,gameAudio);
         }
-        else if(options.game) PlayLoop(window,options,*found);
-        else Loop(window,options,*found);
+        else if(options.game) PlayLoop(window,options,*found,assetRoot/"reference/stages");
+        else Loop(window,options,*found,assetRoot/"reference/stages");
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();gui=false;
