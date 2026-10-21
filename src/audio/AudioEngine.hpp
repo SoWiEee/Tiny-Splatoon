@@ -26,6 +26,8 @@ struct AudioLoopOptions {
     double volume = 1.0;
     double pitch = 1.0;
     std::optional<AudioPosition> pos;
+    struct ZoneHumParameters { int mode=0; double tension=0; };
+    std::optional<ZoneHumParameters> zoneHum;
 };
 
 struct AudioClipMetadata {

@@ -3,6 +3,8 @@
 /out/
 /output/
 /.playwright-cli/
+.codegraph/
+.cache/
 /CMakeUserPresets.json
 *.obj
 *.pdb

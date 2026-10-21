@@ -51,6 +51,7 @@ FacePaint::FacePaint(const StageData& stage, const StageGeometry& geometry, int 
     }
     grid_.resize(total);
     dead_.resize(total);
+    turfCell_.resize(total);
     for (int id = 0; id < static_cast<int>(stage.faces.size()); ++id) {
         const auto& face = stage.faces[id];
         const auto& g = faces_[id];
@@ -62,7 +63,7 @@ FacePaint::FacePaint(const StageData& stage, const StageGeometry& geometry, int 
             p += face.normal * 0.06;
             const int k = g.offset + j * g.columns + i;
             if (geometry.pointInside(p, 0.0, face.block)) dead_[k] = 1;
-            else if (face.turf) { ++turfTotal_; turfArea_ += g.cellWidth * g.cellHeight; }
+            else if (face.turf) { turfCell_[k] = 1; ++turfTotal_; turfArea_ += g.cellWidth * g.cellHeight; }
         }
     }
 }
@@ -96,7 +97,28 @@ void FacePaint::clear() {
     std::fill(grid_.begin(), grid_.end(), 0);
     counts_ = {0, 0};
     visualSplats_.clear();
+    visualFloods_.clear();
     visualClear_ = true;
+}
+
+bool FacePaint::setCells(const std::vector<int>& cells, int team) {
+    if (team < -1 || team > 1) throw std::invalid_argument("invalid paint team");
+    for (const int cell : cells)
+        if (cell < 0 || cell >= static_cast<int>(grid_.size())) throw std::out_of_range("paint cell index");
+    const std::uint8_t value = static_cast<std::uint8_t>(team + 1);
+    bool changed = false;
+    for (const int cell : cells) {
+        auto& current = grid_[static_cast<std::size_t>(cell)];
+        if (current == value) continue;
+        if (turfCell_[static_cast<std::size_t>(cell)]) {
+            if (current) --counts_[current - 1];
+            if (value) ++counts_[value - 1];
+        }
+        current = value;
+        changed = true;
+    }
+    if (changed) ++version_;
+    return changed;
 }
 
 double FacePaint::splat(const glm::dvec3& center, double radius, int team, double seed, const SplatOptions& options) {
@@ -151,6 +173,28 @@ double FacePaint::splat(const glm::dvec3& center, double radius, int team, doubl
 std::vector<VisualSplat> FacePaint::takeVisualSplats() {
     std::vector<VisualSplat> result;
     result.swap(visualSplats_);
+    return result;
+}
+
+void FacePaint::requestVisualFlood(VisualFlood flood) {
+    if (flood.regionId < 0 || flood.team < -1 || flood.team > 1 || !finite(flood.center) ||
+        !std::isfinite(flood.y0) || !std::isfinite(flood.y1) || flood.y1 < flood.y0 ||
+        !std::isfinite(flood.reach) || flood.reach < 0 || !std::isfinite(flood.start) ||
+        !std::isfinite(flood.duration) || flood.duration < 0)
+        throw std::invalid_argument("invalid visual paint flood");
+    for (const auto& poly : flood.polygons) {
+        if (poly.size() < 3) throw std::invalid_argument("invalid visual paint flood polygon");
+        for (const auto& point : poly)
+            if (!std::isfinite(point.x) || !std::isfinite(point.y)) throw std::invalid_argument("invalid visual paint flood polygon");
+    }
+    const auto it = std::find_if(visualFloods_.begin(), visualFloods_.end(), [&](const auto& item) { return item.regionId == flood.regionId; });
+    if (it == visualFloods_.end()) visualFloods_.push_back(std::move(flood));
+    else *it = std::move(flood);
+}
+
+std::vector<VisualFlood> FacePaint::takeVisualFloods() {
+    std::vector<VisualFlood> result;
+    result.swap(visualFloods_);
     return result;
 }
 

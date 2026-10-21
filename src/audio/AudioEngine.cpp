@@ -1,4 +1,5 @@
 #include "AudioEngine.hpp"
+#include "ZoneHum.hpp"
 
 #include <algorithm>
 #include <array>
@@ -92,6 +93,26 @@ double CompressDb(double sample, double thresholdDb, double kneeDb, double ratio
     } else if (level >= upper) output = thresholdDb + (level - thresholdDb) / ratio;
     return std::copysign(std::pow(10.0, output / 20.0), sample);
 }
+struct HumSource {
+    ma_data_source_base base{};
+    ZoneHum synth;
+    ma_uint64 cursor=0;
+    static ma_result Read(ma_data_source* source,void* output,ma_uint64 frames,ma_uint64* read){
+        auto& self=*reinterpret_cast<HumSource*>(source);self.synth.Render(static_cast<float*>(output),static_cast<std::size_t>(frames));self.cursor+=frames;if(read)*read=frames;return MA_SUCCESS;
+    }
+    static ma_result Seek(ma_data_source*,ma_uint64){return MA_NOT_IMPLEMENTED;}
+    static ma_result Format(ma_data_source*,ma_format* format,ma_uint32* channels,ma_uint32* rate,ma_channel* map,size_t capacity){
+        if(format)*format=ma_format_f32;if(channels)*channels=1;if(rate)*rate=48000;if(map&&capacity)map[0]=MA_CHANNEL_MONO;return MA_SUCCESS;
+    }
+    static ma_result Cursor(ma_data_source* source,ma_uint64* cursor){if(cursor)*cursor=reinterpret_cast<HumSource*>(source)->cursor;return MA_SUCCESS;}
+    static ma_result Length(ma_data_source*,ma_uint64* length){if(length)*length=0;return MA_NOT_IMPLEMENTED;}
+    HumSource(){
+        static const ma_data_source_vtable table={Read,Seek,Format,Cursor,Length,nullptr,0};
+        auto config=ma_data_source_config_init();config.vtable=&table;
+        const auto result=ma_data_source_init(&config,&base);if(result!=MA_SUCCESS)throw std::runtime_error(MiniaudioError("zone hum source",result));
+    }
+    ~HumSource(){ma_data_source_uninit(&base);}
+};
 }
 
 struct AudioEngine::Impl {
@@ -106,6 +127,7 @@ struct AudioEngine::Impl {
         std::string name, loopKey;
         std::uint64_t serial = 0;
         double stopAt = 0;
+        std::unique_ptr<HumSource> hum;
     };
     struct MusicVoice {
         ma_sound sound{};
@@ -259,6 +281,7 @@ struct AudioEngine::Impl {
     void StopVoice(Voice& voice) {
         if (voice.soundInitialized) { ma_sound_stop(&voice.sound); ma_sound_uninit(&voice.sound); voice.soundInitialized = false; }
         if (voice.sourceInitialized) { ma_audio_buffer_ref_uninit(&voice.source); voice.sourceInitialized = false; }
+        voice.hum.reset();
         if (!voice.loopKey.empty()) {
             const auto it = loopSlots.find(voice.loopKey);
             if (it != loopSlots.end() && it->second == static_cast<std::size_t>(&voice - voices.data())) loopSlots.erase(it);
@@ -456,10 +479,17 @@ bool AudioEngine::StartLoop(std::string_view key, std::string_view name, const A
     }
     auto slot = std::find_if(impl_->voices.begin() + kVoiceLimit, impl_->voices.end(), [](const auto& v) { return !v.active; });
     if (slot == impl_->voices.end()) return false;
-    ma_result result = ma_audio_buffer_ref_init(ma_format_s16, clip->metadata.channels, clip->pcm.data(), clip->metadata.frames, &slot->source);
-    if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_audio_buffer_ref_init(loop)", result); impl_->StopVoice(*slot); return false; }
-    slot->source.sampleRate = clip->metadata.sampleRate; slot->sourceInitialized = true;
-    result = ma_sound_init_from_data_source(&impl_->engine, reinterpret_cast<ma_data_source*>(&slot->source),
+    ma_result result=MA_SUCCESS;ma_data_source* dataSource=nullptr;
+    if(name=="zone_hum"){
+        slot->hum=std::make_unique<HumSource>();
+        if(options.zoneHum)slot->hum->synth.Set(options.zoneHum->mode,options.zoneHum->tension);
+        dataSource=reinterpret_cast<ma_data_source*>(&slot->hum->base);
+    }else{
+        result=ma_audio_buffer_ref_init(ma_format_s16,clip->metadata.channels,clip->pcm.data(),clip->metadata.frames,&slot->source);
+        if(result!=MA_SUCCESS){impl_->error=MiniaudioError("ma_audio_buffer_ref_init(loop)",result);impl_->StopVoice(*slot);return false;}
+        slot->source.sampleRate=clip->metadata.sampleRate;slot->sourceInitialized=true;dataSource=reinterpret_cast<ma_data_source*>(&slot->source);
+    }
+    result = ma_sound_init_from_data_source(&impl_->engine, dataSource,
         options.pos ? 0 : MA_SOUND_FLAG_NO_SPATIALIZATION, &impl_->sfx, &slot->sound);
     if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_sound_init_from_data_source(loop)", result); impl_->StopVoice(*slot); return false; }
     slot->soundInitialized = true; ma_sound_set_looping(&slot->sound, MA_TRUE);
@@ -474,12 +504,12 @@ bool AudioEngine::StartLoop(std::string_view key, std::string_view name, const A
 }
 
 bool AudioEngine::UpdateLoop(std::string_view key, const AudioLoopOptions& options) {
-    // shortcut: source loop parameters are absent from native events, upgrade when the simulation exposes those controls.
     if (!std::isfinite(options.volume) || options.volume < 0 || !std::isfinite(options.pitch) || options.pitch <= 0) return false;
     const auto it = impl_->loopSlots.find(std::string(key));
     if (it == impl_->loopSlots.end()) return false;
     auto& voice = impl_->voices[it->second];
     if (!voice.active || !voice.soundInitialized) return false;
+    if(voice.hum&&options.zoneHum)voice.hum->synth.Set(options.zoneHum->mode,options.zoneHum->tension);
     voice.stopping = false; voice.stopAt = 0;
     ma_sound_set_volume(&voice.sound, static_cast<float>(std::clamp(options.volume, 0.0, 1.0)));
     ma_sound_set_pitch(&voice.sound, static_cast<float>(std::clamp(options.pitch, 0.05, 4.0)));

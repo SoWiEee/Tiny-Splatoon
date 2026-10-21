@@ -83,6 +83,35 @@ scrollbarvertical sliderbar { background-color: #a3b3a4; border-radius: 3dp; }
 .boss-track { height: 8dp; background-color: #d1dcd0; margin-bottom: 8dp; border-radius: 3dp; }
 #boss-fill { height: 100%; width: 100%; background-color: #467a66; }
 .boss-detail { color: #4b6454; font-size: 12dp; }
+.zones-hud { position: absolute; top: 84dp; left: 50%; margin-left: -270dp; width: 540dp; padding: 12dp 16dp; box-sizing: border-box; background-color: #f5f7f3f2; border: 1dp #d9e0d8; border-radius: 7dp; }
+.zones-counts { display: flex; align-items: center; justify-content: space-between; padding-bottom: 9dp; border-bottom: 1dp #d9e0d8; }
+.zone-team { width: 46%; display: flex; align-items: baseline; }
+.zone-team > span:first-child { width: 42dp; font-size: 12dp; font-weight: 700; }
+.zone-team > strong { font-size: 24dp; margin-right: 5dp; }
+.zone-team > small { color: #596761; font-size: 11dp; }
+.zone-team-a > strong, .zone-team-a > span:first-child { color: #a8450c; }
+.zone-team-b > strong, .zone-team-b > span:first-child { color: #2452bb; }
+.zones-divider { width: 8%; text-align: center; color: #87948b; font-size: 18dp; }
+.zone-penalty { margin-left: auto; color: #596761; font-size: 11dp; }
+.zone-penalty strong { color: #293a32; font-size: 13dp; }
+.zone-objective-row, .zone-phase-row { display: flex; justify-content: space-between; align-items: center; padding: 7dp 0 5dp; font-size: 12dp; }
+.zone-objective-row strong, .zone-phase-row strong { color: #194e40; font-size: 13dp; }
+.zone-objective-row span, .zone-phase-row span { color: #56665c; }
+.zones-active { display: flex; }
+.zone-card { flex: 1; min-width: 0; margin: 0 4dp; padding: 7dp 8dp; background-color: #e9eee8; border-radius: 4dp; }
+.zone-card:first-child { margin-left: 0; }
+.zone-card:last-child { margin-right: 0; }
+.zone-card-heading { display: flex; justify-content: space-between; align-items: center; font-size: 11dp; }
+.zone-card-heading strong { color: #293a32; }
+.zone-card-heading span { color: #596761; font-size: 10dp; }
+.zone-share-track { position: relative; height: 7dp; margin: 6dp 0 4dp; overflow: hidden; background-color: #d5ddd3; border-radius: 4dp; }
+.zone-share-a, .zone-share-b { position: absolute; top: 0; height: 100%; }
+.zone-share-a { left: 0; }
+.zone-share-b { right: 0; }
+.zone-control-threshold { position: absolute; top: 0; left: 80%; width: 1dp; height: 100%; background-color: #28372e; opacity: .8; }
+.zone-share-labels { display: flex; justify-content: space-between; color: #56665c; font-size: 10dp; }
+.zone-phase-row { padding-bottom: 0; }
+.zone-callout { margin-top: 8dp; padding: 6dp 9dp; background-color: #dfeadf; border-radius: 4dp; color: #194e40; font-size: 12dp; font-weight: 700; text-align: center; }
 .overlay { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: #0d181cb3; display: flex; align-items: center; justify-content: center; }
 .dialog { background-color: #f5f7f3; padding: 40dp; border-radius: 12dp; box-sizing: border-box; }
 .pause-dialog { width: 410dp; }
@@ -185,6 +214,7 @@ button { font-size: 15dp; padding: 9dp 14dp; }
 .map-grate { background-color: #87988b; }
 .map-actor { position: absolute; z-index: 2; width: 8dp; height: 8dp; margin-left: -4dp; margin-top: -4dp; border: 1dp #28372e; border-radius: 5dp; }
 .map-actor-local { z-index: 3; width: 12dp; height: 12dp; margin-left: -6dp; margin-top: -6dp; border: 2dp #ffffff; box-shadow: 0 0 0 1dp #24332a; }
+.map-zone-edge { position: absolute; z-index: 2; height: 2dp; transform-origin: 0% 50%; }
 .position-status { margin-top: 5dp; color: #56665c; font-size: 10dp; }
 .practice-tools { display: block; margin: 2dp 0 12dp; padding: 10dp; background-color: #e7ede6; border-radius: 6dp; }
 .practice-tools button { display: block; width: 100%; box-sizing: border-box; margin: 4dp 0; text-align: left; }
@@ -214,4 +244,5 @@ button { font-size: 15dp; padding: 9dp 14dp; }
   .stat-row .stat-track { width: 180dp; }
   .results-dialog { width: 100%; padding: 20dp; }
   .results-preview { display: none; }
+  .zones-hud { left: auto; right: 220dp; margin-left: 0; width: 500dp; }
 }

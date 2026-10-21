@@ -164,6 +164,8 @@ struct StageRenderer::Source {
     struct ShaderEntry { std::unique_ptr<CharacterShader> shader;std::vector<std::pair<std::string,std::vector<double>>> defaults;RenderState state; };
     struct Growing { VisualSplat splat;double age=0,dur=0,dripDur=0; };
     struct PaintVertex { float pos[2],local[3],splat[4],stretch[3],grow[4]; };
+    struct FloodVertex { float pos[2],world[3]; };
+    struct Flood {VisualFlood request;std::vector<FloodVertex> vertices;double age=0,radius=-1;};
     std::filesystem::path root;
     bool environment=false;
     std::string key;
@@ -177,6 +179,9 @@ struct StageRenderer::Source {
     GLuint atlas=0,framebuffer=0,white=0,transparent=0,dfg=0,dummyShadow=0,tlTexture=0,mural=0,paintProgram=0,dryProgram=0,paintVao=0,paintVbo=0,dryVao=0,dryVbo=0;
     std::string muralId;
     std::vector<Growing> growing;
+    std::vector<Flood> floods;
+    std::unique_ptr<CharacterShader> floodShader;
+    GLuint floodVao=0,floodVbo=0;
     std::vector<AtlasRect> atlasRects;
     double clock=0,dryAcc=0;
     double ppm=0;
@@ -264,6 +269,7 @@ struct StageRenderer::Source {
         const GLuint next=uploadTexture(name,GL_TEXTURE_2D,true,false);if(mural)glDeleteTextures(1,&mural);mural=next;muralId=id;
     }
     void cleanup(){
+        floodShader.reset();if(floodVbo)glDeleteBuffers(1,&floodVbo);if(floodVao)glDeleteVertexArrays(1,&floodVao);floodVbo=floodVao=0;
         meshes.clear();for(auto& [_,entry]:shaders)entry.shader.reset();
         const GLuint buffers[]={paintVbo,dryVbo};glDeleteBuffers(2,buffers);paintVbo=dryVbo=0;const GLuint arrays[]={paintVao,dryVao};glDeleteVertexArrays(2,arrays);paintVao=dryVao=0;
         const GLuint textures[]={atlas,white,transparent,dfg,dummyShadow,tlTexture,mural};glDeleteTextures(7,textures);atlas=white=transparent=dfg=dummyShadow=tlTexture=mural=0;
@@ -274,7 +280,7 @@ struct StageRenderer::Source {
 
     void clearInk(){
         GLStateGuard state;glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);glViewport(0,0,atlasSize,atlasSize);glDisable(GL_SCISSOR_TEST);glDisable(GL_BLEND);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
-        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glBindTexture(GL_TEXTURE_2D,atlas);glGenerateMipmap(GL_TEXTURE_2D);growing.clear();clock=0;dryAcc=0;
+        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glBindTexture(GL_TEXTURE_2D,atlas);glGenerateMipmap(GL_TEXTURE_2D);growing.clear();floods.clear();clock=0;dryAcc=0;
     }
     ShaderEntry& getShader(const std::string& name){
         auto found=shaders.find(name);if(found!=shaders.end())return found->second;
@@ -472,21 +478,72 @@ struct StageRenderer::Source {
         }
     }
 
+    void queueFlood(const StageData& stage,const FacePaint& paint,VisualFlood request){
+        if(request.polygons.size()>6)throw std::runtime_error("Source flood polygon capacity exceeded");
+        std::size_t points=0;for(const auto& polygon:request.polygons)points+=polygon.size();
+        if(points>64)throw std::runtime_error("Source flood vertex capacity exceeded");
+        floods.erase(std::remove_if(floods.begin(),floods.end(),[&](const Flood& f){return f.request.regionId==request.regionId;}),floods.end());
+        Flood flood;flood.request=std::move(request);
+        std::map<int,std::array<int,4>> bounds;
+        for(const int cell:flood.request.cells){
+            for(int face=0;face<int(stage.faces.size());++face){const auto& g=paint.faceGrid(face);if(g.offset<0||cell<g.offset||cell>=g.offset+g.columns*g.rows)continue;
+                const int local=cell-g.offset,x=local%g.columns,y=local/g.columns;const auto at=bounds.find(face);
+                if(at==bounds.end())bounds.emplace(face,std::array<int,4>{x,x,y,y});
+                else{auto& b=at->second;b[0]=std::min(b[0],x);b[1]=std::max(b[1],x);b[2]=std::min(b[2],y);b[3]=std::max(b[3],y);}break;
+            }
+        }
+        for(const auto& [id,b]:bounds){const auto& f=stage.faces[id];const auto& g=paint.faceGrid(id);const auto& a=paint.atlas(id);
+            const double pad=(a.pad-.5)/a.ppm,u0=std::max(-pad,(b[0]-1)*g.cellWidth),u1=std::min(f.width+pad,(b[1]+2)*g.cellWidth),v0=std::max(-pad,(b[2]-1)*g.cellHeight),v1=std::min(f.height+pad,(b[3]+2)*g.cellHeight);
+            for(const auto& uv:std::array<glm::dvec2,6>{{{u0,v0},{u1,v0},{u1,v1},{u0,v0},{u1,v1},{u0,v1}}}){
+                const auto world=f.origin+f.u*uv.x+f.v*uv.y;FloodVertex vertex{};
+                vertex.pos[0]=float((a.x+a.pad+uv.x*a.ppm)/atlasSize*2-1);vertex.pos[1]=float((a.y+a.pad+uv.y*a.ppm)/atlasSize*2-1);
+                for(int c=0;c<3;++c)vertex.world[c]=float(world[c]);flood.vertices.push_back(vertex);
+            }
+        }
+        floods.push_back(std::move(flood));
+    }
+    void drawFloods(double dt){
+        if(floods.empty())return;
+        if(!floodShader){
+            const auto assets=root.parent_path()/"zones";
+            floodShader=std::make_unique<CharacterShader>(readText(assets/"flood.vert"),readText(assets/"flood.frag"),true,false,false);
+            glGenVertexArrays(1,&floodVao);glBindVertexArray(floodVao);glGenBuffers(1,&floodVbo);glBindBuffer(GL_ARRAY_BUFFER,floodVbo);
+            const auto position=floodShader->attribute("aPos"),world=floodShader->attribute("aW");
+            glEnableVertexAttribArray(position);glVertexAttribPointer(position,2,GL_FLOAT,GL_FALSE,sizeof(FloodVertex),nullptr);
+            glEnableVertexAttribArray(world);glVertexAttribPointer(world,3,GL_FLOAT,GL_FALSE,sizeof(FloodVertex),reinterpret_cast<void*>(2*sizeof(float)));
+        }
+        floodShader->use();glBindVertexArray(floodVao);glBindBuffer(GL_ARRAY_BUFFER,floodVbo);
+        for(auto& flood:floods){const auto& f=flood.request;flood.age+=dt;const bool done=flood.age>=f.duration;
+            const double x=done?1:flood.age/f.duration,rad=done?1e9:f.reach*(f.easeOut?1-(1-x)*(1-x):x);
+            std::vector<double> polygons(128),parts(7);int at=0,np=0;
+            for(const auto& polygon:f.polygons){parts[np++]=at;for(const auto& p:polygon){polygons[at*2]=p.x;polygons[at*2+1]=p.y;++at;}}parts[np]=at;
+            floodShader->uniform("uPoly",polygons);floodShader->uniform("uPart",parts);floodShader->uniform("uParts",np);
+            floodShader->uniform("uY",std::vector<double>{f.y0,f.y1});floodShader->uniform("uC",std::vector<double>{f.center.x,f.center.z});
+            floodShader->uniform("uR",std::vector<double>{flood.radius,rad});floodShader->uniform("uTeam",f.team);
+            if(f.team<0)glDisable(GL_BLEND);else{glEnable(GL_BLEND);glBlendEquationSeparate(GL_FUNC_ADD,GL_MAX);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE);}
+            glBufferData(GL_ARRAY_BUFFER,flood.vertices.size()*sizeof(FloodVertex),flood.vertices.data(),GL_STREAM_DRAW);glDrawArrays(GL_TRIANGLES,0,static_cast<GLsizei>(flood.vertices.size()));flood.radius=rad;
+        }
+        floods.erase(std::remove_if(floods.begin(),floods.end(),[](const Flood& f){return f.age>=f.request.duration;}),floods.end());
+    }
     void uploadInk(const StageData& stage,FacePaint& paint,double dt){
         if(paint.atlasSize()!=atlasSize)throw std::runtime_error("Source stage renderer requires a 4096×4096 FacePaint atlas");
         usedHeight=paint.usedHeight();ppm=paint.pixelsPerMetre();atlasRects.resize(stage.faces.size());for(std::size_t i=0;i<atlasRects.size();++i)atlasRects[i]=paint.atlas(static_cast<int>(i));
         const bool clear=paint.takeVisualClear();auto incoming=paint.takeVisualSplats();
         if(clear){clearInk();}
+        for(auto& flood:paint.takeVisualFloods())queueFlood(stage,paint,std::move(flood));
         for(const auto& item:incoming){const int kind=static_cast<int>(item.kind);if(kind<0||kind>7)continue;const double duration=item.kind==SplatKind::Speck?.05:.085+std::min(.22,item.radius*.075);const bool canDrip=item.kind!=SplatKind::Speck&&item.kind!=SplatKind::Roll;growing.push_back({item,0,duration,canDrip?1.1+std::min(2.2,item.radius*1.5):0});}
         dt=std::clamp(dt,0.0,.25);clock+=dt;dryAcc+=dt;
         std::vector<PaintVertex> vertices;vertices.reserve(growing.size()*24*6);std::vector<std::size_t> expired;
-        for(std::size_t i=0;i<growing.size();++i){auto& g=growing[i];g.age+=dt;const double tn=g.age/g.dur,td=g.dripDur?std::min(1.0,g.age/g.dripDur):1.0,dT=1-std::pow(1-td,2.2);const bool bodyDone=tn>=1.75;
+        for(std::size_t i=0;i<growing.size();++i){auto& g=growing[i];
+            const bool settle=std::any_of(floods.begin(),floods.end(),[&](const Flood& f){const auto& r=f.request;const auto& s=g.splat;const double reach=r.reach+s.radius*(g.dripDur?3.9:2.75)+.5;return std::hypot(s.center.x-r.center.x,s.center.z-r.center.z)<reach&&s.center.y>r.y0-4&&s.center.y<r.y1+4;});
+            if(settle){appendSplat(stage,paint,g,false,3,1,vertices);expired.push_back(i);continue;}
+            g.age+=dt;const double tn=g.age/g.dur,td=g.dripDur?std::min(1.0,g.age/g.dripDur):1.0,dT=1-std::pow(1-td,2.2);const bool bodyDone=tn>=1.75;
             if(bodyDone&&td>=1){appendSplat(stage,paint,g,g.dripDur>0,3,1,vertices);expired.push_back(i);continue;}
             appendSplat(stage,paint,g,bodyDone,std::min(tn,3.0),dT,vertices);
         }
         for(auto it=expired.rbegin();it!=expired.rend();++it)growing.erase(growing.begin()+static_cast<std::ptrdiff_t>(*it));
         const int n=static_cast<int>(std::floor(dryAcc*40));const int drySteps=n>=2?std::min(n,12):0;if(drySteps)dryAcc-=drySteps/40.0;
-        if(vertices.empty()&&!drySteps)return;
+        if(vertices.empty()&&!drySteps&&floods.empty())return;
         GLStateGuard state;glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);glViewport(0,0,atlasSize,atlasSize);glDisable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);glDisable(GL_SCISSOR_TEST);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
         if(!vertices.empty()){
             glEnable(GL_BLEND);glBlendEquationSeparate(GL_FUNC_ADD,GL_MAX);glBlendFuncSeparate(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE);
@@ -498,6 +555,7 @@ struct StageRenderer::Source {
             glBindVertexArray(dryVao);glBindBuffer(GL_ARRAY_BUFFER,dryVbo);glBufferData(GL_ARRAY_BUFFER,sizeof(quad),quad,GL_STREAM_DRAW);glEnable(GL_BLEND);
             glBlendEquationSeparate(GL_FUNC_REVERSE_SUBTRACT,GL_FUNC_ADD);glBlendFuncSeparate(GL_ONE,GL_ONE,GL_ZERO,GL_ONE);glUseProgram(dryProgram);glUniform1f(glGetUniformLocation(dryProgram,"uDry"),drySteps/255.f);glDrawArrays(GL_TRIANGLE_FAN,0,4);
         }
+        drawFloods(dt);
         glDisable(GL_BLEND);glBindTexture(GL_TEXTURE_2D,atlas);glGenerateMipmap(GL_TEXTURE_2D);
     }
 };

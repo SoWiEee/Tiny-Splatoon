@@ -88,6 +88,9 @@ public:
     glm::dvec3 visualPos() const;
     const std::vector<ShooterProjectile>& projectiles() const { return world_->projectiles(); }
     double turfPainted() const { return turfPainted_; }
+    double zoneTurf() const { return zoneTurf_; }
+    double zoneTurfPainted() const { return zoneTurf_; }
+    void addZoneTurf(double area) { if(area>0.0) zoneTurf_+=area; }
     int deaths() const { return deaths_; }
     int splats() const { return splats_; }
     int shotsFired() const { return shotsFired_; }
@@ -130,7 +133,7 @@ private:
     double coyote_ = 0.0, jumpBuffer_ = 0.0, fireBuffer_ = 0.0, kidT_ = 99.0;
     double firePressT_ = -1.0, squidPressT_ = -1.0, time_ = 0.0;
     double hardLand_ = 0.0, climbSpeed_ = 0.0, climbExit_ = 0.0;
-    double smoothYVelocity_ = 0.0, turfPainted_ = 0.0;
+    double smoothYVelocity_ = 0.0, turfPainted_ = 0.0, zoneTurf_ = 0.0;
     double yawVelocity_ = 0.0, faceTarget_ = 0.0;
     double firingT_ = 0.0, fireFacing_ = 0.0, roofT_ = 0.0, roofStall_ = 0.0;
     glm::dvec3 roofDirection_{0.0}, roofPrevious_{0.0};

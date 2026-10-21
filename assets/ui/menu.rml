@@ -37,7 +37,7 @@
           </div>
           <div id="panel-play" class="panel hidden">
             <h1>選擇遊玩方式</h1><p id="mode-description" class="intro"></p>
-            <div class="mode-row"><button id="mode-turf" class="mode selected">塗地對戰</button><button id="mode-boss" class="mode">破艦巨獸協力</button><button id="mode-practice" class="mode">自由練習</button></div>
+            <div class="mode-row"><button id="mode-turf" class="mode selected">塗地對戰</button><button id="mode-zones" class="mode">區域爭奪</button><button id="mode-boss" class="mode">破艦巨獸協力</button><button id="mode-practice" class="mode">自由練習</button></div>
             <div class="field"><label for="stage">場地</label><select id="stage"></select></div>
             <div class="field"><label for="theme">時段</label><select id="theme"><option value="day">白天</option><option value="dusk">黃昏</option></select></div>
             <div id="difficulty-row" class="field"><label for="difficulty">電腦玩家難度</label><select id="difficulty"><option value="easy">輕鬆</option><option value="normal">標準</option><option value="hard">挑戰</option></select></div>
@@ -51,10 +51,10 @@
             <button id="online-play" class="primary">前往離線遊玩</button>
           </div>
           <div id="panel-loadout" class="panel hidden">
-            <h1>裝備</h1><p class="intro">主武器會套用建議搭配；副武器與特殊技能仍可分別調整。</p>
-            <div class="field"><label for="main">主武器</label><select id="main"></select></div>
-            <div class="field"><label for="sub">副武器</label><select id="sub"></select></div>
-            <div class="field"><label for="special">特殊技能</label><select id="special"></select></div>
+            <h1>裝備</h1><p class="intro">主要武器會套用建議搭配；次要武器與特殊武器仍可分別調整。</p>
+            <div class="field"><label for="main">主要武器</label><select id="main"></select></div>
+            <div class="field"><label for="sub">次要武器</label><select id="sub"></select></div>
+            <div class="field"><label for="special">特殊武器</label><select id="special"></select></div>
             <div class="stats-heading">能力</div>
             <div class="stat-row"><span>射程</span><div class="stat-track"><div id="stat-range"></div></div><b id="stat-range-value"></b></div>
             <div class="stat-row"><span>傷害</span><div class="stat-track"><div id="stat-damage"></div></div><b id="stat-damage-value"></b></div>
@@ -113,7 +113,7 @@
               <div class="setting-row"><label for="rumble">手把震動</label><input id="rumble" type="range" min="0" max="1" step="0.05" disabled="disabled" /><span id="rumble-value"></span></div>
               <div class="setting-check"><input id="colorblind" type="checkbox" /><label for="colorblind">色盲安全隊伍顏色</label><input id="minimap" type="checkbox" /><label for="minimap">小地圖</label></div>
               <div class="setting-row"><label for="palette">隊伍色盤</label><select id="palette"><option value="0">橘紅・鈷藍</option><option value="1">泡泡糖・薄荷</option><option value="2">檸檬・葡萄</option><option value="3">水藍・櫻桃</option><option value="4">萊姆・洋紅</option></select></div>
-              <div class="setting-row"><label for="default-mode">預設模式</label><select id="default-mode"><option value="turf">塗地對戰</option><option value="boss">首領協力</option></select></div>
+              <div class="setting-row"><label for="default-mode">預設模式</label><select id="default-mode"><option value="turf">塗地對戰</option><option value="zones">區域爭奪</option><option value="boss">破艦巨獸協力</option></select></div>
               <div class="setting-row"><label for="default-difficulty">預設難度</label><select id="default-difficulty"><option value="easy">輕鬆</option><option value="normal">標準</option><option value="hard">挑戰</option></select></div>
               <div class="setting-row"><label for="match-length">塗地預設時長</label><select id="match-length"><option value="90">1.5 分鐘</option><option value="180">3 分鐘</option></select></div>
               <div class="setting-row"><label for="time-of-day">預設時段</label><select id="time-of-day"><option value="day">白天</option><option value="dusk">黃昏</option></select></div>
@@ -123,11 +123,11 @@
           <div id="panel-howto" class="panel hidden">
             <h1>操作說明</h1><p class="intro">以鍵盤與滑鼠開始遊玩。</p>
             <div class="control-row"><span>移動與視角</span><strong>W A S D ／方向鍵、滑鼠</strong></div>
-            <div class="control-row"><span>主武器</span><strong>滑鼠左鍵</strong></div>
-            <div class="control-row"><span>副武器</span><strong>滑鼠右鍵 ／ E</strong></div>
+            <div class="control-row"><span>主要武器</span><strong>滑鼠左鍵</strong></div>
+            <div class="control-row"><span>次要武器</span><strong>滑鼠右鍵 ／ E</strong></div>
             <div class="control-row"><span>變形與游泳</span><strong>Shift</strong></div>
             <div class="control-row"><span>跳躍</span><strong>Space</strong></div>
-            <div class="control-row"><span>特殊技能</span><strong>F ／ Q</strong></div>
+            <div class="control-row"><span>特殊武器</span><strong>F ／ Q</strong></div>
             <div class="control-row"><span>地圖與跳躍</span><strong>按住 Tab ／ M</strong></div>
             <div class="control-row"><span>練習選單</span><strong>L</strong></div>
             <div class="control-row"><span>暫停</span><strong>Esc</strong></div>

@@ -3,6 +3,8 @@
 #include "BossSimulation.hpp"
 #include "CombatWorld.hpp"
 #include "CharacterRenderData.hpp"
+#include "ZoneControl.hpp"
+#include "ZonePlan.hpp"
 #include <array>
 #include <functional>
 #include <memory>
@@ -21,7 +23,20 @@ struct MatchOptions {
 struct MatchRosterEntry { std::string name; CharacterStyle style; int team=0,slot=0; bool local=false; };
 enum class MatchPhase { Intro, Playing, Finish, Judge, Results };
 struct BossResult { bool win=false; double time=0,hp=0,maxHp=0; int phase=1; };
-struct MatchResult { std::array<double,2> coverage; int winner=0; std::optional<BossResult> boss; };
+struct ZoneResult {
+    std::array<double,2> counts{}, penalty{};
+    bool overtime=false;
+    std::string reason;
+    std::vector<ZoneEvent> events;
+    std::vector<ZonePenaltyRecord> log;
+    std::vector<double> zoneTurf;
+};
+struct MatchResult {
+    std::array<double,2> coverage;
+    int winner=0;
+    std::optional<BossResult> boss;
+    std::optional<ZoneResult> zones;
+};
 
 class MatchSimulation {
 public:
@@ -40,6 +55,7 @@ public:
     const std::vector<MatchRosterEntry>& roster() const { return roster_; }
     const StageData& stage() const { return stage_; }
     CombatWorld& world() { return world_; }
+    const ZoneControl* zones() const { return zones_.get(); }
     BossSimulation* boss() { return boss_.get(); }
     const BossSimulation* boss() const { return boss_.get(); }
     MatchPhase phase() const { return phase_; }
@@ -63,6 +79,8 @@ private:
     std::vector<BotSimulation*> botPointers_;
     std::vector<PlayerSimulation*> bossSquad_;
     std::unique_ptr<BossSimulation> boss_;
+    std::unique_ptr<ZoneControl> zones_;
+    std::unique_ptr<ZonePlan> zonePlan_;
     std::function<void(BossSimulation&)> bossPoseSink_;
     std::vector<MatchRosterEntry> roster_;
     MatchPhase phase_=MatchPhase::Intro;

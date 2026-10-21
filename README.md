@@ -4,9 +4,9 @@
 
 以 C++17／OpenGL 4.5 還原 `splat-ref/` 的塗地射擊遊戲。原生程式位於依職責分層的 `src/`，直接執行 `Tiny-Splatoon.exe` 即進入 Tiny Splatoon 標題與玩家首頁。
 
-目前可玩的是一名玩家與七名 Bot 的 4v4 Turf：選圖、移動／瞄準／射擊、變形／游泳／跳躍、副武器／特殊技能、暫停／返回、判分／結果與重開。模擬採固定 60 Hz，角色使用來源幾何與即時計算的骨架／程序動畫。
+目前可玩的是一名玩家與七名 Bot 的 4v4 塗地對戰及區域爭奪（Zones）：選圖、移動／瞄準／射擊、變形／游泳／跳躍、副武器／特殊技能、暫停／返回、判分／結果與重開。模擬採固定 60 Hz，角色使用來源幾何與即時計算的骨架／程序動畫。
 
-完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，優先顯示繁體中文。可選離線塗地／Boss、地圖、裝備與難度，並調整音量和減少動態效果。場景已接入來源 bevel／PropKit 幾何、46 層程序材質與連續墨水；投射物使用來源墨滴、弓箭、拳套、刀波與蓄力光帶。miniaudio 的來源資料已擴充為 201 個音效及九首曲目，整合驗收進度見 [還原紀錄](docs/restoration-progress.md)。首頁、角色置物櫃、3D 換裝預覽、結果頒獎台與設定保存已接入；線上與 Zones 仍須依 [spec.md](spec.md) 開發。Boss 的 100 骨架／命中 socket／材質數值已通過 16 組來源姿勢比對，完整模式與材質畫面仍在驗收。
+完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，優先顯示繁體中文。可選離線塗地／區域爭奪／Boss、地圖、裝備與難度，並調整音量和減少動態效果。場景已接入來源 bevel／PropKit 幾何、46 層程序材質與連續墨水；投射物使用來源墨滴、弓箭、拳套、刀波與蓄力光帶。miniaudio 的來源資料已擴充為 201 個音效及九首曲目，整合驗收進度見 [還原紀錄](docs/restoration-progress.md)。首頁、角色置物櫃、3D 換裝預覽、結果頒獎台與設定保存已接入；離線 Zones 的輪替／懲罰／延長、AI、HUD、場地標記及 XP 已接入，見 [區域爭奪契約](docs/zones-source-contract.md)；線上仍須依 [spec.md](spec.md) 開發。Boss 的 100 骨架／命中 socket／材質數值已通過 16 組來源姿勢比對，完整模式與材質畫面仍在驗收。
 
 本輪已接入來源天空／海面／雲／遠景、港區反射、PMREM 與共用光照，裝置目錄擴為雙隊 58 個來源模型，並讓布條與道具持續動畫。潛水變形、潑墨動作與音訊的實際驗收及保留差異見 [本輪驗收](docs/acceptance-2026-10-21.md)。
 
@@ -47,7 +47,7 @@ Optimus 筆電會透過 `NvOptimusEnablement` 請求 NVIDIA；啟動紀錄中的
 | Shift | 變形／己墨游泳 |
 | Space | 跳躍 |
 | F／Q | 啟動特殊技能 |
-| C | Cheer |
+| C | 歡呼 |
 | L | 練習中的裝備與外觀選單 |
 | Esc | 暫停／繼續 |
 
@@ -61,6 +61,7 @@ Optimus 筆電會透過 `NvOptimusEnablement` 請求 NVIDIA；啟動紀錄中的
 .\build\Tiny-Splatoon.exe --frames 3
 .\build\Tiny-Splatoon.exe --reference-match tidewater
 .\build\Tiny-Splatoon.exe --reference-boss tidewater --duration 240
+.\build\Tiny-Splatoon.exe --reference-zones tidewater
 .\build\Tiny-Splatoon.exe --reference-game halyard
 .\build\Tiny-Splatoon.exe --reference-stage halyard --reference-mode turf
 ctest --test-dir build --output-on-failure

@@ -95,9 +95,9 @@ bool PlayerSimulation::damage(double amount) {
 bool PlayerSimulation::damageFromCombat(double amount, PlayerSimulation* attacker, const std::string& source) {
     if (!state.alive || amount <= 0.0 || state.invuln > 0.0) return false;
     amount = world_->specials_.filterDamage(*this, attacker, amount, source);
-    if (amount <= 0.0) return false;
+    if (!(amount > 0.0)) return false;
     amount = runner_.damageTaken(amount, attacker);
-    if (amount <= 0.0) return false;
+    if (!(amount > 0.0)) return false;
     if(damageSink_)damageSink_(amount,attacker&&attacker!=this?&attacker->state.pos:nullptr);
     state.hp -= amount;
     lastDamage_ = 0.0;
@@ -515,15 +515,22 @@ void PlayerSimulation::resolveMotion(double prevY,bool stick) {
 void PlayerSimulation::tick(double dt) {
     if (!(dt > 0.0) || !std::isfinite(dt)) throw std::invalid_argument("player tick requires positive finite dt");
     time_ += dt;
+    const auto respawn=[&]{
+        const double special=state.specialCharge;
+        spawnAt(stage_.spawnPads[team_]+glm::dvec3(std::cos(0.6)*1.1,4.5,std::sin(0.6)*1.1),team_==0?0.0:pi);
+        state.specialCharge=special;state.grounded=false;state.vel.y=-4.0;
+    };
+    // Source actor.js recovers invalid visual/physics state before it reaches weapon muzzles.
+    if(!std::isfinite(state.pos.x+state.pos.y+state.pos.z+state.vel.x+state.vel.y+state.vel.z+state.yaw+state.smoothY)){
+        superJump_.reset();state.yaw=0;yawVelocity_=state.smoothY=smoothYVelocity_=0;
+        if(state.alive)respawn();
+        else{world_->cleanup(*this);state.pos=stage_.spawnPads[team_];state.vel=glm::dvec3(0);}
+    }
 
     if (!state.alive) {
         state.respawnTimer -= dt;
         if (canRespawn_ && state.respawnTimer <= 0.0) {
-            const double special = state.specialCharge;
-            spawnAt(stage_.spawnPads[team_] + glm::dvec3(std::cos(0.6)*1.1,4.5,std::sin(0.6)*1.1), team_ == 0 ? 0.0 : pi);
-            state.specialCharge = special;
-            state.grounded = false;
-            state.vel.y = -4.0;
+            respawn();
         }
         if (poseFrameSink_) poseFrameSink_(dt);
         return;

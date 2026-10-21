@@ -15,6 +15,7 @@
 #include "ScreenEffectsController.hpp"
 #include "LensField.hpp"
 #include "WorldEffects.hpp"
+#include "ZoneRenderer.hpp"
 #include "ProjectileRenderer.hpp"
 #include "EnvironmentRenderer.hpp"
 #include "DeviceRenderer.hpp"
@@ -105,6 +106,11 @@ Options ParseOptions(int argc, char** argv) {
         if (arg == "--reference-boss") {
             result.match = true;result.mode="boss";
             if (i + 1 < argc && argv[i + 1][0] != '-') result.stage = argv[++i];
+            continue;
+        }
+        if (arg == "--reference-zones") {
+            result.match=true;result.mode="zones";
+            if(i+1<argc&&argv[i+1][0]!='-')result.stage=argv[++i];
             continue;
         }
         if (arg == "--native") { result.native = true; continue; }
@@ -405,6 +411,8 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     DeviceRenderer deviceRenderer(characterAssets.parent_path()/"devices");
     worldEffects.SetDeviceRenderer(&deviceRenderer);
     ProjectileRenderer projectileRenderer(characterAssets.parent_path()/"projectiles",true);
+    std::unique_ptr<ZoneRenderer> zoneRenderer;
+    if(match.zones())zoneRenderer=std::make_unique<ZoneRenderer>(characterAssets.parent_path()/"zones",std::string(stage.id));
     ScreenEffectsController screenController;
     LensField lensField;
     DirectionalShadow directionalShadow;
@@ -577,6 +585,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                     MatchRewardInput reward;reward.matchId=matchId;reward.mode=options.mode;
                     reward.won=match.result()->boss?match.result()->boss->win:match.result()->winner==match.local().team();
                     reward.turf=match.local().turfPainted();reward.splats=match.local().splats();
+                    if(match.result()->zones){reward.zoneTurf=match.local().zoneTurfPainted();reward.knockout=match.result()->zones->reason=="knockout";}
                     if(match.boss()){reward.bossDamage=match.boss()->squadDamage()[0];reward.splats+=match.boss()->squadSplats()[0];}
                     const auto earned=ApplyMatchReward(profile,reward);
                     ui.SetProfile(profile);ui.SetReward(earned);
@@ -855,6 +864,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             draws+=bossRenderer->Draw(*match.boss(),view,projection,glm::vec3(renderEye),glm::vec3(teamColors[0]),&lighting);
             draws+=bossRenderer->DrawHazards(*match.boss(),geometry,vp,glm::vec3(teamColors[0]));
         }
+        if(zoneRenderer&&match.zones()&&match.phase()!=MatchPhase::Results)draws+=zoneRenderer->Draw(*match.zones(),view,projection,renderEye,0,match.zones()->ended(),match.world().time());
         draws+=worldEffects.Draw(view,projection,glm::vec3(renderEye),&lighting);
         draws+=projectileRenderer.Draw(view,projection,renderEye,lighting);
         draws+=deviceRenderer.Draw(view,projection,renderEye,lighting,deviceActors,&receiver);
@@ -958,7 +968,7 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
                 {int(preview.x*width),int((1-preview.y-preview.height)*height),int(preview.width*width),int(preview.height*height)},frameStart,ui.profile().settings.reducedMotion);
         const auto action=ui.RenderMenu(width,height);
         const auto& selection=ui.setup();
-        for(const auto& candidate:ReferenceStages())if(candidate.mode=="turf"&&!candidate.onlineOnly&&candidate.id==selection.stage)selected=&candidate;
+        for(const auto& candidate:ReferenceStages())if(candidate.mode==(selection.mode=="zones"?"zones":"turf")&&!candidate.onlineOnly&&candidate.id==selection.stage)selected=&candidate;
         if(action==UiAction::Close) {glfwSetWindowShouldClose(window,1);break;}
         if(options.frames&&++frame>=options.frames) {
             if(!options.uiCapture.empty())Capture(options.uiCapture,width,height);
@@ -1138,8 +1148,8 @@ int RunStageViewer(int argc, char** argv) {
             return stage.id==options.stage && stage.mode==(options.mode=="boss"?"turf":options.mode);
         });
         if (found==stages.end()) throw std::runtime_error("Unknown or unsupported stage/mode: "+options.stage+"/"+options.mode);
-        if((options.game || options.match || options.native) && (found->onlineOnly || found->mode!="turf"))
-            throw std::runtime_error("Native practice currently requires an offline Turf stage");
+        if((options.game || options.match || options.native) && (found->onlineOnly || (found->mode!="turf"&&!(options.match&&options.mode=="zones"))))
+            throw std::runtime_error("Native gameplay requires an offline stage for its selected mode");
         if (!glfwInit()) throw std::runtime_error("GLFW initialization failed");
         glfw=true;
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);

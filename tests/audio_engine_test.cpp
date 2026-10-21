@@ -260,6 +260,13 @@ int main(int argc, char** argv) {
         require(directorEngine.ActiveVoices()==0,"Device loops must fade and clear at match teardown");
         require(directorEngine.lastError().empty(),"Device transition routing requested an unknown source cue");
 
+        AudioLoopOptions zoneLoop;zoneLoop.volume=.1;zoneLoop.zoneHum=AudioLoopOptions::ZoneHumParameters{0,0};
+        require(audio.StartLoop("zone-test","zone_hum",zoneLoop),"The procedural zone hum source must start on miniaudio");
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        zoneLoop.zoneHum=AudioLoopOptions::ZoneHumParameters{2,.9};
+        require(audio.UpdateLoop("zone-test",zoneLoop),"Zone hum controls must update without restarting the source");
+        audio.StopLoop("zone-test",0);audio.Clear();require(audio.ActiveVoices()==0,"Zone hum data sources must stop and clear safely");
+
         std::cout << "Audio source test passed: " << names.size()
                   << " cues, source loop metadata, repeat gaps, miniaudio loop/music lifecycle, GameAudio event routing and cleanup, 48-voice steal, and Clear.\n";
         return 0;

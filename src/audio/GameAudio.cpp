@@ -161,6 +161,7 @@ void GameAudio::Menu(bool active) {
 void GameAudio::BeginMatch(MatchSimulation& match) {
     if (!engine_.ready() && !engine_.Initialize()) return;
     StopLoops(); StopWorldLoops(); engine_.StopMusic(0.05);
+    StopZoneLoops();zoneEventCursor_=0;zoneTicks_={100,100};zoneHumAccumulator_=0;zoneWarnAt_=-99;
     match_ = &match; playing_ = false; bossPhase_ = 0; matchPhase_ = -1; bossHp_ = -1; bossDead_ = false;
     bossMove_.clear(); crablets_.clear(); bossSunkIn_ = 0;
     actorLoops_.clear(); actorStates_.clear();
@@ -193,10 +194,12 @@ void GameAudio::Pause() {
     if (pausedAudio_) return;
     pausedAudio_ = true;
     StopLoops();
+    StopZoneLoops();
 }
 
 void GameAudio::EndMatch() {
     StopLoops(); StopWorldLoops(); engine_.StopMusic(0.6);
+    StopZoneLoops();zoneEventCursor_=0;
     match_ = nullptr; playing_ = false; bossMove_.clear(); crablets_.clear(); actorStates_.clear();
     pausedAudio_ = false; resumeLoops_ = false; hasListenerPosition_ = false;
     bossPhase_ = 0; matchPhase_ = -1; bossHp_ = -1; bossDead_ = false; bossSunkIn_ = 0;
@@ -525,6 +528,48 @@ void GameAudio::UpdateBoss(double dt, MatchSimulation& match) {
     }
 }
 
+void GameAudio::StopZoneLoops(){
+    for(const auto& item:zoneHums_)engine_.StopLoop("zone:"+std::to_string(item.first),.6);
+    zoneHums_.clear();zoneHumAccumulator_=0;
+}
+
+void GameAudio::UpdateZones(double dt,MatchSimulation& match){
+    const auto* z=match.zones();if(!z){StopZoneLoops();return;}
+    const int me=match.local().team();const auto& zones=z->zones();const auto& events=z->events();
+    if(zoneEventCursor_>events.size())zoneEventCursor_=0;
+    for(;zoneEventCursor_<events.size();++zoneEventCursor_){const auto& e=events[zoneEventCursor_];AudioPlayOptions options;
+        switch(e.type){
+        case ZoneEventType::ControlChanged:
+            if(e.owner>=0)engine_.Play(e.owner==me?"zone_ours":"zone_theirs");
+            else if(e.previousOwner>=0)engine_.Play(e.previousOwner==me?"zone_lost":"zone_broken");break;
+        case ZoneEventType::PenaltyAdded:options.volume=e.team==me?.9:.65;options.pitch=e.team==me?.94:1.06;engine_.Play("zone_penalty",options);break;
+        case ZoneEventType::ObjectiveChanged:
+            engine_.Play(e.final?"zone_final":"zone_shift");
+            if(e.moved)for(const int id:z->activeIndices()){const auto& p=zones[id].center;options.pos={p.x,p.y+1,p.z};engine_.Play("zone_wipe",options);}break;
+        case ZoneEventType::OvertimeStarted:engine_.Play("zone_overtime");break;
+        case ZoneEventType::ZoneOwnerChanged:
+            if(e.zone>=0&&e.zone<int(zones.size())&&e.owner>=0){const auto& p=zones[e.zone].center;options.pos={p.x,p.y+1,p.z};options.pitch=e.owner==me?1.06:.9;engine_.Play("zone_flood",options);}break;
+        case ZoneEventType::Contested:
+            if(z->time()-zoneWarnAt_>=1.5){engine_.Play(e.owner==me?"zone_warn":"zone_chance");zoneWarnAt_=z->time();}break;
+        default:break;
+        }
+    }
+    if(match.phase()!=MatchPhase::Playing||match.paused||z->ended()){StopZoneLoops();return;}
+    for(int team=0;team<2;++team){const int total=int(std::ceil(z->counts()[team]+z->penalty()[team]));
+        if(total!=zoneTicks_[team]&&total<=10&&total>0){AudioPlayOptions o;o.volume=team==me?.55:.4;o.pitch=team==me?1.12:.9;engine_.Play("zone_tick",o);}zoneTicks_[team]=total;
+    }
+    zoneHumAccumulator_+=dt;if(zoneHumAccumulator_<1./6)return;const double step=std::min(1.,zoneHumAccumulator_);zoneHumAccumulator_=0;
+    const auto& active=z->activeIndices();
+    for(auto it=zoneHums_.begin();it!=zoneHums_.end();){if(std::find(active.begin(),active.end(),it->first)==active.end()){engine_.StopLoop("zone:"+std::to_string(it->first),.6);it=zoneHums_.erase(it);}else++it;}
+    for(const int id:active){const auto& zone=zones[id];auto& tension=zoneHums_[id];
+        const double target=zone.owner>=0?(zone.share[1-zone.owner]-.08)/(.4-.08):(std::max(zone.share[0],zone.share[1])-.35)/(.8-.35);
+        tension+=(std::clamp(target,0.,1.)-tension)*std::min(1.,step*4);
+        AudioLoopOptions o;o.pos={zone.center.x,zone.center.y+1,zone.center.z};o.volume=(zone.owner<0?.8:.95)*(1+.6*tension);
+        o.zoneHum=AudioLoopOptions::ZoneHumParameters{zone.owner<0?0:zone.owner==me?1:2,tension};
+        engine_.StartLoop("zone:"+std::to_string(id),"zone_hum",o);
+    }
+}
+
 void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<WorldVisualEvent>& events,
     AudioPosition listenerPos, AudioPosition forward, AudioPosition up) {
     if (!engine_.ready()) return;
@@ -536,6 +581,7 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
     }
     UpdateWorldAudio(dt, match);
     UpdateDeviceAudio(match);
+    UpdateZones(dt,match);
 
     const auto phase = match.phase();
     const int phaseValue = static_cast<int>(phase);

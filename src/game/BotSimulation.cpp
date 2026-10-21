@@ -4,6 +4,7 @@
 #include "ArsenalData.hpp"
 #include "CombatWorld.hpp"
 #include "FacePaint.hpp"
+#include "ZonePlan.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1117,9 +1118,10 @@ void BotSimulation::paint(double dt, glm::dvec3& move, double& wantYaw, double& 
     else if (weapon.kind == "blaster") wantPitch = -0.28;
     else if (weapon.kind == "splatling") wantPitch = -0.3;
     else wantPitch = -0.42;
+    const bool zoneAim = zonePlan_ && zonePlan_->paintAim(*this, dt, move, wantMove, wantYaw, wantPitch);
     const glm::dvec3 ahead = actor_.state.pos + heading(wantYaw) * 4.0;
     const auto stats = regionStats(ahead.x, ahead.y, ahead.z, 3.0);
-    const bool needPaint = !stats.count || stats.own < 0.75;
+    const bool needPaint = zoneAim || !stats.count || stats.own < 0.75;
     const auto pose = actor_.combatPose();
     if (melee(weapon.kind)) actor_.input.fire = actor_.state.ink > 8 && (needPaint || random() < 0.02) && wantMove;
     else if (weapon.kind == "spinner" || weapon.kind == "splatling") {
@@ -1134,6 +1136,7 @@ void BotSimulation::paint(double dt, glm::dvec3& move, double& wantYaw, double& 
     } else actor_.input.fire = needPaint && actor_.state.ink > 18;
     if (!actor_.input.fire && pathRemaining() > 5 && actor_.state.groundTeam == 1) actor_.input.squid = true;
     if (bombCooldown_ <= 0 && paintSub()) { actor_.input.sub = true; bombAim_ = true; }
+    if (zonePlan_) zonePlan_->bombAim(*this, dt, wantYaw, wantPitch);
 }
 
 void BotSimulation::finish(double dt, glm::dvec3 move, double wantYaw, double wantPitch, double aimDistance, bool fighting) {
@@ -1209,6 +1212,15 @@ void BotSimulation::tick(double dt, bool playing, const std::vector<BotSimulatio
     }
     time_ += dt; elapsed_ += dt; think_ -= dt; jumpCooldown_ -= dt; bombCooldown_ -= dt; strafeTimer_ -= dt;
     paintPause_ -= dt; dodgeCooldown_ -= dt; acquisitionTime_ += dt;
+    const bool respawned = wasDead_;
+    wasDead_ = false;
+    if (zonePlan_) {
+        if (respawned) {
+            aimYaw_ = a.yaw; aimPitch_ = aimYawVelocity_ = aimPitchVelocity_ = 0.0;
+            zonePlan_->onRespawn(*this, bots);
+        }
+        zonePlan_->syncBot(*this);
+    }
     if (think_ <= 0) { think_ = 0.15 + random() * 0.1; perceive(); }
     if (target_ && !target_->state.alive) target_ = nullptr;
     const double inkFrac = a.ink / 100.0, hpFrac = a.hp / 100.0;
@@ -1226,11 +1238,17 @@ void BotSimulation::tick(double dt, bool playing, const std::vector<BotSimulatio
         mode_ = BotMode::Refill; refillThreshold_ = 0.85 + random() * 0.1;
     }
     if (mode_ == BotMode::Refill && inkFrac >= refillThreshold_) mode_ = BotMode::Paint;
-    if (mode_ != BotMode::Refill && mode_ != BotMode::Retreat) mode_ = target_ ? BotMode::Fight : BotMode::Paint;
+    if (mode_ != BotMode::Refill && mode_ != BotMode::Retreat) {
+        const bool engage = target_ && (!zonePlan_ || zonePlan_->shouldEngage(*this, target_));
+        if (zonePlan_ && mode_ == BotMode::Fight && !engage) goalTimer_ = 0.0;
+        mode_ = engage ? BotMode::Fight : BotMode::Paint;
+    }
+    if (zonePlan_) zonePlan_->maybeRotationJump(*this, bots);
 
     goalTimer_ -= dt; repath_ -= dt;
     if (mode_ == BotMode::Fight && target_) {
-        if (repath_ <= 0) pathTo(target_->state.pos, 0.6);
+        if (zonePlan_ && zonePlan_->holdGround(*this, target_)) { path_.clear(); repath_ = 0.3; }
+        else if (repath_ <= 0) pathTo(target_->state.pos, 0.6);
     } else if (mode_ == BotMode::Refill) {
         if (repath_ <= 0 || path_.empty()) pickRefill();
     } else if (mode_ == BotMode::Retreat) {
@@ -1243,7 +1261,11 @@ void BotSimulation::tick(double dt, bool playing, const std::vector<BotSimulatio
             const auto stats = regionStats(g.x, g.y, g.z, 3);
             if (stats.count && stats.own > 0.85) goalTimer_ = 0;
         }
-        if (goalTimer_ <= 0 || path_.empty() || pathIndex_ >= static_cast<int>(path_.size())) pickPaintGoal(bots);
+        if (zonePlan_) {
+            if (goalTimer_ <= 0 || path_.empty() || pathIndex_ >= static_cast<int>(path_.size())) {
+                if (!zonePlan_->planGoal(*this, bots)) pickPaintGoal(bots);
+            }
+        } else if (goalTimer_ <= 0 || path_.empty() || pathIndex_ >= static_cast<int>(path_.size())) pickPaintGoal(bots);
     }
     glm::dvec3 move = steer(dt);
     unstick(dt, move);
@@ -1266,7 +1288,10 @@ void BotSimulation::tick(double dt, bool playing, const std::vector<BotSimulatio
     if ((mode_ == BotMode::Fight || mode_ == BotMode::Paint) && !actor_.specialPose().active &&
         a.specialCharge >= actor_.weapon().number("specialCost", 190.0)) {
         const bool fighting = mode_ == BotMode::Fight && target_;
-        if (wantSpecial(fighting, fightDistance, visible)) input.special = true;
+        if (zonePlan_) {
+            const bool genericFightSpecial = fighting && wantSpecial(true, fightDistance, visible);
+            if (genericFightSpecial || zonePlan_->shouldUseSpecial(*this, fighting)) input.special = true;
+        } else if (wantSpecial(fighting, fightDistance, visible)) input.special = true;
     }
     specialControl(dt, input, move, fightDistance, visible);
     threatControl(dt, move, wantYaw, wantPitch, aimDistance);

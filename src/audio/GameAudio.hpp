@@ -3,6 +3,7 @@
 #include "AudioEngine.hpp"
 
 #include <string>
+#include <array>
 #include <unordered_map>
 
 namespace restoration {
@@ -41,6 +42,8 @@ private:
     void UpdateDeviceAudio(MatchSimulation& match);
     void Play(std::string_view name, const PlayerSimulation* actor = nullptr, double volume = 1, double pitch = 1);
     void UpdateBoss(double dt, MatchSimulation& match);
+    void UpdateZones(double dt,MatchSimulation& match);
+    void StopZoneLoops();
     void UpdateWorldAudio(double dt, MatchSimulation& match);
     void StopWorldLoops();
     void StopLoops();
@@ -62,6 +65,10 @@ private:
     int bossPhase_ = 0, matchPhase_ = -1;
     bool harborLoop_ = false, pausedAudio_ = false, resumeLoops_ = false;
     bool hasListenerPosition_ = false, bossDead_ = false, playing_ = false;
+    std::size_t zoneEventCursor_=0;
+    std::unordered_map<int,double> zoneHums_;
+    std::array<int,2> zoneTicks_{{100,100}};
+    double zoneHumAccumulator_=0,zoneWarnAt_=-99;
 };
 
 } // namespace restoration

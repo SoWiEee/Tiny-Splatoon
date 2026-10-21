@@ -8,6 +8,7 @@ for (const args of [
   ['--reference-match', 'tidewater'],
   ['--reference-practice', 'tidewater'],
   ['--reference-boss', 'tidewater'],
+  ['--reference-zones', 'tidewater'],
   ['--reference-game', 'tidewater'],
   ['--paint-probe', '0'],
   ['--play-probe', '0'],

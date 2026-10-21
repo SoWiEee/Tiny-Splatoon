@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(Tiny-Splatoon VERSION 0.7.0 LANGUAGES CXX C)
+project(Tiny-Splatoon VERSION 0.7.3 LANGUAGES CXX C)
 
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # MSVC emits UTF-8 here; a system-codepage probe can corrupt Ninja's include prefix.
@@ -58,6 +58,9 @@ add_library(restoration_core STATIC
     src/game/BossPose.cpp
     src/game/BossSimulation.cpp
     src/game/MatchSimulation.cpp
+    src/game/ZoneControl.cpp
+    src/game/ZoneData.cpp
+    src/game/ZonePlan.cpp
     src/game/WorldSpecials.cpp
 )
 target_link_libraries(restoration_core PUBLIC glm::glm)
@@ -66,7 +69,7 @@ if(MSVC)
 endif()
 add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/RmlRenderer.cpp src/gui/UiText.cpp)
 target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
-add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp)
+add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp src/audio/ZoneHum.cpp)
 target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
 find_package(Threads REQUIRED)
 target_link_libraries(game_audio PUBLIC restoration_core Threads::Threads ${CMAKE_DL_LIBS})
@@ -76,12 +79,12 @@ target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp
-    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp)
+    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp src/render/ZoneRenderer.cpp)
 target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals)
 
-target_link_libraries(Tiny-Splatoon PRIVATE 
+target_link_libraries(Tiny-Splatoon PRIVATE
     glad::glad
-    glfw 
+    glfw
     OpenGL::GL
     imgui::imgui
     glm::glm
@@ -99,6 +102,22 @@ set_property(TARGET Tiny-Splatoon APPEND PROPERTY LINK_DEPENDS ${TINY_RUNTIME_AS
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(zone_match_test tests/zone_match_test.cpp)
+    target_link_libraries(zone_match_test PRIVATE restoration_core)
+    add_test(NAME native_zone_matches COMMAND zone_match_test)
+    set_tests_properties(native_zone_matches PROPERTIES TIMEOUT 180)
+    add_executable(zone_control_test tests/zone_control_test.cpp)
+    target_link_libraries(zone_control_test PRIVATE restoration_core)
+    add_test(NAME native_zone_control COMMAND zone_control_test)
+    add_executable(zone_ai_test tests/zone_ai_test.cpp)
+    target_link_libraries(zone_ai_test PRIVATE restoration_core)
+    add_test(NAME native_zone_ai COMMAND zone_ai_test)
+    add_executable(zone_hum_test tests/zone_hum_test.cpp src/audio/ZoneHum.cpp)
+    target_link_libraries(zone_hum_test PRIVATE Threads::Threads)
+    add_test(NAME native_zone_hum COMMAND zone_hum_test)
+    add_executable(zone_visual_gpu_test tests/zone_visual_gpu_test.cpp src/render/ZoneRenderer.cpp src/render/StageRenderer.cpp src/render/CharacterShader.cpp src/render/DirectionalShadow.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(zone_visual_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
+    add_test(NAME native_zone_visual_gpu COMMAND zone_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference" "${CMAKE_BINARY_DIR}/captures/zones")
     add_executable(player_profile_test tests/player_profile_test.cpp)
     target_link_libraries(player_profile_test PRIVATE restoration_core)
     add_test(NAME native_player_profile COMMAND player_profile_test)
@@ -314,6 +333,12 @@ if(BUILD_TESTING)
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/native_entry_cli.test.mjs "$<TARGET_FILE:Tiny-Splatoon>")
         set_tests_properties(reference_native_entry_cli PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/splat-ref/src/config.js")
+            add_test(NAME reference_zone_data COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-zone-data.mjs --check)
+            set_tests_properties(reference_zone_data PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_test(NAME reference_zone_fixtures COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-zone-fixtures.mjs --check)
+            set_tests_properties(reference_zone_fixtures PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_test(NAME reference_zone_visual_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-zone-visuals.mjs --check)
+            set_tests_properties(reference_zone_visual_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_environment_source_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-environment-source.mjs --check)
             add_test(NAME reference_environment_scene_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-environment-scene.mjs --check)
             add_test(NAME reference_device_visual_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-device-visuals.mjs --check)

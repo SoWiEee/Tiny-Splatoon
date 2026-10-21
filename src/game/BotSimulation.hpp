@@ -14,6 +14,7 @@ namespace restoration {
 class FacePaint;
 class CombatWorld;
 class BossSimulation;
+class ZonePlan;
 struct CombatThreat;
 
 enum class BotMode { Paint, Fight, Refill, Retreat };
@@ -35,6 +36,7 @@ public:
     void reset();
     void tick(double dt, bool playing, const std::vector<BotSimulation*>& bots);
     void setBoss(BossSimulation* boss) { boss_ = boss; }
+    void setZonePlan(ZonePlan* plan) { zonePlan_ = plan; }
 
     PlayerSimulation& actor() const { return actor_; }
     BotMode mode() const { return mode_; }
@@ -44,6 +46,7 @@ public:
     const BotDifficulty& difficulty() const { return difficulty_; }
 
 private:
+    friend class ZonePlan;
     struct PaintStats { double own = 0, enemy = 0, empty = 0; int count = 0; };
     struct FaceIndex { int id; double minX, maxX, minZ, maxZ; };
 
@@ -128,6 +131,7 @@ private:
     bool bombAim_ = false, releaseBomb_ = false, threatLos_ = false, threatPulse_ = false;
     void tickBoss(double dt,bool playing);
     BossSimulation* boss_ = nullptr;
+    ZonePlan* zonePlan_ = nullptr;
     int bossShape_ = -1, bossCrab_ = -1;
     double bossShapeTime_ = 0,bossEvadeTime_ = 0,bossThreatSeen_ = -1;
     bool bossHopMiss_ = false,bossWasEvading_ = false,bossRushing_ = false;

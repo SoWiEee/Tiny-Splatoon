@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <glm/vec2.hpp>
 #include <vector>
 
 namespace restoration {
@@ -28,6 +29,17 @@ struct VisualSplat {
     bool hasStretch = false, cosmetic = false;
 };
 
+struct VisualFlood {
+    int regionId = -1; // a new request replaces the in-progress flood with the same ID
+    int team = -1; // -1 wipes to bare floor
+    std::vector<int> cells; // live turf cell indices from the prepared region
+    std::vector<std::vector<glm::dvec2>> polygons;
+    double y0 = -2.0, y1 = 6.0;
+    glm::dvec3 center{0.0};
+    double reach = 0.0, start = 0.0, duration = 0.0;
+    bool easeOut = false;
+};
+
 struct AtlasRect {
     int x = -1, y = -1, width = 0, height = 0, pad = 8;
     double ppm = 0.0;
@@ -44,7 +56,10 @@ public:
     FacePaint(const StageData& stage, const StageGeometry& geometry, int atlasSize = 4096);
 
     double splat(const glm::dvec3& center, double radius, int team, double seed, const SplatOptions& options = {});
+    bool setCells(const std::vector<int>& cells, int team); // team 0/1, or -1 for bare floor; updates turf counts/version
     std::vector<VisualSplat> takeVisualSplats();
+    void requestVisualFlood(VisualFlood flood);
+    std::vector<VisualFlood> takeVisualFloods();
     bool takeVisualClear();
     int sample(int faceId, double u, double v) const;
     std::array<double, 2> coverage() const;
@@ -72,8 +87,9 @@ private:
     int atlasSize_;
     std::vector<AtlasRect> atlas_;
     std::vector<FaceGrid> faces_;
-    std::vector<std::uint8_t> grid_, dead_;
+    std::vector<std::uint8_t> grid_, dead_, turfCell_;
     std::vector<VisualSplat> visualSplats_;
+    std::vector<VisualFlood> visualFloods_;
     bool visualClear_ = false;
     std::array<int, 2> counts_{0, 0};
     int turfTotal_ = 0, usedHeight_ = 0, version_ = 0;

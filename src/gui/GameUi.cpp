@@ -3,12 +3,14 @@
 #include "../game/ArsenalData.hpp"
 #include "../game/MatchSimulation.hpp"
 #include "../game/PlayerSimulation.hpp"
+#include "../game/ZoneControl.hpp"
 #include "UiText.hpp"
 #include "../world/FacePaint.hpp"
 #include "../world/ReferenceData.hpp"
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Core/Elements/ElementFormControlInput.h>
+#include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <array>
@@ -17,6 +19,7 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -28,8 +31,18 @@ std::string Escape(const std::string& text) {
     return out;
 }
 std::string Integer(double n){return std::to_string(static_cast<int>(std::round(n)));}
+std::string ZoneCount(double n){return std::to_string(static_cast<int>(std::ceil(std::max(0.0,n)-1e-9)));}
 std::string Percent(double n){char out[32];std::snprintf(out,sizeof(out),"%.1f%%",n*100);return out;}
 std::string Number(double n,int decimals=2){char out[32];std::snprintf(out,sizeof(out),decimals==0?"%.0f":"%.2f",n);return out;}
+std::string ZoneReason(std::string_view reason){
+    if(reason=="knockout")return "擊倒勝";
+    if(reason=="time")return "時間結束";
+    if(reason=="comeback")return "延長賽反超";
+    if(reason=="retake")return "延長賽奪回區域";
+    if(reason=="neutralised")return "延長賽守住勝勢";
+    if(reason=="overtime-cap")return "延長賽時間上限";
+    return "區域爭奪結束";
+}
 
 class UiSystem : public Rml::SystemInterface {
 public:
@@ -58,7 +71,7 @@ template<std::size_t N>
 void FillStyleOptions(Rml::ElementDocument* doc,const char* id,const char* kind,const std::array<const char*,N>& names){
     std::string markup;
     for(std::size_t i=0;i<names.size();++i){auto label=StyleLabel(kind,static_cast<int>(i));if(label.empty())label=names[i];markup+="<option value=\""+std::to_string(i)+"\">"+Escape(std::string(label))+"</option>";}
-    auto* element=doc->GetElementById(id);if(element)element->SetInnerRML(markup);
+    auto* element=dynamic_cast<Rml::ElementFormControlSelect*>(doc->GetElementById(id));if(element){element->RemoveAll();element->SetInnerRML(markup);}
 }
 void SetChecked(Rml::Element* element,bool checked){
     if(!element)return;
@@ -108,6 +121,9 @@ struct GameUi::Impl : Rml::EventListener {
     std::string terrainStage;
     std::string stageOptionMode,durationOptionMode;
     std::vector<unsigned char> terrainCells;
+    const ZoneControl* displayedZones=nullptr;
+    std::size_t zoneEventCursor=0;
+    double zoneCalloutUntil=0.0;
 
     Impl(GLFWwindow* value,const std::filesystem::path& assets):window(value),system(value){
         Rml::SetSystemInterface(&system);Rml::SetRenderInterface(&renderer);
@@ -177,7 +193,7 @@ struct GameUi::Impl : Rml::EventListener {
         ControlSync sync(syncingControls);
         std::string options;std::string first;
         for(const auto& stage:ReferenceStages()){
-            if(stage.mode!="turf"||stage.onlineOnly||(selection.mode=="boss"&&stage.noBoss))continue;
+            if(stage.mode!=(selection.mode=="zones"?"zones":"turf")||stage.onlineOnly||(selection.mode=="boss"&&stage.noBoss)||(selection.mode=="zones"&&!FindZoneStageDefinition(stage.id)))continue;
             if(first.empty())first=std::string(stage.id);
             std::string_view label=StageLabel(stage.id);if(label.empty())label=stage.name;
             options+="<option value=\""+Escape(std::string(stage.id))+"\">"+Escape(std::string(label))+"</option>";
@@ -185,46 +201,46 @@ struct GameUi::Impl : Rml::EventListener {
         auto* stages=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,"stage"));
         const std::string optionMode=selection.mode=="practice"?"turf":selection.mode;
         if(stageOptionMode!=optionMode){stages->RemoveAll();stages->SetInnerRML(options);stageOptionMode=optionMode;}
-        const bool exists=std::any_of(ReferenceStages().begin(),ReferenceStages().end(),[&](const StageData& stage){return stage.id==selection.stage&&stage.mode=="turf"&&!stage.onlineOnly&&(selection.mode!="boss"||!stage.noBoss);});
+        const bool exists=std::any_of(ReferenceStages().begin(),ReferenceStages().end(),[&](const StageData& stage){return stage.id==selection.stage&&stage.mode==(selection.mode=="zones"?"zones":"turf")&&!stage.onlineOnly&&(selection.mode!="boss"||!stage.noBoss)&&(selection.mode!="zones"||FindZoneStageDefinition(stage.id));});
         if(!exists)selection.stage=first;
         if(!selection.stage.empty())Value("stage",selection.stage);
-        Text(menu,"stage-message",selection.mode=="boss"?"僅顯示可進行協力挑戰的離線場地。":selection.mode=="practice"?"練習場地不計分，也不結算經驗值。":"僅顯示目前可遊玩的離線場地。");
+        Text(menu,"stage-message",selection.mode=="boss"?"僅顯示可進行協力挑戰的離線場地。":selection.mode=="zones"?"區域爭奪會載入該場地的區域配置。":selection.mode=="practice"?"練習場地不計分，也不結算經驗值。":"僅顯示目前可遊玩的離線場地。");
     }
     void RebuildDurationOptions(){
         ControlSync sync(syncingControls);
-        const bool boss=selection.mode=="boss",practice=selection.mode=="practice";
+        const bool boss=selection.mode=="boss",zones=selection.mode=="zones",practice=selection.mode=="practice";
         const std::array<int,3> turfValues={90,180,180};const std::array<int,3> bossValues={180,240,300};
         std::string options;
-        if(boss){for(const int seconds:bossValues){options+="<option value=\""+std::to_string(seconds)+"\">"+std::to_string(seconds/60)+" 分鐘</option>";}}
+        if(zones)options="<option value=\"300\">5 分鐘（固定）</option>";
+        else if(boss){for(const int seconds:bossValues){options+="<option value=\""+std::to_string(seconds)+"\">"+std::to_string(seconds/60)+" 分鐘</option>";}}
         else{for(std::size_t i=0;i<2;++i){const int seconds=turfValues[i];options+="<option value=\""+std::to_string(seconds)+"\">"+(seconds==90?"1.5":"3")+" 分鐘</option>";}}
         auto* durations=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,"duration"));
-        const std::string optionMode=boss?"boss":"turf";
+        const std::string optionMode=zones?"zones":boss?"boss":"turf";
         if(durationOptionMode!=optionMode){durations->RemoveAll();durations->SetInnerRML(options);durationOptionMode=optionMode;}
-        const bool valid=boss?(selection.duration==180||selection.duration==240||selection.duration==300):(selection.duration==90||selection.duration==180);
-        if(!valid)selection.duration=180;
-        Value("duration",std::to_string(selection.duration));Hidden(menu,"duration-row",practice);Hidden(menu,"difficulty-row",practice);
+        const bool valid=zones?selection.duration==300:boss?(selection.duration==180||selection.duration==240||selection.duration==300):(selection.duration==90||selection.duration==180);
+        if(!valid)selection.duration=zones?300:180;
+        Value("duration",std::to_string(selection.duration));Hidden(menu,"duration-row",practice||zones);Hidden(menu,"difficulty-row",practice);
     }
     void PopulateOptions(){
         ControlSync sync(syncingControls);
         RebuildStageOptions();
         auto fillCategory=[&](const char* id,const std::vector<EquipmentData>& rows,EquipmentCategory category){
-            std::string items;for(const auto& row:rows){auto label=EquipmentLabel(category,row.id);if(label.empty())label=row.name;items+="<option value=\""+Escape(std::string(row.id))+"\">"+Escape(std::string(label))+"</option>";}Find(menu,id)->SetInnerRML(items);
+            std::string items;for(const auto& row:rows){auto label=EquipmentLabel(category,row.id);if(label.empty())label=row.name;items+="<option value=\""+Escape(std::string(row.id))+"\">"+Escape(std::string(label))+"</option>";}auto* select=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,id));select->RemoveAll();select->SetInnerRML(items);
         };
         fillCategory("main",MainEquipment(),EquipmentCategory::Main);fillCategory("sub",SubEquipment(),EquipmentCategory::Sub);fillCategory("special",SpecialEquipment(),EquipmentCategory::Special);
         std::string presets="<option value=\"custom\">自訂造型</option>";for(std::size_t i=0;i<CharacterPresets.size();++i){const auto& row=CharacterPresets[i];auto label=StyleLabel("preset",static_cast<int>(i));if(label.empty())label=row.name;presets+="<option value=\""+Escape(row.id)+"\">"+Escape(std::string(label))+"</option>";}
-        Find(menu,"style-preset")->SetInnerRML(presets);
+        auto* stylePreset=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,"style-preset"));stylePreset->RemoveAll();stylePreset->SetInnerRML(presets);
         FillStyleOptions(menu,"style-hair","hair",HairNames);FillStyleOptions(menu,"style-hat","hat",HatNames);FillStyleOptions(menu,"style-skin","skin",SkinNames);
         FillStyleOptions(menu,"style-eyes","eyes",EyeNames);FillStyleOptions(menu,"style-brows","brows",BrowNames);FillStyleOptions(menu,"style-outfit","outfit",OutfitNames);
     }
     void SyncGraphicsControls(){
-        const bool wasSyncing=syncingControls;syncingControls=true;const auto& graphics=player.settings.graphics;
+        ControlSync sync(syncingControls);const auto& graphics=player.settings.graphics;
         const char* preset=graphics.preset==GraphicsPreset::Low?"low":graphics.preset==GraphicsPreset::High?"high":graphics.preset==GraphicsPreset::Custom?"custom":"medium";
         Value("graphics-preset",preset);
         SetChecked(Find(menu,"graphics-shadows"),graphics.shadows);SetChecked(Find(menu,"graphics-reflections"),graphics.reflections);SetChecked(Find(menu,"graphics-post"),graphics.postEffects);
-        syncingControls=wasSyncing;
     }
     void SyncProfileControls(){
-        syncingControls=true;const auto& s=player.settings;
+        ControlSync sync(syncingControls);const auto& s=player.settings;
         Value("profile-name",player.name);Value("main",player.weapon);Value("sub",player.sub.empty()?std::string(GetEquipment(EquipmentCategory::Main,player.weapon).sub):player.sub);
         Value("special",player.special.empty()?std::string(GetEquipment(EquipmentCategory::Main,player.weapon).special):player.special);
         std::string preset="custom";
@@ -239,7 +255,7 @@ struct GameUi::Impl : Rml::EventListener {
             const auto value=Number(item.second,item.first==std::string("duration")||item.first==std::string("match-length")||item.first==std::string("fps-cap")||item.first==std::string("palette")?0:2);
             Value(item.first,value);
         }
-        Value("touch-controls",s.touchControls);Value("default-mode",s.lastMode=="zones"?"turf":s.lastMode);Value("default-difficulty",s.difficulty);Value("time-of-day",s.timeOfDay);
+        Value("touch-controls",s.touchControls);Value("default-mode",s.lastMode);Value("default-difficulty",s.difficulty);Value("time-of-day",s.timeOfDay);
         SetChecked(Find(menu,"invert-y"),s.invertY);SetChecked(Find(menu,"aim-assist-mouse"),s.aimAssistMouse);SetChecked(Find(menu,"touch-invert-y"),s.touchInvertY);
         SetChecked(Find(menu,"graphics-shadows"),s.graphics.shadows);SetChecked(Find(menu,"bloom"),s.bloom);SetChecked(Find(menu,"show-fps"),s.showFps);SetChecked(Find(menu,"fullscreen"),s.fullscreen);
         SetChecked(Find(menu,"colorblind"),s.colorblind);SetChecked(Find(menu,"minimap"),s.minimap);SetChecked(Find(menu,"reduced-motion"),s.reducedMotion);
@@ -248,7 +264,7 @@ struct GameUi::Impl : Rml::EventListener {
         Text(menu,"aim-assist-value",Integer(s.aimAssist*100)+"%");Text(menu,"touch-sensitivity-value",Number(s.touchSensitivity,2)+"×");Text(menu,"fov-value",Integer(s.fov)+"°");
         Text(menu,"master-value",Integer(s.master*100)+"%");Text(menu,"music-value",Integer(s.music*100)+"%");Text(menu,"sfx-value",Integer(s.sfx*100)+"%");
         Text(menu,"camera-shake-value",Integer(s.cameraShake*100)+"%");Text(menu,"rumble-value",Integer(s.rumble*100)+"%");
-        syncingControls=false;UpdateProfileDisplay();UpdateLoadoutStats();
+        UpdateProfileDisplay();UpdateLoadoutStats();
     }
     void UpdateProfileDisplay(){
         const int need=XpForLevel(player.level);Text(menu,"profile-header",player.name+"　Lv."+std::to_string(player.level));
@@ -281,12 +297,13 @@ struct GameUi::Impl : Rml::EventListener {
         else if(tab=="howto")GoTo(UiScreen::HowTo);else if(tab=="credits")GoTo(UiScreen::Credits);
     }
     void Mode(){
-        const bool boss=selection.mode=="boss",practice=selection.mode=="practice";
+        ControlSync sync(syncingControls);
+        const bool boss=selection.mode=="boss",zones=selection.mode=="zones",practice=selection.mode=="practice";
         selection.practice=practice;RebuildStageOptions();RebuildDurationOptions();
-        Find(menu,"mode-turf")->SetClass("selected",!boss&&!practice);Find(menu,"mode-boss")->SetClass("selected",boss);Find(menu,"mode-practice")->SetClass("selected",practice);
-        Text(menu,"mode-description",boss?"一名玩家與七名隊友共同挑戰破艦巨獸。":practice?"在選定場地自由移動、射擊與練習，不結算勝負或經驗。":"與七名電腦玩家進行 4 對 4 對戰，塗滿更多地面。");
-        Text(menu,"start-label",boss?"開始協力挑戰":practice?"開始自由練習":"開始塗地對戰");
-        Text(menu,"start-note",practice?"自由練習 · 不結算資料":"1 位玩家 · 7 名電腦玩家");
+        Find(menu,"mode-turf")->SetClass("selected",!boss&&!zones&&!practice);Find(menu,"mode-zones")->SetClass("selected",zones);Find(menu,"mode-boss")->SetClass("selected",boss);Find(menu,"mode-practice")->SetClass("selected",practice);
+        Text(menu,"mode-description",boss?"一名玩家與七名隊友共同挑戰破艦巨獸。":zones?"與七名電腦玩家進行區域爭奪。倒數 5 分鐘，最後 30 秒鎖定中央區，時間到仍平手則進入延長賽。":practice?"在選定場地自由移動、射擊與練習，不結算勝負或經驗。":"與七名電腦玩家進行 4 對 4 對戰，塗滿更多地面。");
+        Text(menu,"start-label",boss?"開始協力挑戰":zones?"開始區域爭奪":practice?"開始自由練習":"開始塗地對戰");
+        Text(menu,"start-note",practice?"自由練習 · 不結算資料":zones?"1 位玩家 · 7 名電腦玩家 · 固定 5 分鐘＋延長賽":"1 位玩家 · 7 名電腦玩家");
     }
     void CommitSettingFromControl(const std::string& id,const std::string& value,Rml::Element* target){
         auto& s=player.settings;
@@ -350,7 +367,8 @@ struct GameUi::Impl : Rml::EventListener {
             else if(id=="difficulty"){selection.difficulty=value;player.settings.difficulty=value;Commit();}
             else if(id=="duration"){
                 selection.duration=std::stoi(value);
-                if(selection.mode=="boss")player.settings.bossLength=selection.duration;else player.settings.matchLength=selection.duration;
+                if(selection.mode=="boss")player.settings.bossLength=selection.duration;
+                else if(selection.mode!="zones")player.settings.matchLength=selection.duration;
                 Commit();
             }
             else if(id=="main"){
@@ -385,8 +403,8 @@ struct GameUi::Impl : Rml::EventListener {
             else if(hudOverlay){hudOverlay=false;practiceGear=false;menuVisible=false;menu->Hide();hud->Show();Play("ui_back");}
             else{GoTo(UiScreen::Home);Play("ui_back");}
         }
-        else if(id=="mode-turf"||id=="mode-boss"||id=="mode-practice"){
-            selection.mode=id.substr(5);selection.practice=selection.mode=="practice";player.settings.lastMode=selection.mode=="practice"?"turf":selection.mode;Mode();Commit();Play("ui_click");
+        else if(id=="mode-turf"||id=="mode-zones"||id=="mode-boss"||id=="mode-practice"){
+            selection.mode=id.substr(5);selection.practice=selection.mode=="practice";if(selection.mode!="practice")player.settings.lastMode=selection.mode;Mode();Commit();Play("ui_click");
         }
         else if(id=="start"){
             selection.practice=selection.mode=="practice";action=selection.practice?UiAction::Practice:UiAction::Start;Play("ui_confirm");
@@ -462,13 +480,15 @@ struct GameUi::Impl : Rml::EventListener {
         if(!player.settings.minimap){Hidden(hud,"minimap",true);return;}Hidden(hud,"minimap",false);
         const auto& state=match.local().state;const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
         const double now=glfwGetTime();
-        std::string cache=std::string(stage.id)+":"+std::to_string(paint.version())+":"+std::to_string(player.settings.palette)+":"+Bool(player.settings.colorblind);
+        const std::string stageKey=std::string(stage.id)+":"+std::string(stage.mode);
+        std::string cache=stageKey+":"+std::to_string(paint.version())+":"+std::to_string(player.settings.palette)+":"+Bool(player.settings.colorblind)+":"+std::to_string(context->GetDimensions().x);
+        if(const auto* zones=match.zones()){cache+=":"+zones->objective().id;for(const int id:zones->activeIndices())cache+=":"+std::to_string(zones->zones()[id].owner);}
         for(const auto& actor:match.actors())cache+=":"+std::to_string(static_cast<int>(std::round(actor->state.pos.x*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.z*4)))+","+std::to_string(actor->state.alive);
-        if(minimapCache!=cache&&now>=nextMinimapUpdate){
+        if(minimapCache!=cache&&(now>=nextMinimapUpdate||terrainStage!=stageKey)){
             constexpr int columns=32,rows=24;const double minX=stage.bounds.x,maxX=stage.bounds.y,minZ=stage.bounds.z,maxZ=stage.bounds.w;
             const double spanX=std::max(1e-6,maxX-minX),spanZ=std::max(1e-6,maxZ-minZ);
-            if(terrainStage!=stage.id||terrainCells.size()!=columns*rows){
-                terrainStage=stage.id;terrainCells.assign(columns*rows,0);
+            if(terrainStage!=stageKey||terrainCells.size()!=columns*rows){
+                terrainStage=stageKey;terrainCells.assign(columns*rows,0);
                 for(int y=0;y<rows;++y)for(int x=0;x<columns;++x){
                     const double wx=minX+(x+.5)*spanX/columns,wz=maxZ-(y+.5)*spanZ/rows;
                     for(const auto& face:stage.faces){
@@ -512,6 +532,16 @@ struct GameUi::Impl : Rml::EventListener {
                     markup+="<div class=\"map-cell "+std::string(classFor(code))+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;width:"+Number(width,3)+"%;height:"+Number(height,3)+"%;"+(color.empty()?std::string():"background-color:"+color+";")+"\"></div>";}
                 x=end;
             }
+            if(const auto* zones=match.zones()){
+                auto* map=Find(hud,"minimap-map");const double mapWidth=map->GetClientWidth(),mapHeight=map->GetClientHeight();
+                for(const int id:zones->activeIndices()){const auto& zone=zones->zones()[id];const std::string color=zone.owner>=0?std::string(palette[zone.owner]):"#f4cb62";
+                    for(const auto& polygon:zone.region.polygons)for(std::size_t i=0;i<polygon.size();++i){
+                        const auto& a=polygon[i];const auto& b=polygon[(i+1)%polygon.size()];
+                        const double x=(a.x-minX)/spanX,y=(maxZ-a.y)/spanZ,dx=(b.x-a.x)/spanX*mapWidth,dy=(a.y-b.y)/spanZ*mapHeight;
+                        markup+="<div class=\"map-zone-edge\" style=\"left:"+Number(x*100,3)+"%;top:"+Number(y*100,3)+"%;width:"+Number(std::hypot(dx,dy),3)+"px;background-color:"+color+";transform:rotate("+Number(std::atan2(dy,dx)*180/3.141592653589793,3)+"deg);\"></div>";
+                    }
+                }
+            }
             for(std::size_t i=0;i<match.actors().size();++i){
                 const auto& actor=match.actors()[i];if(!actor->state.alive)continue;
                 const double left=std::clamp((actor->state.pos.x-minX)/spanX*100.,0.,100.);
@@ -525,16 +555,84 @@ struct GameUi::Impl : Rml::EventListener {
         const auto coverage=paint.coverage();Text(hud,"terrain-status",ground+std::string("　自隊 ")+Percent(coverage[0]));
         Text(hud,"position-status","位置  "+Number(state.pos.x)+", "+Number(state.pos.z)+"　·　敵隊 "+Percent(coverage[1]));
     }
+    void UpdateZonesHud(MatchSimulation& match){
+        const auto* zones=match.zones();
+        Hidden(hud,"zones-hud",zones==nullptr);
+        if(!zones){displayedZones=nullptr;zoneEventCursor=0;Hidden(hud,"zone-callout",true);return;}
+
+        const int localTeam=match.local().team(),enemyTeam=1-localTeam;
+        const auto teamName=[&](int team){return team==localTeam?std::string("我方"):team==enemyTeam?std::string("對方"):std::string("無隊伍");};
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
+        const auto& counts=zones->counts();const auto& penalties=zones->penalty();
+        Text(hud,"zone-team-a-name",teamName(localTeam));Text(hud,"zone-team-b-name",teamName(enemyTeam));
+        Text(hud,"zone-count-a",ZoneCount(counts[localTeam]));Text(hud,"zone-count-b",ZoneCount(counts[enemyTeam]));
+        Text(hud,"zone-penalty-a",ZoneCount(penalties[localTeam]));Text(hud,"zone-penalty-b",ZoneCount(penalties[enemyTeam]));
+
+        const auto& objective=zones->objective();
+        const std::string objectiveLabel=objective.id=="center"?"中央區":objective.home==localTeam?"己方側區":"敵方側區";
+        Text(hud,"zone-objective",objectiveLabel);
+        Text(hud,"zone-owner",zones->owner()<0?"尚未控制":teamName(zones->owner())+"控制中");
+        const auto& active=zones->activeIndices();const auto& all=zones->zones();
+        std::string markup;
+        for(const int index:active){
+            if(index<0||static_cast<std::size_t>(index)>=all.size())continue;
+            const auto& zone=all[static_cast<std::size_t>(index)];
+            const std::string label=zone.kind=="center"?"中央區":zone.home==localTeam?"己方側區":"敵方側區";
+            const double ownShare=std::clamp(zone.share[localTeam],0.0,1.0),enemyShare=std::clamp(zone.share[enemyTeam],0.0,1.0);
+            const std::string owner=zone.owner<0?"尚未控制":teamName(zone.owner)+"掌控";
+            markup+="<div class=\"zone-card\"><div class=\"zone-card-heading\"><strong>"+label+"</strong><span>"+owner+"</span></div>";
+            markup+="<div class=\"zone-share-track\"><div class=\"zone-share-a\" style=\"width:"+Number(ownShare*100,2)+"%;background-color:"+std::string(palette[0])+";\"></div><div class=\"zone-share-b\" style=\"width:"+Number(enemyShare*100,2)+"%;background-color:"+std::string(palette[1])+";\"></div><i class=\"zone-control-threshold\"></i></div>";
+            markup+="<div class=\"zone-share-labels\"><span>我方 "+ZoneCount(ownShare*100)+"%</span><span>對方 "+ZoneCount(enemyShare*100)+"%</span></div></div>";
+        }
+        if(markup.empty())markup="<div class=\"zone-card\"><div class=\"zone-card-heading\"><strong>區域資訊</strong><span>等待場地載入</span></div></div>";
+        const auto key=std::string("hud/zones-active");if(textCache[key]!=markup){Find(hud,"zones-active")->SetInnerRML(markup);textCache[key]=markup;}
+
+        const double secondsToSwap=std::max(0.0,zones->nextSwap());
+        if(zones->overtime()){
+            Text(hud,"zone-phase","延長賽");
+            Text(hud,"zone-phase-detail","離開有效區 "+ZoneCount(zones->neutralTime())+" / 10 秒");
+        }else if(zones->final()){
+            Text(hud,"zone-phase","最後 30 秒");Text(hud,"zone-phase-detail","僅中央區計分");
+        }else if(secondsToSwap<=5.0){
+            Text(hud,"zone-phase","即將輪替");Text(hud,"zone-phase-detail","區域於 "+ZoneCount(secondsToSwap)+" 秒後輪替");
+        }else{
+            const int swap=static_cast<int>(std::ceil(secondsToSwap));
+            Text(hud,"zone-phase","區域輪替");Text(hud,"zone-phase-detail","下次輪替 "+std::to_string(swap/60)+":"+(swap%60<10?"0":"")+std::to_string(swap%60));
+        }
+
+        if(displayedZones!=zones||zones->events().size()<zoneEventCursor){displayedZones=zones;zoneEventCursor=zones->events().size();zoneCalloutUntil=0;}
+        const auto& events=zones->events();const double now=glfwGetTime();
+        for(;zoneEventCursor<events.size();++zoneEventCursor){
+            const auto& event=events[zoneEventCursor];std::string callout;
+            switch(event.type){
+                case ZoneEventType::ZoneOwnerChanged:callout=std::string("區域由")+teamName(event.owner)+"掌控";break;
+                case ZoneEventType::ControlChanged:callout=event.owner<0?"區域控制權爭奪中":std::string(teamName(event.owner))+"取得區域控制";break;
+                case ZoneEventType::PenaltyAdded:callout=std::string(teamName(event.team))+"罰則 +"+ZoneCount(event.penalty);break;
+                case ZoneEventType::ObjectiveChanged:callout=event.final?"最後 30 秒，僅中央區":event.moved?"區域輪替至"+std::string(event.objective=="center"?"中央區":"側區"):std::string();break;
+                case ZoneEventType::FinalStarted:callout="最後 30 秒，僅中央區";break;
+                case ZoneEventType::OvertimeStarted:callout="進入延長賽";break;
+                case ZoneEventType::Contested:callout="區域爭奪中";break;
+                case ZoneEventType::MatchEnded:callout=event.reason=="knockout"?"擊倒勝！":ZoneReason(event.reason);break;
+            }
+            if(!callout.empty()){Text(hud,"zone-callout",callout);zoneCalloutUntil=now+4.0;}
+        }
+        Hidden(hud,"zone-callout",now>=zoneCalloutUntil);
+    }
     void UpdateResults(MatchSimulation& match,const std::array<double,2>& coverage){
         if(!match.result())return;const auto& result=*match.result();const auto& local=match.local();const bool win=result.boss?result.boss->win:result.winner==local.team();
-        Text(hud,"result-title",win?"勝利":"再接再厲");Text(hud,"result-detail",result.boss?(result.boss->win?"已擊破破艦巨獸":"協力挑戰結束"):"塗地對戰結束");
-        Text(hud,"result-score",result.boss?("破艦巨獸剩餘生命值  "+Integer(result.boss->hp)):Percent(coverage[0])+"  /  "+Percent(coverage[1]));
+        Text(hud,"result-title",win?"勝利":"再接再厲");
+        Text(hud,"result-detail",result.boss?(result.boss->win?"已擊破破艦巨獸":"協力挑戰結束"):result.zones?"區域爭奪 · "+ZoneReason(result.zones->reason)+(result.zones->overtime?" · 延長賽":""):"塗地對戰結束");
+        std::string resultScore;
+        if(result.boss)resultScore="破艦巨獸剩餘生命值  "+Integer(result.boss->hp);
+        else if(result.zones){const auto& zone=*result.zones;const int enemy=1-local.team();resultScore="我方區域計數 "+ZoneCount(zone.counts[local.team()])+"　罰則 "+ZoneCount(zone.penalty[local.team()])+"　／　對方區域計數 "+ZoneCount(zone.counts[enemy])+"　罰則 "+ZoneCount(zone.penalty[enemy]);}
+        else resultScore=Percent(coverage[0])+"  /  "+Percent(coverage[1]);
+        Text(hud,"result-score",resultScore);
         std::string xp="本場經驗值（XP） +"+std::to_string(reward.gained);
         if(reward.applied&&reward.levelAfter>reward.levelBefore)xp+="　升級 Lv."+std::to_string(reward.levelBefore)+" → Lv."+std::to_string(reward.levelAfter);
         else xp+="　Lv."+std::to_string(player.level)+"　"+std::to_string(player.xp)+" / "+std::to_string(XpForLevel(player.level));
         Text(hud,"result-xp",xp);
-        std::string rows="<tr><th>玩家</th><th>塗地</th><th>倒下</th>";if(match.boss())rows+="<th>破艦巨獸傷害</th><th>弱點命中</th><th>小螃蟹擊破</th>";rows+="</tr>";
-        for(std::size_t i=0;i<match.actors().size();++i){const auto& actor=*match.actors()[i];rows+="<tr><td>"+Escape(match.roster()[i].name)+"</td><td>"+Integer(actor.turfPainted())+"</td><td>"+std::to_string(actor.deaths())+"</td>";
+        std::string rows="<tr><th>玩家</th><th>"+std::string(result.zones?"區域塗地":"塗地")+"</th>";if(result.zones)rows+="<th>區域內塗地</th>";rows+="<th>倒下</th>";if(match.boss())rows+="<th>破艦巨獸傷害</th><th>弱點命中</th><th>小螃蟹擊破</th>";rows+="</tr>";
+        for(std::size_t i=0;i<match.actors().size();++i){const auto& actor=*match.actors()[i];rows+="<tr><td>"+Escape(match.roster()[i].name)+"</td><td>"+Integer(actor.turfPainted())+"</td>";if(result.zones)rows+="<td>"+Integer(actor.zoneTurf())+"</td>";rows+="<td>"+std::to_string(actor.deaths())+"</td>";
             if(const auto* boss=match.boss())rows+="<td>"+Integer(boss->squadDamage()[i])+"</td><td>"+std::to_string(boss->squadWeakHits()[i])+"</td><td>"+std::to_string(boss->squadSplats()[i])+"</td>";rows+="</tr>";}
         const auto key="hud/results-table";if(textCache[key]!=rows){Find(hud,"results-table")->SetInnerRML(rows);textCache[key]=rows;}
     }
@@ -552,11 +650,12 @@ struct GameUi::Impl : Rml::EventListener {
         Text(hud,"hp",Integer(state.hp));Text(hud,"ink",Integer(state.ink));Text(hud,"special-status",state.specialCharge>=cost?"特殊技能就緒  F / Q":Integer(state.specialCharge)+" / "+Integer(cost));
         Find(hud,"special-fill")->SetProperty("width",Integer(std::clamp(state.specialCharge/cost,0.,1.)*100)+"%");Find(hud,"special-meter")->SetClass("ready",state.specialCharge>=cost);
         Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
-        Hidden(hud,"boss",!match.boss());Hidden(hud,"team-score",match.boss()!=nullptr);
+        Hidden(hud,"boss",!match.boss());Hidden(hud,"team-score",match.boss()!=nullptr||match.zones()!=nullptr);
         if(const auto* boss=match.boss()){
             const auto& state=boss->state();Text(hud,"boss-phase","階段 "+std::to_string(state.phase));Find(hud,"boss-fill")->SetProperty("width",Integer(state.maxHp>0?std::clamp(state.hp/state.maxHp,0.,1.)*100:0)+"%");Text(hud,"boss-hp",Integer(state.hp)+" / "+Integer(state.maxHp));
             std::string move;if(boss->move()){const char* names[]={"重鉗衝擊","貨櫃彈幕","墨砲掃射","船殼衝撞","小蟹群","狂亂攻勢"};move=names[static_cast<int>(boss->move()->id)];switch(boss->move()->phase(state.clock)){case BossMovePhase::Telegraph:move+="  ·  注意預兆";break;case BossMovePhase::Active:move+="  ·  攻擊中";break;case BossMovePhase::Recovery:move+="  ·  恢復中";break;default:break;}}Text(hud,"boss-move",move);
         }
+        UpdateZonesHud(match);
         UpdateMinimap(stage,paint,match);
         const double now=glfwGetTime();if(lastHudTime>0&&now>lastHudTime)hudFps=static_cast<int>(std::round(1./(now-lastHudTime)));lastHudTime=now;
         Hidden(hud,"fps",!player.settings.showFps);if(player.settings.showFps)Text(hud,"fps-value",std::to_string(hudFps));
@@ -574,8 +673,8 @@ void GameUi::SetProfile(PlayerProfile profile){
     auto& p=*impl_;NormalizeProfile(profile);p.player=std::move(profile);
     p.selection.main=p.player.weapon;p.selection.sub=p.player.sub.empty()?std::string(GetEquipment(EquipmentCategory::Main,p.player.weapon).sub):p.player.sub;
     p.selection.special=p.player.special.empty()?std::string(GetEquipment(EquipmentCategory::Main,p.player.weapon).special):p.player.special;
-    p.selection.mode=p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;p.selection.difficulty=p.player.settings.difficulty;
-    p.selection.duration=p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;p.selection.theme=p.player.settings.timeOfDay;
+    p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;p.selection.difficulty=p.player.settings.difficulty;
+    p.selection.duration=p.selection.mode=="zones"?300:p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;p.selection.theme=p.player.settings.timeOfDay;
     p.SyncProfileControls();p.Mode();
 }
 void GameUi::SetProfileSink(std::function<void(const PlayerProfile&)> sink){impl_->profileSink=std::move(sink);}
@@ -584,9 +683,9 @@ void GameUi::SetReward(MatchRewardResult reward){impl_->reward=reward;}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
 void GameUi::SetVolumeSink(std::function<void(float,float,float)> value){impl_->volumes=std::move(value);if(impl_->volumes)impl_->volumes(static_cast<float>(impl_->player.settings.master),static_cast<float>(impl_->player.settings.music),static_cast<float>(impl_->player.settings.sfx));}
 void GameUi::ShowMenu(const std::string& initialStage){
-    auto& p=*impl_;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
+    auto& p=*impl_;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;
-    p.selection.duration=p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;
+    p.selection.duration=p.selection.mode=="zones"?300:p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;
     p.Value("difficulty",p.selection.difficulty);p.Value("theme",p.selection.theme);p.Value("duration",std::to_string(p.selection.duration));
     p.Tab("home");p.LockerTab("presets");p.menu->Show();p.hud->Hide();p.menuVisible=true;p.practiceGear=false;p.hudOverlay=false;p.interactive=true;p.action=UiAction::None;p.Mode();
 }

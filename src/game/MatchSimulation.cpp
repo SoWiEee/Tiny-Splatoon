@@ -1,5 +1,6 @@
 #include "MatchSimulation.hpp"
 #include "ArsenalData.hpp"
+#include "ZonePlan.hpp"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -7,12 +8,16 @@
 namespace restoration {
 MatchSimulation::MatchSimulation(const StageData& stage,const StageGeometry& geometry,FacePaint& paint,const NavGraph& nav,MatchOptions options)
     :stage_(stage),geometry_(geometry),paint_(paint),nav_(nav),options_(std::move(options)),world_(stage,geometry,paint) {
-    if(stage.onlineOnly||stage.mode!="turf")throw std::invalid_argument("Offline match requires an offline Turf stage");
-    if(options_.mode!="turf"&&options_.mode!="boss")throw std::invalid_argument("Unknown offline mode");
-    if(options_.practice&&options_.mode=="boss")throw std::invalid_argument("Boss Battle cannot be practice");
+    if(stage.onlineOnly||stage.mode!=(options_.mode=="zones"?"zones":"turf"))throw std::invalid_argument("Offline match requires a stage variant matching its mode");
+    if(options_.mode!="turf"&&options_.mode!="zones"&&options_.mode!="boss")throw std::invalid_argument("Unknown offline mode");
+    if(options_.practice&&options_.mode!="turf")throw std::invalid_argument("Only Turf practice is supported");
     if(options_.mode=="boss"){
         if(options_.duration==0)options_.duration=240;
         if(options_.duration!=180&&options_.duration!=240&&options_.duration!=300)throw std::invalid_argument("Boss duration must be 180, 240, or 300 seconds");
+    }
+    else if(options_.mode=="zones") {
+        if(options_.duration==0)options_.duration=300;
+        if(options_.duration<1||options_.duration>600)throw std::invalid_argument("Zones duration must be 1 to 600 seconds");
     }
     else if(options_.duration!=0&&options_.duration!=90&&options_.duration!=180)
         throw std::invalid_argument("Turf duration must be 90 or 180 seconds");
@@ -41,7 +46,7 @@ CharacterStyle MatchSimulation::randomStyle(){
     return style;
 }
 void MatchSimulation::restart(){
-    world_.setBoss(nullptr);boss_.reset();bossSquad_.clear();botPointers_.clear();bots_.clear();actors_.clear();roster_.clear();world_.clear();paint_.clear();seed_=options_.seed;
+    world_.setBoss(nullptr);boss_.reset();zonePlan_.reset();zones_.reset();bossSquad_.clear();botPointers_.clear();bots_.clear();actors_.clear();roster_.clear();world_.clear();paint_.clear();seed_=options_.seed;
     const bool bossMode=options_.mode=="boss";
     phase_=options_.practice?MatchPhase::Playing:MatchPhase::Intro;stateTime_=0;
     remaining_=options_.duration?options_.duration:MatchTuning().number("defaultDuration");paused=false;
@@ -90,6 +95,11 @@ void MatchSimulation::restart(){
         for(auto& bot:bots_)bot->setBoss(boss_.get());
         if(bossPoseSink_)bossPoseSink_(*boss_);
     }
+    else if(options_.mode=="zones"){
+        zones_=std::make_unique<ZoneControl>(stage_,geometry_,paint_,remaining_,[this]{return random();});
+        zonePlan_=std::make_unique<ZonePlan>(*zones_,stage_,geometry_,paint_,nav_,options_.seed,[this]{return random();});
+        for(auto& bot:bots_)bot->setZonePlan(zonePlan_.get());
+    }
 }
 void MatchSimulation::startPlaying(){phase_=MatchPhase::Playing;stateTime_=0;}
 void MatchSimulation::setBossPoseSink(std::function<void(BossSimulation&)> sink){
@@ -104,6 +114,14 @@ void MatchSimulation::judge(){
         result_=MatchResult{coverage,state.dead?0:1,BossResult{state.dead,std::round(elapsed*10)/10,state.hp,state.maxHp,state.phase}};
         phase_=MatchPhase::Judge;stateTime_=0;return;
     }
+    if(zones_){
+        const int winner=zones_->winner().value_or(zones_->counts()[0]==zones_->counts()[1]?(random()<0.5?0:1):(zones_->counts()[0]<zones_->counts()[1]?0:1));
+        ZoneResult zoneResult;zoneResult.counts=zones_->counts();zoneResult.penalty=zones_->penalty();
+        zoneResult.overtime=zones_->overtime();zoneResult.reason=zones_->reason();zoneResult.events=zones_->events();
+        zoneResult.log=zones_->penaltyLog();
+        zoneResult.zoneTurf.reserve(actors_.size());for(const auto& actor:actors_)zoneResult.zoneTurf.push_back(actor->zoneTurf());
+        result_=MatchResult{coverage,winner,std::nullopt,std::move(zoneResult)};phase_=MatchPhase::Judge;stateTime_=0;return;
+    }
     const int winner=coverage[0]==coverage[1]?(random()<0.5?0:1):(coverage[0]>coverage[1]?0:1);
     result_=MatchResult{coverage,winner};phase_=MatchPhase::Judge;stateTime_=0;
 }
@@ -116,9 +134,23 @@ void MatchSimulation::tick(double dt){
     if(paused)return;
     stateTime_+=dt;
     if(phase_==MatchPhase::Intro&&stateTime_>(boss_?7.2:4.2))startPlaying();
-    else if(phase_==MatchPhase::Playing&&!options_.practice){remaining_=std::max(0.0,remaining_-dt);if(remaining_<=0){phase_=MatchPhase::Finish;stateTime_=0;if(boss_)boss_->finish();}}
+    else if(phase_==MatchPhase::Playing&&!options_.practice){
+        if(zones_){
+            zones_->update(dt,actors_);
+            if(zones_->ended()){phase_=MatchPhase::Finish;stateTime_=0;}
+            else if(!zones_->overtime()){
+                remaining_=std::max(0.0,remaining_-dt);
+                if(remaining_<=0){remaining_=0;if(zones_->timeUp()){phase_=MatchPhase::Finish;stateTime_=0;}}
+            }
+        }else{
+            remaining_=std::max(0.0,remaining_-dt);if(remaining_<=0){phase_=MatchPhase::Finish;stateTime_=0;if(boss_)boss_->finish();}
+        }
+    }
     else if(phase_==MatchPhase::Finish&&stateTime_>(boss_?(boss_->state().dead?5.2:3.2):2.6))judge();
     const bool live=phase_==MatchPhase::Playing;
+    if(live&&zonePlan_)zonePlan_->update(dt,botPointers_);
+    std::vector<double> turfBefore;
+    if(zones_&&live){turfBefore.reserve(actors_.size());for(const auto& actor:actors_)turfBefore.push_back(actor->turfPainted());}
     for(auto& bot:bots_)bot->tick(dt,live,botPointers_);
     if(!live)for(auto& actor:actors_){const double yaw=actor->input.aimYaw,pitch=actor->input.aimPitch;actor->input={};actor->input.aimYaw=yaw;actor->input.aimPitch=pitch;}
     for(auto& actor:actors_){actor->setCanRespawn(live);actor->tick(dt);}
@@ -134,5 +166,12 @@ void MatchSimulation::tick(double dt){
         if(d2<radius*radius&&std::abs(dy)<1.2&&d2>1e-5){const double d=std::sqrt(d2),push=(radius-d)*0.5;a.pos.x-=dx/d*push;a.pos.z-=dz/d*push;b.pos.x+=dx/d*push;b.pos.z+=dz/d*push;}
     }
     world_.tick(dt);
+    if(zones_&&live&&phase_==MatchPhase::Playing){
+        for(std::size_t i=0;i<actors_.size();++i){
+            const double painted=actors_[i]->turfPainted()-turfBefore[i];
+            if(painted>0.0&&(zones_->contains(actors_[i]->state.pos)||(actors_[i]->input.hasAimPoint&&zones_->contains(actors_[i]->input.aimPoint))))
+                actors_[i]->addZoneTurf(painted);
+        }
+    }
 }
 }

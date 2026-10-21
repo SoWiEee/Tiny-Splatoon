@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <limits>
 
 using namespace restoration;
 
@@ -166,6 +167,12 @@ int main() {
     for (int i = 0; i < 660; ++i) player.tick(dt);
     check(player.state.alive && near(player.state.hp, 100.0) && player.state.pos.y > 0.0,
           "splat respawns after 5.5 seconds above spawn pad");
+    player.state.invuln=0;const double beforeInvalidDamage=player.state.hp;
+    check(!player.damage(std::numeric_limits<double>::quiet_NaN())&&player.state.hp==beforeInvalidDamage,
+          "source damage filter rejects NaN without poisoning health");
+    player.state.smoothY=std::numeric_limits<double>::quiet_NaN();player.tick(dt);
+    check(std::isfinite(player.state.pos.y+player.state.smoothY+player.state.vel.y)&&player.state.alive,
+          "source safety net recovers invalid visual height before weapon updates");
     if (failures) return 1;
     std::cout << "Player movement, vitals and Spritzer paint passed\n";
 }
