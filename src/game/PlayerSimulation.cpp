@@ -111,7 +111,10 @@ bool PlayerSimulation::damageFromCombat(double amount, PlayerSimulation* attacke
         CharacterTrigger event{"hit"}; event.amount=std::clamp(amount/60.0,0.4,1.2); event.direction=direction;event.hasDirection=true;
         triggerPose(event);
     }
-    if (state.hp <= 0.0) { splat(false); return true; }
+    if (state.hp <= 0.0) {
+        if(attacker && attacker != this && attacker->team() != team()) ++attacker->splats_;
+        splat(false); return true;
+    }
     return false;
 }
 

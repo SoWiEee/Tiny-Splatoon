@@ -43,6 +43,8 @@ add_library(restoration_core STATIC
     src/world/StageGeometry.cpp
     src/world/FacePaint.cpp
     src/game/PlayerSimulation.cpp
+    src/game/PlayerProfile.cpp
+    src/game/PlayerController.cpp
     src/game/FollowCamera.cpp
     src/game/ArsenalData.cpp
     src/game/CombatWorld.cpp
@@ -62,7 +64,7 @@ target_link_libraries(restoration_core PUBLIC glm::glm)
 if(MSVC)
     target_compile_options(restoration_core PRIVATE /utf-8)
 endif()
-add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/RmlRenderer.cpp)
+add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/RmlRenderer.cpp src/gui/UiText.cpp)
 target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
 add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp)
 target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
@@ -74,7 +76,7 @@ target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp
-    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp)
+    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp)
 target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals)
 
 target_link_libraries(Tiny-Splatoon PRIVATE 
@@ -97,6 +99,21 @@ set_property(TARGET Tiny-Splatoon APPEND PROPERTY LINK_DEPENDS ${TINY_RUNTIME_AS
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(player_profile_test tests/player_profile_test.cpp)
+    target_link_libraries(player_profile_test PRIVATE restoration_core)
+    add_test(NAME native_player_profile COMMAND player_profile_test)
+    add_executable(player_showcase_test tests/player_showcase_test.cpp src/render/PlayerShowcase.cpp src/render/CharacterArt.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(player_showcase_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
+    add_test(NAME native_player_showcase COMMAND player_showcase_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters")
+    add_executable(team_palette_test tests/team_palette_test.cpp)
+    target_link_libraries(team_palette_test PRIVATE glm::glm)
+    add_test(NAME native_team_palette COMMAND team_palette_test)
+    add_executable(player_controller_test tests/player_controller_test.cpp)
+    target_link_libraries(player_controller_test PRIVATE restoration_core)
+    add_test(NAME native_player_controller COMMAND player_controller_test)
+    add_executable(ui_text_test tests/ui_text_test.cpp src/gui/UiText.cpp)
+    target_link_libraries(ui_text_test PRIVATE restoration_core)
+    add_test(NAME native_ui_translations COMMAND ui_text_test)
     add_executable(stage_prop_animation_test tests/stage_prop_animation_test.cpp)
     target_link_libraries(stage_prop_animation_test PRIVATE glm::glm)
     add_test(NAME reference_stage_prop_animation COMMAND stage_prop_animation_test)

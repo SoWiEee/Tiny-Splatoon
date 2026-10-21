@@ -20,6 +20,10 @@
 #include "DeviceRenderer.hpp"
 #include "BossRenderer.hpp"
 #include "GameUi.hpp"
+#include "PlayerProfile.hpp"
+#include "PlayerController.hpp"
+#include "PlayerShowcase.hpp"
+#include "TeamPalette.hpp"
 #include "AudioEngine.hpp"
 #include "GameAudio.hpp"
 #include "FollowCamera.hpp"
@@ -44,6 +48,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <thread>
+#include <utility>
 
 namespace restoration {
 namespace {
@@ -55,10 +62,29 @@ struct Options {
     int frames = 0, width = 1600, height = 900;
     int benchmarkWarmup = 120, benchmarkFrames = 600;
     std::uint32_t benchmarkSeed = 1;
-    bool paintProbe = false, game = false, playProbe = false, match = false, native = false;
+    bool paintProbe = false, game = false, playProbe = false, match = false, native = false, practice = false;
     bool paintProbeSpecified = false, playProbeSpecified = false, captureSpecified = false, benchmarkReportSpecified = false;
     bool benchmarkTuningSpecified = false, benchmarkPlayer = false;
     bool widthSpecified = false, heightSpecified = false;
+};
+
+void LimitFrame(double started,int cap){
+    if(cap<=0)return;
+    const double remaining=1.0/cap-(glfwGetTime()-started);
+    if(remaining>0)std::this_thread::sleep_for(std::chrono::duration<double>(remaining));
+}
+
+struct WindowMode {
+    int x=80,y=80,width=1600,height=900;
+    void apply(GLFWwindow* window,bool fullscreen){
+        if((glfwGetWindowMonitor(window)!=nullptr)==fullscreen)return;
+        if(fullscreen){
+            auto* monitor=glfwGetPrimaryMonitor();const auto* mode=monitor?glfwGetVideoMode(monitor):nullptr;
+            if(!mode)return;
+            glfwGetWindowPos(window,&x,&y);glfwGetWindowSize(window,&width,&height);
+            glfwSetWindowMonitor(window,monitor,0,0,mode->width,mode->height,mode->refreshRate);
+        }else glfwSetWindowMonitor(window,nullptr,x,y,width,height,GLFW_DONT_CARE);
+    }
 };
 
 Options ParseOptions(int argc, char** argv) {
@@ -66,6 +92,11 @@ Options ParseOptions(int argc, char** argv) {
     bool stageTool = false;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
+        if (arg == "--reference-practice") {
+            result.match=true;result.practice=true;
+            if(i+1<argc&&argv[i+1][0]!='-')result.stage=argv[++i];
+            continue;
+        }
         if (arg == "--reference-match") {
             result.match = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') result.stage = argv[++i];
@@ -332,10 +363,10 @@ void PlayLoop(GLFWwindow* window,const Options& options,const StageData& initial
     captureMouse(false);
 }
 
-enum class MatchExit { Close, StageSelect };
+enum class MatchExit { Close, StageSelect, Rematch, PracticeStage };
 
 MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& stage,
-                    const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio,bool nativeApp=false) {
+                    const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio,bool nativeApp=false,ProfileStore* store=nullptr,PlayerShowcase* showcase=nullptr) {
     audio.Clear();
     const auto graphics=options.graphicsQuality.empty()?ui.graphicsSettings():ForPreset(options.graphicsQuality=="low"?GraphicsPreset::Low:options.graphicsQuality=="high"?GraphicsPreset::High:GraphicsPreset::Medium);
     StageGeometry geometry(stage);
@@ -343,15 +374,18 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     NavGraph nav(stage,geometry);
     FollowCamera camera;
     MatchOptions setup;
+    setup.practice=options.practice;
     setup.seed=options.benchmarkSeed;
     setup.autopilot=false;
     setup.mode=options.mode;
     setup.duration=options.duration;
     setup.main=options.main;setup.sub=options.sub;setup.special=options.special;setup.difficulty=options.difficulty;
+    if(nativeApp){setup.playerName=ui.profile().name;setup.style=ui.profile().style;}
+    if(nativeApp){camera.horizontalFovDegrees=ui.profile().settings.fov;camera.shake=ui.profile().settings.reducedMotion?0:ui.profile().settings.cameraShake;}
     MatchSimulation match(stage,geometry,paint,nav,setup);
-    if(match.actors().size()!=8) throw std::runtime_error("Reference match did not create eight actors");
-    if(match.bots().size()!=7) throw std::runtime_error("Reference match requires one local actor and seven bots");
-    if(options.mode!="boss")match.startPlaying();
+    if(match.actors().size()!=(options.practice?1:8)) throw std::runtime_error("Incorrect offline actor roster");
+    if(match.bots().size()!=(options.practice?0:7)) throw std::runtime_error("Incorrect offline bot roster");
+    if(options.mode!="boss"&&!nativeApp)match.startPlaying();
     gameAudio.BeginMatch(match);
     camera.yaw=match.local().state.yaw;
     camera.pitch=-0.1;
@@ -364,8 +398,9 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     renderer.Load(stage,0,paint);
     renderer.UploadInk(stage,paint);
     RenderPipeline pipeline;
-    pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects);
+    pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects&&(!nativeApp||ui.profile().settings.bloom));
     CharacterArt art(characterAssets,true,true);
+    const std::string matchId=std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
     WorldEffects worldEffects(art.data());
     DeviceRenderer deviceRenderer(characterAssets.parent_path()/"devices");
     worldEffects.SetDeviceRenderer(&deviceRenderer);
@@ -390,9 +425,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     };
     std::vector<std::unique_ptr<LiveCharacter>> characters;
     characters.reserve(match.actors().size());
-    const std::array<glm::dvec3,2> teamColors={
-        glm::dvec3(1.0,0.2541520943200296,0.0069954101845983935),
-        glm::dvec3(0.028426039499072558,0.10461648408208657,1.0)};
+    const auto teamColors=InkColors;
     const double dt=1.0/60.0;
     double accumulator=0.0,previous=glfwGetTime();
     int frame=0;
@@ -402,13 +435,18 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     const double span=std::max(stage.bounds.y-stage.bounds.x,stage.bounds.w-stage.bounds.z);
     const glm::dvec3 overviewEye=target+glm::dvec3(span*0.82,span*1.15,span*0.82);
     const bool benchmark=!options.benchmarkReport.empty();
-    bool paused=false,escapeWas=false,cheerWas=false,leftWas=false,fireBlocked=true,resultReported=false;
+    bool paused=false,escapeWas=false,gearWas=false,cheerWas=false,leftWas=false,fireBlocked=true,resultReported=false;
     MatchExit matchExit=MatchExit::Close;
     bool pauseSubWasHeld=false,pauseSpecialWasHeld=false,subResumeSync=false,specialResumeBlock=false;
     double judgeElapsed=0.0;
     double mouseX=0.0,mouseY=0.0;
+    double pendingMouseX=0,pendingMouseY=0;
+    PlayerController controller;
+    GLFWgamepadstate pad{};
+    bool hasPad=false,usingPad=false;
     auto captureMouse=[&](bool capture) {
         fireBlocked=true;
+        pendingMouseX=pendingMouseY=0;
         glfwSetInputMode(window,GLFW_CURSOR,capture?GLFW_CURSOR_DISABLED:GLFW_CURSOR_NORMAL);
         if(glfwRawMouseMotionSupported()) glfwSetInputMode(window,GLFW_RAW_MOUSE_MOTION,capture?GLFW_TRUE:GLFW_FALSE);
         glfwGetCursorPos(window,&mouseX,&mouseY);
@@ -416,9 +454,9 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     auto pauseMatch=[&] {
         const auto& input=match.local().input;
         pauseSubWasHeld=input.sub || glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS ||
-            glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS;
+            glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS || (hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER]);
         pauseSpecialWasHeld=input.special || glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS ||
-            glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS;
+            glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS || (hasPad&&(pad.buttons[GLFW_GAMEPAD_BUTTON_Y]||pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_THUMB]));
         paused=true;match.paused=true;accumulator=0.0;captureMouse(false);gameAudio.Pause();
     };
     auto resumeMatch=[&] {
@@ -454,20 +492,25 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             input.jump=action>=72&&action<78;
             ++simulationStep;
         } else {
+            ControllerInput controls;
+            controls.mouseDX=std::exchange(pendingMouseX,0.0);controls.mouseDY=std::exchange(pendingMouseY,0.0);
+            controls.forward=glfwGetKey(window,GLFW_KEY_W)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_UP)==GLFW_PRESS;
+            controls.backward=glfwGetKey(window,GLFW_KEY_S)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_DOWN)==GLFW_PRESS;
+            controls.left=glfwGetKey(window,GLFW_KEY_A)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_LEFT)==GLFW_PRESS;
+            controls.right=glfwGetKey(window,GLFW_KEY_D)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_RIGHT)==GLFW_PRESS;
+            controls.gamepadConnected=hasPad;controls.usingPad=usingPad;
+            if(hasPad){controls.leftStickX=pad.axes[GLFW_GAMEPAD_AXIS_LEFT_X];controls.leftStickY=pad.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];controls.rightStickX=pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];controls.rightStickY=pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];}
+            controls.fire=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS||(hasPad&&pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]>-.4f);
+            controller.Update(dt,controls,nativeApp?ui.profile().settings:PlayerSettings{},match,camera,geometry);
             const auto& pose=camera.pose();
             const glm::dvec3 forward(std::sin(camera.yaw),0,std::cos(camera.yaw));
             const glm::dvec3 right(-std::cos(camera.yaw),0,std::sin(camera.yaw));
-            if(glfwGetKey(window,GLFW_KEY_W)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_UP)==GLFW_PRESS) input.move+=forward;
-            if(glfwGetKey(window,GLFW_KEY_S)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_DOWN)==GLFW_PRESS) input.move-=forward;
-            if(glfwGetKey(window,GLFW_KEY_D)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_RIGHT)==GLFW_PRESS) input.move+=right;
-            if(glfwGetKey(window,GLFW_KEY_A)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_LEFT)==GLFW_PRESS) input.move-=right;
-            if(glm::length(input.move)>1.0) input.move=glm::normalize(input.move);
-            input.jump=glfwGetKey(window,GLFW_KEY_SPACE)==GLFW_PRESS;
-            input.squid=glfwGetKey(window,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS;
-            const bool left=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS;
+            input.jump=glfwGetKey(window,GLFW_KEY_SPACE)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_A]);
+            input.squid=glfwGetKey(window,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS||(hasPad&&pad.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]>-.4f);
+            const bool left=controls.fire;
             if(!left) fireBlocked=false;
             input.fire=left&&!fireBlocked;
-            const bool sub=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS;
+            const bool sub=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER]);
             input.sub=sub;
             if(subResumeSync) {
                 if(!sub) {
@@ -475,10 +518,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                     subResumeSync=false;
                 }
             }
-            const bool special=glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS;
+            const bool special=glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS||(hasPad&&(pad.buttons[GLFW_GAMEPAD_BUTTON_Y]||pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_THUMB]));
             input.special=special&&!specialResumeBlock;
             if(specialResumeBlock&&!special) specialResumeBlock=false;
-            const bool cheer=glfwGetKey(window,GLFW_KEY_C)==GLFW_PRESS;
+            const bool cheer=glfwGetKey(window,GLFW_KEY_C)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_DPAD_UP]);
             input.cheer=cheer&&!cheerWas;
             cheerWas=cheer;
             const auto hit=geometry.raycast(pose.eye,pose.forward,90.0,true);
@@ -529,6 +572,17 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                              <<" orange="<<result->coverage[0]*100.0<<" blue="<<result->coverage[1]*100.0<<'\n';
                 captureMouse(false);
                 resultReported=true;
+                if(nativeApp&&store&&!options.practice&&match.result()){
+                    auto profile=ui.profile();
+                    MatchRewardInput reward;reward.matchId=matchId;reward.mode=options.mode;
+                    reward.won=match.result()->boss?match.result()->boss->win:match.result()->winner==match.local().team();
+                    reward.turf=match.local().turfPainted();reward.splats=match.local().splats();
+                    if(match.boss()){reward.bossDamage=match.boss()->squadDamage()[0];reward.splats+=match.boss()->squadSplats()[0];}
+                    const auto earned=ApplyMatchReward(profile,reward);
+                    ui.SetProfile(profile);ui.SetReward(earned);
+                    try{store->save(profile);ui.SetSaveError({});}
+                    catch(const std::exception& error){ui.SetSaveError(error.what());}
+                }
             }
         }
         if(!benchmark||options.benchmarkPlayer) camera.tick(dt,CameraActor(local),geometry);
@@ -658,17 +712,31 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         const double visualDt=paused?0.0:(capture||options.frames)?dt:std::clamp(now-previous,0.0,0.1);
         audio.Update();
         if(!benchmark&&!options.frames) {
-            const bool escape=glfwGetKey(window,GLFW_KEY_ESCAPE)==GLFW_PRESS;
+            hasPad=false;
+            for(int joystick=GLFW_JOYSTICK_1;joystick<=GLFW_JOYSTICK_LAST;++joystick)
+                if(glfwGetGamepadState(joystick,&pad)){hasPad=true;break;}
+            if(hasPad){
+                for(int i=0;i<4;++i)if(std::abs(pad.axes[i])>.15f)usingPad=true;
+                for(const auto button:pad.buttons)if(button)usingPad=true;
+                if(pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]>-.4f||pad.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]>-.4f)usingPad=true;
+            }
+            const bool escape=glfwGetKey(window,GLFW_KEY_ESCAPE)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_START]);
             if(match.phase()==MatchPhase::Playing && escape&&!escapeWas) {
-                if(paused) resumeMatch(); else pauseMatch();
+                if(!paused)pauseMatch();else if(ui.preview().screen==UiScreen::Pause)resumeMatch();
             }
             escapeWas=escape;
+            const bool gear=options.practice&&glfwGetKey(window,GLFW_KEY_L)==GLFW_PRESS;
+            if(gear&&!gearWas&&!paused){pauseMatch();ui.ShowPracticeGear();}
+            gearWas=gear;
             if(!paused&&match.phase()==MatchPhase::Playing&&!glfwGetWindowAttrib(window,GLFW_FOCUSED)) pauseMatch();
             if(!paused && match.phase()==MatchPhase::Playing) {
                 double x=0.0,y=0.0;
                 glfwGetCursorPos(window,&x,&y);
-                camera.yaw-=(x-mouseX)*0.0021;
-                camera.pitch=std::clamp(camera.pitch-(y-mouseY)*0.0021,-1.05,1.15);
+                const auto settings=nativeApp?ui.profile().settings:PlayerSettings{};
+                pendingMouseX+=x-mouseX;pendingMouseY+=y-mouseY;
+                if(x!=mouseX||y!=mouseY)usingPad=false;
+                camera.horizontalFovDegrees=settings.fov;
+                camera.shake=settings.reducedMotion?0:settings.cameraShake;
                 mouseX=x;mouseY=y;
             }
         }
@@ -795,11 +863,38 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         screen.enabled=screen.enabled&&graphics.postEffects;
         draws+=pipeline.End(GradeSettings::Theme(std::string(stage.theme)),screen,width,height);
         if(!capture||options.benchmarkPlayer) {
-            const auto hudAction=ui.RenderHud(stage,paint,match,width,height,paused,nativeApp);
-            if(hudAction==UiAction::Resume)resumeMatch();
+            if(showcase&&match.phase()==MatchPhase::Results&&match.result()){
+                std::vector<std::size_t> order;
+                for(std::size_t i=0;i<match.actors().size();++i)if(match.actors()[i]->team()==match.local().team())order.push_back(i);
+                if(match.boss())std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){return match.boss()->squadDamage()[a]>match.boss()->squadDamage()[b];});
+                std::vector<PlayerShowcase::PodiumPlayer> podium;
+                for(const auto i:order){if(podium.size()==4)break;const auto& a=*match.actors()[i];podium.push_back({match.roster()[i].name,i==0?ui.profile().style:match.roster()[i].style,a.mainId(),a.subId()});}
+                const bool won=match.result()->boss?match.result()->boss->win:match.result()->winner==match.local().team();
+                const auto p=ui.preview();
+                if(p.type==UiPreviewType::Podium&&p.width>0&&p.height>0)
+                    showcase->drawPodium(podium,won,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);
+            }
+            const bool gearOpen=options.practice&&ui.preview().screen==UiScreen::PracticeGear;
+            if(gearOpen&&showcase){const auto p=ui.preview();if(p.width>0&&p.height>0)showcase->drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);}
+            const auto hudAction=gearOpen?ui.RenderMenu(width,height):ui.RenderHud(stage,paint,match,width,height,paused,nativeApp,options.practice);
+            if(hudAction==UiAction::Resume){
+                if(options.practice){
+                    auto& local=match.local();const auto& profile=ui.profile();
+                    local.setLoadout(profile.weapon,profile.sub,profile.special);
+                    auto& character=*characters.front();character.style=profile.style;
+                    *character.pose=CharacterPose(art.data(),art.data().rig(profile.style.hair,profile.style.hat,profile.style.brows),profile.name,profile.weapon);
+                    character.pose->setStyle(profile.style);character.pose->setSub(profile.sub);character.pose->setColor(teamColors[0]);
+                }
+                resumeMatch();
+            }
             else if(hudAction==UiAction::StageSelect)matchExit=MatchExit::StageSelect;
+            else if(hudAction==UiAction::Rematch)matchExit=MatchExit::Rematch;
+            else if(hudAction==UiAction::PracticeStage)matchExit=MatchExit::PracticeStage;
+            else if(hudAction==UiAction::PracticeReset){paint.clear();worldEffects.Clear();screenController.Reset();}
+            else if(hudAction==UiAction::PracticeFill){auto& s=match.local().state;s.hp=100;s.ink=100;s.specialCharge=match.local().weapon().number("specialCost",190);}
+            else if(hudAction==UiAction::PracticeSpawn){match.local().spawnAt(stage.spawnPads[0],0);camera.reset(CameraActor(match.local()));}
             else if(hudAction==UiAction::Close)glfwSetWindowShouldClose(window,1);
-            if(matchExit==MatchExit::StageSelect) break;
+            if(matchExit!=MatchExit::Close) break;
         }
         if(options.frames&&++frame>=options.frames) {
             if(!options.matchCapture.empty())Capture(options.matchCapture,width,height);
@@ -807,6 +902,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
         if(capture) capture->endGpu();
         glfwSwapBuffers(window);
+        if(nativeApp&&!options.frames)LimitFrame(now,ui.profile().settings.fpsCap);
         if(capture) {
             const PerformanceCapture::FrameCounts counts{
                 static_cast<int>(match.actors().size()),draws,
@@ -823,11 +919,31 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
 
 void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initial,
                 const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio) {
+    ProfileStore store;
+    WindowMode windowMode;
+    try{ui.SetProfile(store.load());}
+    catch(const std::exception& error){ui.SetProfile({});ui.SetSaveError(error.what());}
+    audio.SetVolumes(float(ui.profile().settings.master),float(ui.profile().settings.music),float(ui.profile().settings.sfx));
+    windowMode.apply(window,ui.profile().settings.fullscreen);
+    SetInkPalette(ProfilePaletteColors(ui.profile().settings.palette,ui.profile().settings.colorblind));
+    ui.SetProfileSink([&](const PlayerProfile& profile){
+        windowMode.apply(window,profile.settings.fullscreen);
+        try{store.save(profile);ui.SetSaveError({});}
+        catch(const std::exception& error){ui.SetSaveError(error.what());}
+    });
     const StageData* selected=&initial;
-    ui.ShowMenu(std::string(initial.id));
+    ui.ShowTitle(std::string(initial.id));
+    int loadingWidth=0,loadingHeight=0;glfwGetFramebufferSize(window,&loadingWidth,&loadingHeight);
+    if(loadingWidth>0&&loadingHeight>0){
+        glViewport(0,0,loadingWidth,loadingHeight);glClearColor(.96f,.97f,.95f,1);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderMenu(loadingWidth,loadingHeight);glfwSwapBuffers(window);
+    }
+    PlayerShowcase showcase(characterAssets);
     gameAudio.Menu(true);
     int frame=0;
     while(!glfwWindowShouldClose(window)) {
+        const double frameStart=glfwGetTime();
+        SetInkPalette(ProfilePaletteColors(ui.profile().settings.palette,ui.profile().settings.colorblind));
         glfwPollEvents();
         audio.Update();
         int width=0,height=0;
@@ -836,6 +952,10 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
         glViewport(0,0,width,height);
         glClearColor(.96f,.97f,.95f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        const auto preview=ui.preview();
+        if(preview.type!=UiPreviewType::None&&preview.type!=UiPreviewType::Podium&&preview.width>0&&preview.height>0)
+            showcase.drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,
+                {int(preview.x*width),int((1-preview.y-preview.height)*height),int(preview.width*width),int(preview.height*height)},frameStart,ui.profile().settings.reducedMotion);
         const auto action=ui.RenderMenu(width,height);
         const auto& selection=ui.setup();
         for(const auto& candidate:ReferenceStages())if(candidate.mode=="turf"&&!candidate.onlineOnly&&candidate.id==selection.stage)selected=&candidate;
@@ -846,20 +966,26 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
             break;
         }
         glfwSwapBuffers(window);
-        if(action==UiAction::Start) {
+        if(action==UiAction::Start||action==UiAction::Practice) {
             Options game=options;
             game.stage=std::string(selected->id);
-            game.mode=selection.mode;game.main=selection.main;game.sub=selection.sub;game.special=selection.special;game.difficulty=selection.difficulty;
-            game.duration=selection.mode=="boss"?selection.duration:0;
+            game.practice=action==UiAction::Practice||selection.mode=="practice";
+            game.mode=game.practice?"turf":selection.mode;game.main=selection.main;game.sub=selection.sub;game.special=selection.special;game.difficulty=selection.difficulty;
+            game.duration=game.practice?0:selection.duration;
             game.match=true;
             game.native=false;
             gameAudio.Menu(false);
-            if(MatchLoop(window,game,*selected,characterAssets,ui,audio,gameAudio,true)==MatchExit::Close) break;
-            ui.ShowMenu(std::string(selected->id));
+            StageData gameStage=*selected;gameStage.theme=selection.theme=="dusk"?"sunset":"day";
+            MatchExit exit;
+            do{exit=MatchLoop(window,game,gameStage,characterAssets,ui,audio,gameAudio,true,&store,&showcase);}while(exit==MatchExit::Rematch&&!glfwWindowShouldClose(window));
+            if(exit==MatchExit::Close) break;
+            if(exit==MatchExit::PracticeStage)ui.ShowPracticeStage(std::string(selected->id));else ui.ShowMenu(std::string(selected->id));
             gameAudio.Menu(true);
             frame=0;
         }
+        if(!options.frames)LimitFrame(frameStart,ui.profile().settings.fpsCap);
     }
+    ui.SetProfileSink({});
 }
 
 void Loop(GLFWwindow* window, const Options& options, const StageData& initial,const std::filesystem::path& stageAssets) {
@@ -1022,7 +1148,7 @@ int RunStageViewer(int argc, char** argv) {
         const bool hidden=!options.capture.empty()||!options.matchCapture.empty()||!options.benchmarkReport.empty();
         glfwWindowHint(GLFW_VISIBLE,hidden?GLFW_FALSE:GLFW_TRUE);
         if(!options.benchmarkReport.empty()) glfwWindowHint(GLFW_DECORATED,GLFW_FALSE);
-        window=glfwCreateWindow(options.width,options.height,"Tiny-Splatoon",nullptr,nullptr);
+        window=glfwCreateWindow(options.width,options.height,"Tiny Splatoon",nullptr,nullptr);
         if (!window) throw std::runtime_error("OpenGL 4.5 window creation failed");
         glfwMakeContextCurrent(window);
         if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) throw std::runtime_error("GLAD initialization failed");

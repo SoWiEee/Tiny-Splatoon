@@ -101,13 +101,13 @@ void FollowCamera::tick(double dt, const CameraTarget& target, const StageGeomet
     }
     shoulder_ = damp(shoulder_, shoulderT, 8.0, dt);
     if (shoulder_ > 1e-3) eye += right * shoulder_;
-    const double kick = clamp(recoil_.step(0.0, 22.0, dt), -0.01, 0.035);
+    const double kick = clamp(recoil_.step(0.0, 22.0, dt), -0.01, 0.035) * shake;
     const glm::dvec3 look = pivot + forward * 10.0 + glm::dvec3{0.0, 0.15, 0.0} + (shoulder_ > 1e-3 ? right * shoulder_ : glm::dvec3{0.0});
     const glm::dvec3 aim = glm::normalize(look - eye);
     const glm::dvec3 up = glm::normalize(glm::dvec3{0.0, 1.0, 0.0} - aim * aim.y);
     pose_.eye = eye;
     pose_.forward = aim * std::cos(kick) + up * std::sin(kick);
-    const double fov = 2.0 * std::atan(std::tan(82.0 * std::acos(-1.0) / 360.0) / (16.0 / 9.0)) * 180.0 / std::acos(-1.0) + fovKick_ * 0.8;
+    const double fov = 2.0 * std::atan(std::tan(horizontalFovDegrees * std::acos(-1.0) / 360.0) / (16.0 / 9.0)) * 180.0 / std::acos(-1.0) + fovKick_ * 0.8 * shake;
     if (std::abs(pose_.verticalFovDegrees - fov) > 0.01) pose_.verticalFovDegrees = fov;
 }
 

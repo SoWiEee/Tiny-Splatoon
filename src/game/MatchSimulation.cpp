@@ -14,6 +14,8 @@ MatchSimulation::MatchSimulation(const StageData& stage,const StageGeometry& geo
         if(options_.duration==0)options_.duration=240;
         if(options_.duration!=180&&options_.duration!=240&&options_.duration!=300)throw std::invalid_argument("Boss duration must be 180, 240, or 300 seconds");
     }
+    else if(options_.duration!=0&&options_.duration!=90&&options_.duration!=180)
+        throw std::invalid_argument("Turf duration must be 90 or 180 seconds");
     world_.setNavigation(nav_);
     DifficultyTuning(options_.difficulty);
     GetEquipment(EquipmentCategory::Main,options_.main);
@@ -42,7 +44,7 @@ void MatchSimulation::restart(){
     world_.setBoss(nullptr);boss_.reset();bossSquad_.clear();botPointers_.clear();bots_.clear();actors_.clear();roster_.clear();world_.clear();paint_.clear();seed_=options_.seed;
     const bool bossMode=options_.mode=="boss";
     phase_=options_.practice?MatchPhase::Playing:MatchPhase::Intro;stateTime_=0;
-    remaining_=bossMode?options_.duration:MatchTuning().number("defaultDuration");paused=false;
+    remaining_=options_.duration?options_.duration:MatchTuning().number("defaultDuration");paused=false;
     result_.reset();
     std::vector<std::string> names;for(const auto name:BotNames())names.emplace_back(name);
     for(std::size_t count=names.size();count>1;--count)std::swap(names[count-1],names[static_cast<std::size_t>(random()*count)]);

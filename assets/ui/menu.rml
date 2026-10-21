@@ -1,60 +1,148 @@
 <rml>
-<head><title>INKWAVE</title><link type="text/rcss" href="game.rcss" /></head>
+<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /></head>
 <body id="menu" class="menu">
   <div class="menu-shell">
-    <div class="menu-header"><div class="wordmark">INKWAVE</div><div class="muted">離線遊玩</div></div>
-    <div class="menu-layout">
-      <div class="navigation">
-        <button id="nav-play" class="nav selected">遊玩</button>
-        <button id="nav-loadout" class="nav">裝備</button>
-        <button id="nav-settings" class="nav">設定</button>
-        <button id="nav-controls" class="nav">操作說明</button>
-        <div class="nav-space"></div><button id="close" class="nav exit">離開遊戲</button>
+    <div class="menu-left">
+      <div class="menu-header">
+        <div><div id="brand-wordmark" class="wordmark">Tiny Splatoon</div><div id="screen-title" class="muted">離線遊玩</div></div>
+        <div id="profile-header" class="profile-header"></div>
       </div>
-      <div class="content">
-        <div id="panel-play" class="panel">
-          <h1>開始對戰</h1><p class="intro">選擇模式與場地，準備出發。</p>
-          <div class="mode-row"><button id="mode-turf" class="mode selected">塗地對戰</button><button id="mode-boss" class="mode">Boss 協力</button></div>
-          <p id="mode-description" class="description"></p>
-          <div class="field"><label for="stage">場地</label><select id="stage"></select></div>
-          <div class="field"><label for="difficulty">Bot 難度</label><select id="difficulty"><option value="easy">輕鬆</option><option value="normal" selected="selected">標準</option><option value="hard">挑戰</option></select></div>
-          <div id="duration-row" class="field hidden"><label for="duration">挑戰時間</label><select id="duration"><option value="180">3 分鐘</option><option value="240" selected="selected">4 分鐘</option><option value="300">5 分鐘</option></select></div>
-          <div class="start-row"><button id="start" class="primary"><span id="start-label">開始塗地對戰</span></button><span class="muted">1 位玩家 · 7 名 Bot</span></div>
+      <div class="menu-layout">
+        <div id="navigation" class="navigation">
+          <button id="nav-home" class="nav selected">首頁</button>
+          <button id="nav-play" class="nav">遊玩</button>
+          <button id="nav-online" class="nav">線上</button>
+          <button id="nav-loadout" class="nav">裝備</button>
+          <button id="nav-locker" class="nav">造型衣櫃</button>
+          <button id="nav-settings" class="nav">設定</button>
+          <button id="nav-howto" class="nav">操作說明</button>
+          <button id="nav-credits" class="nav">製作名單</button>
+          <div class="nav-space"></div>
+          <button id="close" class="nav exit">離開遊戲</button>
         </div>
-        <div id="panel-loadout" class="panel hidden">
-          <h1>裝備</h1><p class="intro">選擇主武器，再搭配副武器與特殊技能。</p>
-          <div class="field"><label for="main">主武器</label><select id="main"></select></div>
-          <div class="field"><label for="sub">副武器</label><select id="sub"></select></div>
-          <div class="field"><label for="special">特殊技能</label><select id="special"></select></div>
-          <p class="description">變更主武器時，會先套用該武器的預設搭配。你仍可自由調整。</p>
-        </div>
-        <div id="panel-settings" class="panel hidden">
-          <h1>設定</h1><p class="intro">調整畫質、聲音與介面偏好。</p>
-          <div class="field"><label for="graphics-preset">畫質</label><select id="graphics-preset"><option value="low">低｜流暢優先</option><option value="medium" selected="selected">中｜平衡</option><option value="high">高｜畫質優先</option><option value="custom">自訂</option></select></div>
-          <div class="effect-options">
-            <div class="setting-option"><input id="graphics-shadows" type="checkbox" checked="checked" /><label for="graphics-shadows">陰影</label></div>
-            <div class="setting-option"><input id="graphics-reflections" type="checkbox" /><label for="graphics-reflections">反射</label></div>
-            <div class="setting-option"><input id="graphics-post" type="checkbox" checked="checked" /><label for="graphics-post">後製效果</label></div>
+        <div class="content">
+          <div id="panel-title" class="panel hidden">
+            <div class="title-lockup"><div class="title-eyebrow">離線遊玩</div><h1>Tiny Splatoon</h1><p class="intro">準備好後，前往廣場選擇你的裝備與玩法。</p><button id="title-start" class="primary">按 Enter 開始</button></div>
           </div>
-          <div class="volume-row"><label for="master">主音量</label><input id="master" type="range" min="0" max="100" step="5" value="80" /><span id="master-value">80%</span></div>
-          <div class="volume-row"><label for="music">音樂</label><input id="music" type="range" min="0" max="100" step="5" value="60" /><span id="music-value">60%</span></div>
-          <div class="volume-row"><label for="sfx">音效</label><input id="sfx" type="range" min="0" max="100" step="5" value="85" /><span id="sfx-value">85%</span></div>
-          <div class="setting-option"><input id="reduced-motion" type="checkbox" /><label for="reduced-motion">減少畫面動態</label></div>
-        </div>
-        <div id="panel-controls" class="panel hidden">
-          <h1>操作說明</h1><p class="intro">鍵盤與滑鼠</p>
-          <div class="control-row"><span>移動</span><strong>W A S D ／方向鍵</strong></div>
-          <div class="control-row"><span>瞄準</span><strong>滑鼠</strong></div>
-          <div class="control-row"><span>主武器</span><strong>滑鼠左鍵</strong></div>
-          <div class="control-row"><span>副武器</span><strong>滑鼠右鍵 ／ E</strong></div>
-          <div class="control-row"><span>變形與游泳</span><strong>Shift</strong></div>
-          <div class="control-row"><span>跳躍</span><strong>Space</strong></div>
-          <div class="control-row"><span>特殊技能</span><strong>F ／ Q</strong></div>
-          <div class="control-row"><span>暫停與繼續</span><strong>Esc</strong></div>
+          <div id="panel-home" class="panel">
+            <h1>回到廣場</h1><p class="intro">選好裝備與外觀，開始一場離線塗地對戰。</p>
+            <div class="profile-card">
+              <div class="profile-card-title">玩家資料</div>
+              <div class="field"><label for="profile-name">玩家名稱</label><input id="profile-name" class="text-input" type="text" maxlength="16" value="Player" /></div>
+              <div id="profile-progress" class="profile-progress"></div>
+              <div id="profile-stats" class="profile-stats"></div>
+            </div>
+            <div id="save-error" class="save-error hidden" role="status" aria-live="polite"></div>
+            <div class="start-row"><button id="home-play" class="primary">選擇模式與場地</button><span class="muted">離線遊玩 · 7 名電腦玩家</span></div>
+          </div>
+          <div id="panel-play" class="panel hidden">
+            <h1>選擇遊玩方式</h1><p id="mode-description" class="intro"></p>
+            <div class="mode-row"><button id="mode-turf" class="mode selected">塗地對戰</button><button id="mode-boss" class="mode">破艦巨獸協力</button><button id="mode-practice" class="mode">自由練習</button></div>
+            <div class="field"><label for="stage">場地</label><select id="stage"></select></div>
+            <div class="field"><label for="theme">時段</label><select id="theme"><option value="day">白天</option><option value="dusk">黃昏</option></select></div>
+            <div id="difficulty-row" class="field"><label for="difficulty">電腦玩家難度</label><select id="difficulty"><option value="easy">輕鬆</option><option value="normal">標準</option><option value="hard">挑戰</option></select></div>
+            <div id="duration-row" class="field hidden"><label for="duration">挑戰時間</label><select id="duration"><option value="180">3 分鐘</option><option value="240">4 分鐘</option><option value="300">5 分鐘</option></select></div>
+            <p id="stage-message" class="muted stage-message"></p>
+            <div class="start-row"><button id="start" class="primary"><span id="start-label">開始塗地對戰</span></button><span id="start-note" class="muted">1 位玩家 · 7 名電腦玩家</span></div>
+          </div>
+          <div id="panel-online" class="panel hidden">
+            <h1>線上遊玩</h1><p class="intro">目前尚未接入連線服務。線上房間與同步會在後續網路階段開放。</p>
+            <div class="notice"><strong>連線功能尚未開放</strong><span>現在可以直接進入離線塗地或自由練習。</span></div>
+            <button id="online-play" class="primary">前往離線遊玩</button>
+          </div>
+          <div id="panel-loadout" class="panel hidden">
+            <h1>裝備</h1><p class="intro">主武器會套用建議搭配；副武器與特殊技能仍可分別調整。</p>
+            <div class="field"><label for="main">主武器</label><select id="main"></select></div>
+            <div class="field"><label for="sub">副武器</label><select id="sub"></select></div>
+            <div class="field"><label for="special">特殊技能</label><select id="special"></select></div>
+            <div class="stats-heading">能力</div>
+            <div class="stat-row"><span>射程</span><div class="stat-track"><div id="stat-range"></div></div><b id="stat-range-value"></b></div>
+            <div class="stat-row"><span>傷害</span><div class="stat-track"><div id="stat-damage"></div></div><b id="stat-damage-value"></b></div>
+            <div class="stat-row"><span>連射</span><div class="stat-track"><div id="stat-rate"></div></div><b id="stat-rate-value"></b></div>
+            <div class="stat-row"><span>機動</span><div class="stat-track"><div id="stat-mobility"></div></div><b id="stat-mobility-value"></b></div>
+            <div class="stat-row"><span>塗地</span><div class="stat-track"><div id="stat-paint"></div></div><b id="stat-paint-value"></b></div>
+            <button id="loadout-locker" class="secondary">調整角色外觀</button>
+          </div>
+          <div id="panel-locker" class="panel hidden">
+            <h1>置物櫃</h1><p class="intro">選擇預設造型，再調整髮型、臉部與服裝。</p>
+            <div class="locker-tabs">
+              <button id="locker-tab-presets" class="mode selected">預設</button><button id="locker-tab-hair" class="mode">髮型與頭飾</button><button id="locker-tab-face" class="mode">臉部</button><button id="locker-tab-outfit" class="mode">服裝</button>
+            </div>
+            <div id="locker-section-presets" class="locker-section"><div class="field"><label for="style-preset">角色預設</label><select id="style-preset"></select></div></div>
+            <div id="locker-section-hair" class="locker-section hidden">
+              <div class="field"><label for="style-hair">髮型</label><select id="style-hair"></select></div>
+              <div class="field"><label for="style-hat">頭飾</label><select id="style-hat"></select></div>
+            </div>
+            <div id="locker-section-face" class="locker-section hidden">
+              <div class="field"><label for="style-skin">膚色</label><select id="style-skin"></select></div>
+              <div class="field"><label for="style-eyes">眼睛</label><select id="style-eyes"></select></div>
+              <div class="field"><label for="style-brows">眉型</label><select id="style-brows"></select></div>
+            </div>
+            <div id="locker-section-outfit" class="locker-section hidden"><div class="field"><label for="style-outfit">服裝</label><select id="style-outfit"></select></div></div>
+            <p class="description">造型會即時套用於預覽，變更會寫入玩家資料。</p>
+          </div>
+          <div id="panel-settings" class="panel hidden">
+            <h1>設定</h1><p class="intro">控制、畫面、聲音與遊戲偏好會保存在玩家資料中。</p>
+            <div id="settings-save-error" class="save-error hidden" role="status" aria-live="polite"></div>
+            <div class="settings-group"><h2>操作</h2>
+              <div class="setting-row"><label for="sensitivity">滑鼠靈敏度</label><input id="sensitivity" type="range" min="0.2" max="3" step="0.05" /><span id="sensitivity-value"></span></div>
+              <div class="setting-row"><label for="pad-sensitivity">手把靈敏度</label><input id="pad-sensitivity" type="range" min="0.2" max="3" step="0.05" /><span id="pad-sensitivity-value"></span></div>
+              <div class="setting-check"><input id="invert-y" type="checkbox" /><label for="invert-y">反轉垂直視角</label></div>
+              <div class="setting-row"><label for="aim-assist">手把輔助瞄準</label><input id="aim-assist" type="range" min="0" max="1" step="0.05" /><span id="aim-assist-value"></span></div>
+              <div class="setting-check"><input id="aim-assist-mouse" type="checkbox" /><label for="aim-assist-mouse">滑鼠輔助瞄準</label></div>
+              <div class="setting-row"><label for="touch-controls">觸控操作</label><select id="touch-controls" disabled="disabled"><option value="auto">自動</option><option value="on">開啟</option><option value="off">關閉</option></select></div>
+              <div class="setting-row"><label for="touch-sensitivity">觸控靈敏度</label><input id="touch-sensitivity" type="range" min="0.2" max="3" step="0.05" disabled="disabled" /><span id="touch-sensitivity-value"></span></div>
+              <div class="setting-check"><input id="touch-invert-y" type="checkbox" disabled="disabled" /><label for="touch-invert-y">反轉觸控垂直視角</label></div>
+              <p class="muted capability-note">支援鍵盤、滑鼠與相容手把；目前尚未提供觸控操作與手把震動。</p>
+            </div>
+            <div class="settings-group"><h2>畫面</h2>
+              <div class="setting-row"><label for="graphics-preset">畫質</label><select id="graphics-preset"><option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="custom">自訂</option></select></div>
+              <div class="setting-row"><label for="fov">視野</label><input id="fov" type="range" min="65" max="100" step="1" /><span id="fov-value"></span></div>
+              <div class="setting-check"><input id="graphics-shadows" type="checkbox" /><label for="graphics-shadows">陰影</label></div>
+              <div class="setting-check"><input id="graphics-reflections" type="checkbox" /><label for="graphics-reflections">反射</label><input id="graphics-post" type="checkbox" /><label for="graphics-post">後製效果</label><input id="bloom" type="checkbox" /><label for="bloom">光暈</label></div>
+              <div class="setting-check"><input id="show-fps" type="checkbox" /><label for="show-fps">顯示 FPS</label><input id="fullscreen" type="checkbox" /><label for="fullscreen">全螢幕偏好</label></div>
+              <div class="setting-row"><label for="fps-cap">影格上限</label><select id="fps-cap"><option value="0">跟隨螢幕更新率</option><option value="60">60</option><option value="30">30</option></select></div>
+            </div>
+            <div class="settings-group"><h2>聲音</h2>
+              <div class="setting-row"><label for="master">主音量</label><input id="master" type="range" min="0" max="100" step="5" /><span id="master-value"></span></div>
+              <div class="setting-row"><label for="music">音樂</label><input id="music" type="range" min="0" max="100" step="5" /><span id="music-value"></span></div>
+              <div class="setting-row"><label for="sfx">音效</label><input id="sfx" type="range" min="0" max="100" step="5" /><span id="sfx-value"></span></div>
+            </div>
+            <div class="settings-group"><h2>遊戲</h2>
+              <div class="setting-row"><label for="camera-shake">鏡頭震動</label><input id="camera-shake" type="range" min="0" max="1" step="0.05" /><span id="camera-shake-value"></span></div>
+              <div class="setting-row"><label for="rumble">手把震動</label><input id="rumble" type="range" min="0" max="1" step="0.05" disabled="disabled" /><span id="rumble-value"></span></div>
+              <div class="setting-check"><input id="colorblind" type="checkbox" /><label for="colorblind">色盲安全隊伍顏色</label><input id="minimap" type="checkbox" /><label for="minimap">小地圖</label></div>
+              <div class="setting-row"><label for="palette">隊伍色盤</label><select id="palette"><option value="0">橘紅・鈷藍</option><option value="1">泡泡糖・薄荷</option><option value="2">檸檬・葡萄</option><option value="3">水藍・櫻桃</option><option value="4">萊姆・洋紅</option></select></div>
+              <div class="setting-row"><label for="default-mode">預設模式</label><select id="default-mode"><option value="turf">塗地對戰</option><option value="boss">首領協力</option></select></div>
+              <div class="setting-row"><label for="default-difficulty">預設難度</label><select id="default-difficulty"><option value="easy">輕鬆</option><option value="normal">標準</option><option value="hard">挑戰</option></select></div>
+              <div class="setting-row"><label for="match-length">塗地預設時長</label><select id="match-length"><option value="90">1.5 分鐘</option><option value="180">3 分鐘</option></select></div>
+              <div class="setting-row"><label for="time-of-day">預設時段</label><select id="time-of-day"><option value="day">白天</option><option value="dusk">黃昏</option></select></div>
+              <div class="setting-check"><input id="reduced-motion" type="checkbox" /><label for="reduced-motion">減少畫面動態</label></div>
+            </div>
+          </div>
+          <div id="panel-howto" class="panel hidden">
+            <h1>操作說明</h1><p class="intro">以鍵盤與滑鼠開始遊玩。</p>
+            <div class="control-row"><span>移動與視角</span><strong>W A S D ／方向鍵、滑鼠</strong></div>
+            <div class="control-row"><span>主武器</span><strong>滑鼠左鍵</strong></div>
+            <div class="control-row"><span>副武器</span><strong>滑鼠右鍵 ／ E</strong></div>
+            <div class="control-row"><span>變形與游泳</span><strong>Shift</strong></div>
+            <div class="control-row"><span>跳躍</span><strong>Space</strong></div>
+            <div class="control-row"><span>特殊技能</span><strong>F ／ Q</strong></div>
+            <div class="control-row"><span>地圖與跳躍</span><strong>按住 Tab ／ M</strong></div>
+            <div class="control-row"><span>練習選單</span><strong>L</strong></div>
+            <div class="control-row"><span>暫停</span><strong>Esc</strong></div>
+          </div>
+          <div id="panel-credits" class="panel hidden">
+            <h1>製作名單</h1><p class="intro">Tiny Splatoon 原生離線版本。</p>
+            <div class="control-row"><span>遊戲與程式</span><strong>Tiny Splatoon 原生版本</strong></div>
+            <div class="control-row"><span>介面字體</span><strong>Inter · Noto Sans TC</strong></div>
+            <div class="control-row"><span>參考資料與資產</span><strong>依各自授權使用</strong></div>
+          </div>
         </div>
       </div>
+      <div id="menu-footer" class="menu-footer"><button id="menu-back" class="quiet">返回</button><span id="menu-footer-hint">Tab 切換焦點　Enter 選擇</span></div>
     </div>
-    <div class="menu-footer"><span>INKWAVE · Turf Riot</span><span>Tab 切換焦點　Enter 選擇</span></div>
+    <div id="preview-surface" class="preview-surface" aria-label="角色預覽"></div>
   </div>
 </body>
 </rml>

@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "ProjectileRenderer.hpp"
+#include "TeamPalette.hpp"
 #include "CharacterShader.hpp"
 #include "CharacterRenderData.hpp"
 #include "CombatWorld.hpp"
@@ -18,7 +19,7 @@
 namespace restoration {
 namespace {
 glm::dvec3 teamColor(int team) {
-    return team==1?glm::dvec3(0.028426039499072558,0.10461648408208657,1):glm::dvec3(1,0.2541520943200296,0.0069954101845983935);
+    return InkColors[team==1?1:0];
 }
 }
 struct ProjectileRenderer::Impl {

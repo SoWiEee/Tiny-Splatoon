@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "WorldEffects.hpp"
+#include "TeamPalette.hpp"
 #include "DeviceRenderer.hpp"
 #include "CombatWorld.hpp"
 #include "PlayerSimulation.hpp"
@@ -22,7 +23,7 @@ namespace restoration {
 namespace {
 constexpr float pi=3.14159265358979323846f;
 constexpr glm::vec3 orange{1.0f,0.5412f,0.0784f},blue{0.1843f,0.3569f,1.0f};
-glm::vec3 ink(int team) { return team==1?blue:orange; }
+glm::vec3 ink(int team) { return SrgbInkColors[team==1?1:0]; }
 glm::vec3 unit(glm::vec3 v) { return glm::length(v)>1e-5f?glm::normalize(v):glm::vec3(0,1,0); }
 float clamp01(float v) { return std::clamp(v,0.0f,1.0f); }
 struct Vertex { glm::vec4 posRadius, normalLength, colorAlpha, meta, velocity; };

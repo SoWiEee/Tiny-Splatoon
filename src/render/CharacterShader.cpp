@@ -1,4 +1,5 @@
 #include "CharacterShader.hpp"
+#include "TeamPalette.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <fstream>
@@ -127,7 +128,11 @@ void CharacterShader::uniform(const std::string& name, const std::vector<double>
     if (values.empty() || values.size() % components || values.size() / components > static_cast<std::size_t>(u.size))
         throw std::runtime_error("Invalid source uniform shape: " + name);
     const auto count = static_cast<GLsizei>(values.size() / components);
-    const std::vector<float> f(values.begin(), values.end());
+    std::vector<float> f(values.begin(), values.end());
+    if(u.type==GL_FLOAT_VEC3&&values.size()==3&&(name=="uTeam"||name=="uTeamA"||name=="uTeamB")){
+        for(int team=0;team<2;++team)if(glm::length(glm::dvec3(values[0],values[1],values[2])-SourceInkColors[team])<1e-9)
+            for(int c=0;c<3;++c)f[c]=float(InkColors[team][c]);
+    }
     switch (u.type) {
     case GL_FLOAT: glUniform1fv(u.location, count, f.data()); break;
     case GL_FLOAT_VEC2: glUniform2fv(u.location, count, f.data()); break;

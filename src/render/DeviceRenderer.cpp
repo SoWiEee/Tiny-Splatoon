@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "DeviceRenderer.hpp"
+#include "TeamPalette.hpp"
 #include "CombatWorld.hpp"
 #include "PlayerSimulation.hpp"
 #include "ArsenalData.hpp"
@@ -83,7 +84,7 @@ struct DeviceRenderer::Impl {
         glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&oldVao);glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&oldArray);glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING,&oldElement);glGetIntegerv(GL_BLEND_SRC_RGB,&oldSrc);glGetIntegerv(GL_BLEND_DST_RGB,&oldDst);glGetBooleanv(GL_DEPTH_WRITEMASK,&oldDepth);
         glEnable(GL_DEPTH_TEST);glEnable(GL_BLEND);glDisable(GL_CULL_FACE);glDepthMask(GL_FALSE);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         auto& shader=*ribbonShader;shader.use();shader.matrices(glm::dmat4(1),view,projection,eye);shader.uniform("uTime",now);shader.uniform("uLife",life);
-        const glm::dvec3 color=tail.team==1?glm::dvec3(.028426039499072558,.10461648408208657,1):glm::dvec3(1,.2541520943200296,.0069954101845983935);
+        const glm::dvec3 color=InkColors[tail.team==1?1:0];
         shader.uniform("uColor",{color.x,color.y,color.z});glBindVertexArray(ribbonGpu->vao);
         glBindBuffer(GL_ARRAY_BUFFER,ribbonGpu->position);glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(positions.size()*sizeof(glm::vec3)),positions.data(),GL_STREAM_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER,ribbonGpu->info);glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(info.size()*sizeof(glm::vec2)),info.data(),GL_STREAM_DRAW);
@@ -139,7 +140,12 @@ struct DeviceRenderer::Impl {
         }
         std::stable_sort(render.begin(),render.end(),[&](auto a,auto b){return nodes[a].transparent<nodes[b].transparent;});int draws=0;
         glActiveTexture(GL_TEXTURE6);glBindTexture(GL_TEXTURE_2D,dfg);
-        for(const auto i:render){const auto& n=nodes[i];auto& p=program(n.material);auto& shader=*p.shader;shader.use();for(const auto& [k,v]:p.defaults)shader.uniform(k,v);
+        for(const auto i:render){const auto& n=nodes[i];auto& p=program(n.material);auto& shader=*p.shader;shader.use();
+            for(const auto& [k,v]:p.defaults){
+                if(v.size()==3&&glm::length(glm::dvec3(v[0],v[1],v[2])-SourceInkColors[team==1?1:0])<1e-9){
+                    const auto color=InkColors[team==1?1:0];shader.uniform(k,{color.x,color.y,color.z});
+                }else shader.uniform(k,v);
+            }
             shader.uniform("uTime",age);shader.uniform("uT",age);shader.uniform("uAng",-age*(device?device->spin:1)*.12);shader.uniform("uAlpha",kind=="boomerang"?.72:1.0);shader.uniform("dfgLUT",6);shader.matrices(world[i],view,projection,eye);shader.lights(lights,view);
             shader.uniform("uLife",phase);
             const auto alpha=p.defaults.find("opacity");if(alpha!=p.defaults.end()&&alpha->second.size()==1)shader.uniform("opacity",alpha->second[0]*opacity);

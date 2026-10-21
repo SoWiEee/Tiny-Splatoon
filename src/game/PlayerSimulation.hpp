@@ -89,6 +89,7 @@ public:
     const std::vector<ShooterProjectile>& projectiles() const { return world_->projectiles(); }
     double turfPainted() const { return turfPainted_; }
     int deaths() const { return deaths_; }
+    int splats() const { return splats_; }
     int shotsFired() const { return shotsFired_; }
     glm::dvec3 muzzle(int side=0) const { return runner_.muzzle(side); }
     void setMuzzleSource(std::function<glm::dvec3(int)> source) { muzzleSource_=std::move(source); }
@@ -136,7 +137,7 @@ private:
     bool hasFaceTarget_ = false;
     bool canRespawn_ = true;
     int shotsFired_ = 0;
-    int deaths_ = 0;
+    int deaths_ = 0, splats_ = 0;
     bool prevJump_ = false, prevFire_ = false, prevSquid_ = false, prevSub_ = false, prevSpecial_ = false;
     std::uint32_t seed_ = 1;
     std::function<double()> randomSource_;

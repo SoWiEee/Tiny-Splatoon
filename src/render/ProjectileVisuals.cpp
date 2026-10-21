@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "ProjectileVisuals.hpp"
+#include "TeamPalette.hpp"
 #include "CombatWorld.hpp"
 #include "PlayerSimulation.hpp"
 #include <glm/gtc/matrix_transform.hpp>
@@ -12,7 +13,7 @@ namespace restoration {
 std::vector<ProjectileBlob> BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots) {
     constexpr double pi=3.14159265358979323846;
     constexpr double satelliteSize[]={0.46,0.33,0.24,0.17};
-    const glm::dvec3 colors[]={{1,0.2541520943200296,0.0069954101845983935},{0.028426039499072558,0.10461648408208657,1}};
+    const auto& colors=InkColors;
     std::vector<ProjectileBlob> result;
     result.reserve(std::min<std::size_t>(700,shots.size()*4));
     for(const auto& p:shots) {

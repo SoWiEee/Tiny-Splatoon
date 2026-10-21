@@ -26,6 +26,7 @@ struct CameraPose {
 class FollowCamera {
 public:
     double yaw = 0.0, pitch = -0.1;
+    double horizontalFovDegrees = 82.0, shake = 1.0;
     void reset(const CameraTarget& target);
     void tick(double dt, const CameraTarget& target, const StageGeometry& geometry);
     void recoil(double amount);

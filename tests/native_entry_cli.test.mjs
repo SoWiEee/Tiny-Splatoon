@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 const executable = resolve(process.argv[2] ?? 'build/Tiny-Splatoon.exe');
 for (const args of [
   ['--reference-match', 'tidewater'],
+  ['--reference-practice', 'tidewater'],
   ['--reference-boss', 'tidewater'],
   ['--reference-game', 'tidewater'],
   ['--paint-probe', '0'],

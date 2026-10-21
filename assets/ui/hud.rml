@@ -1,12 +1,40 @@
 <rml>
-<head><title>Match</title><link type="text/rcss" href="game.rcss" /></head>
+<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /></head>
 <body id="hud" class="hud">
   <div class="hud-top"><span id="stage-name" class="stage-name"></span><div id="clock" class="clock">03:00</div><span class="pause-hint">Esc 暫停</span></div>
   <div id="team-score" class="team-score"><span id="score-a" class="team-a">0.0%</span><span class="score-divider">／</span><span id="score-b" class="team-b">0.0%</span></div>
-  <div id="boss" class="boss hidden"><div class="boss-heading"><strong>HULLBREAKER</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-hp"></span></div></div>
+  <div id="boss" class="boss hidden"><div class="boss-heading"><strong>破艦巨獸</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-hp"></span></div></div>
+  <div id="minimap" class="minimap"><div class="minimap-heading"><strong>場地地圖</strong><span id="terrain-status"></span></div><div id="minimap-map" class="minimap-map"></div><div id="position-status" class="position-status"></div></div>
+  <div id="fps" class="fps">影格 <strong id="fps-value">60</strong></div>
   <div class="player-info"><div class="player-bars"><span>HP <strong id="hp">100</strong></span><span>墨量 <strong id="ink">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
   <div id="player-status" class="player-status"></div><div id="reticle" class="reticle"></div>
-  <div id="pause" class="overlay hidden"><div class="dialog pause-dialog"><h1>已暫停</h1><p class="intro">準備好後，繼續這場對戰。</p><button id="resume" class="primary">繼續遊戲</button><button id="return-menu">返回選單</button><button id="pause-close" class="quiet">離開遊戲</button></div></div>
-  <div id="results" class="overlay hidden"><div class="dialog results-dialog"><h1 id="result-title">對戰結束</h1><p id="result-detail" class="intro"></p><div id="result-score" class="result-score"></div><table id="results-table"></table><div class="result-actions"><button id="results-menu" class="primary">返回選單</button><button id="results-close">離開遊戲</button></div></div></div>
+  <div id="pause" class="overlay hidden">
+    <div class="dialog pause-dialog">
+      <h1 id="pause-title">已暫停</h1><p id="pause-description" class="intro">準備好後，繼續這場對戰。</p>
+      <button id="resume" class="primary">繼續遊戲</button>
+      <div id="practice-tools" class="practice-tools hidden">
+        <button id="practice-gear">更換裝備與外觀　L</button>
+        <button id="practice-reset">清除墨水並重設</button>
+        <button id="practice-fill">補滿墨量與特殊</button>
+        <button id="practice-spawn">返回生點</button>
+        <button id="practice-stage">更換場地</button>
+      </div>
+      <button id="pause-settings">設定</button><button id="pause-howto">操作說明</button>
+      <button id="return-menu">返回選單</button><button id="pause-close" class="quiet">離開遊戲</button>
+    </div>
+    <div id="leave-confirm" class="dialog leave-dialog hidden">
+      <h1 id="leave-title">離開這場對戰？</h1><p id="leave-description" class="intro">目前進度不會結算，確定要返回選單嗎？</p>
+      <button id="leave-stay">繼續遊玩</button><button id="leave-yes" class="primary">離開對戰</button>
+    </div>
+  </div>
+  <div id="results" class="overlay results-overlay hidden">
+    <div id="results-preview" class="results-preview" aria-label="結果展示"></div>
+    <div class="dialog results-dialog">
+      <h1 id="result-title">對戰結束</h1><p id="result-detail" class="intro"></p>
+      <div id="result-score" class="result-score"></div><div id="result-xp" class="result-xp"></div>
+      <table id="results-table"></table>
+      <div class="result-actions"><button id="results-rematch" class="primary">再戰一場</button><button id="results-menu">返回選單</button><button id="results-close">離開遊戲</button></div>
+    </div>
+  </div>
 </body>
 </rml>

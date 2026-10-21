@@ -2,15 +2,15 @@
 
 [![Release Windows Build](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml/badge.svg)](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml)
 
-以 C++17／OpenGL 4.5 還原 `splat-ref/` 的塗地射擊遊戲。原生程式位於依職責分層的 `src/`，直接執行 `Tiny-Splatoon.exe` 即進入離線選圖畫面。
+以 C++17／OpenGL 4.5 還原 `splat-ref/` 的塗地射擊遊戲。原生程式位於依職責分層的 `src/`，直接執行 `Tiny-Splatoon.exe` 即進入 Tiny Splatoon 標題與玩家首頁。
 
 目前可玩的是一名玩家與七名 Bot 的 4v4 Turf：選圖、移動／瞄準／射擊、變形／游泳／跳躍、副武器／特殊技能、暫停／返回、判分／結果與重開。模擬採固定 60 Hz，角色使用來源幾何與即時計算的骨架／程序動畫。
 
-完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，可選離線 Turf／Boss、地圖、裝備與難度，並調整音量和減少動態效果。場景已接入來源 bevel／PropKit 幾何、46 層程序材質與連續墨水；投射物使用來源墨滴、弓箭、拳套、刀波與蓄力光帶。miniaudio 的來源資料已擴充為 201 個音效及九首曲目，整合驗收進度見 [還原紀錄](docs/restoration-progress.md)。正式 hub／Locker、設定保存、線上與 Zones 仍須依 [spec.md](spec.md) 開發。Boss 的 100 骨架／命中 socket／材質數值已通過 16 組來源姿勢比對，完整模式與材質畫面仍在驗收。
+完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，優先顯示繁體中文。可選離線塗地／Boss、地圖、裝備與難度，並調整音量和減少動態效果。場景已接入來源 bevel／PropKit 幾何、46 層程序材質與連續墨水；投射物使用來源墨滴、弓箭、拳套、刀波與蓄力光帶。miniaudio 的來源資料已擴充為 201 個音效及九首曲目，整合驗收進度見 [還原紀錄](docs/restoration-progress.md)。首頁、角色置物櫃、3D 換裝預覽、結果頒獎台與設定保存已接入；線上與 Zones 仍須依 [spec.md](spec.md) 開發。Boss 的 100 骨架／命中 socket／材質數值已通過 16 組來源姿勢比對，完整模式與材質畫面仍在驗收。
 
 本輪已接入來源天空／海面／雲／遠景、港區反射、PMREM 與共用光照，裝置目錄擴為雙隊 58 個來源模型，並讓布條與道具持續動畫。潛水變形、潑墨動作與音訊的實際驗收及保留差異見 [本輪驗收](docs/acceptance-2026-10-21.md)。
 
-選單「設定」可選低／中／高畫質，或個別切換陰影、反射及後製。低畫質使用65%內部解析度並停用這三項效果；中畫質使用85%及1024陰影；高畫質使用原生解析度及2048陰影。HUD與字體維持原生解析度，設定於下一場對局套用，目前保留於本次執行期間。診斷入口可使用 `--graphics-quality low|medium|high`，效能報告會記錄實際設定。
+選單「設定」可選低／中／高畫質，或個別切換陰影、反射及後製。低畫質使用65%內部解析度並停用這三項效果；中畫質使用85%及1024陰影；高畫質使用原生解析度及2048陰影。HUD與字體維持原生解析度，畫質設定於下一場對局套用，音量即時套用。玩家名稱、裝備、外觀、設定及 XP 會自動保存至 `%LOCALAPPDATA%/Tiny-Splatoon/profile.json`，寫入失敗時介面顯示錯誤。診斷入口可使用 `--graphics-quality low|medium|high`，效能報告會記錄實際設定。保存契約與限制見 [玩家流程](docs/save-player-flow.md)，繁中名稱來源見 [翻譯表](docs/ui-translations.md)。
 
 ## 建置與執行
 
@@ -48,6 +48,7 @@ Optimus 筆電會透過 `NvOptimusEnablement` 請求 NVIDIA；啟動紀錄中的
 | Space | 跳躍 |
 | F／Q | 啟動特殊技能 |
 | C | Cheer |
+| L | 練習中的裝備與外觀選單 |
 | Esc | 暫停／繼續 |
 
 失去視窗焦點會暫停；重新進入操作時需放開射擊鍵，避免按鈕殘留造成誤射。暫停與結果畫面可返回選圖，或關閉遊戲。

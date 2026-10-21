@@ -100,3 +100,118 @@ th:first-child, td:first-child { text-align: left; }
 .result-actions { display: flex; }
 .result-actions button { margin-right: 12dp; }
 @media (max-width: 900dp) { .menu-shell { padding: 0 24dp; } .navigation { width: 155dp; padding-right: 20dp; } .content { padding-left: 28dp; } .field label { width: 100dp; } select { width: 300dp; } h1 { font-size: 34dp; } }
+
+/* Keep a clear, fixed preview lane for the native character renderer. */
+.hidden { display: none; }
+.menu { background-color: transparent; }
+.menu-shell { position: relative; display: block; max-width: none; height: 100%; margin: 0; padding: 0; }
+.menu-left { position: relative; z-index: 1; width: 66%; height: 100%; box-sizing: border-box; padding: 0 30dp 0 48dp; display: flex; flex-direction: column; background-color: #f5f7f3f5; }
+.preview-surface { position: absolute; right: 0; top: 0; width: 34%; height: 100%; background-color: transparent; }
+.practice-gear #nav-home, .practice-gear #nav-play, .practice-gear #nav-online, .practice-gear #nav-credits { display: none; }
+.menu-header { height: 94dp; }
+.wordmark { color: #172923; font-size: 24dp; letter-spacing: 0; }
+.title-lockup { margin-top: 11%; }
+.title-lockup .title-eyebrow { color: #506d5d; font-size: 14dp; font-weight: 700; letter-spacing: 2dp; margin-bottom: 12dp; }
+.title-lockup h1 { font-size: 54dp; letter-spacing: -1dp; margin-bottom: 12dp; }
+.title-lockup .intro { max-width: 500dp; margin-bottom: 28dp; }
+.title-lockup button { min-width: 220dp; }
+.profile-header { color: #41584c; font-size: 14dp; text-align: right; }
+.menu-layout { flex-grow: 1; min-height: 0; padding-top: 20dp; padding-bottom: 18dp; }
+.navigation { width: 150dp; padding-right: 20dp; }
+.nav { font-size: 15dp; padding: 9dp 12dp; }
+.content { padding-left: 26dp; overflow-y: auto; }
+.panel { max-width: 700dp; padding-right: 8dp; }
+.panel h1 { font-size: 32dp; margin-bottom: 8dp; }
+.intro { font-size: 15dp; margin-bottom: 20dp; }
+.field { margin-bottom: 14dp; }
+.field label { width: 150dp; }
+select { width: 360dp; height: 40dp; padding: 8dp 12dp; font-size: 15dp; }
+button { font-size: 15dp; padding: 9dp 14dp; }
+.mode-row { margin-bottom: 16dp; }
+.mode { width: auto; min-width: 126dp; margin-right: 8dp; }
+.start-row { margin-top: 22dp; }
+.start-row .primary { min-width: 190dp; }
+.menu-footer { height: 46dp; font-size: 12dp; }
+.menu-footer button { padding: 5dp 10dp; font-size: 13dp; }
+.profile-card { padding: 20dp; margin: 6dp 0 16dp; border: 1dp #d6dfd6; border-radius: 8dp; background-color: #ffffffde; }
+.profile-card-title, .stats-heading { font-size: 14dp; font-weight: 700; color: #4a6556; margin-bottom: 14dp; }
+.profile-card .field { margin-bottom: 10dp; }
+.text-input { width: 360dp; height: 38dp; box-sizing: border-box; padding: 8dp 12dp; border: 1dp #c9d4c9; border-radius: 5dp; background-color: #fff; color: #202b28; font-family: Inter; font-size: 15dp; }
+.profile-progress { font-size: 14dp; color: #496054; margin: 12dp 0; }
+.profile-stats { display: flex; color: #596761; font-size: 13dp; }
+.profile-stats span { margin-right: 24dp; }
+.profile-stats strong { color: #202b28; margin-right: 5dp; }
+.save-error { color: #9a332e; font-size: 13dp; margin: 8dp 0; }
+.stage-message { margin: 2dp 0 4dp 150dp; }
+.notice { display: flex; flex-direction: column; padding: 18dp; margin-bottom: 20dp; background-color: #edf0ed; border-left: 4dp #bd6f34; border-radius: 4dp; }
+.notice span { font-size: 14dp; color: #596761; margin-top: 8dp; }
+.stats-heading { margin-top: 22dp; margin-bottom: 10dp; }
+.stat-row { display: flex; align-items: center; margin: 9dp 0; font-size: 14dp; }
+.stat-row span { width: 65dp; color: #596761; }
+.stat-row .stat-track { width: 270dp; height: 8dp; margin-right: 12dp; background-color: #e1e9e0; border-radius: 4dp; }
+.stat-row .stat-track div { height: 100%; width: 0%; background-color: #387860; border-radius: 4dp; }
+.stat-row b { width: 40dp; color: #40584b; font-weight: 500; }
+.secondary { margin-top: 18dp; color: #194e40; background-color: #e2ebe1; border-color: #e2ebe1; }
+.locker-tabs { display: flex; flex-wrap: wrap; margin: 2dp 0 18dp; }
+.locker-tabs .mode { min-width: 90dp; padding: 8dp 10dp; }
+.locker-section { min-height: 172dp; }
+.settings-group { padding: 12dp 0 18dp; margin-bottom: 12dp; border-bottom: 1dp #d9e0d8; }
+.settings-group h2 { display: block; font-size: 18dp; margin: 0 0 13dp; color: #40584b; }
+.setting-row { min-height: 38dp; display: flex; align-items: center; margin: 7dp 0; }
+.setting-row label { width: 160dp; flex-shrink: 0; font-size: 14dp; color: #4a5b52; }
+.setting-row select { width: 300dp; height: 36dp; font-size: 14dp; }
+.setting-row input { width: 260dp; height: 24dp; margin-right: 12dp; }
+.setting-row span { width: 54dp; text-align: right; font-size: 13dp; color: #52665b; }
+.setting-check { min-height: 34dp; display: flex; align-items: center; margin: 6dp 0; }
+.setting-check input[type=checkbox] { width: 18dp; height: 18dp; margin: 0 8dp 0 0; }
+.setting-check label { font-size: 13dp; margin-right: 20dp; color: #4a5b52; }
+.control-row { font-size: 14dp; }
+.control-row strong { font-size: 14dp; }
+.exit { font-size: 13dp; }
+.menu-footer { flex-shrink: 0; }
+.menu-left #menu-back { background-color: transparent; border-color: transparent; color: #52665b; }
+.menu.title-screen .content { padding-left: 0; border-left: 0dp transparent; }
+.menu.title-screen .menu-layout { padding-top: 12dp; }
+.fps { position: absolute; top: 70dp; right: 24dp; z-index: 2; padding: 5dp 9dp; background-color: #15251ed9; border-radius: 4dp; color: #fff; font-size: 12dp; }
+.fps strong { margin-left: 5dp; }
+.minimap { position: absolute; top: 116dp; right: 24dp; width: 184dp; padding: 9dp; background-color: #f5f7f3ee; border: 1dp #d7dfd6; border-radius: 6dp; }
+.minimap-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6dp; font-size: 12dp; }
+.minimap-heading span { color: #69766f; font-size: 10dp; }
+.minimap-map { width: 100%; height: 130dp; background-color: #e3e9e1; border-radius: 3dp; overflow: hidden; }
+.minimap-map { position: relative; }
+.map-cell { position: absolute; }
+.map-floor { background-color: #cbd6ca; }
+.map-obstacle { background-color: #a8b7aa; }
+.map-grate { background-color: #87988b; }
+.map-actor { position: absolute; z-index: 2; width: 8dp; height: 8dp; margin-left: -4dp; margin-top: -4dp; border: 1dp #28372e; border-radius: 5dp; }
+.map-actor-local { z-index: 3; width: 12dp; height: 12dp; margin-left: -6dp; margin-top: -6dp; border: 2dp #ffffff; box-shadow: 0 0 0 1dp #24332a; }
+.position-status { margin-top: 5dp; color: #56665c; font-size: 10dp; }
+.practice-tools { display: block; margin: 2dp 0 12dp; padding: 10dp; background-color: #e7ede6; border-radius: 6dp; }
+.practice-tools button { display: block; width: 100%; box-sizing: border-box; margin: 4dp 0; text-align: left; }
+.pause-dialog { width: 430dp; max-height: 88%; overflow-y: auto; }
+.pause-dialog button { margin-bottom: 7dp; }
+.leave-dialog { position: absolute; z-index: 3; width: 420dp; box-shadow: 0 8dp 36dp #07110db8; }
+.leave-dialog h1 { font-size: 28dp; }
+.leave-dialog button { display: inline-block; width: 48%; margin: 0 1% 0 0; }
+.results-overlay { justify-content: flex-start; }
+.results-dialog { position: relative; z-index: 1; width: 66%; height: 100%; max-height: 100%; padding: 28dp 36dp; border-radius: 0; background-color: #f5f7f3f5; }
+.results-preview { position: absolute; top: 0; right: 0; width: 34%; height: 100%; background-color: transparent; }
+.results-dialog h1 { font-size: 32dp; }
+.results-dialog .intro { margin-bottom: 12dp; }
+.result-score { font-size: 22dp; margin-bottom: 8dp; }
+.result-xp { margin: 4dp 0 14dp; font-size: 14dp; color: #496054; }
+.results-dialog table { font-size: 12dp; margin-bottom: 14dp; }
+.results-dialog th, .results-dialog td { padding: 6dp 7dp; }
+.result-actions button { padding: 8dp 12dp; }
+@media (max-width: 900dp) {
+  .menu-left { width: 100%; padding: 0 20dp; }
+  .preview-surface { display: none; }
+  .menu-layout { padding-top: 10dp; }
+  .navigation { width: 122dp; padding-right: 12dp; }
+  .content { padding-left: 16dp; }
+  .field label, .setting-row label { width: 108dp; }
+  select, .setting-row select, .text-input { width: 240dp; }
+  .stat-row .stat-track { width: 180dp; }
+  .results-dialog { width: 100%; padding: 20dp; }
+  .results-preview { display: none; }
+}
