@@ -63,6 +63,21 @@ int main(int argc,char** argv){
         glViewport(0,0,1024,1200);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         i=0;for(const auto& preset:CharacterPresets)panel(i++,test::RenderFixture(std::string("preset/")+preset.id),preset.style,"shooter","bomb");
         capture("preset-models.png");
+        // Exercise live state transitions through the same pose solver used by matches.
+        CharacterPose live(art.data(),art.data().rig(0,0,0),"live-forms","shooter");
+        live.setColor({1.0,.2541520943,.0069954102});
+        CharacterAnimState liveState;CharacterSceneInput liveScene;liveScene.inWorld=true;
+        glViewport(0,0,1024,1200);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        i=0;
+        for(const auto form:{CharacterForm::Kid,CharacterForm::Squid,CharacterForm::Swim,CharacterForm::Climb,CharacterForm::Kid}){
+            liveState.form=form;liveState.speed=form==CharacterForm::Swim?7:2;liveState.localMove={0,1};
+            for(int f=0;f<36;f++)live.update(1.0/60,liveState,liveScene);
+            const auto frame=live.frame();
+            if(form==CharacterForm::Kid?(!frame.kid.visible||frame.squid.visible):(frame.kid.visible||!frame.squid.visible))
+                throw std::runtime_error("Live dive/return selected the wrong character model");
+            panel(i++,frame,{},"shooter","bomb");
+        }
+        capture("live-dive-return.png");
         for(const auto& expected:test::TankFixtures){
             auto frame=test::RenderFixture("preset/rookie");frame.root.matrixOverride=true;frame.root.authoredMatrix=expected.root;
             const auto style=CharacterPresets.front().style;

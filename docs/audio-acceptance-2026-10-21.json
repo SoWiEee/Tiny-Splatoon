@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-21",
+  "command": "node tools/export-audio-source.mjs --check",
+  "exitCode": 0,
+  "sfx": 201,
+  "loopBeds": 31,
+  "tracks": {
+    "battle": {
+      "maxPcm16Lsb": 29,
+      "nrmseFullScale": 2.491e-05,
+      "correlation": 0.999999991519
+    },
+    "battle_final": {
+      "maxPcm16Lsb": 734,
+      "nrmseFullScale": 0.002533,
+      "correlation": 0.999916703003
+    },
+    "boss": {
+      "maxPcm16Lsb": 801,
+      "nrmseFullScale": 0.0022,
+      "correlation": 0.999938326789
+    },
+    "boss_2": {
+      "maxPcm16Lsb": 723,
+      "nrmseFullScale": 0.002204,
+      "correlation": 0.999940782327
+    },
+    "boss_3": {
+      "maxPcm16Lsb": 820,
+      "nrmseFullScale": 0.002157,
+      "correlation": 0.999945307038
+    },
+    "menu": {
+      "maxPcm16Lsb": 25,
+      "nrmseFullScale": 2.152e-05,
+      "correlation": 0.999999992229
+    },
+    "results_lose": {
+      "maxPcm16Lsb": 9,
+      "nrmseFullScale": 2.435e-05,
+      "correlation": 0.999999992744
+    },
+    "results_win": {
+      "maxPcm16Lsb": 17,
+      "nrmseFullScale": 2.156e-05,
+      "correlation": 0.999999991829
+    },
+    "title": {
+      "maxPcm16Lsb": 28,
+      "nrmseFullScale": 2.441e-05,
+      "correlation": 0.999999991149
+    }
+  },
+  "menuCalibration": "audio-menu-repeatability-2026-10-21.json",
+  "negativeControls": "one-frame shift, changed loop hash and changed frame count rejected"
+}

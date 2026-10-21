@@ -7,3 +7,5 @@
 *.obj
 *.pdb
 splat-ref/
+/assets/audio/songs/
+/assets/audio/custom-music.tsv

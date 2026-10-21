@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(Tiny-Splatoon VERSION 1.0 LANGUAGES CXX C)
+project(Tiny-Splatoon VERSION 0.7.0 LANGUAGES CXX C)
 
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # MSVC emits UTF-8 here; a system-codepage probe can corrupt Ninja's include prefix.
@@ -74,7 +74,7 @@ target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp
-    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp)
+    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp)
 target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals)
 
 target_link_libraries(Tiny-Splatoon PRIVATE 
@@ -97,6 +97,15 @@ set_property(TARGET Tiny-Splatoon APPEND PROPERTY LINK_DEPENDS ${TINY_RUNTIME_AS
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(stage_prop_animation_test tests/stage_prop_animation_test.cpp)
+    target_link_libraries(stage_prop_animation_test PRIVATE glm::glm)
+    add_test(NAME reference_stage_prop_animation COMMAND stage_prop_animation_test)
+    add_executable(environment_gpu_test tests/environment_gpu_test.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(environment_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
+    add_test(NAME reference_environment_gpu COMMAND environment_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/environment" "${CMAKE_BINARY_DIR}/captures/environment")
+    add_executable(device_visual_gpu_test tests/device_visual_gpu_test.cpp src/render/DeviceRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(device_visual_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
+    add_test(NAME reference_device_visual_gpu COMMAND device_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/devices" "${CMAKE_BINARY_DIR}/captures/devices")
     add_executable(character_footstep_test tests/character_footstep_test.cpp)
     target_link_libraries(character_footstep_test PRIVATE restoration_core)
     add_test(NAME reference_character_footstep COMMAND character_footstep_test)
@@ -254,13 +263,15 @@ if(BUILD_TESTING)
     add_executable(worldfx_eval tests/worldfx_eval.cpp src/render/WorldFxRecipes.cpp)
     target_link_libraries(worldfx_eval PRIVATE glm::glm)
 
-    add_executable(worldfx_gpu_test tests/worldfx_gpu_test.cpp src/render/WorldEffects.cpp src/render/WorldFxRecipes.cpp src/app/GpuPreference.cpp)
+    add_executable(worldfx_gpu_test tests/worldfx_gpu_test.cpp src/render/WorldEffects.cpp src/render/WorldFxRecipes.cpp src/render/DeviceRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(worldfx_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
     add_test(NAME reference_worldfx_gpu COMMAND worldfx_gpu_test)
     set_tests_properties(reference_worldfx_gpu PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
     find_program(REFERENCE_NODE_EXECUTABLE node)
     if(REFERENCE_NODE_EXECUTABLE)
+        add_test(NAME reference_custom_music_import COMMAND "${REFERENCE_NODE_EXECUTABLE}" --test tests/import_music.test.mjs)
+        set_tests_properties(reference_custom_music_import PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         add_test(NAME reference_boss_pose
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/boss_pose_oracle.test.mjs "$<TARGET_FILE:boss_pose_eval>")
         set_tests_properties(reference_boss_pose PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -286,6 +297,11 @@ if(BUILD_TESTING)
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/native_entry_cli.test.mjs "$<TARGET_FILE:Tiny-Splatoon>")
         set_tests_properties(reference_native_entry_cli PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/splat-ref/src/config.js")
+            add_test(NAME reference_environment_source_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-environment-source.mjs --check)
+            add_test(NAME reference_environment_scene_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-environment-scene.mjs --check)
+            add_test(NAME reference_device_visual_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-device-visuals.mjs --check)
+            set_tests_properties(reference_environment_source_export reference_environment_scene_export reference_device_visual_export
+                PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_boss_material_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-boss-materials.mjs --check)
             set_tests_properties(reference_boss_material_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_stage_visual_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/stage_visual_export.test.mjs)

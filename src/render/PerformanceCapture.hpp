@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <glad/glad.h>
+#include "GraphicsSettings.hpp"
 
 namespace restoration {
 
@@ -21,7 +22,7 @@ public:
     };
 
     PerformanceCapture(std::filesystem::path jsonPath, std::string stage, std::string mode, std::uint32_t seed,
-                       int width, int height, int warmupFrames = 120, int measuredFrames = 600);
+                       int width, int height, int warmupFrames = 120, int measuredFrames = 600, bool playerView = false,GraphicsSettings graphics=ForPreset(GraphicsPreset::High));
     ~PerformanceCapture();
     PerformanceCapture(const PerformanceCapture&) = delete;
     PerformanceCapture& operator=(const PerformanceCapture&) = delete;
@@ -45,10 +46,11 @@ private:
     std::uint32_t seed_;
     int width_, height_, warmupFrames_, measuredFrames_, frameIndex_ = 0;
     unsigned logicalCpus_ = 0;
-    bool inFrame_ = false, gpuOpen_ = false, written_ = false, nvxMemory_ = false;
+    bool inFrame_ = false, gpuOpen_ = false, written_ = false, nvxMemory_ = false, playerView_ = false;
     std::chrono::steady_clock::time_point frameStart_, captureStart_;
     std::vector<GLuint> queries_;
     std::vector<Frame> frames_;
+    GraphicsSettings graphics_;
 };
 
 } // namespace restoration

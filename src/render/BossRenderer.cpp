@@ -44,6 +44,7 @@ in vec4 vColor;out vec4 outColor;void main(){outColor=vColor;})GLSL";
 }
 
 struct BossRenderer::State {
+    bool environment=false;
     explicit State(std::filesystem::path path):assets(std::move(path)),pose(assets/"model.bin"){}
     std::filesystem::path assets;
     BossPose pose;
@@ -72,7 +73,7 @@ struct BossRenderer::State {
     }
     void loadShader(const std::string& name){
         const auto directory=assets/"shaders";
-        auto shader=std::make_unique<CharacterShader>(CharacterShader::readSource(directory/(name+".vert")),CharacterShader::readSource(directory/(name+".frag")),true);
+        auto shader=std::make_unique<CharacterShader>(CharacterShader::readSource(directory/(name+".vert")),CharacterShader::readSource(directory/(name+".frag")),true,environment);
         shader->use();std::ifstream defaults(directory/(name+".uniforms"));std::string key;std::size_t count;
         if(!defaults)throw std::runtime_error("Missing source Boss material defaults: "+name);
         while(defaults>>key>>count){if(!count||count>64)throw std::runtime_error("Invalid source Boss uniform shape: "+key);std::vector<double> values(count);for(auto& value:values)if(!(defaults>>value))throw std::runtime_error("Truncated source Boss material defaults: "+key);shader->uniform(key,values);}
@@ -133,7 +134,7 @@ struct BossRenderer::State {
     }
 };
 
-BossRenderer::BossRenderer(std::filesystem::path assets):state_(std::make_unique<State>(std::move(assets))){}
+BossRenderer::BossRenderer(std::filesystem::path assets,bool environment):state_(std::make_unique<State>(std::move(assets))){state_->environment=environment;}
 BossRenderer::~BossRenderer()=default;
 void BossRenderer::Update(BossSimulation& boss){state_->pose.Update(boss);}
 int BossRenderer::DrawShadow(const BossSimulation& boss,const glm::mat4& lightViewProjection){
@@ -150,11 +151,12 @@ int BossRenderer::DrawShadow(const BossSimulation& boss,const glm::mat4& lightVi
     if(depth)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);if(blend)glEnable(GL_BLEND);else glDisable(GL_BLEND);glDepthFunc(GL_LESS);glDepthMask(GL_TRUE);
     return static_cast<int>(state_->hull.meshes.size()+state_->crablet.meshes.size()*state_->pose.crablets().size());
 }
-int BossRenderer::Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const glm::vec3& squadColor){
+int BossRenderer::Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const glm::vec3& squadColor,const CharacterLightState* sceneLights){
     if(!boss.state().visible)return 0;state_->ensureGpu();const GLboolean depth=glIsEnabled(GL_DEPTH_TEST),cull=glIsEnabled(GL_CULL_FACE),blend=glIsEnabled(GL_BLEND);GLint oldProgram=0,oldVao=0,oldActive=0,textures[3]{};glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&oldVao);glGetIntegerv(GL_ACTIVE_TEXTURE,&oldActive);
     for(int i=0;i<3;++i){glActiveTexture(GL_TEXTURE6+i);glGetIntegerv(GL_TEXTURE_BINDING_2D,&textures[i]);}glActiveTexture(oldActive);
     glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDepthFunc(GL_LEQUAL);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);
     CharacterLightState lights;lights.ambient={.22f,.22f,.22f};lights.sunDirection=glm::normalize(glm::vec3(-.4f,.85f,.35f));lights.sunColor={1.0f,.92f,.82f};lights.skyDirection={0,1,0};lights.skyColor={.32f,.42f,.5f};lights.groundColor={.18f,.15f,.12f};
+    if(sceneLights)lights=*sceneLights;
     (void)squadColor;const glm::dmat4 viewD(view),projectionD(projection);const glm::dvec3 cameraD(camera);
     state_->drawModel(state_->hull,state_->pose.hullbreaker(),viewD,projectionD,cameraD,lights);
     for(const auto& crab:state_->pose.crablets()){

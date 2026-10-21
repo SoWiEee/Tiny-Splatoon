@@ -1,4 +1,5 @@
 #include "StageRenderer.hpp"
+#include "StagePropAnimation.hpp"
 #include "FacePaint.hpp"
 #include "PlayerSimulation.hpp"
 #include "StageGeometry.hpp"
@@ -45,7 +46,7 @@ struct GLStateGuard {
     GLint program=0,vao=0,arrayBuffer=0,drawFbo=0,readFbo=0,viewport[4]{},activeTexture=0;
     GLint blendSrcRgb=0,blendDstRgb=0,blendSrcAlpha=0,blendDstAlpha=0,blendEqRgb=0,blendEqAlpha=0;
     GLint depthFunc=GL_LESS,cullMode=GL_BACK,polygon[2]{GL_FILL,GL_FILL},unpack=4,pack=4,pixelPack=0,pixelUnpack=0;
-    GLint textureUnits[9]={0,1,2,3,4,5,6,7,8},textureBindings[9]{},arrayTextureBindings[9]{};
+    GLint textureUnits[10]={0,1,2,3,4,5,6,7,8,9},textureBindings[10]{},arrayTextureBindings[10]{};
     GLfloat clearColor[4]{},clearDepth=1.0f,polygonFactor=0.0f,polygonUnits=0.0f;
     GLboolean blend=GL_FALSE,depth=GL_FALSE,cull=GL_FALSE,scissor=GL_FALSE,sampleAlphaToCoverage=GL_FALSE,polygonOffsetFill=GL_FALSE,depthMask=GL_TRUE,colorMask[4]{GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE};
     GLStateGuard(){
@@ -62,13 +63,13 @@ struct GLStateGuard {
         blend=glIsEnabled(GL_BLEND);depth=glIsEnabled(GL_DEPTH_TEST);cull=glIsEnabled(GL_CULL_FACE);scissor=glIsEnabled(GL_SCISSOR_TEST);
         sampleAlphaToCoverage=glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE);polygonOffsetFill=glIsEnabled(GL_POLYGON_OFFSET_FILL);
         glGetIntegerv(GL_ACTIVE_TEXTURE,&activeTexture);
-        for(std::size_t i=0;i<9;++i){glActiveTexture(GL_TEXTURE0+textureUnits[i]);glGetIntegerv(GL_TEXTURE_BINDING_2D,&textureBindings[i]);glGetIntegerv(GL_TEXTURE_BINDING_2D_ARRAY,&arrayTextureBindings[i]);}
+        for(std::size_t i=0;i<10;++i){glActiveTexture(GL_TEXTURE0+textureUnits[i]);glGetIntegerv(GL_TEXTURE_BINDING_2D,&textureBindings[i]);glGetIntegerv(GL_TEXTURE_BINDING_2D_ARRAY,&arrayTextureBindings[i]);}
         glActiveTexture(activeTexture);
     }
     ~GLStateGuard(){
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER,drawFbo);glBindFramebuffer(GL_READ_FRAMEBUFFER,readFbo);glViewport(viewport[0],viewport[1],viewport[2],viewport[3]);
         glUseProgram(program);glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,arrayBuffer);
-        for(std::size_t i=0;i<9;++i){glActiveTexture(GL_TEXTURE0+textureUnits[i]);glBindTexture(GL_TEXTURE_2D,textureBindings[i]);glBindTexture(GL_TEXTURE_2D_ARRAY,arrayTextureBindings[i]);}
+        for(std::size_t i=0;i<10;++i){glActiveTexture(GL_TEXTURE0+textureUnits[i]);glBindTexture(GL_TEXTURE_2D,textureBindings[i]);glBindTexture(GL_TEXTURE_2D_ARRAY,arrayTextureBindings[i]);}
         glActiveTexture(activeTexture);glBlendFuncSeparate(blendSrcRgb,blendDstRgb,blendSrcAlpha,blendDstAlpha);glBlendEquationSeparate(blendEqRgb,blendEqAlpha);
         glDepthFunc(depthFunc);glCullFace(cullMode);glPolygonMode(GL_FRONT_AND_BACK,polygon[0]);
         glPolygonOffset(polygonFactor,polygonUnits);
@@ -91,7 +92,7 @@ std::vector<PackedMesh> readMeshPack(const std::filesystem::path& path){
     std::size_t head=8;const auto rawSize=readU32(bytes,head);if(!rawSize||rawSize>1024u*1024u*1024u)throw std::runtime_error("Invalid source stage visual payload length");
     std::vector<unsigned char> raw(rawSize);uLongf output=static_cast<uLongf>(raw.size());
     if(uncompress(raw.data(),&output,bytes.data()+head,static_cast<uLong>(bytes.size()-head))!=Z_OK||output!=raw.size())throw std::runtime_error("Cannot decompress source stage visual pack");
-    std::size_t p=0;const auto sections=readU32(raw,p);if(!sections||sections>32)throw std::runtime_error("Invalid source stage visual section count");
+    std::size_t p=0;const auto sections=readU32(raw,p);if(!sections||sections>4096)throw std::runtime_error("Invalid source stage visual section count");
     std::vector<PackedMesh> result;result.reserve(sections);
     for(std::uint32_t i=0;i<sections;++i){
         PackedMesh m;const auto n=readU16(raw,p);if(p+n>raw.size())throw std::runtime_error("Truncated source stage mesh section name");m.name.assign(raw.begin()+p,raw.begin()+p+n);p+=n;
@@ -149,13 +150,25 @@ GLenum depthFunction(int source){switch(source){case 0:return GL_NEVER;case 1:re
 
 struct StageRenderer::Source {
     static constexpr int atlasSize=4096;
-    struct GpuMesh { GLuint vao=0,vbo=0,ebo=0;GLsizei count=0;std::string shader;RenderState state;bool castsShadow=true;~GpuMesh(){if(ebo)glDeleteBuffers(1,&ebo);if(vbo)glDeleteBuffers(1,&vbo);if(vao)glDeleteVertexArrays(1,&vao);} };
+    struct AnimatedPiece {StagePropAnimation animation;std::vector<float> data;unsigned stride=11;};
+    struct GpuMesh {
+        GLuint vao=0,vbo=0,ebo=0;GLsizei count=0;std::string name,shader;RenderState state;bool castsShadow=true;
+        StagePropAnimation animation;
+        std::vector<float> rest;
+        std::vector<std::uint32_t> elements;
+        unsigned stride=0;
+        std::vector<AnimatedPiece> pieces;
+        double animatedAt=-1;
+        ~GpuMesh(){if(ebo)glDeleteBuffers(1,&ebo);if(vbo)glDeleteBuffers(1,&vbo);if(vao)glDeleteVertexArrays(1,&vao);}
+    };
     struct ShaderEntry { std::unique_ptr<CharacterShader> shader;std::vector<std::pair<std::string,std::vector<double>>> defaults;RenderState state; };
     struct Growing { VisualSplat splat;double age=0,dur=0,dripDur=0; };
     struct PaintVertex { float pos[2],local[3],splat[4],stretch[3],grow[4]; };
     std::filesystem::path root;
+    bool environment=false;
     std::string key;
     std::string stageId;
+    std::string uploadedTheme;
     std::vector<std::unique_ptr<GpuMesh>> meshes;
     std::map<std::string,ShaderEntry> shaders;
     std::map<std::string,std::filesystem::path> textureFiles;
@@ -169,7 +182,7 @@ struct StageRenderer::Source {
     double ppm=0;
     int usedHeight=0;
 
-    explicit Source(std::filesystem::path directory):root(std::move(directory)) {
+    explicit Source(std::filesystem::path directory,bool useEnvironment):root(std::move(directory)),environment(useEnvironment) {
         GLStateGuard state;
         GLint maxTexture=0;glGetIntegerv(GL_MAX_TEXTURE_SIZE,&maxTexture);if(maxTexture<atlasSize)throw std::runtime_error("Source stage ink atlas requires a 4096 texture size");
         GLuint vertex=0,fragment=0;
@@ -267,14 +280,15 @@ struct StageRenderer::Source {
         auto found=shaders.find(name);if(found!=shaders.end())return found->second;
         const std::string file=name=="level"?"level":"props-"+name.substr(6);
         const std::string defaults=name=="level"?"level-"+stageId:file;
-        ShaderEntry entry;entry.shader=std::make_unique<CharacterShader>(readText(root/"shaders"/(file+".vert")),readText(root/"shaders"/(file+".frag")),true);
+        ShaderEntry entry;entry.shader=std::make_unique<CharacterShader>(readText(root/"shaders"/(file+".vert")),readText(root/"shaders"/(file+".frag")),true,environment);
         entry.defaults=readUniforms(root/"shaders"/(defaults+".uniforms"));if(name!="level")entry.state=readRenderState(root/"shaders"/(file+".state"));
         return shaders.emplace(name,std::move(entry)).first->second;
     }
     std::unique_ptr<GpuMesh> makeMesh(const PackedMesh& mesh){
-        auto gpu=std::make_unique<GpuMesh>();gpu->shader=mesh.name=="stage"?"level":mesh.name.substr(0,6)=="props."?mesh.name:"";
+        auto gpu=std::make_unique<GpuMesh>();gpu->name=mesh.name;gpu->shader=mesh.name=="stage"?"level":mesh.name.substr(0,6)=="props."?mesh.name.substr(0,mesh.name.find_first_of("@~")):"";
+        if(mesh.name.find('@')!=std::string::npos){gpu->rest=mesh.data;gpu->elements=mesh.elements;gpu->stride=mesh.stride;}
         if(gpu->shader.empty())throw std::runtime_error("Unknown source stage mesh section: "+mesh.name);
-        auto& shader=getShader(gpu->shader);gpu->state=shader.state;gpu->castsShadow=gpu->shader!="props.glow"&&gpu->shader!="props.blob";glGenVertexArrays(1,&gpu->vao);glBindVertexArray(gpu->vao);
+        auto& shader=getShader(gpu->shader);gpu->state=shader.state;gpu->castsShadow=mesh.name.find("~ns")==std::string::npos&&gpu->shader!="props.glow"&&gpu->shader!="props.blob";glGenVertexArrays(1,&gpu->vao);glBindVertexArray(gpu->vao);
         glGenBuffers(1,&gpu->vbo);glBindBuffer(GL_ARRAY_BUFFER,gpu->vbo);glBufferData(GL_ARRAY_BUFFER,mesh.data.size()*sizeof(float),mesh.data.data(),GL_STATIC_DRAW);
         glGenBuffers(1,&gpu->ebo);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,gpu->ebo);glBufferData(GL_ELEMENT_ARRAY_BUFFER,mesh.elements.size()*sizeof(std::uint32_t),mesh.elements.data(),GL_STATIC_DRAW);
         const std::size_t stride=mesh.stride*sizeof(float);
@@ -289,8 +303,21 @@ struct StageRenderer::Source {
     }
     void load(const StageData& stage){
         const std::string requested=std::string(stage.id)+"-"+std::string(stage.mode);if(key==requested)return;
+        uploadedTheme=std::string(stage.theme);
         GLStateGuard state;meshes.clear();for(auto& [_,entry]:shaders)entry.shader.reset();shaders.clear();stageId=std::string(stage.id);loadMural(stageId);const auto packed=readMeshPack(root/(requested+".stg.z"));
         bool haveStage=false;for(const auto& data:packed){if(data.name=="stage")haveStage=true;meshes.push_back(makeMesh(data));}
+        std::ifstream animationFile(root/(requested+".anim"));
+        if(!animationFile)throw std::runtime_error("Missing source stage animation metadata: "+requested);
+        std::string name;
+        while(animationFile>>name){
+            const auto found=std::find_if(meshes.begin(),meshes.end(),[&](const auto& m){return m->name==name;});
+            if(found==meshes.end())throw std::runtime_error("Source prop animation references missing mesh: "+name);
+            auto& a=(*found)->animation;
+            if(!(animationFile>>a.kind>>a.speed>>a.phase>>a.rate>>a.lo>>a.hi)||
+                (a.kind!="y"&&a.kind!="z"&&a.kind!="blink"&&a.kind!="cloth"))throw std::runtime_error("Invalid source prop animation: "+name);
+            for(int c=0;c<4;c++)for(int r=0;r<4;r++)if(!(animationFile>>a.base[c][r])||!std::isfinite(a.base[c][r]))throw std::runtime_error("Invalid source prop animation matrix");
+        }
+        batchAnimations();
         if(!haveStage||meshes.empty())throw std::runtime_error("Source stage visual pack has no level geometry: "+requested);
         key=requested;usedHeight=0;ppm=0;atlasRects.clear();growing.clear();clock=dryAcc=0;clearInk();
     }
@@ -338,15 +365,50 @@ struct StageRenderer::Source {
         shader.uniform("directionalLightShadows[0].shadowRadius",shadow->radius());
         shader.uniform("directionalLightShadows[0].shadowMapSize",std::vector<double>{static_cast<double>(shadow->size()),static_cast<double>(shadow->size())});
     }
-    int draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,bool wireframe,const DirectionalShadow* shadow){
+    void animate(GpuMesh& mesh){
+        if(!mesh.pieces.empty()){
+            if(mesh.animatedAt==clock)return;
+            std::vector<float> data;
+            for(const auto& piece:mesh.pieces){
+                const auto matrix=glm::mat4(piece.animation.matrix(clock));const auto normal=glm::transpose(glm::inverse(glm::mat3(matrix)));
+                const float brightness=static_cast<float>(piece.animation.brightness(clock));
+                for(std::size_t i=0;i<piece.data.size();i+=piece.stride){
+                    glm::vec3 p(piece.data[i],piece.data[i+1],piece.data[i+2]),n(piece.data[i+3],piece.data[i+4],piece.data[i+5]);
+                    if(piece.animation.kind=="cloth")piece.animation.cloth(clock,piece.data[i+11],{piece.data[i+12],piece.data[i+13],piece.data[i+14]},p,n);
+                    p=glm::vec3(matrix*glm::vec4(p,1));n=glm::normalize(normal*n);
+                    data.insert(data.end(),{p.x,p.y,p.z,n.x,n.y,n.z,piece.data[i+6]*brightness,piece.data[i+7]*brightness,piece.data[i+8]*brightness,piece.data[i+9],piece.data[i+10]});
+                }
+            }
+            glBindBuffer(GL_ARRAY_BUFFER,mesh.vbo);glBufferSubData(GL_ARRAY_BUFFER,0,data.size()*sizeof(float),data.data());mesh.animatedAt=clock;return;
+        }
+    }
+    void batchAnimations(){
+        struct Batch {PackedMesh mesh;std::vector<AnimatedPiece> pieces;};std::map<std::string,Batch> batches;
+        for(const auto& mesh:meshes){
+            if(mesh->animation.kind.empty())continue;auto& batch=batches[mesh->shader];batch.mesh.name=mesh->shader;batch.mesh.stride=11;
+            AnimatedPiece piece{mesh->animation,mesh->rest,mesh->stride};
+            const auto vertices=static_cast<unsigned>(mesh->rest.size()/mesh->stride);
+            for(std::size_t i=0;i<mesh->rest.size();i+=mesh->stride)batch.mesh.data.insert(batch.mesh.data.end(),mesh->rest.begin()+i,mesh->rest.begin()+i+11);
+            for(const auto index:mesh->elements)batch.mesh.elements.push_back(batch.mesh.vertices+index);
+            batch.mesh.vertices+=vertices;batch.mesh.indices+=static_cast<unsigned>(mesh->elements.size());batch.pieces.push_back(std::move(piece));
+        }
+        meshes.erase(std::remove_if(meshes.begin(),meshes.end(),[](const auto& m){return !m->animation.kind.empty();}),meshes.end());
+        for(auto& [_,batch]:batches){auto gpu=makeMesh(batch.mesh);gpu->pieces=std::move(batch.pieces);gpu->castsShadow=gpu->shader!="props.blink";meshes.push_back(std::move(gpu));}
+    }
+    int draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,bool wireframe,const DirectionalShadow* shadow,bool reflection=false){
         if(meshes.empty())return 0;
         GLStateGuard state;int draws=0;
         glPolygonMode(GL_FRONT_AND_BACK,wireframe?GL_LINE:GL_FILL);
         for(bool transparentPass:{false,true})for(const auto& mesh:meshes){
             if(mesh->state.transparent!=transparentPass)continue;
+            if(reflection&&(mesh->shader=="props.glow"||mesh->shader=="props.blink"||mesh->shader=="props.cloth"||mesh->shader=="props.fence"||mesh->shader=="props.blob"||mesh->shader=="props.foliage"||!mesh->pieces.empty()))continue;
             auto& entry=getShader(mesh->shader);auto& shader=*entry.shader;shader.use();
+            shader.uniform("iwDepthOnly",0);
             for(const auto& [name,value]:entry.defaults)shader.uniform(name,value);
-            shader.lights(lights,view);shader.matrices(glm::dmat4(1.0),view,projection,eye);applyShadow(entry,shadow);bindCommonTextures(entry,mesh->shader=="level",mesh->shader,shadow);
+            animate(*mesh);
+            shader.lights(lights,view);shader.matrices(mesh->animation.matrix(clock),view,projection,eye);applyShadow(entry,shadow);bindCommonTextures(entry,mesh->shader=="level",mesh->shader,shadow);
+            if(mesh->animation.kind=="blink")shader.uniform("diffuse",std::vector<double>(3,mesh->animation.brightness(clock)));
+            if(mesh->shader=="props.glow")shader.uniform("diffuse",std::vector<double>(3,uploadedTheme=="sunset"?1.0:.5));
             glDepthMask(mesh->state.depthWrite?GL_TRUE:GL_FALSE);if(mesh->state.depthTest)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);
             glDepthFunc(depthFunction(mesh->state.depthFunc));
             if(mesh->state.side==2)glDisable(GL_CULL_FACE);else{glEnable(GL_CULL_FACE);glCullFace(mesh->state.side==1?GL_FRONT:GL_BACK);}
@@ -366,8 +428,10 @@ struct StageRenderer::Source {
         for(const auto& mesh:meshes){
             if(!mesh->castsShadow)continue;
             auto& entry=getShader(mesh->shader);auto& shader=*entry.shader;shader.use();
+            shader.uniform("iwDepthOnly",1);
             for(const auto& [name,value]:entry.defaults)shader.uniform(name,value);
-            shader.lights(lights,identity);shader.matrices(identity,identity,lightViewProjection,eye);applyShadow(entry,nullptr);bindCommonTextures(entry,mesh->shader=="level",mesh->shader,nullptr);
+            animate(*mesh);
+            shader.lights(lights,identity);shader.matrices(mesh->animation.matrix(clock),identity,lightViewProjection,eye);applyShadow(entry,nullptr);bindCommonTextures(entry,mesh->shader=="level",mesh->shader,nullptr);
             glBindVertexArray(mesh->vao);glDrawElements(GL_TRIANGLES,mesh->count,GL_UNSIGNED_INT,nullptr);++draws;
         }
         glBindVertexArray(0);return draws;
@@ -438,7 +502,7 @@ struct StageRenderer::Source {
     }
 };
 
-StageRenderer::StageRenderer(std::filesystem::path stageAssets):stageAssets_(std::move(stageAssets)) {
+StageRenderer::StageRenderer(std::filesystem::path stageAssets,bool environment):stageAssets_(std::move(stageAssets)),environment_(environment) {
         const char* vs = R"GLSL(#version 450 core
 layout(location=0) in vec3 p;
 layout(location=1) in vec3 n;
@@ -531,7 +595,7 @@ void StageRenderer::Load(const StageData& stage, int display, const FacePaint& p
         GLStateGuard state;
         display_=display;
         if(display==0){
-            if(!source_)source_=std::make_unique<Source>(stageAssets_);
+            if(!source_)source_=std::make_unique<Source>(stageAssets_,environment_);
             source_->load(stage);
             vertices=0;
             uploadedStage=nullptr;uploadedGrid.clear();
@@ -700,8 +764,8 @@ int StageRenderer::Draw(const glm::mat4& vp, const glm::vec3& eye, bool wirefram
         return vertices > 0 ? 1 : 0;
     }
 int StageRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,
-                        bool wireframe,const DirectionalShadow* shadow) {
-        if(display_==0&&source_&&!source_->meshes.empty())return source_->draw(view,projection,eye,lights,wireframe,shadow);
+                        bool wireframe,const DirectionalShadow* shadow,bool reflection) {
+        if(display_==0&&source_&&!source_->meshes.empty())return source_->draw(view,projection,eye,lights,wireframe,shadow,reflection);
         const glm::mat4 vp=glm::mat4(projection*view);const glm::vec3 camera(eye);
         return Draw(vp,camera,wireframe,true,shadow);
     }

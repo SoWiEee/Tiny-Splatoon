@@ -13,6 +13,8 @@ namespace restoration {
 class CombatWorld;
 class CharacterData;
 struct WorldVisualEvent;
+struct CharacterLightState;
+class DeviceRenderer;
 
 // fx.js' short-lived pools and specials.js' persistent world visuals, drawn inside the HDR scene.
 class WorldEffects {
@@ -26,7 +28,8 @@ public:
     WorldEffects(const WorldEffects&) = delete;
     WorldEffects& operator=(const WorldEffects&) = delete;
     void Update(double dt, CombatWorld& world, glm::dvec3 camera);
-    int Draw(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camera);
+    int Draw(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camera,const CharacterLightState* lights=nullptr);
+    void SetDeviceRenderer(DeviceRenderer* models){models_=models;}
     void Clear();
     Counts counts() const;
     const std::vector<Item>& liveItems() const { return live_; }
@@ -46,7 +49,8 @@ private:
     void initSourceGpu();
     struct GpuMesh;
     const GpuMesh& sourceMesh(const char* kind, const char* role);
-    int drawSourceItems(const glm::mat4& view, const glm::mat4& projection);
+    int drawSourceItems(const glm::mat4& view, const glm::mat4& projection,const glm::vec3& camera,const CharacterLightState* lights);
+    DeviceRenderer* models_=nullptr;
     const CharacterData* data_ = nullptr;
     std::vector<Item> live_, world_;
     std::vector<WorldVisualEvent> lastEvents_;

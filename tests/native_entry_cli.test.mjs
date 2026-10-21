@@ -14,6 +14,8 @@ for (const args of [
   ['--benchmark-report', 'unused.json'],
   ['--benchmark-warmup', '0'],
   ['--benchmark-frames', '1'],
+  ['--benchmark-camera', 'player'],
+  ['--graphics-quality', 'low'],
 ]) {
   test(`native menu rejects conflicting ${args[0]} before creating a window`, () => {
     const result = spawnSync(executable, ['--native', ...args], { encoding: 'utf8', timeout: 10000 });
@@ -25,6 +27,9 @@ for (const args of [
 }
 
 for (const [args, message] of [
+  [['--reference-match', 'tidewater', '--graphics-quality', 'invalid'], /must be low, medium or high/],
+  [['--reference-match', 'tidewater', '--benchmark-camera', 'invalid'], /must be player or overview/],
+  [['--reference-match', 'tidewater', '--benchmark-camera', 'player'], /requires --benchmark-report/],
   [['--reference-boss', 'tidewater', '--duration', '120'], /Boss duration must be/],
   [['--reference-boss', 'tidewater', '--duration', '240junk'], /Boss duration must be/],
   [['--reference-match', 'tidewater', '--duration', '240'], /--duration requires a Boss match/],

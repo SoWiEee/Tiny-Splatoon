@@ -34,6 +34,11 @@ int main(){
             return int(pixel[0]);
         };
         const int gray=render(.18f,0,false,false,neutral,{});
+        pipeline.Configure(0,false,false);pipeline.Begin(32,32,projection,glm::mat4(1),.1f,100);
+        glClearColor(.18f,.18f,.18f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);pipeline.End(neutral,{},64,64);
+        GLint scaledViewport[4]{};glGetIntegerv(GL_VIEWPORT,scaledViewport);
+        std::array<unsigned char,4> scaledPixel{};glReadPixels(48,48,1,1,GL_RGBA,GL_UNSIGNED_BYTE,scaledPixel.data());
+        if(scaledViewport[2]!=64||scaledViewport[3]!=64||std::abs(int(scaledPixel[0])-gray)>1)throw std::runtime_error("Render scale did not upscale to the full output framebuffer");
         // Source Neutral subtracts .04 above .08; sRGB(.18-.04) is 104.56/255.
         if(std::abs(gray-105)>2)throw std::runtime_error("Neutral/sRGB color path differs from source: "+std::to_string(gray));
         const int msaa=render(.18f,4,true,false,neutral,{},79,53);

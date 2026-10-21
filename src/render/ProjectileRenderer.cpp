@@ -36,9 +36,10 @@ struct ProjectileRenderer::Impl {
     std::vector<ShooterProjectile> custom;
     std::map<std::string,std::unique_ptr<Part>> parts;
     std::filesystem::path assets;
-    explicit Impl(const std::filesystem::path& assets)
-      :blobShader(CharacterShader::readSource(assets/"blob.vert"),CharacterShader::readSource(assets/"blob.frag"),true),
-       ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),assets(assets) {
+    bool environment=false;
+    explicit Impl(const std::filesystem::path& assets,bool environment)
+      :blobShader(CharacterShader::readSource(assets/"blob.vert"),CharacterShader::readSource(assets/"blob.frag"),true,environment),
+       ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),assets(assets),environment(environment) {
         std::ifstream file(assets/"blob.bin",std::ios::binary);
         char magic[8]{};std::uint32_t vertices=0,indices=0;
         file.read(magic,8);file.read(reinterpret_cast<char*>(&vertices),4);file.read(reinterpret_cast<char*>(&indices),4);
@@ -96,7 +97,7 @@ struct ProjectileRenderer::Impl {
     Part& part(const std::string& name) {
         auto found=parts.find(name);if(found!=parts.end())return *found->second;
         auto p=std::make_unique<Part>();
-        p->shader=std::make_unique<CharacterShader>(CharacterShader::readSource(assets/(name+".vert")),CharacterShader::readSource(assets/(name+".frag")),true);
+        p->shader=std::make_unique<CharacterShader>(CharacterShader::readSource(assets/(name+".vert")),CharacterShader::readSource(assets/(name+".frag")),true,environment);
         std::ifstream file(assets/(name+".bin"),std::ios::binary);char magic[8];std::uint32_t nv=0,ni=0;
         file.read(magic,8);file.read(reinterpret_cast<char*>(&nv),4);file.read(reinterpret_cast<char*>(&ni),4);
         if(!file||std::string(magic,8)!="TSGEOM01"||!nv||nv>1000000||ni>6000000||ni%3)throw std::runtime_error("Invalid source projectile part: "+name);
@@ -114,7 +115,7 @@ struct ProjectileRenderer::Impl {
         return *parts.emplace(name,std::move(p)).first->second;
     }
 };
-ProjectileRenderer::ProjectileRenderer(const std::filesystem::path& assets):impl_(std::make_unique<Impl>(assets)){}
+ProjectileRenderer::ProjectileRenderer(const std::filesystem::path& assets,bool environment):impl_(std::make_unique<Impl>(assets,environment)){}
 ProjectileRenderer::~ProjectileRenderer()=default;
 const std::vector<ProjectileBlob>& ProjectileRenderer::blobs()const{return impl_->blobs;}
 std::size_t ProjectileRenderer::ribbons()const{return impl_->beams.size()+impl_->sights.size();}

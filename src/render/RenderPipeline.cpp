@@ -114,7 +114,7 @@ void RenderPipeline::Begin(int w,int h,const glm::mat4& p,const glm::mat4& world
     s.resize(w,h);s.projection=p;s.world=world;s.nearPlane=nearPlane;s.farPlane=farPlane;s.active=true;
     s.target(s.scene);glDisable(GL_FRAMEBUFFER_SRGB);glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);
 }
-int RenderPipeline::End(const GradeSettings& g,const ScreenEffects& f){
+int RenderPipeline::End(const GradeSettings& g,const ScreenEffects& f,int outputWidth,int outputHeight){
     auto& s=*state_;if(!s.active)throw std::logic_error("No HDR frame to resolve");
     glBindFramebuffer(GL_READ_FRAMEBUFFER,s.scene.fbo);glBindFramebuffer(GL_DRAW_FRAMEBUFFER,s.resolved.fbo);
     glBlitFramebuffer(0,0,s.width,s.height,0,0,s.width,s.height,GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,GL_NEAREST);
@@ -152,7 +152,7 @@ int RenderPipeline::End(const GradeSettings& g,const ScreenEffects& f){
     v4("uEdgeInk",f.edgeInk);v4("uAura",f.aura);v4("uHeart",f.heart);e.uniform("uHurt",f.hurt);v4("uUrgency",f.urgency);v4("uSwim",f.swim);e.uniform("uFocus",f.focus);v4("uShimmer",f.shimmer);v4("uFlood",f.flood);e.uniform("uFloodDrip",f.floodDrip);e.uniform("uFloodClear",f.floodClear);e.uniform("uHole",f.hole);v3("uHoleRim",f.holeRim);v4("uFlash",f.flash);e.uniform("uDesat",f.desaturation);e.uniform("uSat",f.saturation);v4("uKill",f.kill);v4("uCharge",f.charge);s.draw();draws++;
     current=effected.color;
     }
-    glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,s.width,s.height);s.output->use();bindTexture(*s.output,"tDiffuse",current,0);s.output->uniform("toneMappingExposure",1.);s.draw();draws++;
+    glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,outputWidth>0?outputWidth:s.width,outputHeight>0?outputHeight:s.height);s.output->use();bindTexture(*s.output,"tDiffuse",current,0);s.output->uniform("toneMappingExposure",1.);s.draw();draws++;
     glActiveTexture(GL_TEXTURE0);s.active=false;return draws;
 }
 }

@@ -432,7 +432,7 @@ void CombatWorld::explodeDevice(CombatDevice& d,PlayerSimulation* direct) {
     d.exploding=true;
     const auto& sub=GetEquipment(EquipmentCategory::Sub,d.kind);
     if(d.kind=="scan" || d.kind=="mist" || d.kind=="curtain" || d.kind=="sprinkler" || d.kind=="beacon") { d.live=false;return; }
-    emitVisual({"explosion",d.pos,{0,1,0},sub.number("radius",2.4),d.team});
+    emitVisual({"explosion",d.pos,{0,1,0},sub.number("radius",2.4),d.team,0,.08,0,d.kind});
     if(d.kind=="waddle") {
         const auto center=d.pos+glm::dvec3(0,0.25,0);
         guardActorsWithCanopies(center,sub.number("radius"),d.team);

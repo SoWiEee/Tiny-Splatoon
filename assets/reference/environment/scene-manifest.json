@@ -1,0 +1,88 @@
+{
+  "source": "c359eeef59c83a9937ebf14e18a2d2711e59a17f6af97484af836cf9779c6bb5",
+  "materials": [
+    "0e65d561409339fb699f",
+    "15e2126c70605b75686f",
+    "19ef85aa5810773b1426",
+    "1f4c54b642bb69fb184b",
+    "280691ce066cd0f6b29a",
+    "2dc8507ed1749d9ed8b9",
+    "457138d67eab5c2bf1df",
+    "4d6451f2ca8424d5005f",
+    "5888fd8dfba68ca2d0a0",
+    "59997ea8984044e099ef",
+    "67c4ef3839bb7f14b011",
+    "7adb70ab74f19558af59",
+    "7c280cef2a1ddac0ba1b",
+    "7c5cf1dee659d1b9b7a3",
+    "93ae238cf3a1fc83f4f3",
+    "9ffb5ca4036f05934b65",
+    "a6b3c37448ec0ee96525",
+    "aeed30fa7b48e0175c01",
+    "b700fbf02a10d78c0700",
+    "bbd634e9fb9749c6ac31",
+    "d891f1066a9beeb28cd9",
+    "d923a9e9e2c146e0e842",
+    "f6059b7fe18e86150393",
+    "f951d1751f2fd48b8cbc",
+    "fd05e7176bf28d8410c6"
+  ],
+  "stages": [
+    {
+      "id": "tidewater",
+      "meshes": 14,
+      "instances": 383,
+      "waterContours": 0,
+      "sha256": "d7cb80ea331ed46aa7608ca1a92824255cb42ada45f839fca26b35e455c2a41d"
+    },
+    {
+      "id": "kelpline",
+      "meshes": 11,
+      "instances": 534,
+      "waterContours": 0,
+      "sha256": "19658a4599e745dbd34ae1737d83c7319432be67bd85b36b675cef659aa9b5d1"
+    },
+    {
+      "id": "halyard",
+      "meshes": 12,
+      "instances": 233,
+      "waterContours": 13750,
+      "sha256": "8af4b095cfa76dd4f2d8e4ffc2be469676224d6439d2aa5821de0f96dd19ebd6"
+    },
+    {
+      "id": "saltpan",
+      "meshes": 14,
+      "instances": 415,
+      "waterContours": 0,
+      "sha256": "1a2921a171486803b06cb006ce8455d9afb070fd4e2ad166e417cb0fdd7be75e"
+    },
+    {
+      "id": "crossmarket",
+      "meshes": 14,
+      "instances": 383,
+      "waterContours": 0,
+      "sha256": "4f81a47c57d8036f89f03ac162776c15b0653fa08868706c561fb0e882f99a67"
+    },
+    {
+      "id": "lockgate",
+      "meshes": 11,
+      "instances": 190,
+      "waterContours": 680,
+      "sha256": "2176490069a37fc2b3925c29415254392f9e8bc2d45cdd49993f8a20295a7069"
+    },
+    {
+      "id": "terraces",
+      "meshes": 14,
+      "instances": 453,
+      "waterContours": 0,
+      "sha256": "5fcbbf2321805f842b939f18cb4fb4a0026ddf26b8453659c0af8ec6564a4b8f"
+    },
+    {
+      "id": "cargo",
+      "meshes": 11,
+      "instances": 534,
+      "waterContours": 0,
+      "sha256": "19658a4599e745dbd34ae1737d83c7319432be67bd85b36b675cef659aa9b5d1"
+    }
+  ]
+}

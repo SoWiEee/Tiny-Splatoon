@@ -2,7 +2,7 @@
   "version": 1,
   "source": {
     "splat-ref/src/boss/bossMats.js": "c20add43b9744f70b4cbf3c53d07968156821e370b956e7c1ba14931c0daa982",
-    "tools/export-character-shaders.mjs": "d35cc5579f9ce3d48d9f1ace816acfc254322a02663581595c30af74cc841f2a"
+    "tools/export-character-shaders.mjs": "d45c5c4012c9bcbd270fb1da7c2aa8e542bbfe8f532ef5f8c50d66e56d24884f"
   },
   "stencil": {
     "file": "stencil.tex.z",

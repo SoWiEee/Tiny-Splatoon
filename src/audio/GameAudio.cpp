@@ -56,6 +56,8 @@ const char* WeaponSound(const PlayerSimulation& actor) {
     if (kind == "roller" || kind == "brush") return "roller_flick";
     if (kind == "bow") return "bow_loose";
     if (kind == "blade") return "blade_swish";
+    if (kind == "brolly") return "brolly_blast";
+    if (kind == "mitts") return "mitts_punch";
     return "shoot_shooter";
 }
 const char* SubThrowSound(const PlayerSimulation& actor) {
@@ -66,8 +68,8 @@ const char* SubThrowSound(const PlayerSimulation& actor) {
         if (special.kind == "blower") return "bubble_release";
     }
     const auto& sub = actor.subId();
-    if (sub == "seeker") return "torpedo_throw";
-    if (sub == "tracer") return "tracer_hit";
+    if (sub == "tracer") return "tracer_zap";
+    if (sub == "boomerang") return "boomerang_throw";
     if (sub == "torpedo") return "torpedo_throw";
     return "bomb_throw";
 }
@@ -141,7 +143,7 @@ void GameAudio::ActorTrigger(PlayerSimulation& actor, const CharacterTrigger& ev
         const char* sound = kind == "bow" ? "bow_loose" : kind == "charger" ? "shoot_charger" : "shoot_splatling";
         Play(sound, &actor, 0.65, std::clamp(1.08 - 0.16 * amount, 0.8, 1.15)); return;
     }
-    if (event.name == "throw") { Play(SubThrowSound(actor), &actor); return; }
+    if (event.name == "throw") { Play(SubThrowSound(actor), &actor);if(actor.subId()=="torpedo")Play("bomb_throw",&actor,.6,.92);return; }
     if (event.name == "flick") { Play("roller_flick", &actor, 0.8, event.side < 0 ? 1.08 : 1.0); return; }
     if (event.name == "slosh") { Play("slosh_throw", &actor, 0.65); return; }
     if (event.name == "blade_slash") { Play("blade_swish", &actor, 0.55, event.side < 0 ? 1.09 : 1.0); return; }
@@ -174,6 +176,10 @@ void GameAudio::BeginMatch(MatchSimulation& match) {
 void GameAudio::StopLoops() {
     for (const auto& [actor, loop] : actorLoops_) engine_.StopLoop(loop.key, 0.2);
     actorLoops_.clear();
+    for (const auto& [actor, loop] : weaponLoops_) engine_.StopLoop(loop.key, 0.2);
+    weaponLoops_.clear();
+    for(const auto& [id,state]:deviceStates_)if(!state.loop.empty())engine_.StopLoop("device:"+std::to_string(id),.15);
+    deviceStates_.clear();
     for (const auto* key : {"boss:sweep", "boss:gallop", "boss:frenzy", "boss:dizzy"}) engine_.StopLoop(key, 0.2);
     bossLoop_.clear();
 }
@@ -203,6 +209,23 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
     const bool specialReady = actor.state.specialCharge >= specialCost;
     auto [stateIt, inserted] = actorStates_.try_emplace(&actor);
     auto& previous = stateIt->second;
+    const auto combat=actor.combatPose();
+    const auto canopy=combat.canopyState;
+    if(!inserted&&actor.mainId()=="brolly"&&previous.canopy!=canopy&&!resumeLoops_){
+        if(canopy=="ready"&&actor.state.alive)Play("brolly_regrow",&actor,.6);
+        else if(canopy=="launched")Play("brolly_launch",&actor,.8);
+        else if(canopy=="broken")Play("brolly_break",&actor,.8);
+    }
+    if(!inserted&&actor.mainId()=="brolly"&&!resumeLoops_){
+        if(previous.canopyOpen<=0&&combat.canopyOpen>0)Play("brolly_open",&actor,.6);
+        else if(previous.canopyOpen>.4&&combat.canopyOpen<previous.canopyOpen&&canopy=="ready")Play("brolly_close",&actor,.5);
+        if(canopy!="broken"&&previous.canopyHp>combat.canopyHp+.01){
+            const double damage=previous.canopyHp-combat.canopyHp;
+            Play("brolly_hit",&actor,std::clamp(.35+damage/90.,.35,.9)*(actor.isLocal()?.8:.65),damage>60?.8:1.);
+        }
+    }
+    previous.canopy=canopy;
+    previous.canopyOpen=combat.canopyOpen;previous.canopyHp=combat.canopyHp;
     if (inserted) {
         previous.alive = actor.state.alive;
         previous.squid = actor.state.squid;
@@ -210,6 +233,9 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
         previous.specialReady = specialReady;
         previous.specialActive = pose.active;
         previous.specialKind = pose.kind;
+        previous.bowRingEvents = combat.bowRingEvents;
+        previous.chargeFull = combat.charging && combat.charge >= 0.999;
+        previous.streaming = combat.streaming;
     } else {
         if (previous.alive && !actor.state.alive) {
             Play(actor.isLocal() ? "splatted_self" : (actor.team() == match_->local().team() ? "ally_splatted" : "splat_enemy"), &actor);
@@ -226,12 +252,67 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
         } else if (previous.specialActive && !pose.active && actor.state.alive) {
             Play("special_end", &actor, 0.7);
         }
+        const auto kind = actor.weaponProfile().kind;
+        if (!resumeLoops_) {
+            if (kind == "bow") {
+                if (previous.bowRingEvents < 1 && combat.bowRingEvents >= 1 && actor.isLocal()) Play("bow_ring1", &actor, 0.65);
+                if (previous.bowRingEvents < 2 && combat.bowRingEvents >= 2 && actor.isLocal()) Play("bow_full", &actor, 0.7);
+            }
+            if (!previous.chargeFull && combat.charging && combat.charge >= 0.999) {
+                if (kind == "charger" && actor.isLocal()) Play("charger_full", &actor, 0.7);
+                else if (kind == "spinner" && actor.isLocal()) Play("splatling_ready", &actor, 0.7);
+                else if (kind == "blade" && (actor.isLocal() || !hasListenerPosition_ || DistanceSquared(Position(actor.state.pos), listenerPosition_) <= 40.0 * 40.0))
+                    Play("blade_ready", &actor, actor.isLocal() ? 0.6 : 0.4);
+                else if (kind == "mitts" && (actor.isLocal() || !hasListenerPosition_ || DistanceSquared(Position(actor.state.pos), listenerPosition_) <= 40.0 * 40.0))
+                    Play("mitts_full", &actor, actor.isLocal() ? 0.6 : 0.4);
+            }
+            if (kind == "spinner" && previous.streaming && !combat.streaming && actor.state.alive)
+                Play("splatling_wind", &actor, actor.isLocal() ? 0.6 : 0.42);
+        }
         previous.alive = actor.state.alive;
         previous.squid = actor.state.squid;
         previous.lowInk = lowInk;
         previous.specialReady = specialReady;
         previous.specialActive = pose.active;
         previous.specialKind = pose.kind;
+        previous.bowRingEvents = combat.bowRingEvents;
+        previous.chargeFull = combat.charging && combat.charge >= 0.999;
+        previous.streaming = combat.streaming;
+    }
+
+    const auto kind = actor.weaponProfile().kind;
+    const bool nearActor = actor.isLocal() || !hasListenerPosition_ ||
+        DistanceSquared(Position(actor.state.pos), listenerPosition_) <= 40.0 * 40.0;
+    std::string desiredWeapon;
+    if (actor.state.alive && nearActor && combat.charging) {
+        if (kind == "charger") desiredWeapon = "charger_charge";
+        else if (kind == "spinner") desiredWeapon = "splatling_spin";
+        else if (kind == "bow") desiredWeapon = "bow_draw";
+        else if (kind == "blade") desiredWeapon = "blade_charge";
+        else if (kind == "mitts") desiredWeapon = "mitts_charge";
+    }
+    if (actor.state.alive && nearActor && kind == "spinner" && combat.streaming) desiredWeapon = "splatling_spin";
+    auto weaponLoop = weaponLoops_.find(&actor);
+    if (weaponLoop != weaponLoops_.end() && weaponLoop->second.cue != desiredWeapon) {
+        engine_.StopLoop(weaponLoop->second.key, 0.18);
+        weaponLoops_.erase(weaponLoop);
+        weaponLoop = weaponLoops_.end();
+    }
+    if (!desiredWeapon.empty()) {
+        const std::string key = "weapon:" + std::to_string(reinterpret_cast<std::uintptr_t>(&actor)) + ':' + desiredWeapon;
+        AudioLoopOptions options;
+        options.volume = kind == "charger" ? (actor.isLocal() ? 0.55 : 0.35) :
+            kind == "spinner" ? (actor.isLocal() ? 0.6 : 0.4) :
+            kind == "mitts" ? (actor.isLocal() ? 0.5 : 0.35) : (actor.isLocal() ? 0.5 : 0.32);
+        if (desiredWeapon == "charger_charge") options.pitch = 1.0 + 1.5 * combat.charge;
+        else if (desiredWeapon == "splatling_spin") options.pitch = combat.streaming ? 1.5 : 0.6 + 0.85 * combat.charge;
+        else if (desiredWeapon == "bow_draw") options.pitch = 0.6 + 0.9 * combat.charge;
+        else if (desiredWeapon == "blade_charge") options.pitch = 1.0 + 0.6 * combat.charge;
+        else if (desiredWeapon == "mitts_charge") options.pitch = 0.8 + 0.9 * combat.charge;
+        if (!actor.isLocal()) options.pos = Position(actor.state.pos);
+        if (weaponLoop == weaponLoops_.end()) {
+            if (engine_.StartLoop(key, desiredWeapon, options)) weaponLoops_.emplace(&actor, ActorLoop{key, desiredWeapon});
+        } else engine_.UpdateLoop(weaponLoop->second.key, options);
     }
 
     std::string desired;
@@ -245,7 +326,6 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
     if (desired.empty() && actor.state.alive && actor.state.squid && actor.state.submerged && horizontalSpeed > 0.5) desired = "swim";
     if (desired.empty() && actor.state.alive && actor.state.climbing) desired = "climb";
     if (desired.empty() && actor.state.alive && actor.state.grounded && actor.state.groundTeam == 2) desired = "enemy_ink_sizzle";
-    if (desired.empty() && actor.state.alive && actor.weaponProfile().kind == "spinner" && actor.combatPose().streaming) desired = "splatling_spin";
     auto loopIt = actorLoops_.find(&actor);
     if (loopIt != actorLoops_.end() && loopIt->second.cue != desired) {
         engine_.StopLoop(loopIt->second.key, 0.18);
@@ -272,6 +352,41 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
     } else {
         engine_.UpdateLoop(loopIt->second.key, options);
     }
+}
+
+void GameAudio::UpdateDeviceAudio(MatchSimulation& match){
+    std::unordered_set<std::uint64_t> live;
+    for(const auto& d:match.world().devices()){
+        if(!d.live)continue;live.insert(d.id);auto [it,inserted]=deviceStates_.try_emplace(d.id);auto& old=it->second;
+        const auto cue=[&](const char* name,double volume){AudioPlayOptions o;o.pos=Position(d.pos);o.volume=volume;engine_.Play(name,o);};
+        if(!inserted&&!resumeLoops_){
+            if(d.kind=="torpedo"&&old.state!=d.state){
+                if(d.state=="unfold"){cue("torpedo_transform",.8);if((d.owner&&d.owner->isLocal())||(d.target&&d.target->isLocal()))engine_.Play("torpedo_lock",d.target&&d.target->isLocal()?.7:.45);}
+                else if(d.state=="launch")cue("torpedo_launch",.8);
+            }
+            if(d.kind=="waddle"){
+                if(old.state=="fly"&&d.state=="sense")cue("waddle_land",.6);
+                if(old.state!=d.state&&d.state=="wake")cue("waddle_lock",1);
+                if(!old.hopping&&d.hopping)cue("waddle_hop",.6);
+                if(old.hopping&&!d.hopping)cue("waddle_land",.45);
+            }
+            if(d.kind=="boomerang"&&old.state!=d.state&&d.state=="return")cue("boomerang_return",.8);
+            if(d.kind=="shaker"&&d.uses<old.uses)cue("shaker_hop",.6);
+            if(d.kind=="tracer"&&d.uses>old.uses)cue("tracer_bounce",.7);
+        }
+        std::string loop;
+        if(d.kind=="torpedo"&&(d.state=="fly"||d.state=="unfold"||d.state=="launch"))loop="torpedo_whirr";
+        else if(d.kind=="tracer"&&d.state=="fly")loop="tracer_hum";
+        else if(d.kind=="waddle"&&d.state=="walk")loop="waddle_walk";
+        else if(d.kind=="boomerang")loop=d.state=="orbit"?"boomerang_orbit":"boomerang_whirr";
+        const auto key="device:"+std::to_string(d.id);
+        if(old.loop!=loop&&!old.loop.empty())engine_.StopLoop(key,.1);
+        if(!loop.empty()){AudioLoopOptions options;options.pos=Position(d.pos);options.volume=.35;
+            if(d.kind=="waddle")options.pitch=.75+std::clamp(d.speed/4.,0.,1.)*.45;
+            if(old.loop!=loop)engine_.StartLoop(key,loop,options);else engine_.UpdateLoop(key,options);}
+        old={d.state,loop,d.hopping,d.uses};
+    }
+    for(auto it=deviceStates_.begin();it!=deviceStates_.end();)if(!live.count(it->first)){if(!it->second.loop.empty())engine_.StopLoop("device:"+std::to_string(it->first),.15);it=deviceStates_.erase(it);}else ++it;
 }
 
 void GameAudio::UpdateWorldAudio(double dt, MatchSimulation& match) {
@@ -420,6 +535,7 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
         pausedAudio_ = false; resumeLoops_ = true; bossMove_.clear();
     }
     UpdateWorldAudio(dt, match);
+    UpdateDeviceAudio(match);
 
     const auto phase = match.phase();
     const int phaseValue = static_cast<int>(phase);
@@ -452,13 +568,24 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
         UpdateActorAudio(*actor);
     }
     for (auto it = actorLoops_.begin(); it != actorLoops_.end();) {
-        if (live.find(it->first) == live.end()) { engine_.StopLoop(it->second.key, 0.15); actorStates_.erase(it->first); it = actorLoops_.erase(it); }
+        if (live.find(it->first) == live.end()) { engine_.StopLoop(it->second.key, 0.15); it = actorLoops_.erase(it); }
+        else ++it;
+    }
+    for (auto it = weaponLoops_.begin(); it != weaponLoops_.end();) {
+        if (live.find(it->first) == live.end()) { engine_.StopLoop(it->second.key, 0.15); it = weaponLoops_.erase(it); }
+        else ++it;
+    }
+    for (auto it = actorStates_.begin(); it != actorStates_.end();) {
+        if (live.find(it->first) == live.end()) it = actorStates_.erase(it);
         else ++it;
     }
 
     for (const auto& event : events) {
         AudioPlayOptions options; options.pos = Position(event.pos);
-        if (event.kind == "explosion") { options.volume = std::clamp(0.45 + event.radius * 0.08, 0.5, 1.0); engine_.Play("bomb_explode", options); }
+        if (event.kind == "explosion") { options.volume = std::clamp(0.45 + event.radius * 0.08, 0.5, 1.0); engine_.Play("bomb_explode", options);
+            if(event.source=="torpedo")engine_.Play("torpedo_pop",options);
+            else if(event.source=="boomerang")engine_.Play("boomerang_burst",options);
+        }
         else if (event.kind == "bulletImpact") { options.volume = 0.35; engine_.Play("ink_hit_wall", options); }
         else if (event.kind == "beam") {
             // ActorTrigger handles the source weapon/special shot at the firing edge; beam geometry has no owner ID.

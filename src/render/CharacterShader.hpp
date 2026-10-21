@@ -13,13 +13,17 @@ struct CharacterLightState {
     glm::vec3 sunDirection{0.0f, 1.0f, 0.0f}, sunColor{1.0f};
     glm::vec3 skyDirection{0.0f, 1.0f, 0.0f}, skyColor{0.0f}, groundColor{0.0f};
     float exposure = 1.0f;
+    unsigned environmentTexture = 0;
+    float environmentIntensity = 0.0f;
+    glm::vec3 fogColor{0.0f};
+    float fogNear = 1.0e8f, fogFar = 1.0e9f;
 };
 
 // Compiles the exported source shader. OpenGL resource ownership stays local to
 // the renderer, while pose and asset data remain usable without a GL context.
 class CharacterShader {
 public:
-    CharacterShader(const std::string& vertex, const std::string& fragment,bool linearOutput=false);
+    CharacterShader(const std::string& vertex, const std::string& fragment,bool linearOutput=false,bool environment=false,bool fog=true);
     ~CharacterShader();
     CharacterShader(const CharacterShader&) = delete;
     CharacterShader& operator=(const CharacterShader&) = delete;

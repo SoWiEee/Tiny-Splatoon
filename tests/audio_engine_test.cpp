@@ -1,6 +1,7 @@
 #include "../src/audio/AudioEngine.hpp"
 #include "../src/audio/GameAudio.hpp"
 #include "../src/game/MatchSimulation.hpp"
+#include "../src/game/CombatWorld.hpp"
 #include "../src/game/NavGraph.hpp"
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/ReferenceData.hpp"
@@ -9,10 +10,13 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <thread>
+#include <tuple>
 
 namespace {
 void require(bool condition, const char* message) {
@@ -58,6 +62,53 @@ int main(int argc, char** argv) {
         audio.Clear();
         audio.Clear();
         require(audio.ActiveVoices() == 0, "Clear must be idempotent before initialization");
+
+        std::string battleIndex;
+        {
+            std::ifstream musicIndex(assets / "music.tsv");
+            for (std::string line; std::getline(musicIndex, line);)
+                if (line.rfind("battle\t", 0) == 0) { battleIndex = std::move(line); break; }
+        }
+        require(!battleIndex.empty(), "Custom song tests need the packaged battle metadata row");
+        const auto tempRoot = std::filesystem::temp_directory_path() /
+            ("tiny-splatoon-audio-recordings-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        const auto makeRecordingRoot = [&](const std::string& name, bool customFile, bool packagedFallback, bool brokenFile) {
+            const auto root = tempRoot / name;
+            std::filesystem::create_directories(root / "music");
+            std::filesystem::create_directories(root / "songs");
+            { std::ofstream index(root / "music.tsv"); index << battleIndex << '\n'; }
+            { std::ofstream index(root / "custom-music.tsv"); index << "battle\t-3\tsongs/recording.flac\n"; }
+            if (customFile && brokenFile) {
+                std::ofstream recording(root / "songs" / "recording.flac", std::ios::binary);
+                recording << "broken FLAC fixture";
+            } else if (customFile) {
+                std::filesystem::copy_file(assets / "music" / "battle.flac", root / "songs" / "recording.flac");
+            }
+            if (packagedFallback)
+                std::filesystem::copy_file(assets / "music" / "battle.flac", root / "music" / "battle.flac");
+            return root;
+        };
+        try {
+            {
+                AudioEngine customMusic(makeRecordingRoot("valid", true, false, false));
+                require(customMusic.Initialize(), "A valid optional recording should initialize miniaudio");
+                require(customMusic.PlayMusic("battle", 0), "A valid optional recording should play when the packaged track is absent");
+                require(customMusic.lastError().empty(), "A successful optional recording should leave no decoder error");
+                customMusic.Clear();
+            }
+            for (const auto& [name, present, broken] : {
+                    std::tuple{"missing", false, false}, std::tuple{"broken", true, true}}) {
+                AudioEngine fallback(makeRecordingRoot(name, present, true, broken));
+                require(fallback.Initialize(), "A packaged fallback test should initialize miniaudio");
+                require(fallback.PlayMusic("battle", 0), "A missing or undecodable optional recording must fall back to the packaged track");
+                require(fallback.lastError().empty(), "A successful packaged fallback should clear the failed optional decoder error");
+                fallback.Clear();
+            }
+            std::filesystem::remove_all(tempRoot);
+        } catch (...) {
+            std::filesystem::remove_all(tempRoot);
+            throw;
+        }
 
         if (!audio.Initialize()) throw std::runtime_error("miniaudio engine initialization failed: " + audio.lastError());
         require(audio.ready(), "The miniaudio engine should report ready after initialization");
@@ -184,6 +235,30 @@ int main(int argc, char** argv) {
         directorEngine.Update();
         require(directorEngine.ActiveVoices() == 0, "EndMatch must stop managed actor loops and clear faded voices");
         require(directorEngine.lastError().empty(), "A complete GameAudio match lifecycle must not request missing source assets");
+        director.BeginMatch(match);
+        match.world().deploy(actor,"boomerang");
+        director.Update(1.0/60,match,{},listener,forward);
+        require(directorEngine.ActiveVoices()>=2,"Source device loop must start alongside harbour ambience");
+        const auto readyCue = directorEngine.Metadata("ready");
+        require(readyCue.has_value(), "The device pause test needs the ready cue duration to settle intro audio");
+        double introCueSeconds = readyCue->durationSeconds;
+        if (match.phase() == MatchPhase::Playing) {
+            const auto goCue = directorEngine.Metadata("go_horn");
+            require(goCue.has_value(), "A playing match needs the go-horn duration to settle intro audio");
+            introCueSeconds = std::max(introCueSeconds, goCue->durationSeconds);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((introCueSeconds + 0.25) * 1000.0)));
+        directorEngine.Update(); // Let BeginMatch's one-shot cues finish before counting managed loops.
+        director.Pause();
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices()==1,"Pause must stop device loops while preserving harbour ambience");
+        director.Update(1.0/60,match,{},listener,forward);
+        require(directorEngine.ActiveVoices()>=2,"The next update must restore live device loops after pause");
+        director.EndMatch();
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));directorEngine.Update();
+        require(directorEngine.ActiveVoices()==0,"Device loops must fade and clear at match teardown");
+        require(directorEngine.lastError().empty(),"Device transition routing requested an unknown source cue");
 
         std::cout << "Audio source test passed: " << names.size()
                   << " cues, source loop metadata, repeat gaps, miniaudio loop/music lifecycle, GameAudio event routing and cleanup, 48-voice steal, and Clear.\n";

@@ -103,6 +103,7 @@ struct WorldVisualEvent {
     double radius = 0.0;
     int team = 0;
     double charge = 0, width = 0.08, seed = 0;
+    std::string source;
 };
 
 // Match owns actors; this owns attacks and applies hit/paint/credit exactly once.

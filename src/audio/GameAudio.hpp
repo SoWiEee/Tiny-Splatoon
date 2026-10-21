@@ -31,8 +31,14 @@ private:
     };
     struct ActorState {
         bool alive = false, squid = false, lowInk = false, specialReady = false, specialActive = false;
+        bool chargeFull = false, streaming = false;
+        int bowRingEvents = 0;
         std::string specialKind;
+        std::string canopy;
+        double canopyOpen = 0, canopyHp = 0;
     };
+    struct DeviceState {std::string state,loop;bool hopping=false;int uses=0;};
+    void UpdateDeviceAudio(MatchSimulation& match);
     void Play(std::string_view name, const PlayerSimulation* actor = nullptr, double volume = 1, double pitch = 1);
     void UpdateBoss(double dt, MatchSimulation& match);
     void UpdateWorldAudio(double dt, MatchSimulation& match);
@@ -43,7 +49,9 @@ private:
     AudioEngine& engine_;
     MatchSimulation* match_ = nullptr;
     std::unordered_map<const PlayerSimulation*, ActorLoop> actorLoops_;
+    std::unordered_map<const PlayerSimulation*, ActorLoop> weaponLoops_;
     std::unordered_map<const PlayerSimulation*, ActorState> actorStates_;
+    std::unordered_map<std::uint64_t,DeviceState> deviceStates_;
     std::unordered_map<int, bool> crablets_;
     std::string bossLoop_, bossMove_;
     AudioPosition listenerPosition_{};

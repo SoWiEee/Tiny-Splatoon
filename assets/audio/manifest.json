@@ -12,7 +12,12 @@
     "musicCheck": {
       "maxPcm16Lsb": 1024,
       "nrmseFullScaleMax": 0.003,
-      "correlationMin": 0.9999
+      "correlationMin": 0.9999,
+      "menu": {
+        "maxPcm16Lsb": 1024,
+        "nrmseFullScaleMax": 0.004,
+        "correlationMin": 0.9997
+      }
     },
     "musicEncoding": "lossless FLAC"
   },

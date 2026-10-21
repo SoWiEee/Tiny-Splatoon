@@ -10,18 +10,19 @@ namespace restoration {
 class BossSimulation;
 class StageGeometry;
 class BossModelData;
+struct CharacterLightState;
 
 // Renders the source-built HULLBREAKER mesh and its telegraphed attack geometry.
 class BossRenderer {
 public:
-    explicit BossRenderer(std::filesystem::path assets="assets/reference/boss");
+    explicit BossRenderer(std::filesystem::path assets="assets/reference/boss",bool environment=false);
     ~BossRenderer();
     BossRenderer(const BossRenderer&)=delete;
     BossRenderer& operator=(const BossRenderer&)=delete;
     void Update(BossSimulation& boss);
     int DrawShadow(const BossSimulation& boss,const glm::mat4& lightViewProjection);
     int Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,
-             const glm::vec3& camera,const glm::vec3& squadColor);
+             const glm::vec3& camera,const glm::vec3& squadColor,const CharacterLightState* lights=nullptr);
     int DrawHazards(const BossSimulation& boss,const StageGeometry& geometry,
                     const glm::mat4& viewProjection,const glm::vec3& squadColor);
 private:

@@ -99,7 +99,10 @@ const CharacterModel& CharacterData::model(const std::string& id)const{
 const CharacterMesh& CharacterData::mesh(const std::string& file)const{
     if(!meshName(file))throw std::invalid_argument("Unknown character mesh filename");
     const auto found=meshes_.find(file);if(found!=meshes_.end())return found->second;
-    Reader in(directory_/file);in.magic("TSMESH01");CharacterMesh mesh;
+    return meshes_.emplace(file,LoadMesh(directory_/file)).first->second;
+}
+CharacterMesh CharacterData::LoadMesh(const std::filesystem::path& path){
+    Reader in(path);in.magic("TSMESH01");CharacterMesh mesh;
     mesh.vertices=in.count(10000000);const auto indices=in.count(30000000),attributes=in.count(32);
     if(!mesh.vertices || !attributes || indices%3)throw std::runtime_error("Invalid character mesh topology");
     for(std::uint32_t a=0;a<attributes;++a){
@@ -115,6 +118,6 @@ const CharacterMesh& CharacterData::mesh(const std::string& file)const{
     in.end();
     const auto position=std::find_if(mesh.attributes.begin(),mesh.attributes.end(),[](const auto& a){return a.name=="position"&&a.components==3;});
     if(position==mesh.attributes.end())throw std::runtime_error("Character mesh has no position attribute");
-    return meshes_.emplace(file,std::move(mesh)).first->second;
+    return mesh;
 }
 }

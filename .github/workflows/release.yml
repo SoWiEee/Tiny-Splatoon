@@ -83,4 +83,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/Tiny-Splatoon-${{ github.ref_name }}-windows-x64.zip
+          body_path: RELEASE_NOTES.md
           generate_release_notes: true

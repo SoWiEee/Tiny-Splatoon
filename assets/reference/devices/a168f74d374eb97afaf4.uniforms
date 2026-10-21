@@ -1,0 +1,19 @@
+diffuse 3 1 0.5151988613080192 0.35454701661998894
+opacity 1 0.4
+mapTransform 9 1 0 0 0 1 0 0 0 1
+alphaMapTransform 9 1 0 0 0 1 0 0 0 1
+alphaTest 1 0
+specularMapTransform 9 1 0 0 0 1 0 0 0 1
+envMapRotation 9 1 0 0 0 1 0 0 0 1
+reflectivity 1 1
+ior 1 1.5
+refractionRatio 1 0.98
+aoMapIntensity 1 1
+aoMapTransform 9 1 0 0 0 1 0 0 0 1
+lightMapIntensity 1 1
+lightMapTransform 9 1 0 0 0 1 0 0 0 1
+fogDensity 1 0.00025
+fogNear 1 1
+fogFar 1 2000
+fogColor 3 1 1 1
+toneMappingExposure 1 1

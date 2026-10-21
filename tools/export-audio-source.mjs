@@ -17,6 +17,8 @@ if (checking && comparisonSelfTest) throw new Error('Choose either --check or --
 let selected = [];
 
 const musicComparisonLimits = { maxPcm16Lsb: 1024, nrmseFullScale: 0.003, minCorrelation: 0.9999 };
+// Three fresh source menu renders include a repeatable alternate waveform; see the calibration report.
+const menuComparisonLimits={maxPcm16Lsb:1024,nrmseFullScale:0.004,minCorrelation:0.9997};
 
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'],
@@ -155,11 +157,12 @@ function comparePcm16(a, b) {
     nrmseFullScale: Math.sqrt(sumSquaredDelta / count) / 32768, correlation };
 }
 
-function compareMusicPcm16(a, b) {
+function compareMusicPcm16(a, b,track='') {
   const result = comparePcm16(a, b);
-  result.equivalent = result.maxDelta <= musicComparisonLimits.maxPcm16Lsb &&
-    result.nrmseFullScale <= musicComparisonLimits.nrmseFullScale &&
-    result.correlation >= musicComparisonLimits.minCorrelation;
+  const limits=track==='menu'?menuComparisonLimits:musicComparisonLimits;
+  result.equivalent = result.maxDelta <= limits.maxPcm16Lsb &&
+    result.nrmseFullScale <= limits.nrmseFullScale &&
+    result.correlation >= limits.minCorrelation;
   return result;
 }
 
@@ -201,7 +204,7 @@ if (comparisonSelfTest) {
   }
   const stable = compareMusicPcm16(pcm16Wav(reference), pcm16Wav(reference));
   const negativeControl = compareMusicPcm16(pcm16Wav(reference), pcm16Wav(shifted));
-  if (!stable.equivalent || negativeControl.equivalent)
+  if (!stable.equivalent || negativeControl.equivalent ||compareMusicPcm16(pcm16Wav(reference),pcm16Wav(shifted),'menu').equivalent)
     throw new Error(`Music comparison control failed: stable=${JSON.stringify(stable)}, shifted=${JSON.stringify(negativeControl)}`);
   const baseManifest = { schema: 3, clips: [{ file: 'loop.wav', sha256: 'kept', frames: 100,
     loop: { file: 'loop-bed.wav', sha256: 'loop-kept', frames: 90, sourceActiveSeconds: 3.1, sourcePeak: 0.4, sourceRms: 0.08 } }] };
@@ -368,6 +371,7 @@ try {
       sourceMaxVoices: sourceMeta.maxVoices, sourcePitchJitter: sourceMeta.pitchJitter,
       sourceMinGapSeconds: sourceMeta.minGapSeconds, loopable: sourceMeta.loopable,
     });
+    if(checking&&entries.length%25===0)console.log(`Source SFX checked: ${entries.length}/${selected.length}`);
     if (checking) {
     } else {
       await mkdir(outputRoot, { recursive: true });
@@ -510,7 +514,7 @@ try {
     let flac;
     if (checking || existsSync(flacPath)) {
       try {
-        const decoded = await decodedFlac(flacPath, decodedPath), comparison = compareMusicPcm16(decoded, sourceWav);
+        const decoded = await decodedFlac(flacPath, decodedPath), comparison = compareMusicPcm16(decoded, sourceWav,track);
         if (!comparison.equivalent) {
           if (checking) throw new Error(`Stale source music asset: ${relative} (${musicComparisonSummary(comparison)})`);
         } else flac = await readFile(flacPath);
@@ -528,7 +532,7 @@ try {
     const decodedPcm = readSourceWav(decodedForManifest);
     if (decodedPcm.fmt.sampleRate !== rendered.sampleRate || decodedPcm.fmt.channels !== rendered.channels || decodedPcm.frames !== rendered.frames)
       throw new Error(`Unexpected decoded source music format ${track}`);
-    if (checking) console.log(`Source music ${track}: ${musicComparisonSummary(compareMusicPcm16(decodedForManifest, sourceWav))}`);
+    if (checking) console.log(`Source music ${track}: ${musicComparisonSummary(compareMusicPcm16(decodedForManifest, sourceWav,track))}`);
     const decodedPcmSha256 = createHash('sha256').update(decodedForManifest.subarray(
       decodedPcm.data.offset, decodedPcm.data.offset + decodedPcm.data.size)).digest('hex');
     musicEntries.push({ name: track, file: relative, sampleRate: 48000, channels: 2, bitsPerSample: 16,
@@ -546,7 +550,8 @@ try {
     source: 'splat-ref/src/audio/{audio,music}.js via Microsoft Edge OfflineAudioContext',
     render: { sampleRate: 48000, channels: 2, bitsPerSample: 16, seed: 1234, sourceMasterChain: true, trimAfterActiveSignalSeconds: 0.12,
       checkTolerancePcm16Lsb: 8, musicCheck: { maxPcm16Lsb: musicComparisonLimits.maxPcm16Lsb,
-        nrmseFullScaleMax: musicComparisonLimits.nrmseFullScale, correlationMin: musicComparisonLimits.minCorrelation }, musicEncoding: 'lossless FLAC' },
+        nrmseFullScaleMax: musicComparisonLimits.nrmseFullScale, correlationMin: musicComparisonLimits.minCorrelation,
+        menu:{maxPcm16Lsb:menuComparisonLimits.maxPcm16Lsb,nrmseFullScaleMax:menuComparisonLimits.nrmseFullScale,correlationMin:menuComparisonLimits.minCorrelation} }, musicEncoding: 'lossless FLAC' },
     scope: 'All SFX registered by src/audio/audio.js and src/game/kits/index.js, all nine procedural soundtrack tracks, and source loop builders.',
     clips: entries,
     music: musicEntries,
@@ -560,12 +565,12 @@ try {
     if ((await readFile(catalogPath, 'utf8')).replace(/\r\n/g, '\n') !== catalogText) throw new Error('Stale source SFX registry');
     if ((await readFile(musicIndexPath, 'utf8')).replace(/\r\n/g, '\n') !== musicIndexText) throw new Error('Stale source music index');
     const expected = new Set(['manifest.json', 'catalog.tsv', 'music.tsv', ...entries.flatMap((entry) => [entry.file, ...(entry.loop ? [entry.loop.file] : [])]), ...musicEntries.map((entry) => entry.file)]);
-    const actual = new Set(await listFiles(outputRoot));
+    const actual = new Set((await listFiles(outputRoot)).filter(file=>file!=='custom-music.tsv'&&!file.startsWith('songs/')));
     if (actual.size !== expected.size || [...expected].some((file) => !actual.has(file))) throw new Error('Unexpected file in assets/audio');
   } else {
     await Promise.all([writeFile(manifestPath, manifestText), writeFile(catalogPath, catalogText), writeFile(musicIndexPath, musicIndexText)]);
     const expected = new Set(['manifest.json', 'catalog.tsv', 'music.tsv', ...entries.flatMap((entry) => [entry.file, ...(entry.loop ? [entry.loop.file] : [])]), ...musicEntries.map((entry) => entry.file)]);
-    for (const file of await listFiles(outputRoot)) if (!expected.has(file)) throw new Error(`Unexpected file in assets/audio; review it manually: ${file}`);
+    for (const file of await listFiles(outputRoot)) if (!expected.has(file)&&file!=='custom-music.tsv'&&!file.startsWith('songs/')) throw new Error(`Unexpected file in assets/audio; review it manually: ${file}`);
   }
   console.log(`${checking ? 'Checked' : 'Exported'} ${entries.length} source SFX and ${musicEntries.length} source music tracks (${entries.reduce((sum, entry) => sum + entry.bytes + (entry.loop?.bytes || 0), 0) + musicEntries.reduce((sum, entry) => sum + entry.bytes, 0)} bytes).`);
 } finally {

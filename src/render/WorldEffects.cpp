@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "WorldEffects.hpp"
+#include "DeviceRenderer.hpp"
 #include "CombatWorld.hpp"
 #include "PlayerSimulation.hpp"
 #include "ArsenalData.hpp"
@@ -337,7 +338,7 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
             if(s.groundTeam==2&&s.grounded&&dt>0&&random()<dt*8)
                 spawn({Shape::Puff,pos+glm::vec3((random()-0.5f)*0.5f,0.1f,(random()-0.5f)*0.5f),{0,0.5f,0},{0,1,0},ink(1-actor->team()),0.16f,0,0,0.3f,0.5f,0,random()});
             if(pose.active) {
-                if(pose.kind=="bubbler"||pose.kind=="kraken")add({Shape::Bubble,pos+glm::vec3(0,0.85f,0),{},{0,1,0},color,pose.kind=="kraken"?1.15f:1.8f,0,0,1,0.65f,0,0});
+                if(pose.kind=="bubbler"||(!models_&&pose.kind=="kraken"))add({Shape::Bubble,pos+glm::vec3(0,0.85f,0),{},{0,1,0},color,pose.kind=="kraken"?1.15f:1.8f,0,0,1,0.65f,0,0});
                 else if(pose.kind=="booyah"&&!pose.thrown)add({Shape::Orb,pos+glm::vec3(0,2.0f,0),{},{0,1,0},color,0.5f+float(pose.charge)*0.65f,0,0,1,0.9f,0,0});
                 else if(pose.kind=="zipcaster"&&pose.phase=="zip") {
                     glm::vec3 to(pose.target),from=pos+glm::vec3(0,0.8f,0),axis=to-from;
@@ -435,6 +436,7 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
     for(const auto& device:combat.devices()) {
         if(!device.live||!near(device.pos,65))continue;
         const glm::vec3 pos(device.pos),col=ink(device.team);
+        if(models_&&device.kind!="sonar")continue;
         if(device.kind=="sonar")add({Shape::Ring,pos,{},{0,1,0},col,float(device.radius),0,0,1,0.8f,7,0});
         else if(device.shield)add({Shape::Bubble,pos,{},{0,1,0},col,float(std::max(device.R,device.radius)),0,0,1,0.45f,0,0});
         else {
@@ -520,7 +522,7 @@ const WorldEffects::GpuMesh& WorldEffects::sourceMesh(const char* kind,const cha
     return *inserted.first->second;
 }
 
-int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& projection) {
+int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const CharacterLightState* lights) {
     if(world_.empty())return 0;
     const auto isSource=[](WorldFxShape shape){return shape==Shape::Swirl||shape==Shape::Bubble||shape==Shape::Orb
         ||shape==Shape::Stamp||shape==Shape::Speaker||shape==Shape::Missile||shape==Shape::Cloud
@@ -572,6 +574,15 @@ int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& project
     for(const auto& item:world_){
         if(!isSource(item.shape)||item.alpha<=0)continue;
         const glm::vec3 pos=item.pos,color=item.color;
+        if(models_&&lights&&(item.shape==Shape::Cloud||item.shape==Shape::Missile||item.shape==Shape::Stamp||item.shape==Shape::Speaker)){
+            const int team=color.b>color.r?1:0;std::string kind;glm::mat4 model(1);
+            if(item.shape==Shape::Cloud){kind=item.style<.5f?"stormBase":"stormTop";const float bob=std::sin(time_*1.6f+item.seed)*.0025f;model=glm::translate(glm::mat4(1),pos+glm::vec3(0,bob,0))*glm::scale(glm::mat4(1),glm::vec3(item.radius,item.radius*.68f,item.radius));}
+            else if(item.shape==Shape::Missile){kind="missile";model=meshModel(pos,item.normal,{1,1,1});}
+            else if(item.shape==Shape::Stamp){kind="stamp";model=glm::translate(glm::mat4(1),pos)*glm::rotate(glm::mat4(1),std::atan2(item.vel.x,item.vel.z),glm::vec3(0,1,0))*glm::rotate(glm::mat4(1),item.age*14,glm::vec3(1,0,0))*glm::scale(glm::mat4(1),glm::vec3(1.6f));}
+            else {kind="speaker";const float k=clamp01(item.age/.25f),scale=item.style<1.5f?.2f+.8f*(1-std::pow(1-k,3.f)):item.style<2.5f?1.f:std::max(.01f,1-item.age/.6f);model=glm::translate(glm::mat4(1),pos)*glm::rotate(glm::mat4(1),std::atan2(item.normal.x,item.normal.z),glm::vec3(0,1,0))*glm::scale(glm::mat4(1),glm::vec3(scale));}
+            drawCalls+=models_->DrawModel(kind,team,glm::dmat4(model),item.age,glm::dmat4(view),glm::dmat4(projection),glm::dvec3(camera),*lights,false,item.shape==Shape::Cloud?item.alpha/.97:1,item.style);
+            glUseProgram(sourceProgram_);continue;
+        }
         if(item.shape==Shape::Swirl){
             const float grow=item.expand>0?item.expand:1.0f;
             const glm::mat4 model=glm::translate(glm::mat4(1),pos)
@@ -631,7 +642,7 @@ int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& project
     return drawCalls;
 }
 
-int WorldEffects::Draw(const glm::mat4& view,const glm::mat4& projection,const glm::vec3&) {
+int WorldEffects::Draw(const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const CharacterLightState* lights) {
     if(live_.empty()&&world_.empty())return 0;
     std::vector<Vertex> vertices;vertices.reserve(live_.size()+world_.size());
     const auto sourceShape=[](WorldFxShape shape){return shape==Shape::Swirl||shape==Shape::Bubble||shape==Shape::Orb
@@ -667,7 +678,7 @@ int WorldEffects::Draw(const glm::mat4& view,const glm::mat4& projection,const g
         if(culled)glEnable(GL_CULL_FACE);if(!blended)glDisable(GL_BLEND);
         ++calls;
     }
-    calls+=drawSourceItems(view,projection);
+    calls+=drawSourceItems(view,projection,camera,lights);
     return calls;
 }
 }

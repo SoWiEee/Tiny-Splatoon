@@ -29,7 +29,13 @@
           <p class="description">變更主武器時，會先套用該武器的預設搭配。你仍可自由調整。</p>
         </div>
         <div id="panel-settings" class="panel hidden">
-          <h1>設定</h1><p class="intro">調整聲音與介面偏好。</p>
+          <h1>設定</h1><p class="intro">調整畫質、聲音與介面偏好。</p>
+          <div class="field"><label for="graphics-preset">畫質</label><select id="graphics-preset"><option value="low">低｜流暢優先</option><option value="medium" selected="selected">中｜平衡</option><option value="high">高｜畫質優先</option><option value="custom">自訂</option></select></div>
+          <div class="effect-options">
+            <div class="setting-option"><input id="graphics-shadows" type="checkbox" checked="checked" /><label for="graphics-shadows">陰影</label></div>
+            <div class="setting-option"><input id="graphics-reflections" type="checkbox" /><label for="graphics-reflections">反射</label></div>
+            <div class="setting-option"><input id="graphics-post" type="checkbox" checked="checked" /><label for="graphics-post">後製效果</label></div>
+          </div>
           <div class="volume-row"><label for="master">主音量</label><input id="master" type="range" min="0" max="100" step="5" value="80" /><span id="master-value">80%</span></div>
           <div class="volume-row"><label for="music">音樂</label><input id="music" type="range" min="0" max="100" step="5" value="60" /><span id="music-value">60%</span></div>
           <div class="volume-row"><label for="sfx">音效</label><input id="sfx" type="range" min="0" max="100" step="5" value="85" /><span id="sfx-value">85%</span></div>

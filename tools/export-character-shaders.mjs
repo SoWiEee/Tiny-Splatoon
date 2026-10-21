@@ -124,8 +124,9 @@ export function buildCharacterShader(material, options = {}) {
 function buildCustomShader(material,options){
   const featureDefines=defines(material,options);
   const common=`#version 450 core\n${featureDefines}#define texture2D texture\nuniform mat4 modelMatrix,modelViewMatrix,projectionMatrix,viewMatrix;uniform mat3 normalMatrix;uniform vec3 cameraPosition;\n`;
-  const vertex=common+'#define varying out\n#define attribute in\nin vec3 position,normal;in vec2 uv;\n'+expand(material.vertexShader);
-  let fragment=common+'#define varying in\nlayout(location=0)out vec4 iwFragColor;\n#define gl_FragColor iwFragColor\n'+expand(THREE.ShaderChunk.common)+'\n'+expand(THREE.ShaderChunk.tonemapping_pars_fragment)+'\n'+expand(THREE.ShaderChunk.colorspace_pars_fragment)+'\nvec3 toneMapping(vec3 color){return NeutralToneMapping(color);}\nvec4 linearToOutputTexel(vec4 color){return sRGBTransferOETF(color);}\n'+expand(material.fragmentShader);
+  const lighting={NUM_DIR_LIGHTS:1,NUM_HEMI_LIGHTS:1,...(options.shadows?{NUM_DIR_LIGHT_SHADOWS:1}:{}),...options.lighting};
+  const vertex=common+'#define varying out\n#define attribute in\nin vec3 position,normal;in vec2 uv;\n'+unroll(counts(expand(material.vertexShader,[],options.shadows),lighting));
+  let fragment=common+'#define varying in\nlayout(location=0)out vec4 iwFragColor;\n#define gl_FragColor iwFragColor\n'+(material.fragmentShader.includes('#include <common>')?'':expand(THREE.ShaderChunk.common))+'\n'+expand(THREE.ShaderChunk.tonemapping_pars_fragment)+'\n'+expand(THREE.ShaderChunk.colorspace_pars_fragment)+'\nvec3 toneMapping(vec3 color){return NeutralToneMapping(color);}\nvec4 linearToOutputTexel(vec4 color){return sRGBTransferOETF(color);}\n'+unroll(counts(expand(material.fragmentShader,[],options.shadows),lighting));
   if(options.linearOutput)fragment=fragment.replace('return sRGBTransferOETF(color);','return LinearTransferOETF(color);');
   return {vertex,fragment,uniforms:Object.fromEntries(Object.entries(material.uniforms).map(([key,u])=>[key,plain(u.value)])),sourceKey:material.customProgramCacheKey(),
     renderState:{transparent:material.transparent,opacity:material.opacity,depthWrite:material.depthWrite,depthTest:material.depthTest,depthFunc:material.depthFunc,side:material.side,blending:material.blending,premultipliedAlpha:material.premultipliedAlpha},

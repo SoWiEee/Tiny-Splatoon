@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GraphicsSettings.hpp"
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -29,6 +30,7 @@ public:
     UiAction RenderMenu(int width,int height);
     UiAction RenderHud(const StageData&,const FacePaint&,MatchSimulation&,int width,int height,bool paused,bool nativeApp);
     const UiSetup& setup() const;
+    const GraphicsSettings& graphicsSettings() const;
     void SetSoundSink(std::function<void(const std::string&)> sink);
     void SetVolumeSink(std::function<void(float,float,float)> sink);
 private:

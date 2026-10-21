@@ -15,10 +15,11 @@ struct CharacterShadowState {
 // Source meshes and material programs are shared across all actors.
 class CharacterArt {
 public:
-    struct LodDraw { double fade=0.0, side=1.0; bool includeProps=true; };
-    explicit CharacterArt(std::filesystem::path directory="assets/reference/characters",bool linearOutput=false);
+    struct LodDraw { double fade=0.0, side=1.0; bool includeProps=true,hideTank=false; };
+    explicit CharacterArt(std::filesystem::path directory="assets/reference/characters",bool linearOutput=false,bool environment=false);
     ~CharacterArt();
     const CharacterData& data() const { return data_; }
+    glm::dmat4 attachment(const CharacterPoseFrame& frame,const CharacterStyle& style,const std::string& binding) const;
     std::size_t draw(const CharacterPoseFrame& frame,const CharacterStyle& style,
                      const std::string& main,const std::string& sub,const std::string& lod,
                      const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 camera,

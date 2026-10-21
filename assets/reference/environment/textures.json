@@ -1,0 +1,44 @@
+{
+  "wave.rgba8.z": {
+    "width": 256,
+    "height": 256,
+    "bits": 8,
+    "sha256": "f084409e79017ad9c0f9385ee15d9203c0022acf17b6b4d35f0fb019cb4efd11"
+  },
+  "cloud-day.rgba16f.z": {
+    "width": 2048,
+    "height": 640,
+    "bits": 16,
+    "sha256": "4b59205f37f7139c0fd1d44d99ea39261aef30ede5e42ddd25e62293ed7d85be"
+  },
+  "pmrem-day.rgba16f.z": {
+    "width": 768,
+    "height": 1024,
+    "bits": 16,
+    "sha256": "4c19114fbfefe9c8cd9edfd5800fd28cb3903ffee19f16a618dd8a777eb43288"
+  },
+  "cloud-sunset.rgba16f.z": {
+    "width": 2048,
+    "height": 640,
+    "bits": 16,
+    "sha256": "b0f2d39974f9e29a8b9bf1ec96d1a7d71acad3643765a0fc3c14250b9bb049f4"
+  },
+  "pmrem-sunset.rgba16f.z": {
+    "width": 768,
+    "height": 1024,
+    "bits": 16,
+    "sha256": "f146f4eef23179739959924d1903627f48dade5f77510f75f8de627673b4a645"
+  },
+  "cloud-golden.rgba16f.z": {
+    "width": 2048,
+    "height": 640,
+    "bits": 16,
+    "sha256": "f910c5ba94eef464edb3ae3509770c02eeaf3ed02894a35fbd80ab2758755b9e"
+  },
+  "pmrem-golden.rgba16f.z": {
+    "width": 768,
+    "height": 1024,
+    "bits": 16,
+    "sha256": "e838c5751770db364be6ab4b76989d17fffb0ca0d0e06d92bf2ce446b37f24b0"
+  }
+}

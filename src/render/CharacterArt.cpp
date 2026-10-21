@@ -27,13 +27,13 @@ struct CharacterArt::GpuMesh {
     ~GpuMesh(){if(index)glDeleteBuffers(1,&index);if(!attributes.empty())glDeleteBuffers(static_cast<GLsizei>(attributes.size()),attributes.data());if(vao)glDeleteVertexArrays(1,&vao);}
 };
 
-CharacterArt::CharacterArt(std::filesystem::path directory,bool linearOutput):data_(directory) {
+CharacterArt::CharacterArt(std::filesystem::path directory,bool linearOutput,bool environment):data_(directory) {
     for(const auto& material:CharacterMaterials()){
         const auto shaders=directory/"shaders";
-        programs_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shaders/(material.key+".vert")),CharacterShader::readSource(shaders/(material.key+".frag")),linearOutput));
+        programs_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shaders/(material.key+".vert")),CharacterShader::readSource(shaders/(material.key+".frag")),linearOutput,environment));
         const auto shadowShaders=directory/"shaders-shadow";
         if(std::filesystem::exists(shadowShaders/(material.key+".vert")))
-            shadowPrograms_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shadowShaders/(material.key+".vert")),CharacterShader::readSource(shadowShaders/(material.key+".frag")),linearOutput));
+            shadowPrograms_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shadowShaders/(material.key+".vert")),CharacterShader::readSource(shadowShaders/(material.key+".frag")),linearOutput,environment));
         materials_.emplace(material.key,&material);
     }
     glGenTextures(1,&dfg_);glBindTexture(GL_TEXTURE_2D,dfg_);
@@ -93,7 +93,7 @@ std::size_t CharacterArt::draw(const CharacterPoseFrame& frame,const CharacterSt
             const auto parent=node.bone>=0?boneWorld[node.bone]:node.parent>=0?world[node.parent]:glm::dmat4(1.0);
             world.push_back(parent*local.matrix());
             visible.push_back(local.visible&&(node.parent<0||visible[node.parent])&&(node.bone<0||frame.kid.visible));
-            if(!visible.back()||node.mesh.empty())continue;
+            if(!visible.back()||node.mesh.empty()||(lodDraw.hideTank&&node.binding.rfind("tank/",0)==0))continue;
             auto program=node.material;
             if((program=="brollyInk"||program=="brollyCream")&&part&&part->transparent.value_or(false))program+="_local";
             if(!node.skinned&&materials_.at(program)->skinned)program+="_plain";
@@ -179,5 +179,19 @@ std::size_t CharacterArt::draw(const CharacterPoseFrame& frame,const CharacterSt
     }
     glBindVertexArray(0);glDepthMask(GL_TRUE);glDepthFunc(GL_LESS);glFrontFace(GL_CCW);glEnable(GL_DEPTH_TEST);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);
     return draws.size();
+}
+glm::dmat4 CharacterArt::attachment(const CharacterPoseFrame& frame,const CharacterStyle& style,const std::string& binding)const{
+    const auto& rig=data_.rig(style.hair,style.hat,style.brows);
+    const auto& model=data_.model("body/"+std::to_string(style.hair)+"/"+std::to_string(style.hat)+"/"+std::to_string(style.brows)+"/game");
+    const auto kid=frame.root.matrix()*frame.model.matrix()*frame.kid.matrix();
+    std::map<std::string,const CharacterPartPose*> parts;for(const auto& part:frame.parts)parts[part.name]=&part;
+    std::vector<glm::dmat4> world;world.reserve(model.nodes.size());
+    for(const auto& node:model.nodes){
+        auto local=node.local;const auto found=parts.find(node.binding);if(found!=parts.end())local=found->second->local;
+        if(node.binding=="root")local=frame.root;else if(node.binding=="model")local=frame.model;else if(node.binding=="kid")local=frame.kid;
+        const auto parent=node.bone>=0?kid*frame.skinMatrices[node.bone]*glm::inverse(rig.bones[node.bone].inverseBind):node.parent>=0?world[node.parent]:glm::dmat4(1);
+        world.push_back(parent*local.matrix());if(node.binding==binding)return world.back();
+    }
+    throw std::runtime_error("Missing source character attachment: "+binding);
 }
 }

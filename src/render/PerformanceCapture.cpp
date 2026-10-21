@@ -100,9 +100,9 @@ template<class T> void JsonOptional(std::ostream& out, const std::optional<T>& v
 } // namespace
 
 PerformanceCapture::PerformanceCapture(std::filesystem::path jsonPath, std::string stage, std::string mode, std::uint32_t seed,
-                                       int width, int height, int warmupFrames, int measuredFrames)
+                                       int width, int height, int warmupFrames, int measuredFrames, bool playerView,GraphicsSettings graphics)
     : jsonPath_(std::move(jsonPath)), stage_(std::move(stage)), mode_(std::move(mode)), seed_(seed), width_(width), height_(height),
-      warmupFrames_(warmupFrames), measuredFrames_(measuredFrames), logicalCpus_(std::thread::hardware_concurrency()) {
+      warmupFrames_(warmupFrames), measuredFrames_(measuredFrames), logicalCpus_(std::thread::hardware_concurrency()),playerView_(playerView),graphics_(graphics) {
     if (jsonPath_.empty() || width != 1920 || height != 1080 || warmupFrames < 0 || measuredFrames < 1)
         throw std::invalid_argument("Benchmark requires a report path, 1920x1080, and positive sample count");
     if (mode_ != "turf" && mode_ != "boss")
@@ -205,7 +205,10 @@ void PerformanceCapture::write() {
          << "{\n  \"schema\": 2,\n  \"scope\": " << JsonString("native_live_" + mode_ + "_diagnostic")
          << ",\n  \"mode\": " << JsonString(mode_) << ",\n"
          << "  \"qa12_claim\": false,\n"
-         << "  \"limits\": \"Component integration diagnostic. Whole-scene reference image parity, complete device materials and the full QA12 workload are not accepted. The distant overview camera can cull nearby FX; this report alone does not validate player-view visual quality or worst-case effects performance.\",\n"
+         << "  \"camera\": " << JsonString(playerView_?"player_follow_with_hud":"distant_overview_without_hud") << ",\n"
+         << "  \"graphics\": {\"render_scale\": " << graphics_.renderScale << ", \"shadow_map_size\": " << graphics_.shadowMapSize
+         << ", \"shadows\": " << (graphics_.shadows?"true":"false") << ", \"reflections\": " << (graphics_.reflections?"true":"false") << ", \"post_effects\": " << (graphics_.postEffects?"true":"false") << "},\n"
+         << "  \"limits\": \"Fixed-seed integration measurement. Whole-frame browser pixel parity, subjective listening and the full worst-case QA12 effects/quality matrix require separate evidence.\",\n"
          << "  \"stage\": " << JsonString(stage_) << ",\n  \"seed\": " << seed_
          << ",\n  \"resolution\": [" << width_ << ", " << height_ << "],\n"
          << "  \"warmup_frames\": " << warmupFrames_ << ",\n  \"measured_frames\": " << measuredFrames_ << ",\n"

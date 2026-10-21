@@ -2,7 +2,7 @@ import { register } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -76,8 +76,9 @@ function propMaterialMeshes(kit) {
   const add = (mesh, world, instanceColor = null) => {
     const materialKey = Object.keys(kit.mat).find((key) => kit.mat[key] === mesh.material);
     if (!materialKey) throw new Error(`Missing PropKit material identity for ${mesh.name}`);
-    let target = result.get(materialKey);
-    if (!target) { target = { positions: [], normals: [], colors: [], uvs: [], indices: [] }; result.set(materialKey, target); }
+    const groupKey=materialKey+(mesh.castShadow?'':'~ns');
+    let target = result.get(groupKey);
+    if (!target) { target = { positions: [], normals: [], colors: [], uvs: [], indices: [] }; result.set(groupKey, target); }
     const g = mesh.geometry, p = g.attributes.position, n = g.attributes.normal, c = g.attributes.color, uv = g.attributes.uv;
     const base = target.positions.length / 3;
     const normalMatrix = new THREE.Matrix3().getNormalMatrix(world);
@@ -98,6 +99,7 @@ function propMaterialMeshes(kit) {
   kit.group.updateMatrixWorld(true);
   for (const mesh of kit.group.children) {
     if (!(mesh.isMesh || mesh.isInstancedMesh) || !mesh.geometry?.attributes?.position) continue;
+    if(mesh.userData.axis||mesh.userData.blink||mesh.userData.cloth)continue;
     if (mesh.isInstancedMesh) {
       const instance = new THREE.Matrix4(), world = new THREE.Matrix4();
       const color = new THREE.Color();
@@ -112,10 +114,34 @@ function propMaterialMeshes(kit) {
   return result;
 }
 
+function animatedProps(kit) {
+  const sections=[],records=[];
+  for(const mesh of kit._inst){
+    const ud=mesh.userData;if(!ud.axis&&!ud.blink&&!ud.cloth)continue;
+    const material=Object.keys(kit.mat).find(key=>kit.mat[key]===mesh.material);
+    if(!material)throw new Error(`Unknown animated PropKit material ${mesh.name}`);
+    const g=mesh.geometry,p=g.attributes.position,n=g.attributes.normal,uv=g.attributes.uv;
+    for(let i=0;i<mesh.count;i++){
+      const record=ud.recs[i],name=`props.${material}@${records.length}`,stride=ud.cloth?15:11;
+      const data=new Float32Array(p.count*stride),color=new THREE.Color();
+      if(ud.blink)color.copy(record.color);else if(mesh.instanceColor)color.fromBufferAttribute(mesh.instanceColor,i);else color.set(0xffffff);
+      for(let v=0;v<p.count;v++){
+        const at=v*stride;data.set([p.getX(v),p.getY(v),p.getZ(v),n.getX(v),n.getY(v),n.getZ(v),color.r,color.g,color.b,uv?.getX(v)||0,uv?.getY(v)||0],at);
+        if(ud.cloth)data.set([g.attributes.flex.getX(v),g.attributes.wave.getX(v),g.attributes.wave.getY(v),g.attributes.wave.getZ(v)],at+11);
+      }
+      const base=ud.axis?record.base:record.m;
+      const kind=ud.axis|| (ud.blink?'blink':'cloth');
+      records.push({name,kind,matrix:base.toArray(),speed:record.speed||0,phase:record.phase||0,rate:record.rate||0,lo:record.lo||0,hi:record.hi||0});
+      sections.push({name,stride,vertices:p.count,data,indices:Uint32Array.from(g.index?.array??Array.from({length:p.count},(_,k)=>k))});
+    }
+  }
+  return {sections,records};
+}
+
 function propShader(material, key) {
   const clone = material.clone();
   clone.vertexColors = true;
-  // Cloth is flattened at the exported canonical pose; its source atlas and material remain active.
+  // The native dynamic mesh evaluates the source cloth displacement and normal equations on its small CPU buffer.
   if (key === 'cloth') clone.onBeforeCompile = () => {};
   return buildSourceMaterialShader(clone, shaderOptions);
 }
@@ -149,7 +175,10 @@ async function artifact(relativePath, content) {
     await mkdir(dirname(target), { recursive: true });
     const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content);
     const existing = await readFile(target).catch(() => null);
-    if (!existing?.equals(bytes)) await writeFile(target, bytes);
+    if (!existing?.equals(bytes)) {
+      // Keep the previous pack intact if Windows rejects a write while the asset is being read.
+      const temporary=target+'.tmp';await writeFile(temporary,bytes);await rename(temporary,target);
+    }
   }
 }
 
@@ -192,6 +221,15 @@ async function main() {
   const levelMat = createLevelMaterial(new THREE.Texture(), atlasSize, muralHandle('tidewater'), { texlib: sourceTexlib });
   const levelShader = buildSourceMaterialShader(levelMat, shaderOptions);
   const shaders = new Map([['level', levelShader]]);
+  const exportPropShader=async(kit,key)=>{
+    if(shaders.has(`props.${key}`))return;
+    const shader=propShader(kit.mat[key],key);shaders.set(`props.${key}`,shader);
+    await artifact(`shaders/props-${key}.vert`,shader.vertex);
+    await artifact(`shaders/props-${key}.frag`,shader.fragment);
+    await artifact(`shaders/props-${key}.uniforms`,serialUniforms(shader.uniforms));
+    const state=shader.renderState,m=kit.mat[key];
+    await artifact(`shaders/props-${key}.state`,`${Number(state.transparent)} ${Number(state.depthWrite)} ${Number(state.depthTest)} ${state.side} ${state.blending} ${state.depthFunc} ${Number(m.alphaToCoverage)} ${Number(m.polygonOffset)} ${m.polygonOffsetFactor} ${m.polygonOffsetUnits}\n`);
+  };
   await artifact('shaders/level.vert', levelShader.vertex);
   await artifact('shaders/level.frag', levelShader.fragment);
   await artifact('shaders/level.uniforms', serialUniforms(levelShader.uniforms));
@@ -238,6 +276,7 @@ async function main() {
         const stageSection = interleaveLevel(geometry);
         const sections = [{ name: 'stage', ...stageSection }];
         const propMeshes = propMaterialMeshes(kit);
+        const animated=animatedProps(kit);
         let propVertexCount = 0, propIndexCount = 0;
         for (const [key, mesh] of propMeshes) {
           if (!mesh.indices.length) continue;
@@ -253,18 +292,14 @@ async function main() {
           const indices = Uint32Array.from(mesh.indices);
           sections.push({ name: `props.${key}`, vertices, indices, stride, data });
           propVertexCount += vertices; propIndexCount += indices.length;
-          if (!shaders.has(`props.${key}`)) {
-            const shader = propShader(kit.mat[key], key);
-            shaders.set(`props.${key}`, shader);
-            await artifact(`shaders/props-${key}.vert`, shader.vertex);
-            await artifact(`shaders/props-${key}.frag`, shader.fragment);
-            await artifact(`shaders/props-${key}.uniforms`, serialUniforms(shader.uniforms));
-            const state = shader.renderState;
-            await artifact(`shaders/props-${key}.state`, `${Number(state.transparent)} ${Number(state.depthWrite)} ${Number(state.depthTest)} ${state.side} ${state.blending} ${state.depthFunc} ${Number(kit.mat[key].alphaToCoverage)} ${Number(kit.mat[key].polygonOffset)} ${kit.mat[key].polygonOffsetFactor} ${kit.mat[key].polygonOffsetUnits}\n`);
-          }
+          await exportPropShader(kit,key.split('~')[0]);
         }
         if (!propVertexCount) throw new Error(`Source PropKit emitted no render vertices for ${id}/${mode}`);
         const file = `${id}-${mode}.stg.z`;
+        sections.push(...animated.sections);
+        for(const section of animated.sections)await exportPropShader(kit,section.name.slice(6).split('@')[0]);
+        for(const section of animated.sections){propVertexCount+=section.vertices;propIndexCount+=section.indices.length;}
+        await artifact(`${id}-${mode}.anim`,animated.records.map(r=>[r.name,r.kind,r.speed,r.phase,r.rate,r.lo,r.hi,...r.matrix].join(' ')).join('\n')+'\n');
         const packed = meshPack(sections);
         await artifact(file, packed.file);
         const edgeNormalCount = (() => {
@@ -278,7 +313,7 @@ async function main() {
         })();
         entries.push({ id: map.id, mode, file, vertexCount: stageSection.vertices, indexCount: stageSection.indices.length,
           propVertexCount, propIndexCount, exposedBevelNormalCount: edgeNormalCount, sourceProps: sourceDressing.length,
-          rawBytes: packed.rawBytes, compressedBytes: packed.file.length,
+          rawBytes: packed.rawBytes, compressedBytes: packed.file.length, animations: animated.records.length,
           stageShaderDigest: levelShader.digest, paintShaderDigest: createHash('sha256').update(paint.vertex).update(paint.fragment).digest('hex') });
         geometry.dispose();
       } finally { kit.dispose(); }

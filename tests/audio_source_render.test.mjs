@@ -62,6 +62,8 @@ if (manifest.render?.checkTolerancePcm16Lsb !== 8 ||
     manifest.render?.musicCheck?.nrmseFullScaleMax !== 0.003 ||
     manifest.render?.musicCheck?.correlationMin !== 0.9999)
   fail('SFX/loop or master-compressed music render comparison bounds changed');
+if(manifest.render.musicCheck.menu?.maxPcm16Lsb!==1024||manifest.render.musicCheck.menu?.nrmseFullScaleMax!==.004||manifest.render.musicCheck.menu?.correlationMin!==.9997)
+  fail('source-measured menu comparison bounds changed');
 if (!Array.isArray(manifest.clips) || manifest.clips.length < 200 || !Array.isArray(manifest.music) || manifest.music.length !== 9)
   fail(`expected the complete SFX bank and nine source tracks; found ${manifest.clips?.length ?? 0} cues and ${manifest.music?.length ?? 0} tracks`);
 
@@ -188,7 +190,7 @@ for (const clip of manifest.clips) {
   expectedMusicFiles.add(clip.file);
   if (clip.loop) expectedMusicFiles.add(clip.loop.file);
 }
-const actual = new Set(await filesUnder(audioRoot));
+const actual = new Set((await filesUnder(audioRoot)).filter(file=>file!=='custom-music.tsv'&&!file.startsWith('songs/')));
 if (actual.size !== expectedMusicFiles.size || [...expectedMusicFiles].some((file) => !actual.has(file)))
   fail('asset folder has an unexpected file or a missing source export');
 

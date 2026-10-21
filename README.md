@@ -8,6 +8,10 @@
 
 完整還原尚在進行；投影尺寸 LOD 已加入來源門檻、遲滯與交錯淡變。玩家選單與 HUD 使用 RmlUi，採簡約版面、Inter 與 Noto Sans TC，可選離線 Turf／Boss、地圖、裝備與難度，並調整音量和減少動態效果。場景已接入來源 bevel／PropKit 幾何、46 層程序材質與連續墨水；投射物使用來源墨滴、弓箭、拳套、刀波與蓄力光帶。miniaudio 的來源資料已擴充為 201 個音效及九首曲目，整合驗收進度見 [還原紀錄](docs/restoration-progress.md)。正式 hub／Locker、設定保存、線上與 Zones 仍須依 [spec.md](spec.md) 開發。Boss 的 100 骨架／命中 socket／材質數值已通過 16 組來源姿勢比對，完整模式與材質畫面仍在驗收。
 
+本輪已接入來源天空／海面／雲／遠景、港區反射、PMREM 與共用光照，裝置目錄擴為雙隊 58 個來源模型，並讓布條與道具持續動畫。潛水變形、潑墨動作與音訊的實際驗收及保留差異見 [本輪驗收](docs/acceptance-2026-10-21.md)。
+
+選單「設定」可選低／中／高畫質，或個別切換陰影、反射及後製。低畫質使用65%內部解析度並停用這三項效果；中畫質使用85%及1024陰影；高畫質使用原生解析度及2048陰影。HUD與字體維持原生解析度，設定於下一場對局套用，目前保留於本次執行期間。診斷入口可使用 `--graphics-quality low|medium|high`，效能報告會記錄實際設定。
+
 ## 建置與執行
 
 需求：Windows、支援 OpenGL 4.5 的顯卡、C++17 編譯器（已驗證 MSVC x64）、CMake、Ninja 與 vcpkg。相依套件由 [vcpkg.json](vcpkg.json) 宣告：GLFW、GLAD、GLM、RmlUi、miniaudio、Dear ImGui、OpenGL、zlib 與 stb。Dear ImGui 用於開發診斷介面；GameNetworkingSockets 留供後續原生多人連線接入，目前 target 不連結或初始化它。

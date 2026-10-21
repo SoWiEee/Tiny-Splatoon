@@ -51,6 +51,8 @@ input slidertrack { height: 6dp; margin-top: 11dp; background-color: #d4dfd2; bo
 input sliderbar { width: 18dp; height: 18dp; margin-top: -6dp; background-color: #216551; border-radius: 9dp; cursor: pointer; }
 input sliderbar:hover { background-color: #194e40; }
 input sliderarrowdec, input sliderarrowinc { display: none; }
+.effect-options { display: flex; margin-bottom: 24dp; }
+.effect-options .setting-option { margin-top: 0; margin-right: 28dp; }
 .setting-option { display: flex; align-items: center; margin-top: 45dp; }
 input.checkbox, input[type=checkbox] { width: 22dp; height: 22dp; margin-right: 13dp; background-color: #ffffff; border: 2dp #93a696; border-radius: 4dp; cursor: pointer; }
 input[type=checkbox]:checked { background-color: #216551; border-color: #216551; }

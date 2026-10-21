@@ -50,11 +50,13 @@ struct GameUi::Impl : Rml::EventListener {
     Rml::Context* context=nullptr;
     Rml::ElementDocument *menu=nullptr,*hud=nullptr;
     UiSetup selection;
+    GraphicsSettings graphics;
     UiAction action=UiAction::None;
     std::function<void(const std::string&)> sound;
     std::function<void(float,float,float)> volumes;
     float master=.8f,music=.6f,sfx=.85f;
     bool menuVisible=true,interactive=true;
+    bool syncingGraphicsControls=false;
     bool mouse[3]{};
     std::array<bool,8> keys{};
     std::string hovered;
@@ -106,6 +108,18 @@ struct GameUi::Impl : Rml::EventListener {
         if(!control)throw std::runtime_error("Invalid UI form control: "+id);
         control->SetValue(value);
     }
+    void SyncGraphicsControls(){
+        syncingGraphicsControls=true;
+        const char* preset=graphics.preset==GraphicsPreset::Low?"low":graphics.preset==GraphicsPreset::High?"high":graphics.preset==GraphicsPreset::Custom?"custom":"medium";
+        Value("graphics-preset",preset);
+        for(const auto& option:std::array<std::pair<const char*,bool>,3>{{{"graphics-shadows",graphics.shadows},{"graphics-reflections",graphics.reflections},{"graphics-post",graphics.postEffects}}}){
+            auto* control=Find(menu,option.first);
+            if(control->HasAttribute("checked")!=option.second){
+                if(option.second)control->SetAttribute("checked","");else control->RemoveAttribute("checked");
+            }
+        }
+        syncingGraphicsControls=false;
+    }
     void Populate(){
         std::string options;
         for(const auto& stage:ReferenceStages())if(stage.mode=="turf"&&!stage.onlineOnly)
@@ -149,6 +163,7 @@ struct GameUi::Impl : Rml::EventListener {
             return;
         }
         if(event.GetType()=="change"){
+            if(syncingGraphicsControls)return;
             auto* control=dynamic_cast<Rml::ElementFormControl*>(target);if(!control)return;
             const auto value=control->GetValue();
             if(id=="stage")selection.stage=value;
@@ -161,7 +176,21 @@ struct GameUi::Impl : Rml::EventListener {
             else if(id=="special")selection.special=value;
             else if(id=="duration")selection.duration=std::stoi(value);
             else if(id=="reduced-motion"){selection.reducedMotion=target->HasAttribute("checked");Play("ui_toggle");}
-            else if(id=="master"||id=="music"||id=="sfx"){
+            else if(id=="graphics-preset"){
+                if(value=="low")graphics=ForPreset(GraphicsPreset::Low);
+                else if(value=="high")graphics=ForPreset(GraphicsPreset::High);
+                else if(value=="medium")graphics=ForPreset(GraphicsPreset::Medium);
+                else graphics.preset=GraphicsPreset::Custom;
+                SyncGraphicsControls();Play("ui_click");
+            }else if(id=="graphics-shadows"||id=="graphics-reflections"||id=="graphics-post"){
+                const bool enabled=control->IsSubmitted();
+                if(id=="graphics-shadows"){
+                    graphics.shadows=enabled;
+                    if(enabled&&!graphics.shadowMapSize)graphics.shadowMapSize=1024;
+                }else if(id=="graphics-reflections")graphics.reflections=enabled;
+                else graphics.postEffects=enabled;
+                graphics.preset=GraphicsPreset::Custom;Value("graphics-preset","custom");Play("ui_toggle");
+            }else if(id=="master"||id=="music"||id=="sfx"){
                 const float gain=std::clamp(std::stof(value)/100.f,0.f,1.f);
                 if(id=="master")master=gain;else if(id=="music")music=gain;else sfx=gain;
                 Text(menu,id+"-value",Integer(gain*100)+"%");if(volumes)volumes(master,music,sfx);
@@ -199,6 +228,7 @@ struct GameUi::Impl : Rml::EventListener {
 GameUi::GameUi(GLFWwindow* window,const std::filesystem::path& assets):impl_(std::make_unique<Impl>(window,assets)){}
 GameUi::~GameUi()=default;
 const UiSetup& GameUi::setup()const{return impl_->selection;}
+const GraphicsSettings& GameUi::graphicsSettings()const{return impl_->graphics;}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
 void GameUi::SetVolumeSink(std::function<void(float,float,float)> value){impl_->volumes=std::move(value);if(impl_->volumes)impl_->volumes(impl_->master,impl_->music,impl_->sfx);}
 void GameUi::ShowMenu(const std::string& initialStage){

@@ -1,0 +1,46 @@
+diffuse 3 1 1 1
+opacity 1 1
+mapTransform 9 1 0 0 0 1 0 0 0 1
+alphaMapTransform 9 1 0 0 0 1 0 0 0 1
+alphaTest 1 0
+envMapRotation 9 1 0 0 0 1 0 0 0 1
+reflectivity 1 1
+ior 1 1.5
+refractionRatio 1 0.98
+aoMapIntensity 1 1
+aoMapTransform 9 1 0 0 0 1 0 0 0 1
+lightMapIntensity 1 1
+lightMapTransform 9 1 0 0 0 1 0 0 0 1
+emissiveMapTransform 9 1 0 0 0 1 0 0 0 1
+bumpMapTransform 9 1 0 0 0 1 0 0 0 1
+bumpScale 1 1
+normalMapTransform 9 1 0 0 0 1 0 0 0 1
+normalScale 2 1 1
+displacementMapTransform 9 1 0 0 0 1 0 0 0 1
+displacementScale 1 1
+displacementBias 1 0
+roughnessMapTransform 9 1 0 0 0 1 0 0 0 1
+metalnessMapTransform 9 1 0 0 0 1 0 0 0 1
+fogDensity 1 0.00025
+fogNear 1 1
+fogFar 1 2000
+fogColor 3 1 1 1
+probesMin 3 0 0 0
+probesMax 3 0 0 0
+probesResolution 3 0 0 0
+emissive 3 0 0 0
+roughness 1 0.6
+metalness 1 0
+envMapIntensity 1 1
+uTime 1 0
+uSunDir 3 -0.5775319998974024 0.6293203910498374 -0.5200121484190409
+uZenith 3 0.012286488353353374 0.158960835050774 0.7156935005005721
+uSkyMid 3 0.10224173307914941 0.3915724777393922 0.8879231178794775
+uHorizon 3 0.6583748172725346 0.8387990117372213 0.9559733532482866
+uGround 3 0.158960835050774 0.3712376804636741 0.508881320845802
+uHorizonGlow 3 0.05 0.04523305871945102 0.035784675025028606
+uGlowColor 3 1 0.8713671191959567 0.6038273388475408
+uGlowParams 4 900 0.9 7 0.06
+uHaze 4 0.0005405405405405405 0.9 260 0
+uNight 1 0
+toneMappingExposure 1 1

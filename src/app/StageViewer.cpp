@@ -16,6 +16,8 @@
 #include "LensField.hpp"
 #include "WorldEffects.hpp"
 #include "ProjectileRenderer.hpp"
+#include "EnvironmentRenderer.hpp"
+#include "DeviceRenderer.hpp"
 #include "BossRenderer.hpp"
 #include "GameUi.hpp"
 #include "AudioEngine.hpp"
@@ -47,7 +49,7 @@ namespace restoration {
 namespace {
 struct Options {
     std::string stage = "tidewater", mode = "turf", capture,matchCapture,uiCapture;
-    std::string benchmarkReport;
+    std::string benchmarkReport,graphicsQuality;
     std::string main="shooter",sub,special,difficulty="normal";
     int duration = 0;
     int frames = 0, width = 1600, height = 900;
@@ -55,7 +57,7 @@ struct Options {
     std::uint32_t benchmarkSeed = 1;
     bool paintProbe = false, game = false, playProbe = false, match = false, native = false;
     bool paintProbeSpecified = false, playProbeSpecified = false, captureSpecified = false, benchmarkReportSpecified = false;
-    bool benchmarkTuningSpecified = false;
+    bool benchmarkTuningSpecified = false, benchmarkPlayer = false;
     bool widthSpecified = false, heightSpecified = false;
 };
 
@@ -89,6 +91,15 @@ Options ParseOptions(int argc, char** argv) {
         else if (arg == "--match-capture") result.matchCapture = value;
         else if (arg == "--ui-capture") result.uiCapture = value;
         else if (arg == "--benchmark-report") { result.benchmarkReport = value; result.benchmarkReportSpecified = true; }
+        else if(arg=="--graphics-quality"){
+            if(value!="low"&&value!="medium"&&value!="high")throw std::runtime_error("--graphics-quality must be low, medium or high");
+            result.graphicsQuality=value;
+        }
+        else if (arg == "--benchmark-camera") {
+            result.benchmarkTuningSpecified=true;
+            if(value!="player"&&value!="overview")throw std::runtime_error("--benchmark-camera must be player or overview");
+            result.benchmarkPlayer=value=="player";
+        }
         else if (arg == "--benchmark-seed") {
             result.benchmarkTuningSpecified = true;
             std::size_t end = 0;
@@ -132,10 +143,12 @@ Options ParseOptions(int argc, char** argv) {
     if (!result.uiCapture.empty() && !result.native) throw std::runtime_error("--ui-capture requires the native menu");
     if(result.playProbe && !result.game) throw std::runtime_error("--play-probe requires --reference-game");
     if (result.native && (result.match || result.game || result.paintProbeSpecified || result.playProbeSpecified ||
-                          result.captureSpecified || !result.matchCapture.empty() || result.benchmarkReportSpecified || result.benchmarkTuningSpecified))
+                          result.captureSpecified || !result.matchCapture.empty() || result.benchmarkReportSpecified || result.benchmarkTuningSpecified || !result.graphicsQuality.empty()))
         throw std::runtime_error("--native cannot be combined with reference matches, practice probes, captures, or benchmark options");
     if (!result.benchmarkReport.empty() && !result.match)
         throw std::runtime_error("--benchmark-report requires --reference-match");
+    if(!result.graphicsQuality.empty()&&!result.match)throw std::runtime_error("--graphics-quality requires --reference-match");
+    if(result.benchmarkPlayer&&result.benchmarkReport.empty())throw std::runtime_error("--benchmark-camera player requires --benchmark-report");
     if (result.duration&&( !result.match||result.mode!="boss"))throw std::runtime_error("--duration requires a Boss match");
     if (!result.matchCapture.empty() && !result.match)
         throw std::runtime_error("--match-capture requires --reference-match");
@@ -324,6 +337,7 @@ enum class MatchExit { Close, StageSelect };
 MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& stage,
                     const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio,bool nativeApp=false) {
     audio.Clear();
+    const auto graphics=options.graphicsQuality.empty()?ui.graphicsSettings():ForPreset(options.graphicsQuality=="low"?GraphicsPreset::Low:options.graphicsQuality=="high"?GraphicsPreset::High:GraphicsPreset::Medium);
     StageGeometry geometry(stage);
     FacePaint paint(stage,geometry);
     NavGraph nav(stage,geometry);
@@ -343,20 +357,25 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     camera.pitch=-0.1;
     camera.reset(CameraActor(match.local()));
 
-    StageRenderer renderer(characterAssets.parent_path()/"stages");
+    StageRenderer renderer(characterAssets.parent_path()/"stages",true);
+    EnvironmentRenderer environment(characterAssets.parent_path()/"environment");
+    environment.SetReflectionsEnabled(graphics.reflections);
+    environment.Load(stage);
     renderer.Load(stage,0,paint);
     renderer.UploadInk(stage,paint);
     RenderPipeline pipeline;
-    pipeline.Configure(4,true,true);
-    CharacterArt art(characterAssets,true);
+    pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects);
+    CharacterArt art(characterAssets,true,true);
     WorldEffects worldEffects(art.data());
-    ProjectileRenderer projectileRenderer(characterAssets.parent_path()/"projectiles");
+    DeviceRenderer deviceRenderer(characterAssets.parent_path()/"devices");
+    worldEffects.SetDeviceRenderer(&deviceRenderer);
+    ProjectileRenderer projectileRenderer(characterAssets.parent_path()/"projectiles",true);
     ScreenEffectsController screenController;
     LensField lensField;
     DirectionalShadow directionalShadow;
     std::unique_ptr<BossRenderer> bossRenderer;
     if(match.boss()){
-        bossRenderer=std::make_unique<BossRenderer>(characterAssets.parent_path()/"boss");
+        bossRenderer=std::make_unique<BossRenderer>(characterAssets.parent_path()/"boss",true);
         match.setBossPoseSink([&](BossSimulation& boss){bossRenderer->Update(boss);});
     }
     match.local().setDamageSink([&screenController](double amount,const glm::dvec3* attacker){screenController.Damage(amount,attacker);});
@@ -512,22 +531,17 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                 resultReported=true;
             }
         }
-        if(!benchmark) camera.tick(dt,CameraActor(local),geometry);
-        const auto fxCamera=benchmark?overviewEye:camera.pose().eye;
+        if(!benchmark||options.benchmarkPlayer) camera.tick(dt,CameraActor(local),geometry);
+        const auto fxCamera=benchmark&&!options.benchmarkPlayer?overviewEye:camera.pose().eye;
         worldEffects.Update(dt,match.world(),fxCamera);
+        deviceRenderer.Update(dt,match.world(),fxCamera);
         const auto& events=worldEffects.lastEvents();
         projectileRenderer.Update(dt,match.world(),events);
-        const auto forward=benchmark?glm::normalize(target-fxCamera):camera.pose().forward;
+        const auto forward=benchmark&&!options.benchmarkPlayer?glm::normalize(target-fxCamera):camera.pose().forward;
         gameAudio.Update(dt,match,events,{fxCamera.x,fxCamera.y,fxCamera.z},{forward.x,forward.y,forward.z});
         pendingVisualEvents.insert(pendingVisualEvents.end(),events.begin(),events.end());
     };
-    CharacterLightState lighting;
-    lighting.ambient=glm::vec3(0.23f,0.25f,0.29f);
-    lighting.sunDirection=glm::normalize(glm::vec3(-0.4f,0.85f,0.35f));
-    lighting.sunColor=glm::vec3(1.0f,0.92f,0.82f);
-    lighting.skyDirection=glm::vec3(0.0f,1.0f,0.0f);
-    lighting.skyColor=glm::vec3(0.42f,0.56f,0.75f);
-    lighting.groundColor=glm::vec3(0.27f,0.22f,0.18f);
+    const CharacterLightState lighting=environment.Lights();
     for(std::size_t i=0;i<match.actors().size();++i) {
         auto* actor=match.actors()[i].get();
         const auto& roster=match.roster()[i];
@@ -617,7 +631,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             animation.runner=runner;
 
             auto& scene=state->scene;
-            scene.cameraPosition=options.benchmarkReport.empty() ? camera.pose().eye : overviewEye;
+            scene.cameraPosition=!benchmark||options.benchmarkPlayer ? camera.pose().eye : overviewEye;
             for(std::size_t j=0;j<match.actors().size();++j) {
                 const auto& other=*match.actors()[j];
                 scene.actors[j]={j+1,other.team(),j!=i&&other.state.alive,other.visualPos()};
@@ -629,7 +643,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     std::unique_ptr<PerformanceCapture> capture;
     if(!options.benchmarkReport.empty())
         capture=std::make_unique<PerformanceCapture>(options.benchmarkReport,std::string(stage.id),options.mode,options.benchmarkSeed,
-            options.width,options.height,options.benchmarkWarmup,options.benchmarkFrames);
+            options.width,options.height,options.benchmarkWarmup,options.benchmarkFrames,options.benchmarkPlayer,graphics);
     if(!benchmark&&!options.frames) captureMouse(true);
     glEnable(GL_DEPTH_TEST);
     double lodPrevious=glfwGetTime();
@@ -665,10 +679,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
         previous=now;
         renderer.UploadInk(stage,paint,visualDt);
-        const glm::dvec3 renderEye=benchmark?overviewEye:camera.pose().eye;
-        const glm::dvec3 renderForward=benchmark?glm::normalize(target-overviewEye):camera.pose().forward;
+        const glm::dvec3 renderEye=benchmark&&!options.benchmarkPlayer?overviewEye:camera.pose().eye;
+        const glm::dvec3 renderForward=benchmark&&!options.benchmarkPlayer?glm::normalize(target-overviewEye):camera.pose().forward;
         glm::mat4 projection,view;
-        if(benchmark) {
+        if(benchmark&&!options.benchmarkPlayer) {
             projection=glm::perspective(glm::radians(48.0f),static_cast<float>(width)/height,0.15f,6500.0f);
             view=glm::lookAt(glm::vec3(overviewEye),glm::vec3(target),glm::vec3(0,1,0));
         } else {
@@ -678,31 +692,40 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         const auto vp=projection*view;
         const double lodStep=benchmark?dt:paused?0.0:std::clamp(now-lodPrevious,0.0,0.1);
         lodPrevious=now;
+        environment.Update(lodStep);
         std::vector<CharacterLodFrame> lodFrames(characters.size());
         for(std::size_t i=0;i<characters.size();++i){
             auto& character=*characters[i];const auto& pose=character.pose->frame();
             lodFrames[i]=character.lod.update(CharacterLod::screenPixels(pose.root.matrix(),renderEye,
                 projection[1][1],height),character.scene.isLocal,lodStep);
         }
-        directionalShadow.Begin(stage.bounds,glm::dvec3(lighting.sunDirection),2048);
+        std::vector<DeviceActorPose> deviceActors;deviceActors.reserve(characters.size());
+        for(std::size_t i=0;i<characters.size();i++){const auto& character=*characters[i];const auto special=match.actors()[i]->specialPose();deviceActors.push_back({match.actors()[i].get(),&character.pose->frame(),&character.style,special.active&&special.kind=="jetpack"?art.attachment(character.pose->frame(),character.style,"tank/group"):glm::dmat4(1)});}
+        int shadowDraws=0;
+        if(graphics.shadows){
+        directionalShadow.Begin(stage.bounds,glm::dvec3(lighting.sunDirection),graphics.shadowMapSize);
         GLboolean colorMask[4]{};glGetBooleanv(GL_COLOR_WRITEMASK,colorMask);glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
-        int shadowDraws=renderer.DrawShadow(glm::mat4(directionalShadow.matrix()));
+        shadowDraws=renderer.DrawShadow(glm::mat4(directionalShadow.matrix()));
+        shadowDraws+=environment.DrawShadow(directionalShadow.matrix());
         const CharacterShadowState shadowCaster{true,0,directionalShadow.matrix(),0.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
         for(std::size_t i=0;i<characters.size();++i){
             const auto& actor=*match.actors()[i];auto& character=*characters[i];const auto& pose=character.pose->frame();const auto& lod=lodFrames[i];
+            const auto special=actor.specialPose();const bool hideTank=special.active&&special.kind=="jetpack";
             if(lod.transitioning){
                 const double fade=std::max(1e-4,lod.fade);
                 shadowDraws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),CharacterTierName(lod.tier),
-                    directionalShadow.view(),directionalShadow.projection(),renderEye,lighting,{fade,1.0,lod.fade<0.5},&shadowCaster));
+                    directionalShadow.view(),directionalShadow.projection(),renderEye,lighting,{fade,1.0,lod.fade<0.5,hideTank},&shadowCaster));
                 shadowDraws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),CharacterTierName(lod.to),
-                    directionalShadow.view(),directionalShadow.projection(),renderEye,lighting,{fade,-1.0,lod.fade>=0.5},&shadowCaster));
+                    directionalShadow.view(),directionalShadow.projection(),renderEye,lighting,{fade,-1.0,lod.fade>=0.5,hideTank},&shadowCaster));
             }else shadowDraws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),CharacterTierName(lod.tier),
-                directionalShadow.view(),directionalShadow.projection(),renderEye,lighting,{},&shadowCaster));
+                directionalShadow.view(),directionalShadow.projection(),renderEye,lighting,{0,1,true,hideTank},&shadowCaster));
         }
         if(bossRenderer&&match.boss())shadowDraws+=bossRenderer->DrawShadow(*match.boss(),glm::mat4(directionalShadow.matrix()));
+        shadowDraws+=deviceRenderer.DrawShadow(directionalShadow.matrix(),deviceActors);
         glColorMask(colorMask[0],colorMask[1],colorMask[2],colorMask[3]);
         directionalShadow.End();
+        }
 
         for(const auto& event:pendingVisualEvents){
             if(event.kind=="bulletImpact")screenController.Impact(event.pos,event.team==match.local().team(),false);
@@ -729,39 +752,49 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         const auto jump=local.superJumpState();if(jump){screenInput.jumpPhase=jump->flight?"flight":jump->home?"home":"";screenInput.jumpTime=jump->elapsed;screenInput.jumpDuration=jump->duration;}
         ScreenEffects screen=screenController.Update(lodStep,screenInput);
 
-        pipeline.Begin(width,height,projection,glm::inverse(view),0.15f,6500.0f);
-        glViewport(0,0,width,height);
+        const int renderWidth=std::max(1,int(std::round(width*graphics.renderScale))),renderHeight=std::max(1,int(std::round(height*graphics.renderScale)));
+        pipeline.Begin(renderWidth,renderHeight,projection,glm::inverse(view),0.15f,6500.0f);
+        const int reflectionDraws=environment.RenderReflection(view,projection,glm::vec3(renderEye),renderWidth,renderHeight,[&](const auto& reflectedView,const auto& reflectedProjection,const auto& reflectedEye){
+            return renderer.Draw(glm::dmat4(reflectedView),glm::dmat4(reflectedProjection),glm::dvec3(reflectedEye),lighting,false,graphics.shadows?&directionalShadow:nullptr,true);
+        });
+        glViewport(0,0,renderWidth,renderHeight);
         glClearColor(0.64f,0.81f,0.9f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        int draws=shadowDraws+renderer.Draw(glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,false,&directionalShadow);
-        CharacterShadowState receiver{false,directionalShadow.texture(),directionalShadow.matrix(),1.0,
+        int draws=shadowDraws+reflectionDraws+renderer.Draw(glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,false,graphics.shadows?&directionalShadow:nullptr);
+        draws+=environment.DrawSea(view,projection,glm::vec3(renderEye),graphics.shadows?&directionalShadow:nullptr);
+        draws+=environment.DrawScenery(view,projection,glm::vec3(renderEye));
+        draws+=environment.DrawSky(view,projection,glm::vec3(renderEye));
+        CharacterShadowState receiver{false,graphics.shadows?directionalShadow.texture():0,directionalShadow.matrix(),1.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
         for(std::size_t i=0;i<characters.size();++i) {
             const auto& actor=*match.actors()[i];
             auto& character=*characters[i];
             const auto& pose=character.pose->frame();
             const auto& lod=lodFrames[i];
+            const auto activeSpecial=actor.specialPose();const bool hideTank=activeSpecial.active&&activeSpecial.kind=="jetpack";
             if(lod.transitioning) {
                 const double fade=std::max(1e-4,lod.fade);
                 draws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),
                     CharacterTierName(lod.tier),glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,
-                    {fade,1.0,lod.fade<0.5},&receiver));
+                    {fade,1.0,lod.fade<0.5,hideTank},&receiver));
                 draws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),
                     CharacterTierName(lod.to),glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,
-                    {fade,-1.0,lod.fade>=0.5},&receiver));
+                    {fade,-1.0,lod.fade>=0.5,hideTank},&receiver));
             } else draws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),
-                CharacterTierName(lod.tier),glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,{},&receiver));
+                    CharacterTierName(lod.tier),glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,{0,1,true,hideTank},&receiver));
         }
         if(bossRenderer&&match.boss()){
-            draws+=bossRenderer->Draw(*match.boss(),view,projection,glm::vec3(renderEye),glm::vec3(teamColors[0]));
+            draws+=bossRenderer->Draw(*match.boss(),view,projection,glm::vec3(renderEye),glm::vec3(teamColors[0]),&lighting);
             draws+=bossRenderer->DrawHazards(*match.boss(),geometry,vp,glm::vec3(teamColors[0]));
         }
-        draws+=worldEffects.Draw(view,projection,glm::vec3(renderEye));
+        draws+=worldEffects.Draw(view,projection,glm::vec3(renderEye),&lighting);
         draws+=projectileRenderer.Draw(view,projection,renderEye,lighting);
-        draws+=lensField.Render(screenController.lens(),width,height);
+        draws+=deviceRenderer.Draw(view,projection,renderEye,lighting,deviceActors,&receiver);
+        if(graphics.postEffects)draws+=lensField.Render(screenController.lens(),renderWidth,renderHeight);
         screen.lensTexture=lensField.texture();screen.lensTexel=lensField.texel();
-        draws+=pipeline.End(GradeSettings::Theme(std::string(stage.theme)),screen);
-        if(!capture) {
+        screen.enabled=screen.enabled&&graphics.postEffects;
+        draws+=pipeline.End(GradeSettings::Theme(std::string(stage.theme)),screen,width,height);
+        if(!capture||options.benchmarkPlayer) {
             const auto hudAction=ui.RenderHud(stage,paint,match,width,height,paused,nativeApp);
             if(hudAction==UiAction::Resume)resumeMatch();
             else if(hudAction==UiAction::StageSelect)matchExit=MatchExit::StageSelect;

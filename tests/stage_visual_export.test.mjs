@@ -69,6 +69,16 @@ test('source-derived stage geometry and render material assets are present for e
     const stage = meshes.get('stage');
     assert.ok(stage && stage.stride === 25 && stage.vertices === item.vertexCount);
     assert.ok([...meshes.keys()].some((name) => name.startsWith('props.')));
+    assert.ok([...meshes.keys()].some((name) => name.endsWith('~ns')), 'source non-shadow-casting props stay separate');
+    const animations=(await readFile(new URL(`${item.id}-${item.mode}.anim`,root),'utf8')).trim().split('\n');
+    assert.ok(animations.length>20,'live prop motions must remain in the source export');
+    for(const line of animations){
+      const [name,kind,...numbers]=line.split(' ');
+      assert.ok(meshes.has(name),`animation references missing mesh ${name}`);
+      assert.ok(['y','z','blink','cloth'].includes(kind));
+      assert.equal(numbers.length,21);
+      assert.ok(numbers.every(n=>Number.isFinite(Number(n))));
+    }
     let roundedEdgeNormals = 0;
     for (let i = 0; i < stage.vertices; i++) {
       const n = [stage.floats[i * stage.stride + 3], stage.floats[i * stage.stride + 4], stage.floats[i * stage.stride + 5]];

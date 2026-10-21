@@ -35,10 +35,17 @@ std::vector<double> values(const glm::mat<C, R, T, Q>& value) {
 }
 }
 
-CharacterShader::CharacterShader(const std::string& vertex, const std::string& fragment,bool linearOutput) {
-    const GLuint vs = compile(GL_VERTEX_SHADER, vertex);
+CharacterShader::CharacterShader(const std::string& vertex, const std::string& fragment,bool linearOutput,bool environment,bool fog) {
+    std::string sceneVertex=vertex,sceneFragment=fragment;
+    if(environment){
+        // Activate the already-expanded source chunks for the source 256-face PMREM atlas.
+        const std::string features=std::string("\n#define USE_ENVMAP\n#define ENVMAP_TYPE_CUBE_UV\n#define CUBEUV_TEXEL_WIDTH (1.0 / 768.0)\n#define CUBEUV_TEXEL_HEIGHT (1.0 / 1024.0)\n#define CUBEUV_MAX_MIP 8.0\n")+(fog?"#define USE_FOG\n":"");
+        sceneVertex.insert(sceneVertex.find('\n')+1,features);
+        sceneFragment.insert(sceneFragment.find('\n')+1,features);
+    }
+    const GLuint vs = compile(GL_VERTEX_SHADER, sceneVertex);
     GLuint fs = 0;
-    std::string lodFragment = fragment;
+    std::string lodFragment = sceneFragment;
     if(linearOutput){
         // Three's render-target materials bypass tone mapping and output encoding;
         // the final pass applies Neutral and sRGB exactly once.
@@ -51,6 +58,7 @@ CharacterShader::CharacterShader(const std::string& vertex, const std::string& f
     const std::regex main(R"(void\s+main\s*\(\s*\)\s*\{)");
     const std::string dither = R"GLSL(
 uniform vec2 uLodFade;
+uniform bool iwDepthOnly;
 float iwLodIGN(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
 void main() {
     if (uLodFade.x > 0.0) {
@@ -60,6 +68,9 @@ void main() {
 )GLSL";
     if (!std::regex_search(lodFragment, main)) { glDeleteShader(vs); throw std::runtime_error("Source character fragment has no main"); }
     lodFragment = std::regex_replace(lodFragment, main, dither, std::regex_constants::format_first_only);
+    // Preserve source alpha/hash clipping, then skip PBR work when only depth is written.
+    const auto depthAt=lodFragment.find("// source chunk: normal_fragment_begin");
+    if(depthAt!=std::string::npos)lodFragment.insert(depthAt,"if(iwDepthOnly){gl_FragColor=vec4(0.0);return;}\n");
     try { fs = compile(GL_FRAGMENT_SHADER, lodFragment); }
     catch (...) { glDeleteShader(vs); throw; }
     program_ = glCreateProgram();
@@ -151,6 +162,14 @@ void CharacterShader::lights(const CharacterLightState& light, const glm::dmat4&
     uniform("hemisphereLights[0].direction", values(glm::normalize(rotation * glm::dvec3(light.skyDirection))));
     uniform("hemisphereLights[0].skyColor", values(light.skyColor)); uniform("hemisphereLights[0].groundColor", values(light.groundColor));
     uniform("toneMappingExposure", light.exposure);
+    uniform("fogColor",values(light.fogColor));
+    uniform("fogNear",light.fogNear);uniform("fogFar",light.fogFar);
+    uniform("envMap",9.0);uniform("envMapIntensity",light.environmentTexture?light.environmentIntensity:0.0);
+    uniform("envMapRotation",std::vector<double>{1,0,0,0,1,0,0,0,1});
+    if(light.environmentTexture){
+        GLint previous=0;glGetIntegerv(GL_ACTIVE_TEXTURE,&previous);
+        glActiveTexture(GL_TEXTURE9);glBindTexture(GL_TEXTURE_2D,light.environmentTexture);glActiveTexture(previous);
+    }
 }
 
 void CharacterShader::material(const CharacterMaterialState& m) const {

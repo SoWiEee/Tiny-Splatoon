@@ -21,6 +21,15 @@ test('fixture envelope preserves the complete rig, live face/hair, forms, and al
   assert.notDeepEqual(idle[0].uniforms.uGaze, idle.at(-1).uniforms.uGaze, 'Gaze must remain live');
   const forms = data.scenarios.find(s => s.definition.name === 'form_cycle').samples;
   assert.deepEqual(new Set(forms.map(s => s.state.form)), new Set(['kid', 'squid', 'swim', 'climb']));
+  for (const form of ['squid', 'swim', 'climb']) {
+    const sample = forms.find(s => s.state.form === form);
+    assert.ok(sample.squid.visible, `${form}: source squid must be rendered`);
+    assert.equal(sample.kid.visible, false, `${form}: kid must be hidden after transformation`);
+  }
+  for (const weapon of ['roller', 'brush', 'bucket', 'blade']) {
+    const samples = data.scenarios.find(s => s.definition.name === `weapon_${weapon}`).samples;
+    assert.notDeepEqual(samples[0].bones, samples.at(-1).bones, `${weapon}: splashing must animate the rig`);
+  }
   for (const scenario of data.scenarios) for (const sample of scenario.samples) {
     assert.equal(sample.bones.length, 87);
     assert.equal(sample.skinMatrices.length, 87);

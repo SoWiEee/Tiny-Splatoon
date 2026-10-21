@@ -36,6 +36,7 @@ public:
     const CharacterRig& rig(int hair,int hat,int brows) const;
     const CharacterModel& model(const std::string& id) const;
     const CharacterMesh& mesh(const std::string& file) const;
+    static CharacterMesh LoadMesh(const std::filesystem::path& path);
     std::size_t rigCount() const { return rigs_.size(); }
     const std::map<std::string,CharacterModel>& models() const { return models_; }
 private:

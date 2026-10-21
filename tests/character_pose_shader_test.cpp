@@ -25,6 +25,16 @@ int main(int argc, char** argv) {
             else if(material.depthFunc!=3)throw std::runtime_error("Unexpected source depth function: "+material.key);
         }
         if(!ghostDepth)throw std::runtime_error("Source squid ghost must use GreaterDepth without depth writes");
+        {
+            restoration::CharacterShader depth(
+                "#version 450 core\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}",
+                "#version 450 core\nout vec4 color;\n#define gl_FragColor color\nvoid main(){if(gl_FragCoord.x<32.)discard;\n// source chunk: normal_fragment_begin\ngl_FragColor=vec4(1.);}");
+            GLuint vao=0;glGenVertexArrays(1,&vao);glBindVertexArray(vao);glViewport(0,0,64,64);glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);
+            std::vector<float> normal(64*64),fast(64*64);depth.use();
+            for(int pass=0;pass<2;pass++){glClear(GL_DEPTH_BUFFER_BIT);depth.uniform("iwDepthOnly",pass);glDrawArrays(GL_TRIANGLES,0,3);glReadPixels(0,0,64,64,GL_DEPTH_COMPONENT,GL_FLOAT,pass?fast.data():normal.data());}
+            if(normal!=fast||fast[16]!=1.f||fast[48]>=1.f)throw std::runtime_error("Depth-only PBR bypass changed alpha-clipped shadow coverage");
+            glDeleteVertexArrays(1,&vao);
+        }
         const std::filesystem::path directory = argc > 1 ? argv[1] : "assets/reference/characters/shaders";
         int count = 0;
         std::set<std::string> families;
