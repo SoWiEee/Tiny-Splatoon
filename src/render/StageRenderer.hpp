@@ -13,6 +13,7 @@ namespace restoration {
 struct StageData;
 class FacePaint;
 class PlayerSimulation;
+class CombatWorld;
 class DirectionalShadow;
 struct CharacterLightState;
 
@@ -31,6 +32,7 @@ public:
              bool wireframe=false,const DirectionalShadow* shadow=nullptr,bool reflection=false);
     int DrawShadow(const glm::mat4& lightViewProjection);
     void LoadActors(const PlayerSimulation& player);
+    void UpdateSwimWake(double dt,const CombatWorld& world,glm::dvec3 camera);
 private:
     struct Source;
     std::filesystem::path stageAssets_;

@@ -1,11 +1,11 @@
 # Native architecture
 
-`main.cpp` forwards every launch to `restoration::RunStageViewer`. With no explicit diagnostic selector, the application opens the native offline Turf stage-select menu. `--native` remains an alias; `--reference-stage`, `--reference-game`, and `--reference-match` select the existing diagnostic or direct-match paths. Unknown options fail during parsing before GLFW initialization.
+`main.cpp` forwards every launch to `restoration::RunStageViewer`. The default launch opens the native player menu. `--native` remains an alias; `--reference-practice`, `--reference-match`, `--reference-boss`, and `--reference-zones` select the current native gameplay paths. Retired stage/practice diagnostic selectors are rejected. Unknown options fail during parsing before GLFW initialization.
 
 ## Build ownership
 
 - `restoration_core` is the C++17 static library for reference data, stage geometry, CPU paint, player/controller, weapons, combat world, specials, navigation, bots, match lifecycle, and live character poses. It depends on GLM and has no GLFW or network lifetime.
-- `Tiny-Splatoon` adds `StageViewer`, `CharacterArt`, `CharacterShader`, `PerformanceCapture`, and `GpuPreference`. GLFW／GLAD／OpenGL own the window and graphics; ImGui remains for diagnostics and stb writes diagnostic PNGs.
+- `Tiny-Splatoon` adds `StageViewer`, `CharacterArt`, `CharacterShader`, `PerformanceCapture`, and `GpuPreference`. GLFW／GLAD／OpenGL own the window and graphics; RmlUi owns all interface pages and stb writes validation PNGs.
 - `player_ui` owns `GameUi` and the RmlUi OpenGL renderer. RML/RCSS assets describe the menu and HUD; UI emits actions and settings rather than mutating the simulation directly. Inter and Noto Sans TC are bundled under OFL.
 - `game_audio` owns miniaudio playback, source cue metadata, bounded one-shot voices, positional loops and streamed source music. `GameAudio` maps actor, world, match and Boss state to that playback interface. Source-rendered assets and remaining limits are documented in [the audio contract](docs/audio-source-contract.md).
 - Tests link the same core library. Source exporters operate on the locally supplied, hash-locked `splat-ref/`; native fixtures and application builds use committed data.
@@ -25,7 +25,7 @@ The physical `restoration/` directory is retired. The existing C++ namespace and
 
 ## Runtime ownership
 
-`RunStageViewer` owns one GLFW window, OpenGL context, diagnostic ImGui context, `GameUi` and `AudioEngine`. The native menu starts a `MatchLoop` in that same context. The match owns its stage geometry, `FacePaint`, navigation, `MatchSimulation`, `FollowCamera`, per-actor `CharacterPose`, and character GPU resources. Return/replay destroys these match objects and clears active sounds before reopening the stage menu. All UI and GL resources are destroyed before the context is released; audio sounds release their borrowed PCM cursors before the engine and cache are destroyed.
+`RunStageViewer` owns one GLFW window, OpenGL context, `GameUi` and `AudioEngine`. The native menu starts a `MatchLoop` in that same context. The match owns its stage geometry, `FacePaint`, navigation, `MatchSimulation`, `FollowCamera`, per-actor `CharacterPose`, and character GPU resources. Return/replay destroys these match objects and clears active sounds before reopening the stage menu. All UI and GL resources are destroyed before the context is released; audio sounds release their borrowed PCM cursors before the engine and cache are destroyed.
 
 `MatchSimulation` owns eight actors and seven bots in offline Turf. `PlayerSimulation`, `WeaponRunner`, `CombatWorld` and `WorldSpecials` are the shared gameplay path. Pose trigger/frame callbacks consume those states; renderer and UI do not run a second combat implementation. Simulation and the match follow-camera advance at a fixed 60 Hz; rendering displays the latest pose at the window frame rate. Focus loss and pause stop match advancement, and resume resets mouse/fire input edges.
 

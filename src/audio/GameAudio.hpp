@@ -42,6 +42,7 @@ private:
     void UpdateDeviceAudio(MatchSimulation& match);
     void Play(std::string_view name, const PlayerSimulation* actor = nullptr, double volume = 1, double pitch = 1);
     void UpdateBoss(double dt, MatchSimulation& match);
+    void ClearBossPendingAudio();
     void UpdateZones(double dt,MatchSimulation& match);
     void StopZoneLoops();
     void UpdateWorldAudio(double dt, MatchSimulation& match);
@@ -60,11 +61,15 @@ private:
     AudioPosition listenerPosition_{};
     std::uint32_t audioRandomState_ = 0x6d2b79f5u;
     double previousRemaining_ = 0, bossHp_ = -1, bossSunkIn_ = 0;
+    double bossIntroSlamAt_=-1,bossIntroRoarAt_=-1,bossSlamAt_=-1,bossChargeRoarAt_=-1,bossCrabletSecondAt_=-1;
+    AudioPosition bossIntroSlamPos_{},bossIntroRoarPos_{},bossSlamPos_{},bossChargeRoarPos_{},bossCrabletPos_{},bossBarragePos_{};
+    double bossBarrageStartedAt_=-1;
+    int bossBarrageCount_=0,bossBarrageWhistles_=0,bossBarrageBarrels_=0;
     double gullTimer_ = 4, gustTimer_ = 2, clinkTimer_ = 0, hornTimer_ = 32;
     int pendingHalyardClinks_ = 0;
     int bossPhase_ = 0, matchPhase_ = -1;
     bool harborLoop_ = false, pausedAudio_ = false, resumeLoops_ = false;
-    bool hasListenerPosition_ = false, bossDead_ = false, playing_ = false;
+    bool hasListenerPosition_ = false, bossDead_ = false, playing_ = false,bossIntroSeen_=false;
     std::size_t zoneEventCursor_=0;
     std::unordered_map<int,double> zoneHums_;
     std::array<int,2> zoneTicks_{{100,100}};

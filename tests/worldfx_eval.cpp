@@ -53,6 +53,7 @@ int main(){
     while(std::getline(std::cin,name)){
         if(name.empty())continue;std::uint32_t rng=0x6d2b79f5u;glm::dvec3 pos(0),normal(0,1,0),color=orange();double radius=1;
         if(name=="explosion")radius=3;if(name=="slamWave")radius=5.2f;if(name=="stormStart")radius=3.4f;if(name=="rainSheet"){pos.y=4.6f;radius=3.4f;}
+        if(name=="formPop")radius=1;if(name=="dive"||name=="emerge")radius=4;if(name=="wake"){normal={0,0,1};radius=8;}
         auto items=BuildWorldFxRecipe(name,pos,normal,color,radius,rng);
         std::cout<<"{\"recipe\":\""<<name<<"\",\"immediatePools\":";pools(items,false);
         UpdateWorldFxRecipe(items,1.0/60.0,rng);

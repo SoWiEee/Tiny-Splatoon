@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(Tiny-Splatoon VERSION 0.7.3 LANGUAGES CXX C)
+project(Tiny-Splatoon VERSION 0.7.5 LANGUAGES CXX C)
 
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # MSVC emits UTF-8 here; a system-codepage probe can corrupt Ninja's include prefix.
@@ -28,7 +28,6 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
 find_package(RmlUi CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_path(MINIAUDIO_INCLUDE_DIR miniaudio.h)
@@ -86,7 +85,6 @@ target_link_libraries(Tiny-Splatoon PRIVATE
     glad::glad
     glfw
     OpenGL::GL
-    imgui::imgui
     glm::glm
     ZLIB::ZLIB
 )
@@ -136,6 +134,12 @@ if(BUILD_TESTING)
     add_executable(stage_prop_animation_test tests/stage_prop_animation_test.cpp)
     target_link_libraries(stage_prop_animation_test PRIVATE glm::glm)
     add_test(NAME reference_stage_prop_animation COMMAND stage_prop_animation_test)
+    add_executable(swim_wake_test tests/swim_wake_test.cpp)
+    target_link_libraries(swim_wake_test PRIVATE restoration_core)
+    add_test(NAME reference_swim_wake_state COMMAND swim_wake_test)
+    add_executable(worldfx_transition_test tests/worldfx_transition_test.cpp)
+    target_link_libraries(worldfx_transition_test PRIVATE glm::glm)
+    add_test(NAME reference_worldfx_transitions COMMAND worldfx_transition_test)
     add_executable(environment_gpu_test tests/environment_gpu_test.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(environment_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
     add_test(NAME reference_environment_gpu COMMAND environment_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/environment" "${CMAKE_BINARY_DIR}/captures/environment")

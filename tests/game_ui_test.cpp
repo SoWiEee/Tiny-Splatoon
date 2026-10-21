@@ -12,13 +12,15 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace {
-void Check(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
+void Check(bool condition,const std::string& message){if(!condition)throw std::runtime_error(message);}
 void Capture(const std::filesystem::path& file,int width,int height){
     std::filesystem::create_directories(file.parent_path());
     std::vector<unsigned char> pixels(width*height*3);
@@ -29,12 +31,14 @@ void Capture(const std::filesystem::path& file,int width,int height){
 }
 int main(int argc,char** argv){
     if(argc!=3||!glfwInit())return 1;
-    glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    auto* window=glfwCreateWindow(1600,900,"Player UI interaction test",nullptr,nullptr);
+    glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);glfwWindowHint(GLFW_DECORATED,GLFW_FALSE);glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+    auto* window=glfwCreateWindow(1920,1080,"Player UI interaction test",nullptr,nullptr);
     if(!window){glfwTerminate();return 1;}
     glfwMakeContextCurrent(window);if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))return 1;
     int result=0;
     try{
+        int framebufferWidth=0,framebufferHeight=0;glfwGetFramebufferSize(window,&framebufferWidth,&framebufferHeight);
+        Check(framebufferWidth>=1920&&framebufferHeight>=1080,"Frameless UI test framebuffer must support 1920x1080 captures (actual="+std::to_string(framebufferWidth)+"x"+std::to_string(framebufferHeight)+")");
         using namespace restoration;
         GameUi ui(window,std::filesystem::path(argv[1])/"assets");
         std::vector<std::string> sounds;float master=0;
@@ -127,7 +131,8 @@ int main(int argc,char** argv){
         for(const auto& row:ReferenceStages())if(row.id=="tidewater"&&row.mode=="zones"&&!row.onlineOnly)zonesStage=&row;
         Check(zonesStage!=nullptr,"Missing Zone Control stage variant");
         StageGeometry geometry(*stage);FacePaint paint(*stage,geometry);NavGraph nav(*stage,geometry);
-        MatchSimulation match(*stage,geometry,paint,nav);
+        MatchOptions matchOptions;matchOptions.duration=90;
+        MatchSimulation match(*stage,geometry,paint,nav,matchOptions);
         auto hudRender=[&](bool paused,bool practice=false){glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return ui.RenderHud(*stage,paint,match,1600,900,paused,true,practice);};
         hudRender(true);
         auto* hud=context->GetDocument("hud");Check(hud!=nullptr,"Missing match HUD document");
@@ -143,6 +148,48 @@ int main(int argc,char** argv){
         Check(hud->GetElementById("zones-hud")->IsVisible()&&!hud->GetElementById("team-score")->IsVisible(),"Zone Control should replace the turf coverage panel with its own score HUD");
         Check(hud->GetElementById("zone-count-a")->GetInnerRML().find("100")!=Rml::String::npos&&hud->GetElementById("zone-penalty-a")->GetInnerRML().find("0")!=Rml::String::npos,"Zone Control must display score count and separate penalty values");
         Check(hud->GetElementById("zone-objective")->GetInnerRML().find("區")!=Rml::String::npos&&hud->GetElementById("zones-active")->GetInnerRML().find("zone-share-labels")!=Rml::String::npos,"Zone HUD must locate the active center/side area and show both teams’ control share");
+        auto captureZonesHud=[&](int width,int height,const char* filename){
+            glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            ui.RenderHud(*zonesStage,zonesPaint,zonesMatch,width,height,false,true);
+            auto* panel=hud->GetElementById("zones-hud");
+            Check(panel->GetBox().GetSize(Rml::BoxArea::Border).y<height*.25f,"Zone HUD should stay compact at 720p and 1080p");
+            auto* phaseDetail=hud->GetElementById("zone-phase-detail");
+            const float phaseHeight=phaseDetail->GetBox().GetSize(Rml::BoxArea::Border).y;
+            const float dpRatio=std::clamp(std::min(width/1440.f,height/900.f),.72f,1.6f);
+            Check(phaseHeight>=14.f,"Zone phase detail should be at least 14 screen px high (box="+std::to_string(phaseHeight)+"px, font="+std::to_string(phaseDetail->GetComputedValues().font_size())+"px, DPR="+std::to_string(dpRatio)+")");
+            auto checkReadableFont=[&](Rml::Element* element,const char* label){
+                const float fontSize=element->GetComputedValues().font_size();
+                Check(fontSize>=14.f,std::string(label)+" should be at least 14 screen px at 720p and 1080p (font="+std::to_string(fontSize)+"px, DPR="+std::to_string(dpRatio)+")");
+            };
+            auto bounds=[](Rml::Element* element){
+                const auto offset=element->GetAbsoluteOffset(Rml::BoxArea::Border);
+                const auto size=element->GetBox().GetSize(Rml::BoxArea::Border);
+                return std::array<float,4>{offset.x,offset.y,offset.x+size.x,offset.y+size.y};
+            };
+            auto checkVerticalOrder=[&](Rml::Element* above,Rml::Element* below,const char* label){
+                const auto a=bounds(above),b=bounds(below);
+                Check(a[3]<=b[1]+1.f,std::string(label)+" elements must not overlap vertically");
+            };
+            auto* minimapHeading=hud->GetElementById("minimap-heading");
+            auto* minimapTitle=minimapHeading->GetFirstChild();
+            auto* terrainStatus=hud->GetElementById("terrain-status");
+            auto* minimapMap=hud->GetElementById("minimap-map");
+            auto* positionCoverage=hud->GetElementById("position-team-coverage");
+            checkVerticalOrder(minimapTitle,terrainStatus,"Minimap title and terrain status");
+            checkVerticalOrder(terrainStatus,minimapMap,"Minimap terrain status and map");
+            checkVerticalOrder(minimapMap,positionCoverage,"Minimap map and footer");
+            checkReadableFont(hud->GetElementById("terrain-status"),"Minimap heading metadata");
+            checkReadableFont(positionCoverage,"Minimap team coverage metadata");
+            checkReadableFont(hud->GetElementById("zone-owner"),"Zone owner metadata");
+            checkReadableFont(hud->GetElementById("zone-team-a-name"),"Zone team label");
+            auto* firstZoneCard=hud->GetElementById("zones-active")->GetFirstChild();
+            Check(firstZoneCard!=nullptr,"Zone HUD should have at least one active area card");
+            auto* shareLabels=firstZoneCard->GetLastChild();
+            Check(shareLabels!=nullptr,"Zone HUD area card should include share percentages");
+            checkReadableFont(shareLabels,"Zone share percentages");
+            Capture(std::filesystem::path(argv[2])/filename,width,height);
+        };
+        captureZonesHud(1280,720,"zones-1280x720.png");captureZonesHud(1920,1080,"zones-1920x1080.png");
         Check(hud->GetElementById("minimap-map")->GetInnerRML().find("map-zone-edge")!=Rml::String::npos,"The minimap must locate the active zone outlines");
         auto* liveZones=const_cast<ZoneControl*>(zonesMatch.zones());
         Check(!liveZones->timeUp()&&liveZones->overtime(),"A tied Zone Control round should transition into overtime");
@@ -176,10 +223,36 @@ int main(int argc,char** argv){
         for(int i=0;i<1850&&match.phase()!=MatchPhase::Judge;++i)match.tick(.1);
         Check(match.phase()==MatchPhase::Judge,"UI lifecycle test did not reach judging");match.finishJudging();
         MatchRewardResult reward;reward.applied=true;reward.gained=640;reward.levelBefore=1;reward.levelAfter=2;reward.xpBefore=100;reward.xpAfter=40;ui.SetReward(reward);
+        sounds.clear();
         hudRender(false);Check(hud->GetElementById("results")->IsVisible(),"Results overlay did not appear");
         Check(hud->GetElementById("results-table")->GetNumChildren()>=9,"Results lost squad rows");
-        Check(hud->GetElementById("result-xp")->GetInnerRML().find("640")!=Rml::String::npos,"Results must display the saved XP reward");
+        auto* xpLabel=hud->GetElementById("result-xp-label");
+        Check(xpLabel->GetInnerRML().find("+0")!=Rml::String::npos,"Results should begin the XP reveal at zero");
+        const double xpMidTime=glfwGetTime()+.2;glfwSetTime(xpMidTime);hudRender(false);
+        Check(xpLabel->GetInnerRML().find("+640")==Rml::String::npos&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"XP should count up with one tick while the award is in flight");
+        const auto xpMidReveal=xpLabel->GetInnerRML();ui.SetReward(reward);glfwSetTime(xpMidTime);hudRender(false);
+        Check(xpLabel->GetInnerRML()==xpMidReveal&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"Repeated reward assignments must not restart the XP reveal or duplicate a tick");
+        glfwSetTime(glfwGetTime()+2.0);hudRender(false);
+        Check(xpLabel->GetInnerRML().find("+640")!=Rml::String::npos,"Results must finish by displaying the saved XP reward");
         Capture(std::filesystem::path(argv[2])/"results.png",1600,900);
+        auto captureResults=[&](int width,int height,const char* filename){
+            glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            ui.RenderHud(*stage,paint,match,width,height,false,true);
+            Capture(std::filesystem::path(argv[2])/filename,width,height);
+        };
+        captureResults(1280,720,"results-1280x720.png");captureResults(1920,1080,"results-1920x1080.png");
+        match.restart();
+        glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        ui.RenderHud(*stage,paint,match,1600,900,false,true); // Intro frame clears the prior result identity.
+        match.startPlaying();
+        for(int i=0;i<1000&&match.phase()!=MatchPhase::Judge;++i)match.tick(.1);
+        Check(match.phase()==MatchPhase::Judge,"Rematch UI lifecycle did not reach judging");match.finishJudging();
+        sounds.clear();ui.SetReward(reward);
+        glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        ui.RenderHud(*stage,paint,match,1600,900,false,true);
+        Check(xpLabel->GetInnerRML().find("+0")!=Rml::String::npos,"The same-match rematch should start a fresh XP reveal for an identical award");
+        glfwSetTime(glfwGetTime()+.2);ui.RenderHud(*stage,paint,match,1600,900,false,true);
+        Check(xpLabel->GetInnerRML().find("+640")==Rml::String::npos&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"The same-match rematch's identical award should animate and tick once");
         hud->GetElementById("results-rematch")->Click();Check(hudRender(false)==UiAction::Rematch,"Results rematch action did not reach the match loop");
         hud->GetElementById("results-menu")->Click();Check(hudRender(false)==UiAction::StageSelect,"Return action did not reach the match loop");
         ui.ShowMenu("tidewater");Check(render()==UiAction::None&&menu->IsVisible(),"Returning from results did not restore the menu");

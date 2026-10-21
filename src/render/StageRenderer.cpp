@@ -3,9 +3,11 @@
 #include "FacePaint.hpp"
 #include "PlayerSimulation.hpp"
 #include "StageGeometry.hpp"
+#include "CombatWorld.hpp"
 #include "DirectionalShadow.hpp"
 #include "CharacterShader.hpp"
 #include "CharacterRenderData.hpp"
+#include "SwimWake.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -180,6 +182,7 @@ struct StageRenderer::Source {
     std::string muralId;
     std::vector<Growing> growing;
     std::vector<Flood> floods;
+    SwimWake swimWake;
     std::unique_ptr<CharacterShader> floodShader;
     GLuint floodVao=0,floodVbo=0;
     std::vector<AtlasRect> atlasRects;
@@ -280,7 +283,7 @@ struct StageRenderer::Source {
 
     void clearInk(){
         GLStateGuard state;glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);glViewport(0,0,atlasSize,atlasSize);glDisable(GL_SCISSOR_TEST);glDisable(GL_BLEND);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
-        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glBindTexture(GL_TEXTURE_2D,atlas);glGenerateMipmap(GL_TEXTURE_2D);growing.clear();floods.clear();clock=0;dryAcc=0;
+        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glBindTexture(GL_TEXTURE_2D,atlas);glGenerateMipmap(GL_TEXTURE_2D);growing.clear();floods.clear();swimWake.reset();clock=0;dryAcc=0;
     }
     ShaderEntry& getShader(const std::string& name){
         auto found=shaders.find(name);if(found!=shaders.end())return found->second;
@@ -348,6 +351,11 @@ struct StageRenderer::Source {
         if(level){shader.uniform("uAtlasSize",static_cast<double>(atlasSize));shader.uniform("uTexel",1.0/atlasSize);shader.uniform("uPpm",ppm);
             shader.uniform("uInkClock",clock);shader.uniform("uTime",clock);shader.uniform("uAO",0.0);}
     }
+    void uploadSwimWake(ShaderEntry& entry){
+        const auto& values=swimWake.uniformValues();
+        entry.shader->uniform("uWake",values.points);entry.shader->uniform("uWakeB",values.bounds);
+        entry.shader->uniform("uSwimH",values.heads);entry.shader->uniform("uSwimF",values.forwards);
+    }
     void applyShadow(ShaderEntry& entry,const DirectionalShadow* shadow){
         auto& shader=*entry.shader;
         if(!shadow||!shadow->texture()){
@@ -411,6 +419,7 @@ struct StageRenderer::Source {
             auto& entry=getShader(mesh->shader);auto& shader=*entry.shader;shader.use();
             shader.uniform("iwDepthOnly",0);
             for(const auto& [name,value]:entry.defaults)shader.uniform(name,value);
+            if(mesh->shader=="level")uploadSwimWake(entry);
             animate(*mesh);
             shader.lights(lights,view);shader.matrices(mesh->animation.matrix(clock),view,projection,eye);applyShadow(entry,shadow);bindCommonTextures(entry,mesh->shader=="level",mesh->shader,shadow);
             if(mesh->animation.kind=="blink")shader.uniform("diffuse",std::vector<double>(3,mesh->animation.brightness(clock)));
@@ -742,6 +751,18 @@ void StageRenderer::UploadInk(const StageData& stage,FacePaint& paint,double dt)
         uploadedGrid=grid;
         const std::string requested=std::string(stage.id)+"-"+std::string(stage.mode);
         if(source_&&source_->key==requested)source_->uploadInk(stage,paint,dt);
+    }
+void StageRenderer::UpdateSwimWake(double dt,const CombatWorld& world,glm::dvec3 camera) {
+        if(display_!=0||!source_)return;
+        std::vector<SwimWakeActor> actors;actors.reserve(world.actors().size());
+        for(const auto* actor:world.actors()) {
+            if(!actor)continue;
+            const auto& state=actor->state;const auto special=actor->specialPose();
+            const bool squidForm=state.squid&&!special.body&&!special.noSquid;
+            actors.push_back({actor,state.pos,state.vel,state.alive,actor->isLocal(),
+                squidForm&&state.submerged,squidForm&&state.climbing});
+        }
+        source_->swimWake.update(dt,source_->clock,actors,camera);
     }
 glm::vec4 StageRenderer::ReadVisualInk(int faceId,double u,double v) const {
         if(!source_||faceId<0||static_cast<std::size_t>(faceId)>=source_->atlasRects.size())return glm::vec4(0.0f);

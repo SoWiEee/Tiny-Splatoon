@@ -24,6 +24,8 @@ int main() try {
         for(const auto& matrix:pose->hullbreaker().skin){if(comma)std::cout<<',';comma=true;std::cout<<'[';const auto* data=glm::value_ptr(matrix);for(int n=0;n<16;n++){if(n)std::cout<<',';std::cout<<data[n];}std::cout<<']';}
         std::cout<<"],\"shapes\":[";comma=false;
         for(const auto& h:pose->hitShapes()){if(comma)std::cout<<',';comma=true;std::cout<<'['<<h.pos.x<<','<<h.pos.y<<','<<h.pos.z<<','<<h.radius<<','<<int(h.weak)<<','<<int(h.active)<<']';}
+        std::cout<<"],\"poseSockets\":[";comma=false;
+        for(const auto& socket:pose->poseSockets()){if(comma)std::cout<<',';comma=true;std::cout<<"[\""<<socket.name<<"\","<<socket.pos.x<<','<<socket.pos.y<<','<<socket.pos.z<<']';}
         std::cout<<"],\"uniforms\":{";comma=false;
         for(const auto& [name,values]:pose->materialUniforms()){if(comma)std::cout<<',';comma=true;std::cout<<'"'<<name<<"\":[";for(std::size_t n=0;n<values.size();n++){if(n)std::cout<<',';std::cout<<values[n];}std::cout<<']';}
         std::cout<<"}}\n";

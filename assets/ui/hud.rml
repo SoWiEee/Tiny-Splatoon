@@ -9,13 +9,12 @@
       <div class="zones-divider">／</div>
       <div class="zone-team zone-team-b"><span id="zone-team-b-name">對方</span><strong id="zone-count-b">100</strong><small>計數</small><span class="zone-penalty">罰則 <strong id="zone-penalty-b">0</strong></span></div>
     </div>
-    <div class="zone-objective-row"><strong id="zone-objective">中央區</strong><span id="zone-owner">尚未控制</span></div>
+    <div class="zone-meta-row"><div class="zone-meta-group"><strong id="zone-objective">中央區</strong><span id="zone-owner">尚未控制</span></div><div class="zone-meta-group zone-phase-group"><strong id="zone-phase">區域輪替</strong><span id="zone-phase-detail"></span></div></div>
     <div id="zones-active" class="zones-active"></div>
-    <div class="zone-phase-row"><strong id="zone-phase">區域輪替</strong><span id="zone-phase-detail"></span></div>
     <div id="zone-callout" class="zone-callout hidden" aria-live="polite"></div>
   </div>
   <div id="boss" class="boss hidden"><div class="boss-heading"><strong>破艦巨獸</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-hp"></span></div></div>
-  <div id="minimap" class="minimap"><div class="minimap-heading"><strong>場地地圖</strong><span id="terrain-status"></span></div><div id="minimap-map" class="minimap-map"></div><div id="position-status" class="position-status"></div></div>
+  <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><strong>場地地圖</strong><span id="terrain-status"></span></div><div id="minimap-map" class="minimap-map"></div><div id="position-status" class="position-status"><span id="position-team-coverage"></span></div></div>
   <div id="fps" class="fps">影格 <strong id="fps-value">60</strong></div>
   <div class="player-info"><div class="player-bars"><span>生命 <strong id="hp">100</strong></span><span>墨量 <strong id="ink">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
   <div id="player-status" class="player-status"></div><div id="reticle" class="reticle"></div>
@@ -42,7 +41,7 @@
     <div id="results-preview" class="results-preview" aria-label="結果展示"></div>
     <div class="dialog results-dialog">
       <h1 id="result-title">對戰結束</h1><p id="result-detail" class="intro"></p>
-      <div id="result-score" class="result-score"></div><div id="result-xp" class="result-xp"></div>
+      <div id="result-score" class="result-score"></div><div id="result-xp" class="result-xp"><div id="result-xp-label" class="result-xp-label"></div><div class="result-xp-track" aria-hidden="true"><div id="result-xp-fill"></div></div></div>
       <table id="results-table"></table>
       <div class="result-actions"><button id="results-rematch" class="primary">再戰一場</button><button id="results-menu">返回選單</button><button id="results-close">離開遊戲</button></div>
     </div>

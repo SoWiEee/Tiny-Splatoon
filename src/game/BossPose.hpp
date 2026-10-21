@@ -34,6 +34,7 @@ public:
     const BossRigPose& hullbreaker() const { return hull_; }
     const std::vector<BossCrabletPose>& crablets() const { return crablets_; }
     const std::array<BossHitShape,10>& hitShapes() const { return hitShapes_; }
+    const std::vector<BossPoseSocket>& poseSockets() const { return poseSockets_; }
     const std::map<std::string,std::vector<double>>& materialUniforms() const { return uniforms_; }
     const BossModelAsset& hullAsset() const { return assets_.at(0); }
     const BossModelAsset& crabletAsset() const { return assets_.at(1); }
@@ -53,6 +54,7 @@ private:
     BossRigPose hull_;
     std::vector<BossCrabletPose> crablets_;
     std::array<BossHitShape,10> hitShapes_{};
+    std::vector<BossPoseSocket> poseSockets_;
     std::map<std::string,std::vector<double>> uniforms_;
 };
 } // namespace restoration

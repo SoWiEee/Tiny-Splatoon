@@ -416,6 +416,8 @@ void BossPose::Animator::update(BossPose& owner,Rig& rig,const BossPoseInput& s)
     owner.uniforms_=uniforms;
     const bool below=p[BY]<-2.2;const glm::dmat4 hitRoot=trs(rootPos,rootQ,glm::dvec3(1));
     for(std::size_t i=0;i<owner.hitShapes_.size();++i){const auto& sock=owner.assets_[0].sockets[i];if(sock.bone>=rig.currentGlobal.size())throw std::runtime_error("Boss socket references an absent bone");const glm::dvec3 pos=point(multiplyThree(hitRoot,rig.currentGlobal[sock.bone]),glm::dvec3(sock.offset));const bool active=!s.dead&&!below&&(sock.name=="belly"?(s.stunned||phase>=3||p[BELLY]>.5):(sock.name=="crackL"||sock.name=="crackR"?springs[13].x>.5:true));owner.hitShapes_[i]={sock.name,pos,sock.radius,sock.weak,active};}
+    owner.poseSockets_.clear();owner.poseSockets_.reserve(owner.assets_[0].poseSockets.size());
+    for(const auto& sock:owner.assets_[0].poseSockets){if(sock.bone>=rig.currentGlobal.size())throw std::runtime_error("Boss pose socket references an absent bone");owner.poseSockets_.push_back({sock.name,point(multiplyThree(hitRoot,rig.currentGlobal[sock.bone]),glm::dvec3(sock.offset))});}
 }
 
 void BossPose::Animator::animateCrablet(Rig& rig,const BossCrablet& crab,double dt,double t,double seed,double& ph){
@@ -459,7 +461,7 @@ void BossPose::Update(BossSimulation& simulation){
         default:input.move.clear();break;}
         if(!input.move.empty()){input.moveTime=std::max(0.0,state.clock-move.t0-phaseStart);input.hasParams=true;input.wall=move.wall;input.count=move.count;input.rings=move.rings;for(const auto& barrel:move.barrels)input.barrels.push_back({barrel.x,barrel.y,barrel.z,barrel.throwAt});}
     }
-    Update(input);simulation.setHitShapes(hitShapes_);
+    Update(input);simulation.setHitShapes(hitShapes_);simulation.setPoseSockets(poseSockets_);
     std::vector<int> live;live.reserve(simulation.crablets().size());const double dt=input.dt;
     for(const auto& crab:simulation.crablets())if(!crab.dead){live.push_back(crab.id);AnimateCrablet(rigs_.at(1),crab,dt);BossCrabletPose pose;pose.id=crab.id;pose.root=glm::translate(glm::dmat4(1),crab.pos)*glm::rotate(glm::dmat4(1),crab.yaw,glm::dvec3(0,1,0));Evaluate(rigs_[1]);pose.skin=rigs_[1].skin;crablets_.push_back(std::move(pose));}
     for(auto it=animator_->crabPhi.begin();it!=animator_->crabPhi.end();)if(std::find(live.begin(),live.end(),it->first)==live.end()){animator_->crabSeed.erase(it->first);it=animator_->crabPhi.erase(it);}else ++it;

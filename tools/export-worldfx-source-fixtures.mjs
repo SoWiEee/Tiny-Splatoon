@@ -49,7 +49,7 @@ function pool(fx, name, immediate) {
 function snapshot(fx, immediate) {
   return Object.fromEntries(['drops', 'puffs', 'glows', 'rings', 'shells', 'beams'].map(name => [name, pool(fx, name, immediate)]));
 }
-for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart', 'rainSheet']) {
+for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart', 'rainSheet', 'formPop', 'dive', 'emerge', 'wake']) {
   const fx = new FX(new THREE.Scene(), { quality: 1 });
   seed = 0x6d2b79f5;
   if (name === 'burst') fx.burst(origin, up, orange, { count: 12, size: 0.1 });
@@ -58,6 +58,10 @@ for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart'
   if (name === 'slamWave') fx.slamWave(origin, orange, 5.2);
   if (name === 'stormStart') fx.stormStart(origin, orange, 3.4);
   if (name === 'rainSheet') fx.rainSheet(new THREE.Vector3(0, 4.6, 0), 3.4, orange, 1 / 60);
+  if (name === 'formPop') fx.formPop(origin, orange, true, false);
+  if (name === 'dive') fx.dive(origin, orange, 4);
+  if (name === 'emerge') fx.emerge(origin, orange, 4);
+  if (name === 'wake') fx.wake(origin, new THREE.Vector3(0, 0, 1), orange, 8);
   const immediate = fx.stats();
   const immediatePools = snapshot(fx, true);
   fx.update(1 / 60);
@@ -71,7 +75,9 @@ for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart'
 Math.random = nativeRandom;
 const out = { source: 'splat-ref/src/fx/fx.js', sha256: checksum, rng: 'xorshift32(seed=0x6d2b79f5, Math.random call order)', vectorColor: '#ff8a14 (THREE.Color linear RGB)', recipes };
 const path = new URL('../tests/worldfx_source_fixtures.json', import.meta.url);
-const data = JSON.stringify(out, null, 2) + '\n';
+const data = JSON.stringify(out, (key, value) =>
+  typeof value === 'number' && Object.is(value, -0) ? '__WORLD_FX_NEGATIVE_ZERO__' : value, 2)
+  .replaceAll('"__WORLD_FX_NEGATIVE_ZERO__"', '-0') + '\n';
 if (check) {
   if (await readFile(path, 'utf8') !== data) throw new Error('Stale World FX source fixtures');
 } else await writeFile(path, data);

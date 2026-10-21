@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -40,6 +41,7 @@ struct BossHitShape {
     double radius=0;
     bool weak=false,active=true;
 };
+struct BossPoseSocket { std::string name; glm::dvec3 pos{0}; };
 struct BossSegmentHit {
     glm::dvec3 point{0};
     double t=0,distance=0;
@@ -79,6 +81,12 @@ public:
     const std::array<int,8>& squadSplats() const {return splatsBy_;}
     const std::array<BossHitShape,10>& hitShapes() const {return hitShapes_;}
     void setHitShapes(const std::array<BossHitShape,10>& shapes);
+    const std::vector<BossPoseSocket>& poseSockets() const {return poseSockets_;}
+    void setPoseSockets(const std::vector<BossPoseSocket>& sockets) {poseSockets_=sockets;}
+    std::optional<glm::dvec3> poseSocket(std::string_view name) const {
+        for(const auto& socket:poseSockets_)if(socket.name==name)return socket.pos;
+        return std::nullopt;
+    }
     std::optional<BossSegmentHit> segmentHit(glm::dvec3 from,glm::dvec3 to,double pad=0) const;
     double hit(PlayerSimulation& attacker,double damage,const BossSegmentHit& hit,const std::string& weapon);
     double splash(PlayerSimulation& attacker,glm::dvec3 center,double radius,double maxDamage,double minDamage,const std::string& weapon);
@@ -123,6 +131,7 @@ private:
     std::vector<BossMove> moves_;
     std::vector<BossCrablet> crabs_;
     std::array<BossHitShape,10> hitShapes_{};
+    std::vector<BossPoseSocket> poseSockets_;
     bool externalHitShapes_=false,spawnedCrabs_=false,finished_=false;
     int pendingPhase_=0,crabSeq_=1;
     double damageMultiplier_=1,cool_=2.4,retarget_=0,goalTime_=0,stuckTime_=0,

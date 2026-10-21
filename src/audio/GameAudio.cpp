@@ -87,7 +87,8 @@ const char* SpecialActivationSound(std::string_view kind) {
     if (kind == "bubbler") return "shield_up";
     return nullptr;
 }
-AudioPosition BossPosition(const BossSimulation& boss) {
+AudioPosition BossPosition(const BossSimulation& boss, std::string_view socket = {}) {
+    if (!socket.empty()) if (const auto position = boss.poseSocket(socket)) return Position(*position);
     const auto& p = boss.state().pos;
     return {p.x, p.y + 3.0, p.z};
 }
@@ -163,7 +164,7 @@ void GameAudio::BeginMatch(MatchSimulation& match) {
     StopLoops(); StopWorldLoops(); engine_.StopMusic(0.05);
     StopZoneLoops();zoneEventCursor_=0;zoneTicks_={100,100};zoneHumAccumulator_=0;zoneWarnAt_=-99;
     match_ = &match; playing_ = false; bossPhase_ = 0; matchPhase_ = -1; bossHp_ = -1; bossDead_ = false;
-    bossMove_.clear(); crablets_.clear(); bossSunkIn_ = 0;
+    bossMove_.clear(); crablets_.clear(); bossSunkIn_ = 0; bossIntroSeen_=false; ClearBossPendingAudio();
     actorLoops_.clear(); actorStates_.clear();
     pausedAudio_ = false; resumeLoops_ = false; hasListenerPosition_ = false;
     gullTimer_ = 4.0; gustTimer_ = 2.0; clinkTimer_ = 0.0; pendingHalyardClinks_ = 0;
@@ -193,14 +194,21 @@ void GameAudio::StopWorldLoops() {
 void GameAudio::Pause() {
     if (pausedAudio_) return;
     pausedAudio_ = true;
+    ClearBossPendingAudio();
     StopLoops();
     StopZoneLoops();
+}
+
+void GameAudio::ClearBossPendingAudio() {
+    bossIntroSlamAt_=bossIntroRoarAt_=bossSlamAt_=bossChargeRoarAt_=bossCrabletSecondAt_=-1;
+    bossBarrageStartedAt_=-1;bossBarrageCount_=bossBarrageWhistles_=bossBarrageBarrels_=0;
 }
 
 void GameAudio::EndMatch() {
     StopLoops(); StopWorldLoops(); engine_.StopMusic(0.6);
     StopZoneLoops();zoneEventCursor_=0;
     match_ = nullptr; playing_ = false; bossMove_.clear(); crablets_.clear(); actorStates_.clear();
+    ClearBossPendingAudio();bossIntroSeen_=false;
     pausedAudio_ = false; resumeLoops_ = false; hasListenerPosition_ = false;
     bossPhase_ = 0; matchPhase_ = -1; bossHp_ = -1; bossDead_ = false; bossSunkIn_ = 0;
 }
@@ -449,6 +457,18 @@ void GameAudio::UpdateBoss(double dt, MatchSimulation& match) {
     if (!boss) return;
     const auto& state = boss->state();
     const auto pos = BossPosition(*boss);
+    const auto socketPos = [&](std::string_view name) { return BossPosition(*boss, name); };
+    if(state.dead)ClearBossPendingAudio();
+    const bool scheduleAudio = match.phase()!=MatchPhase::Finish&&match.phase()!=MatchPhase::Results&&!resumeLoops_;
+    if(state.anim==1&&!bossIntroSeen_){
+        bossIntroSeen_=true;
+        if(scheduleAudio){bossIntroSlamAt_=state.clock+.1;bossIntroSlamPos_=pos;bossIntroRoarAt_=state.clock+.35;bossIntroRoarPos_=socketPos("mouth");}
+    }
+    if(bossIntroSlamAt_>=0&&state.clock>=bossIntroSlamAt_){AudioPlayOptions options;options.pos=bossIntroSlamPos_;options.volume=.55;options.pitch=.8;engine_.Play("boss_slam",options);bossIntroSlamAt_=-1;}
+    if(bossIntroRoarAt_>=0&&state.clock>=bossIntroRoarAt_){AudioPlayOptions options;options.pos=bossIntroRoarPos_;engine_.Play("boss_roar",options);bossIntroRoarAt_=-1;}
+    if(bossSlamAt_>=0&&state.clock>=bossSlamAt_){AudioPlayOptions options;options.pos=bossSlamPos_;engine_.Play("boss_slam",options);bossSlamAt_=-1;}
+    if(bossChargeRoarAt_>=0&&state.clock>=bossChargeRoarAt_){AudioPlayOptions options;options.pos=bossChargeRoarPos_;options.volume=.45;options.pitch=1.25;engine_.Play("boss_roar",options);bossChargeRoarAt_=-1;}
+    if(bossCrabletSecondAt_>=0&&state.clock>=bossCrabletSecondAt_){AudioPlayOptions options;options.pos=bossCrabletPos_;options.pitch=1.15;engine_.Play("crablet_chitter",options);bossCrabletSecondAt_=-1;}
     if (state.phase != bossPhase_) {
         if (bossPhase_ != 0 && !resumeLoops_) engine_.Play("boss_phase");
         bossPhase_ = state.phase;
@@ -482,40 +502,64 @@ void GameAudio::UpdateBoss(double dt, MatchSimulation& match) {
             if (bossLoop_.size()) { engine_.StopLoop(bossLoop_, 0.2); bossLoop_.clear(); }
             if (movePhase == BossMovePhase::Telegraph) {
                 if (!suppressResumedEdges) {
-                    const char* cue = move->id == BossMoveId::Sweep ? "boss_cannon_charge" : "boss_tele";
-                    AudioPlayOptions options; options.pos = pos;
-                    engine_.Play(cue, options);
-                    if (move->id == BossMoveId::Charge) { options.volume = 0.45; options.pitch = 1.2; engine_.Play("boss_roar", options); }
+                    AudioPlayOptions options;
+                    switch (move->id) {
+                    case BossMoveId::Slam: options.pos = socketPos("clawL"); engine_.Play("boss_tele", options); break;
+                    case BossMoveId::Barrage: options.pos = socketPos("shellTop"); options.pitch = 1.12; engine_.Play("boss_tele", options); break;
+                    case BossMoveId::Sweep: options.pos = socketPos("cannon"); engine_.Play("boss_cannon_charge", options); break;
+                    case BossMoveId::Charge:
+                        options.pos = socketPos("mouth"); options.pitch = 0.82; engine_.Play("boss_tele", options);
+                        bossChargeRoarAt_=scheduleAudio?state.clock+.2:-1;bossChargeRoarPos_=socketPos("mouth");break;
+                    case BossMoveId::Crablets: options.pos = socketPos("hatch"); options.pitch = 1.25; engine_.Play("boss_tele", options); break;
+                    case BossMoveId::Frenzy: options.pos = socketPos("mouth"); options.volume = 0.7; options.pitch = 1.15; engine_.Play("boss_roar", options); break;
+                    }
                 }
             } else if (movePhase == BossMovePhase::Active) {
                 if (move->id == BossMoveId::Slam) {
-                    if (!suppressResumedEdges) { AudioPlayOptions options; options.pos = pos; engine_.Play("boss_slam", options); }
+                    if (!suppressResumedEdges) { bossSlamAt_=state.clock+.12;bossSlamPos_=socketPos("clawL"); }
                 }
                 else if (move->id == BossMoveId::Barrage) {
                     if (!suppressResumedEdges) {
-                        AudioPlayOptions options; options.pos = pos; options.volume = 0.7; engine_.Play("boss_whistle", options);
-                        for (const auto& barrel : move->barrels) { options.pos = {barrel.x, barrel.y, barrel.z}; options.volume = 0.55; engine_.Play("boss_barrel", options); }
+                        bossBarrageStartedAt_=state.clock;bossBarragePos_=socketPos("shellTop");
+                        bossBarrageCount_=3+static_cast<int>(AudioRandom(audioRandomState_)*3.0);
+                        bossBarrageWhistles_=bossBarrageBarrels_=0;
                     }
                 } else if (move->id == BossMoveId::Crablets) {
-                    if (!suppressResumedEdges) { AudioPlayOptions options; options.pos = pos; engine_.Play("crablet_chitter", options); }
+                    if (!suppressResumedEdges) {
+                        bossCrabletPos_=socketPos("hatch");AudioPlayOptions options;options.pos=bossCrabletPos_;engine_.Play("crablet_chitter",options);
+                        bossCrabletSecondAt_=scheduleAudio?state.clock+.3:-1;
+                    }
                 }
                 else {
                     const char* cue = move->id == BossMoveId::Sweep ? "boss_cannon_sweep" : move->id == BossMoveId::Charge ? "boss_gallop" : "boss_frenzy";
                     const std::string loop = move->id == BossMoveId::Sweep ? "boss:sweep" : move->id == BossMoveId::Charge ? "boss:gallop" : "boss:frenzy";
-                    AudioLoopOptions options; options.pos = pos; options.volume = 0.7;
+                    AudioLoopOptions options; options.pos = move->id == BossMoveId::Sweep ? socketPos("cannon") : pos; options.volume = 0.7;
                     if (engine_.StartLoop(loop, cue, options)) bossLoop_ = loop;
                 }
             }
         }
-        if (!bossLoop_.empty()) { AudioLoopOptions options; options.pos = pos; options.pitch = 1; options.volume = 0.7; engine_.UpdateLoop(bossLoop_, options); }
+        if (!bossLoop_.empty()) { AudioLoopOptions options; options.pos = bossLoop_ == "boss:sweep" ? socketPos("cannon") : bossLoop_ == "boss:dizzy" ? socketPos("eyeL") : pos; options.pitch = 1; options.volume = 0.7; engine_.UpdateLoop(bossLoop_, options); }
+        if(movePhase!=BossMovePhase::Active||move->id!=BossMoveId::Barrage){bossBarrageStartedAt_=-1;bossBarrageCount_=bossBarrageWhistles_=bossBarrageBarrels_=0;}
+        if(movePhase==BossMovePhase::Active&&move->id==BossMoveId::Barrage&&bossBarrageStartedAt_>=0&&scheduleAudio){
+            const double elapsed=state.clock-bossBarrageStartedAt_;
+            while(bossBarrageWhistles_<bossBarrageCount_&&elapsed+1e-9>=bossBarrageWhistles_*.2){
+                AudioPlayOptions options;options.pos=bossBarragePos_;options.pitch=.9+AudioRandom(audioRandomState_)*.25;engine_.Play("boss_whistle",options);++bossBarrageWhistles_;
+            }
+            while(bossBarrageBarrels_<bossBarrageCount_&&elapsed+1e-9>=.95+bossBarrageBarrels_*.2){
+                AudioPlayOptions options;options.volume=.55;
+                if(bossBarrageBarrels_<static_cast<int>(move->barrels.size())){const auto& barrel=move->barrels[static_cast<std::size_t>(bossBarrageBarrels_)];options.pos={barrel.x,barrel.y,barrel.z};}
+                engine_.Play("boss_barrel",options);++bossBarrageBarrels_;
+            }
+        }
     } else if (!bossMove_.empty()) {
         bossMove_.clear(); if (!bossLoop_.empty()) engine_.StopLoop(bossLoop_, 0.2); bossLoop_.clear();
+        bossBarrageStartedAt_=-1;bossBarrageCount_=bossBarrageWhistles_=bossBarrageBarrels_=0;
     }
 
     if (state.stunned && bossLoop_ != "boss:dizzy") {
         if (!bossLoop_.empty()) engine_.StopLoop(bossLoop_, 0.1);
-        AudioPlayOptions options; options.pos = pos; engine_.Play("boss_crash", options);
-        AudioLoopOptions loop; loop.pos = pos; loop.volume = 0.4;
+        AudioPlayOptions options; options.pos = socketPos("shellTop"); engine_.Play("boss_crash", options);
+        AudioLoopOptions loop; loop.pos = socketPos("eyeL"); loop.volume = 0.4;
         if (engine_.StartLoop("boss:dizzy", "boss_dizzy", loop)) bossLoop_ = "boss:dizzy";
     } else if (!state.stunned && bossLoop_ == "boss:dizzy") { engine_.StopLoop("boss:dizzy", 0.2); bossLoop_.clear(); }
 
@@ -586,6 +630,7 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
     const auto phase = match.phase();
     const int phaseValue = static_cast<int>(phase);
     const bool enteredPhase = phaseValue != matchPhase_;
+    if ((phase == MatchPhase::Finish || phase == MatchPhase::Results) && enteredPhase) ClearBossPendingAudio();
     if (phase == MatchPhase::Playing && !playing_) {
         playing_ = true;
         if (!match.boss()) engine_.PlayMusic("battle", 0.75);

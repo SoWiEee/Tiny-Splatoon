@@ -53,7 +53,7 @@ double BossSimulation::random(){
 }
 double BossSimulation::pace()const{return difficulty_=="easy"?1.25:difficulty_=="hard"?.85:1;}
 void BossSimulation::reset(){
-    seed_=initialSeed_;state_={};move_.reset();moves_.clear();crabs_.clear();oneShotHits_.clear();
+    seed_=initialSeed_;state_={};move_.reset();moves_.clear();crabs_.clear();oneShotHits_.clear();poseSockets_.clear();
     poseHitPulse_={};
     forcedMove_.reset();lastMove_.reset();attention_.fill(0);damageBy_.fill(0);totalDamageBy_.fill(0);weakHitsBy_.fill(0);splatsBy_.fill(0);
     externalHitShapes_=false;spawnedCrabs_=false;finished_=false;pendingPhase_=0;crabSeq_=1;

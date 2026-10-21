@@ -54,7 +54,7 @@ private:
     const CharacterData* data_ = nullptr;
     std::vector<Item> live_, world_;
     std::vector<WorldVisualEvent> lastEvents_;
-    struct ActorState { glm::dvec3 pos{0}; double hp=100,charge=0,step=0; bool initialized=false,alive=true,squid=false,grounded=false; std::string special,phase; };
+    struct ActorState { glm::dvec3 pos{0}; double hp=100,charge=0,step=0,born=0,climbEnd=-9,wakeTimer=0; bool initialized=false,alive=true,squid=false,swimming=false,climbing=false,grounded=false; std::string special,phase; };
     std::unordered_map<const void*,ActorState> actors_;
     std::uint32_t random_ = 0x6d2b79f5u;
     float time_ = 0;

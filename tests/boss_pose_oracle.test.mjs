@@ -17,13 +17,14 @@ function compare(actual,expected,path,state){
  if(!actual||actual.length!==expected.length){state.failures++;state.first??=`${path} length ${actual?.length} != ${expected.length}`;return;}
  for(let n=0;n<expected.length;n++){
   if(Array.isArray(expected[n]))compare(actual[n],expected[n],path+'/'+n,state);
+  else if(typeof expected[n]==='string'){if(actual[n]!==expected[n]){state.failures++;state.first??=`${path}/${n}: ${actual[n]} != ${expected[n]}`;}}
   else{const error=Math.abs(actual[n]-expected[n]);state.maxError=Math.max(state.maxError,error);if(!Number.isFinite(error)||error>.001){state.failures++;state.first??=`${path}/${n}: ${actual[n]} != ${expected[n]}`;}}
  }
 }
 for(let n=0;n<samples.length;n++){
  const expected=samples[n],actual=output[n];let state=stats.get(expected.scenario);if(!state){state={scenario:expected.scenario,failures:0,maxError:0,first:null};stats.set(expected.scenario,state);}
  const first=state.first;
- compare(actual.skin,expected.skin,`frame ${expected.frame} bone`,state);compare(actual.shapes,expected.shapes,`frame ${expected.frame} shape`,state);
+ compare(actual.skin,expected.skin,`frame ${expected.frame} bone`,state);compare(actual.shapes,expected.shapes,`frame ${expected.frame} shape`,state);compare(actual.poseSockets,expected.poseSockets,`frame ${expected.frame} pose socket`,state);
  for(const [name,values]of Object.entries(expected.uniforms))compare(actual.uniforms[name],values,`frame ${expected.frame} material ${name}`,state);
  if(first===null&&state.first!==null)failures.push(state);
 }

@@ -124,6 +124,8 @@ struct GameUi::Impl : Rml::EventListener {
     const ZoneControl* displayedZones=nullptr;
     std::size_t zoneEventCursor=0;
     double zoneCalloutUntil=0.0;
+    const MatchSimulation* resultXpMatch=nullptr;
+    double resultXpStartedAt=0.0,resultXpNextTick=0.0;
 
     Impl(GLFWwindow* value,const std::filesystem::path& assets):window(value),system(value){
         Rml::SetSystemInterface(&system);Rml::SetRenderInterface(&renderer);
@@ -553,7 +555,7 @@ struct GameUi::Impl : Rml::EventListener {
         }
         const char* ground=state.groundTeam==1?"自隊墨水":state.groundTeam==2?"敵隊墨水":"乾燥地面";
         const auto coverage=paint.coverage();Text(hud,"terrain-status",ground+std::string("　自隊 ")+Percent(coverage[0]));
-        Text(hud,"position-status","位置  "+Number(state.pos.x)+", "+Number(state.pos.z)+"　·　敵隊 "+Percent(coverage[1]));
+        Text(hud,"position-team-coverage","敵隊 "+Percent(coverage[1]));
     }
     void UpdateZonesHud(MatchSimulation& match){
         const auto* zones=match.zones();
@@ -627,10 +629,20 @@ struct GameUi::Impl : Rml::EventListener {
         else if(result.zones){const auto& zone=*result.zones;const int enemy=1-local.team();resultScore="我方區域計數 "+ZoneCount(zone.counts[local.team()])+"　罰則 "+ZoneCount(zone.penalty[local.team()])+"　／　對方區域計數 "+ZoneCount(zone.counts[enemy])+"　罰則 "+ZoneCount(zone.penalty[enemy]);}
         else resultScore=Percent(coverage[0])+"  /  "+Percent(coverage[1]);
         Text(hud,"result-score",resultScore);
-        std::string xp="本場經驗值（XP） +"+std::to_string(reward.gained);
+        const double now=glfwGetTime();
+        if(resultXpMatch!=&match){resultXpMatch=&match;resultXpStartedAt=now;resultXpNextTick=now+0.065;}
+        double xpProgress=1.0;
+        const bool animateXp=reward.applied&&reward.gained>0&&!player.settings.reducedMotion;
+        if(animateXp){
+            const double t=std::clamp((now-resultXpStartedAt)/1.7,0.0,1.0);
+            xpProgress=1.0-std::pow(1.0-t,3.0);
+            if(t>0.0&&t<1.0&&now>=resultXpNextTick){Play("xp_tick");resultXpNextTick=now+0.065;}
+        }
+        const int shownXp=animateXp?static_cast<int>(std::round(reward.gained*xpProgress)):reward.gained;
+        std::string xp="本場經驗值（XP） +"+std::to_string(shownXp);
         if(reward.applied&&reward.levelAfter>reward.levelBefore)xp+="　升級 Lv."+std::to_string(reward.levelBefore)+" → Lv."+std::to_string(reward.levelAfter);
         else xp+="　Lv."+std::to_string(player.level)+"　"+std::to_string(player.xp)+" / "+std::to_string(XpForLevel(player.level));
-        Text(hud,"result-xp",xp);
+        Text(hud,"result-xp-label",xp);Find(hud,"result-xp-fill")->SetProperty("width",Integer(xpProgress*100)+"%");
         std::string rows="<tr><th>玩家</th><th>"+std::string(result.zones?"區域塗地":"塗地")+"</th>";if(result.zones)rows+="<th>區域內塗地</th>";rows+="<th>倒下</th>";if(match.boss())rows+="<th>破艦巨獸傷害</th><th>弱點命中</th><th>小螃蟹擊破</th>";rows+="</tr>";
         for(std::size_t i=0;i<match.actors().size();++i){const auto& actor=*match.actors()[i];rows+="<tr><td>"+Escape(match.roster()[i].name)+"</td><td>"+Integer(actor.turfPainted())+"</td>";if(result.zones)rows+="<td>"+Integer(actor.zoneTurf())+"</td>";rows+="<td>"+std::to_string(actor.deaths())+"</td>";
             if(const auto* boss=match.boss())rows+="<td>"+Integer(boss->squadDamage()[i])+"</td><td>"+std::to_string(boss->squadWeakHits()[i])+"</td><td>"+std::to_string(boss->squadSplats()[i])+"</td>";rows+="</tr>";}
@@ -638,6 +650,7 @@ struct GameUi::Impl : Rml::EventListener {
     }
     void RenderHudData(const StageData& stage,const FacePaint& paint,MatchSimulation& match,bool paused,bool nativeApp,bool practice){
         const bool results=match.phase()==MatchPhase::Results;
+        if(!results)resultXpMatch=nullptr;
         activePractice=practice;
         interactive=paused||results||practiceGear||hudOverlay;
         Hidden(hud,"pause",!paused||results);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
@@ -683,7 +696,7 @@ void GameUi::SetReward(MatchRewardResult reward){impl_->reward=reward;}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
 void GameUi::SetVolumeSink(std::function<void(float,float,float)> value){impl_->volumes=std::move(value);if(impl_->volumes)impl_->volumes(static_cast<float>(impl_->player.settings.master),static_cast<float>(impl_->player.settings.music),static_cast<float>(impl_->player.settings.sfx));}
 void GameUi::ShowMenu(const std::string& initialStage){
-    auto& p=*impl_;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
+    auto& p=*impl_;p.resultXpMatch=nullptr;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;
     p.selection.duration=p.selection.mode=="zones"?300:p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;
     p.Value("difficulty",p.selection.difficulty);p.Value("theme",p.selection.theme);p.Value("duration",std::to_string(p.selection.duration));

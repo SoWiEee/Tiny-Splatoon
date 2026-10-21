@@ -4,9 +4,13 @@ The World FX port separates short lived `fx.js` pools from persistent world spec
 
 ## Pooled recipes
 
-`WorldFxRecipes.cpp` ports the reference pooled recipes `burst`, `explosion`, `slamLaunch`, `slamWave`, `stormStart`, and `rainSheet`. The native evaluator compares full pool records, render attributes after the first 1/60-second update, and expiration after 181 updates. The fixture exporter patches `Math.random` before loading `fx.js`, resets its xorshift32 state to `0x6d2b79f5` for each recipe, and preserves source call order.
+`WorldFxRecipes.cpp` ports the reference pooled recipes `burst`, `explosion`, `slamLaunch`, `slamWave`, `stormStart`, `rainSheet`, `formPop`, `dive`, `emerge`, and `wake`. The native evaluator compares full pool records, render attributes after the first 1/60-second update, and expiration after 181 updates. The fixture exporter patches `Math.random` before loading `fx.js`, resets its xorshift32 state to `0x6d2b79f5` for each recipe, and preserves source call order.
 
-All fixture keys, counts, scalar values, and Float32 values compare exactly. The only tolerance is ordered Float32 bit distance at most one ULP for the explicitly listed trigonometry-derived positions and velocities in `tests/worldfx_oracle.test.mjs`; all other arrays are bit-exact. The current run observed a maximum of one ULP at `stormStart.immediatePools.puffs.pos[0]`. `fx.js` SHA-256 is `9e8a646a6154824b64f9b35eeab1e4347f3bdb282ff7c337645dca14f8b88bc8`.
+For each fixture key, the oracle requires matching pool counts, scalar values, and Float32 values. The only tolerance is ordered Float32 bit distance at most one ULP for the explicitly listed trigonometry-derived positions and velocities in `tests/worldfx_oracle.test.mjs`; all other arrays are bit-exact. The source hash recorded in the fixtures is `9e8a646a6154824b64f9b35eeab1e4347f3bdb282ff7c337645dca14f8b88bc8`.
+
+`WorldFxTransitions.hpp` keeps the reference's kid/squid form-pop event separate from ink submergence. The form pop is suppressed for fresh spawns, super-jump, special poses, and own-ink entry; swimming into ink emits `dive`, while leaving swim emits `emerge`. Entering climb is not treated as a dive, and leaving climb is not mislabeled as an emerge. The actor swim-spray cadence follows `Actor.update()`: horizontal speed above 2 m/s, accumulated updates over 0.05 seconds, and the source's 45 m camera range. `StageRenderer::UpdateSwimWake` separately supplies the four source ink-surface wake slots and mound shader inputs for swim and climb forms.
+
+The source fixture calls `fx.js` without the app's `onRipple` paint callback, so dive/emerge ripple records use the source FX ring fallback. Production `fxHooks` sends those ripples into the paint surface; the native visual port currently has no matching paint-ripple callback. The submerged wake shader supplies the continuous surface wake, but this does not claim exact production parity for the transient paint ripple.
 
 Run the pool check with:
 

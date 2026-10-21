@@ -48,7 +48,80 @@ std::size_t countShape(const std::vector<WorldFxParticle>& items,WorldFxShape sh
 
 std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3 pos,glm::dvec3 normal,glm::dvec3 color,double radius,std::uint32_t& rng,double waterY,glm::dvec3 camera){
     std::vector<WorldFxParticle> out;normal=normalized(normal);const glm::dvec3 up(0,1,0),white(1);
-    if(name=="burst"){
+    if(name=="formPop"){
+        const bool toSquid=radius>0.5;const double y=pos.y+(toSquid?0.35:0.55);
+        const auto puffColor=mix(color,white,0.35);
+        sprite(out,WorldFxShape::Puff,{pos.x,y,pos.z},{0,toSquid?-0.2:0.6,0},puffColor,0.22,0.62,0.26,0.38,rng,5);
+        const auto ringColor=mix(color,white,0.4);
+        ring(out,{pos.x,y,pos.z},normalized(camera-glm::dvec3(pos.x,y,pos.z)),ringColor,0.5,0.16,7,0.7,1,rng);
+        constexpr int count=5;
+        for(int i=0;i<count;i++){
+            const double a=(double(i)/count)*tau+rand01(rng)*0.6;
+            const double speed=1.4+rand01(rng)*1.2;
+            const double vy=1.2+rand01(rng)*1.6;
+            const double size=0.022+rand01(rng)*0.02;
+            drop(out,{pos.x,y,pos.z},{std::cos(a)*speed,vy,std::sin(a)*speed},color,size,0.6,1,1,0,rng);
+        }
+    }else if(name=="dive"){
+        const double speed=radius;
+        const glm::dvec3 p(pos.x,pos.y+0.01,pos.z);
+        const glm::dvec3 tangent(0,0,1),bitangent(1,0,0);
+        const int count=std::max(1,static_cast<int>(std::floor((10+speed*0.6)+0.5)));
+        const double a0=rand01(rng)*tau;
+        for(int i=0;i<count;i++){
+            const double a=a0+(double(i)/count)*tau+(rand01(rng)-0.5)*0.5;
+            const double c=std::cos(a),s=std::sin(a);
+            const double upAmount=0.7+rand01(rng)*0.9,outward=0.6+rand01(rng)*0.6;
+            const double sp=(2.2+std::min(2.5,speed*0.18))*(0.6+rand01(rng)*0.6);
+            const glm::dvec3 d=(tangent*c+bitangent*s)*outward+up*upAmount;
+            const double size=0.036*(0.55+rand01(rng)*0.8);
+            drop(out,p+up*0.04,d*sp,color,size,1.2,1,1,0,rng);
+        }
+        if(speed>3)shell(out,{pos.x,pos.y+0.04,pos.z},color,0.12,0.34+std::min(0.25,speed*0.02),0.06,0.2,0.95,0,0,0.2,up,1,rng);
+        const auto rippleColor=mix(color,white,0.2);
+        ring(out,p,up,rippleColor,1.5*0.85*0.8+0.1,0.85*0.7,1,0.45,1,rng);
+        const auto bubbleColor=mix(color,white,0.55)*1.1;
+        for(int i=0;i<3;i++){
+            const double ox=(rand01(rng)-0.5)*0.5,oy=0.05+rand01(rng)*0.05,oz=(rand01(rng)-0.5)*0.5;
+            const double vy=0.3+rand01(rng)*0.3;
+            const double size0=0.04+rand01(rng)*0.04,size1=0.08+rand01(rng)*0.04;
+            const double life=0.3+rand01(rng)*0.25,fadeIn=0.04+rand01(rng)*0.1;
+            sprite(out,WorldFxShape::Glow,pos+glm::dvec3(ox,oy,oz),{0,vy,0},bubbleColor,size0,size1,life,0.8,rng,1,0,21,fadeIn,0);
+        }
+    }else if(name=="emerge"){
+        constexpr int count=8;
+        for(int i=0;i<count;i++){
+            const auto d=cone(up,0.55,rng);
+            const double speed=2.5+rand01(rng)*2;
+            const double ox=(rand01(rng)-0.5)*0.25,oz=(rand01(rng)-0.5)*0.25;
+            const double size=0.022+rand01(rng)*0.026;
+            drop(out,{pos.x+ox,pos.y+0.08,pos.z+oz},d*speed,color,size,0.9,1,1.3,0,rng);
+        }
+        const auto rippleColor=mix(color,white,0.2);
+        ring(out,{pos.x,pos.y+0.01,pos.z},up,rippleColor,1.3*0.75*0.8+0.1,0.75*0.7,1,0.45,1,rng);
+    }else if(name=="wake"){
+        if(glm::dot(pos-camera,pos-camera)>=45.0*45.0)return out;
+        const glm::dvec3 dir=normalized(normal),right(dir.z,0,-dir.x);
+        const double speed=radius,k=std::min(1.0,speed/11.8);
+        const int count=static_cast<int>(std::floor((0.5+3.0*k*k)+rand01(rng)));
+        for(int i=0;i<count;i++){
+            const double back=speed*(0.06+rand01(rng)*0.1);
+            const double upward=1.5+rand01(rng)*1.3+1.5*k;
+            const double side=(rand01(rng)-0.5)*(0.7+0.9*k);
+            const glm::dvec3 velocity=-dir*back+up*upward+right*side;
+            const double size=0.016+rand01(rng)*0.018+0.012*k;
+            drop(out,pos-dir*0.34+up*0.05,velocity,color,size,0.6,1,1.7,0,rng);
+        }
+        if(rand01(rng)<0.28+0.08){
+            const double behindX=0.35+rand01(rng)*0.6,jitterX=(rand01(rng)-0.5)*0.3;
+            const double behindZ=0.35+rand01(rng)*0.6,jitterZ=(rand01(rng)-0.5)*0.3;
+            const double vy=0.22,size0=0.045+rand01(rng)*0.04,size1=0.09;
+            const double life=0.3+rand01(rng)*0.15;
+            const auto bubbleColor=mix(color,white,0.5)*1.1;
+            sprite(out,WorldFxShape::Glow,{pos.x-dir.x*behindX+jitterX,pos.y+0.05,pos.z-dir.z*behindZ+jitterZ},
+                {0,vy,0},bubbleColor,size0,size1,life,0.7,rng,1,0,21,0.03,0);
+        }
+    }else if(name=="burst"){
         constexpr int count=12;const double size=0.1;
         const glm::dvec3 at=pos+normal*0.04;
         for(int i=0;i<count;i++){
@@ -134,7 +207,7 @@ void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& p,double seconds,std::uin
     for(auto& x:p){const double t=x.life>0?double(x.age)/x.life:0;
         if(x.shape==WorldFxShape::Drop){const double speed=std::sqrt(double(x.vel.x)*x.vel.x+double(x.vel.y)*x.vel.y+double(x.vel.z)*x.vel.z);double stretch=1+std::min(speed*0.062*double(x.stretch),2.3*double(x.stretch));stretch*=1+0.14*std::sin(double(x.age)*38+double(x.seed)*20)*std::min(1.0,double(x.age)*6);x.renderRadius=f32(double(x.radius)*std::min(1.0,double(x.age)*22+0.35)*std::min(1.0,(double(x.life)-x.age)/0.12));x.renderLength=f32(std::max(1.0,stretch));}
         else if(x.shape==WorldFxShape::Puff||x.shape==WorldFxShape::Glow){x.renderRadius=f32(double(x.radius)+(double(x.radius1)-x.radius)*easeOut(t));const double fi=x.fadeIn>0?std::min(1.0,double(x.age)/x.fadeIn):1,fo=x.fadeOut>0?std::min(1.0,(double(x.life)-x.age)/x.fadeOut):(x.shape==WorldFxShape::Glow?1-t:1-t*t);x.renderAlpha=f32(double(x.alpha)*fi*fo);}
-        else if(x.shape==WorldFxShape::Ring)x.renderRadius=f32(double(x.radius)*(x.expand+(1-x.expand)*easeOut(t)));
+        else if(x.shape==WorldFxShape::Ring){const double expand=double(x.expand);x.renderRadius=f32(double(x.radius)*(expand+(1.0-expand)*easeOut(t)));}
         else if(x.shape==WorldFxShape::Shell){const double te=std::min(1.0,double(x.age)/x.expand);x.renderRadius=f32(double(x.radius)+(double(x.radius1)-x.radius)*easeOut(te));x.renderAlpha=x.alpha;x.renderLength=f32(double(x.wobble)*(1-te*0.6));}
         else if(x.shape==WorldFxShape::Beam){x.renderLength=f32(double(x.length)*easeOut(std::min(1.0,t*3.2)));x.renderRadius=f32(double(x.radius)*(0.55+0.6*easeOut(std::min(1.0,t*4)))*(1-0.5*t));x.renderAlpha=f32(std::pow(1-t,1.6)*std::min(1.0,t*25));}
     }

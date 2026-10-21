@@ -1,9 +1,11 @@
 #include "BossModelData.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
+#include <unordered_set>
 #include <utility>
 
 namespace restoration {
@@ -26,13 +28,13 @@ private:
     void read(void* data,std::streamsize size){bytes(data,size);}
     std::ifstream file_;
 };
-constexpr std::uint32_t MaxBones=128,MaxMeshes=8,MaxVertices=200000,MaxIndices=1000000,MaxSockets=64;
+constexpr std::uint32_t MaxBones=128,MaxMeshes=8,MaxVertices=200000,MaxIndices=1000000,MaxSockets=64,MaxPoseSockets=32;
 }
 
 std::vector<BossModelAsset> LoadBossModels(const std::filesystem::path& path){
     Reader r(path);
     char magic[4]{};r.bytes(magic,4);
-    if(std::string(magic,4)!="IBOS"||r.u32()!=2)throw std::runtime_error("Invalid Boss model header");
+    if(std::string(magic,4)!="IBOS"||r.u32()!=3)throw std::runtime_error("Invalid Boss model header");
     const auto modelCount=r.u32();if(modelCount!=2)throw std::runtime_error("Boss model asset must contain hullbreaker and crablet");
     std::vector<BossModelAsset> models;models.reserve(modelCount);
     for(std::uint32_t m=0;m<modelCount;++m){
@@ -72,11 +74,20 @@ std::vector<BossModelAsset> LoadBossModels(const std::filesystem::path& path){
             if(socket.bone>=boneCount||socket.radius<=0||socket.radius>10)throw std::runtime_error("Invalid Boss model socket");
             model.sockets.push_back(std::move(socket));
         }
+        const auto poseSocketCount=r.u32();if(poseSocketCount>MaxPoseSockets)throw std::runtime_error("Invalid Boss model pose socket count");
+        model.poseSockets.reserve(poseSocketCount);std::unordered_set<std::string> poseSocketNames;
+        for(std::uint32_t i=0;i<poseSocketCount;++i){
+            BossModelPoseSocket socket;socket.name=r.string();socket.bone=r.u16();socket.offset={r.f32(),r.f32(),r.f32()};
+            if(socket.bone>=boneCount||!poseSocketNames.insert(socket.name).second)throw std::runtime_error("Invalid Boss model pose socket");
+            model.poseSockets.push_back(std::move(socket));
+        }
         models.push_back(std::move(model));
     }
     if(!r.done())throw std::runtime_error("Trailing bytes in Boss model asset");
-    if(models[0].name!="hullbreaker"||models[0].bones.size()!=100||models[0].meshes.size()!=5||models[0].sockets.size()!=10||
-       models[1].name!="crablet"||models[1].meshes.size()!=1||models[1].sockets.size()!=0)
+    const std::unordered_set<std::string> requiredPoseSockets={"clawL","cannon","mouth","shellTop","hatch","eyeL"};
+    const bool hasAudioSockets=std::all_of(requiredPoseSockets.begin(),requiredPoseSockets.end(),[&](const auto& name){return std::any_of(models[0].poseSockets.begin(),models[0].poseSockets.end(),[&](const auto& socket){return socket.name==name;});});
+    if(models[0].name!="hullbreaker"||models[0].bones.size()!=100||models[0].meshes.size()!=5||models[0].sockets.size()!=10||models[0].poseSockets.size()!=20||!hasAudioSockets||
+       models[1].name!="crablet"||models[1].meshes.size()!=1||models[1].sockets.size()!=0||!models[1].poseSockets.empty())
         throw std::runtime_error("Incomplete source Boss model asset");
     return models;
 }

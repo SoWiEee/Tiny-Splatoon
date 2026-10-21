@@ -30,6 +30,7 @@ function trigSensitive(path) {
     if (recipe === 'slamLaunch') return direct[1] === 'drops' && direct[2] === 'vel';
     if (recipe === 'slamWave') return true;
     if (recipe === 'stormStart') return direct[1] === 'puffs';
+    if (recipe === 'formPop' || recipe === 'dive' || recipe === 'emerge') return direct[1] === 'drops' && direct[2] === 'vel';
     return false;
   }
   const render = /\.(drops|puffs)\.render\.(aPosR|aPosSize|aVelS)\[(\d+)\]$/.exec(path);
@@ -40,7 +41,7 @@ function trigSensitive(path) {
       return recipe === 'explosion' || recipe === 'slamWave' || (recipe === 'stormStart' && render[1] === 'puffs');
     }
     if (render[2] === 'aVelS')
-      return render[1] === 'drops' && ['burst', 'explosion', 'slamLaunch', 'slamWave'].includes(recipe);
+      return render[1] === 'drops' && ['burst', 'explosion', 'slamLaunch', 'slamWave', 'formPop', 'dive', 'emerge'].includes(recipe);
   }
   return false;
 }

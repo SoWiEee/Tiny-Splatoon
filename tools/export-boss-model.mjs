@@ -37,16 +37,17 @@ function packMesh(name, positions, normals, uv, joints, weights, material, indic
   return { name, count, triangles: indices.length / 3, data: Buffer.concat([string(name), u32(count), u32(indices.length), vertices, element]) };
 }
 function u32(value) { const out = Buffer.alloc(4); out.writeUInt32LE(value); return out; }
-function rigData(name, rig, meshes, sockets = []) {
+function rigData(name, rig, meshes, sockets = [], poseSockets = []) {
   const bones = rig.bones.map((bone) => ({
     name: bone.name, parent: bone.parent ? bone.parent.userData.i : -1,
     position: [bone.position.x, bone.position.y, bone.position.z],
   }));
   const boneBytes = bones.map((bone) => Buffer.concat([string(bone.name), i16(bone.parent), ...bone.position.map(f32)]));
   return {
-    name, bones, meshes, sockets,
+    name, bones, meshes, sockets, poseSockets,
     data: Buffer.concat([string(name), u32(bones.length), ...boneBytes, u32(meshes.length), ...meshes.map((mesh) => mesh.data),
-      u32(sockets.length), ...sockets.flatMap((socket) => [string(socket.name), u16(socket.bone), ...socket.offset.map(f32), f32(socket.radius), Buffer.from([socket.weak ? 1 : 0, socket.active ? 1 : 0])])]),
+      u32(sockets.length), ...sockets.flatMap((socket) => [string(socket.name), u16(socket.bone), ...socket.offset.map(f32), f32(socket.radius), Buffer.from([socket.weak ? 1 : 0, socket.active ? 1 : 0])]),
+      u32(poseSockets.length), ...poseSockets.flatMap((socket) => [string(socket.name), u16(socket.bone), ...socket.offset.map(f32)])]),
   };
 }
 function i16(value) { const out = Buffer.alloc(2); out.writeInt16LE(value); return out; }
@@ -82,7 +83,15 @@ const hitSockets = hitSpecs.map((spec) => {
   const bone = rig.by[boneName].userData.i;
   return { name: spec.name, bone, offset: [offset.x, offset.y, offset.z], radius: spec.radius, weak: spec.weak, active: !spec.weak || spec.name.startsWith('eye') };
 });
-const hull = rigData('hullbreaker', rig, hullMeshes, hitSockets);
+const poseSockets = Object.entries(parts.sockets).map(([name, [boneName, socket]]) => {
+  // BossModel overrides this entry in its constructor; mirror its public getSocket semantics.
+  const sourceBone = name === 'body' ? 'head' : boneName;
+  const sourcePoint = name === 'body' ? new THREE.Vector3(0, 2.2, 2.3) : socket;
+  const offset = sourcePoint.offset ?? sourcePoint.clone().sub(rig.rest[sourceBone]);
+  return { name, bone: rig.by[sourceBone].userData.i, offset: [offset.x, offset.y, offset.z] };
+});
+if (poseSockets.length !== 20) throw new Error(`Expected 20 source boss pose sockets, found ${poseSockets.length}`);
+const hull = rigData('hullbreaker', rig, hullMeshes, hitSockets, poseSockets);
 
 const crab = buildCrablet('high');
 const geo = crab.geo;
@@ -91,7 +100,7 @@ const crabMesh = packMesh('crablet', attr('position'), attr('normal'), attr('uv'
 const crablet = rigData('crablet', crab, [crabMesh]);
 
 const models = [hull, crablet];
-const binary = Buffer.concat([text('IBOS'), u32(2), u32(models.length), ...models.map((model) => model.data)]);
+const binary = Buffer.concat([text('IBOS'), u32(3), u32(models.length), ...models.map((model) => model.data)]);
 const poseRig = Buffer.concat([
   text('IBPR'), u32(2), u32(rig.bones.length), ...rig.bones.flatMap((bone) => [string(bone.name), ...v3d(bone.position)]),
   ...v3d(BODY.pivot), ...v3d(CONT.pos), f64(CONT.pitch), f64(CONT.hl), f64(CONT.hw), f64(CONT.hh),
@@ -104,16 +113,17 @@ const poseRig = Buffer.concat([
   ]),
 ]);
 const manifest = Buffer.from(`${JSON.stringify({
-  version: 3,
+  version: 4,
   source: Object.fromEntries(await Promise.all(['bossModelGeo.js', 'bossModel.js'].map(async (file) => [
     file, hash(await readFile(resolve(root, 'splat-ref/src/boss', file))),
   ]))),
   binary: hash(binary),
   poseRig: hash(poseRig),
-  models: models.map(({ name, bones, meshes, sockets }) => ({
+  models: models.map(({ name, bones, meshes, sockets, poseSockets }) => ({
     name, bones: bones.map((bone) => bone.name),
     meshes: meshes.map(({ name, count, triangles }) => ({ name, vertices: count, triangles })),
     sockets: sockets.map(({ name, bone, offset, radius, weak, active }) => ({ name, bone, offset, radius, weak, active })),
+    poseSockets: poseSockets.map(({ name, bone, offset }) => ({ name, bone, offset })),
   })),
 }, null, 2)}\n`);
 

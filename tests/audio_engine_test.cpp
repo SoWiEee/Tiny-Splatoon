@@ -40,8 +40,8 @@ int main(int argc, char** argv) {
                 "Source-rendered cue must be audible and have valid metadata");
         }
         for (const char* name : {"shoot_shooter", "shoot_blaster", "shoot_charger", "shoot_dualies", "shoot_splatling",
-                "slosh_throw", "roller_flick", "bow_loose", "blade_swish", "crab_cannon", "boss_cannon_sweep"})
-            require(audio.Metadata(name).has_value(), "Weapon, active-special, and Boss cues must resolve by source name");
+                "slosh_throw", "roller_flick", "bow_loose", "blade_swish", "crab_cannon", "boss_cannon_sweep", "xp_tick"})
+            require(audio.Metadata(name).has_value(), "Weapon, active-special, Boss, and UI cues must resolve by source name");
         require(audio.Metadata("swim")->loopable && audio.Metadata("climb")->loopable &&
                 audio.Metadata("enemy_ink_sizzle")->loopable && audio.Metadata("harbor_ambience")->loopable &&
                 audio.Metadata("splatling_spin")->loopable && audio.Metadata("boss_dizzy")->loopable,
@@ -259,6 +259,84 @@ int main(int argc, char** argv) {
         std::this_thread::sleep_for(std::chrono::milliseconds(300));directorEngine.Update();
         require(directorEngine.ActiveVoices()==0,"Device loops must fade and clear at match teardown");
         require(directorEngine.lastError().empty(),"Device transition routing requested an unknown source cue");
+
+        MatchOptions bossOptions; bossOptions.mode = "boss"; bossOptions.duration = 180;
+        MatchSimulation bossMatch(*stage, geometry, paint, nav, bossOptions);
+        auto* boss = bossMatch.boss();
+        require(boss != nullptr, "The Boss audio fallback test needs a live Boss simulation");
+        for (int i = 0; i < 55; ++i) boss->tick(0.1, false);
+        require(boss->state().visible && !boss->poseSocket("hatch"),
+            "A Boss without a pose sink must expose no named socket and use audio's body-position fallback");
+        bool positionedPlayer = false;
+        for (const int cell : boss->nav().planIds()) {
+            const auto [x, z] = boss->nav().xz(cell);
+            if (boss->nav().inPad(x, z, 3.5)) continue;
+            bossMatch.local().spawnAt({x, boss->nav().floorAt(x, z), z}, boss->state().yaw);
+            positionedPlayer = true;
+            break;
+        }
+        require(positionedPlayer, "The Boss audio test needs a target outside the spawn pads");
+        for (const auto& actor : bossMatch.actors())
+            if (actor.get() != &bossMatch.local()) actor->state.alive = false;
+        bossMatch.startPlaying();
+        boss->forceMove(BossMoveId::Crablets);
+        const auto isCrabletTelegraph = [&] {
+            return boss->move() && boss->move()->id == BossMoveId::Crablets &&
+                boss->move()->phase(boss->state().clock) == BossMovePhase::Telegraph;
+        };
+        for (int i = 0; i < 60 && !isCrabletTelegraph(); ++i) boss->tick(1.0 / 60.0, true);
+        require(boss->state().target == 0, "The Boss fallback setup must select its repositioned local target");
+        require(isCrabletTelegraph(),
+            "The Boss fallback test must route a telegraph that looks up its missing hatch socket");
+        director.BeginMatch(bossMatch);
+        const auto voicesBeforeBossCue = directorEngine.ActiveVoices();
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() > voicesBeforeBossCue && directorEngine.lastError().empty(),
+            "GameAudio must route a Boss socket cue through its optional body-position fallback");
+        const auto advanceBossAudio = [&](double step) {
+            boss->tick(step, true);
+            director.Update(step, bossMatch, {}, listener, forward);
+        };
+        while (boss->move()->phase(boss->state().clock) == BossMovePhase::Telegraph) advanceBossAudio(0.1);
+        require(boss->move()->phase(boss->state().clock) == BossMovePhase::Active,
+            "The Crablet move should reach its active phase for delayed-cue timing checks");
+        const auto voicesAtCrabletAct = directorEngine.ActiveVoices();
+        advanceBossAudio(0.1); advanceBossAudio(0.1);
+        require(directorEngine.ActiveVoices() == voicesAtCrabletAct,
+            "The second Crablet chitter must not play before its 300 ms source delay");
+        const auto chitterMetadata = audio.Metadata("crablet_chitter");
+        require(chitterMetadata && chitterMetadata->durationSeconds > chitterMetadata->sourceMinGapSeconds,
+            "The Crablet chitter must outlast its source repeat gap for a voice-count timing check");
+        std::this_thread::sleep_for(std::chrono::duration<double>(chitterMetadata->sourceMinGapSeconds + 0.03));
+        advanceBossAudio(0.1); advanceBossAudio(0.01);
+        require(directorEngine.ActiveVoices() > voicesAtCrabletAct,
+            "The second Crablet chitter must play after the 300 ms source delay");
+        director.EndMatch();
+
+        boss->reset();
+        for (int i = 0; i < 55; ++i) boss->tick(0.1, false);
+        boss->forceMove(BossMoveId::Barrage);
+        const auto isBarrageTelegraph = [&] {
+            return boss->move() && boss->move()->id == BossMoveId::Barrage &&
+                boss->move()->phase(boss->state().clock) == BossMovePhase::Telegraph;
+        };
+        for (int i = 0; i < 60 && !isBarrageTelegraph(); ++i) boss->tick(1.0 / 60.0, true);
+        require(boss->move() && boss->move()->id == BossMoveId::Barrage && !boss->move()->barrels.empty(),
+            "The Barrage timing test needs an active source move with at least one barrel target");
+        director.BeginMatch(bossMatch);
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        while (boss->move()->phase(boss->state().clock) == BossMovePhase::Telegraph) advanceBossAudio(0.1);
+        require(boss->move()->phase(boss->state().clock) == BossMovePhase::Active,
+            "Barrage should reach its active phase for whistle and barrel timing checks");
+        const auto voicesAtBarrageAct = directorEngine.ActiveVoices();
+        for (int i = 0; i < 9; ++i) advanceBossAudio(0.1);
+        const auto voicesBeforeFirstBarrel = directorEngine.ActiveVoices();
+        require(voicesBeforeFirstBarrel >= voicesAtBarrageAct,
+            "Staggered Barrage whistles should remain routed through the active phase");
+        advanceBossAudio(0.1);
+        require(directorEngine.ActiveVoices() > voicesBeforeFirstBarrel,
+            "The first Barrage barrel cue must wait until approximately 950 ms after the first whistle");
+        director.EndMatch();
 
         AudioLoopOptions zoneLoop;zoneLoop.volume=.1;zoneLoop.zoneHum=AudioLoopOptions::ZoneHumParameters{0,0};
         require(audio.StartLoop("zone-test","zone_hum",zoneLoop),"The procedural zone hum source must start on miniaudio");

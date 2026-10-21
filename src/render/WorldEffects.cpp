@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "WorldEffects.hpp"
+#include "WorldFxTransitions.hpp"
 #include "TeamPalette.hpp"
 #include "DeviceRenderer.hpp"
 #include "CombatWorld.hpp"
@@ -269,7 +270,8 @@ void WorldEffects::explosion(glm::vec3 pos,glm::vec3 color,float radius) {
 }
 void WorldEffects::emitSpecial(const char* kind,glm::vec3 pos,glm::vec3 normal,glm::vec3 color,float radius,glm::vec3 camera) {
     const std::string_view recipe(kind);
-    if(recipe=="burst"||recipe=="explosion"||recipe=="slamWave"||recipe=="stormStart") {
+    if(recipe=="burst"||recipe=="explosion"||recipe=="slamWave"||recipe=="stormStart"||
+       recipe=="formPop"||recipe=="dive"||recipe=="emerge"||recipe=="wake") {
         auto particles=BuildWorldFxRecipe(recipe,pos,normal,color,radius,random_,-1.6f,camera);
         for(auto& particle:particles)spawn(std::move(particle));
     } else if(std::strcmp(kind,"beam")==0)
@@ -294,6 +296,15 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
         if(!actor)continue;
         auto& old=actors_[actor];const auto& s=actor->state;
         const auto pose=actor->specialPose();
+        const bool squidForm=s.squid&&!pose.body&&!pose.noSquid;
+        const WorldFxActorForm previous{old.squid,old.swimming,old.climbing};
+        const WorldFxActorForm current{squidForm,squidForm&&s.submerged,squidForm&&s.climbing};
+        if(old.initialized&&!old.alive&&s.alive)old.born=time_;
+        const bool fresh=!old.initialized||time_-old.born<0.35;
+        const bool superJump=actor->superJumpState().has_value();
+        const WorldFxTransitionConditions transitionConditions{
+            old.initialized,s.alive,fresh,superJump,pose.active,s.groundTeam==1,time_-old.climbEnd<0.25,near(s.pos,26),near(s.pos,30)};
+        const auto transitions=ResolveWorldFxTransitions(previous,current,transitionConditions);
         const glm::vec3 pos(actor->visualPos()),color=ink(actor->team());
         if(old.initialized) {
             const double distance=glm::length(glm::dvec2(s.pos.x-old.pos.x,s.pos.z-old.pos.z));
@@ -305,10 +316,12 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
                     else burst(pos+glm::vec3(0,0.03f,0),{0,1,0},s.groundTeam==2?ink(1-actor->team()):color,0.045f,4);
                 }
             }
-            if(s.alive&&old.squid!=s.squid&&near(s.pos,30)) {
-                burst(pos+glm::vec3(0,0.2f,0),{0,1,0},color,s.squid?0.09f:0.12f,s.squid?9:12);
-                spawn({Shape::Ring,pos,{},{0,1,0},color,s.squid?0.75f:1.15f,0,0,0.38f,0.65f,1,random()});
-            }
+            if(transitions.formPop)
+                emitSpecial("formPop",pos,{0,1,0},color,current.squid?1.0f:0.0f,glm::vec3(camera));
+            if(transitions.dive)
+                emitSpecial("dive",glm::vec3(s.pos),{0,1,0},color,float(std::hypot(s.vel.x,s.vel.z)),glm::vec3(camera));
+            if(transitions.emerge)
+                emitSpecial("emerge",glm::vec3(s.pos),{0,1,0},color,float(std::hypot(s.vel.x,s.vel.z)),glm::vec3(camera));
             if(s.alive&&!old.grounded&&s.grounded&&s.landSpeed>3.5&&near(s.pos,38))burst(pos,{0,1,0},color,0.11f,14);
             if(old.alive&&!s.alive&&near(s.pos,60)) {
                 explosion(pos+glm::vec3(0,0.8f,0),color,1.2f);
@@ -333,9 +346,18 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
                 for(int i=0;i<3;i++)spawn({Shape::Drop,pos+glm::vec3((random()-0.5f)*0.8f,1,0),{0,-16,0},{0,1,0},color,0.025f,0,0,0.15f,1,0,random()});
             }
         }
+        if(s.alive&&current.swimming&&dt>0&&std::hypot(s.vel.x,s.vel.z)>2.0) {
+            old.wakeTimer+=dt;
+            if(old.wakeTimer>0.05) {
+                old.wakeTimer=0;
+                const double horizontalSpeed=std::hypot(s.vel.x,s.vel.z);
+                if(near(s.pos,45)) {
+                    const glm::dvec3 direction(s.vel.x/horizontalSpeed,0,s.vel.z/horizontalSpeed);
+                    emitSpecial("wake",s.pos,direction,color,float(horizontalSpeed),glm::vec3(camera));
+                }
+            }
+        }
         if(s.alive&&near(s.pos,55)) {
-            if(s.submerged&&dt>0&&glm::length(glm::dvec2(s.vel.x,s.vel.z))>2.0)
-                spawn({Shape::Ring,pos,{},{0,1,0},color,0.45f,0,0,0.28f,0.55f,1,random()});
             if(s.groundTeam==2&&s.grounded&&dt>0&&random()<dt*8)
                 spawn({Shape::Puff,pos+glm::vec3((random()-0.5f)*0.5f,0.1f,(random()-0.5f)*0.5f),{0,0.5f,0},{0,1,0},ink(1-actor->team()),0.16f,0,0,0.3f,0.5f,0,random()});
             if(pose.active) {
@@ -347,8 +369,10 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
                 } else if(pose.kind=="slam"&&pose.phase=="hang")add({Shape::Glow,pos+glm::vec3(0,1,0),{},{0,1,0},color*2.0f,1.3f,0,0,1,0.5f,0,0});
             }
         }
+        if(!old.initialized)old.born=time_;
+        if(old.initialized&&old.climbing&&!current.climbing)old.climbEnd=time_;
         old.initialized=true;old.pos=s.pos;old.hp=s.hp;old.charge=s.specialCharge;old.alive=s.alive;
-        old.squid=s.squid;old.grounded=s.grounded;old.special=pose.active?pose.kind:"";old.phase=pose.phase;
+        old.squid=current.squid;old.swimming=current.swimming;old.climbing=current.climbing;old.grounded=s.grounded;old.special=pose.active?pose.kind:"";old.phase=pose.phase;
     }
     for(auto it=actors_.begin();it!=actors_.end();) {
         if(std::find(combat.actors().begin(),combat.actors().end(),it->first)==combat.actors().end())it=actors_.erase(it);

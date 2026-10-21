@@ -34,11 +34,17 @@ struct BossModelSocket {
     float radius=0;
     bool weak=false,active=false;
 };
+struct BossModelPoseSocket {
+    std::string name;
+    unsigned bone=0;
+    glm::vec3 offset{0};
+};
 struct BossModelAsset {
     std::string name;
     std::vector<BossModelBone> bones;
     std::vector<BossModelMesh> meshes;
     std::vector<BossModelSocket> sockets;
+    std::vector<BossModelPoseSocket> poseSockets;
 };
 struct BossPoseLegData {
     glm::dvec3 hip{0},cox{0},knee{0},ankle{0},foot{0},out{0};

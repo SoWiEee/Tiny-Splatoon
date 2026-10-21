@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 register(new URL('./reference-loader.mjs',import.meta.url));
 const THREE=await import('three');
 const {BossModel}=await import('../splat-ref/src/boss/bossModel.js');
+const {buildRig,buildParts}=await import('../splat-ref/src/boss/bossModelGeo.js');
+const poseSocketNames=Object.keys(buildParts(buildRig(),'high').sockets);
 const moves={slam:[1.15,1.9,1],barrage:[.85,2,.8],sweep:[1.15,2.1,.9],charge:[1.15,1.5,.9],crablets:[.9,.8,.6],frenzy:[1.2,3,1.7]};
 const cases=[];
 const base=()=>({dt:1/60,position:[0,0,0],yaw:0,speed:0,turn:0,hurt:0,phase:1,stunned:false,dead:false,hasAim:false,aim:[0,0,0],move:'',movePhase:'',moveTime:0,phaseDuration:0,hasParams:false,wall:true,count:3,rings:[],barrels:[],flash:0,weakFlash:false,trigger:''});
@@ -43,8 +45,9 @@ for(const scenario of cases){
    const invRoot=model.root.matrixWorld.clone().invert();
    const skin=model.rig.bones.map((b,n)=>invRoot.clone().multiply(b.matrixWorld).multiply(model.skeleton.boneInverses[n]).toArray());
    const shapes=model.hitShapes.map(h=>[...h.pos.toArray(),h.r,+h.weak,+h.active]);
+   const poseSockets=poseSocketNames.map(name=>[name,...model.getSocket(name,new THREE.Vector3()).toArray()]);
    const uniforms=Object.fromEntries(Object.entries(model.U).flatMap(([name,u])=>{const v=u.value;if(typeof v==='number')return [[name,[v]]];if(v?.isVector2||v?.isVector3||v?.isVector4||v?.isColor||v?.isMatrix4)return [[name,v.toArray()]];return [];}));
-   records.push({frame,skin,shapes,uniforms});
+   records.push({frame,skin,shapes,poseSockets,uniforms});
   }
  }
  scenario.records=records;model.dispose();
