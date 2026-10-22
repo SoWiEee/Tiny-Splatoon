@@ -4,7 +4,7 @@
 
 使用者指定優先記錄的三個候選：
 
-1. 音訊剩餘來源差異：結果 `xp_tick` 的 65 ms 節奏與 Boss 動態 sockets 已接入；XP 音高／音量、Boss impact／腳步／階段事件、主觀定位及 `zone_hum` 混響／空間化仍需對照。
+1. 音訊剩餘來源差異：結果 `xp_tick` 的 65 ms 節奏與 Boss 動態 sockets 已接入；XP 音高／音量、Boss impact／腳步／階段事件、主觀定位與 HRTF／完整壓縮器仍需對照；Shaker／Tracer／Wail 事件和 `zone_hum` 混響已補驗。
 2. 道具特效與潛水特效盡可能還原：正式墨面游泳尾流、隆起、入墨／出墨／水花及 paint-ripple 回呼已接入；15 副武器／19 特殊技能已逐項核對來源生命週期，完整逐影格視覺矩陣仍待補齊，見[道具與技能檢查表](device-special-lifecycle-audit.md)。
 3. HUD／UI 已放大字級並壓縮 Zones 面板，保留繁中及 Noto Sans TC／Inter；完整來源版面與所有模式／解析度仍需比對。
 
@@ -16,7 +16,7 @@
 | HUD／UI 排版與字級 | 繁中名稱及 Inter／Noto Sans TC 已接入；來源版面比例與字級仍待調整 | HUD-01–08、FLOW-01–10；[翻譯表](ui-translations.md) | 1280×720 與 1920×1080 的 HUD、選單、暫停和結果畫面來源對照及可讀性 |
 | Zone 模式與正式進度 | 離線七圖已接入 Zone 規則／逆轉／延長、AI／HUD／場地標記／音效與 XP；仍需完整人工視覺／聽感及跨 GPU 驗收，線上 follower 同步屬網路待辦 | MODE-Z01–07、AI-04、AUDIO-03、SAVE-04 | 三難度對戰、領地切換、逆轉／延長、結算只執行一次 |
 | 線上連線 | 房碼／房間／ready、同步、延遲緩衝、換主、斷線 Bot 接手及回原房尚未移植；GameNetworkingSockets 目前只保留相依宣告 | NET-01–12 | 2／3／8 clients、三模式、延遲／抖動／斷線／換主及跨網測試 |
-| 音訊的剩餘來源差異 | 選配歌曲與多項事件、Zone／XP 事件已接入，但 `xp_tick` 節奏與 20 個 Boss 動態 sockets 已接入；XP 音高／音量、Boss impact／腳步／階段時序、細分碰撞、主觀定位及 `zone_hum` 的 Web Audio 混響／空間化仍有差異 | AUDIO-01–04；[音訊契約](audio-source-contract.md) | 裝備與 Boss 的主觀聽感／定位、XP 節奏、loop 參數變化與切場清理 |
+| 音訊的剩餘來源差異 | 選配歌曲與多項事件、Zone／XP 事件已接入，但 `xp_tick` 節奏與 20 個 Boss 動態 sockets 已接入；XP 音高／音量、Boss impact／腳步／階段時序、細分碰撞、主觀定位、HRTF 與完整壓縮器仍有差異；Shaker／Tracer／Wail 事件及 ZoneHum convolution 已補驗 | AUDIO-01–04；[音訊契約](audio-source-contract.md) | 裝備與 Boss 的主觀聽感／定位、XP 節奏、loop 參數變化與切場清理 |
 | 全量驗收 | 元件 oracle 通過不代表全場景 100%；Boss hazard／live crablet 演出仍需完整視覺矩陣，音訊仍需主觀聽感比對；QA-12 最壞視效負載與品質矩陣未完成 | QA、規格第 15 節 | 固定 reference captures、長局重入／清場、各品質與 GPU 完成時間量測 |
 
 環境與裝置來源資產及離線 Zones 已接入；其餘差異、效能優化與完整玩家流程仍按候選範圍安排。線上連線涉及權責與傳輸契約，適合獨立一輪處理。

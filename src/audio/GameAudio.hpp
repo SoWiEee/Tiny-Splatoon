@@ -47,7 +47,8 @@ private:
     void StopZoneLoops();
     void UpdateWorldAudio(double dt, MatchSimulation& match);
     void StopWorldLoops();
-    void StopLoops();
+    void StopLoops(bool preserveWail = false);
+    void UpdateWailAudio(MatchSimulation& match);
     void UpdateActorAudio(PlayerSimulation& actor);
 
     AudioEngine& engine_;
@@ -56,6 +57,7 @@ private:
     std::unordered_map<const PlayerSimulation*, ActorLoop> weaponLoops_;
     std::unordered_map<const PlayerSimulation*, ActorState> actorStates_;
     std::unordered_map<std::uint64_t,DeviceState> deviceStates_;
+    std::unordered_map<std::uint64_t,AudioPosition> wailLoops_;
     std::unordered_map<int, bool> crablets_;
     std::string bossLoop_, bossMove_;
     AudioPosition listenerPosition_{};

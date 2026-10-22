@@ -1,16 +1,21 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "combat_runner_fixtures.hpp"
+#include "controller_fixtures.hpp"
 #include <cmath>
 #include <exception>
 #include <iostream>
 #include <algorithm>
 #include <memory>
+#include <string_view>
 using namespace restoration;
 int main() {
     StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
     StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);
     std::unique_ptr<PlayerSimulation> actor;std::unique_ptr<WeaponRunner> runner;
     std::string id;double dt=0,hold=0;int frame=0,failures=0;
+    auto require=[&](bool condition,const char* message) {
+        if(!condition) { std::cerr<<message<<'\n'; ++failures; }
+    };
     for(const auto& f:test::combatRunnerFixtures) {
         if(id!=f.id || dt!=f.dt || hold!=f.hold) {
             id=f.id;dt=f.dt;hold=f.hold;frame=0;runner.reset();actor=std::make_unique<PlayerSimulation>(stage,geometry,paint);actor->setLoadout(id);actor->state.grounded=true;runner=std::make_unique<WeaponRunner>(*actor);
@@ -24,4 +29,46 @@ int main() {
     if(failures)return 1;
     std::cout<<test::combatRunnerFixtures.size()<<" source WeaponRunner snapshots passed\n";
 
+    PlayerSimulation shaker(stage,geometry,paint);
+    shaker.setLoadout("shooter","shaker");
+    shaker.state.grounded=true;
+    WeaponRunner shakerRunner(shaker);
+    constexpr double shakerStep=1.0/60.0;
+    for(int frame=0;frame<240 && shakerRunner.pose().shakerCharge<1.0;++frame)
+        shakerRunner.tick(shakerStep,false,false,true,false);
+    const auto chargedPose=shakerRunner.pose();
+    require(chargedPose.shakerCharging && chargedPose.shakerCharge>=1.0,
+          "Shaker held-charge pose must expose its fully charged gameplay state");
+    auto shakerEvents=shaker.combatWorld().takeVisualEvents();
+    const auto countSource=[&](std::string_view source) {
+        return std::count_if(shakerEvents.begin(),shakerEvents.end(),[&](const auto& event) {
+            return event.kind=="special_audio" && event.source==source;
+        });
+    };
+    require(countSource("shaker_clink")==1 && countSource("shaker_clink_max")==1,
+          "Shaker charge must emit one clink at each source level transition, without replaying while held");
+    shakerRunner.tick(shakerStep,false,false,false,true);
+    require(!shakerRunner.pose().shakerCharging && shakerRunner.pose().shakerCharge==0.0,
+          "Shaker release must stop exposing the held-charge loop state");
+
+    StageData shakerDeathStage=stage;
+    shakerDeathStage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry shakerDeathGeometry(shakerDeathStage);
+    FacePaint shakerDeathPaint(shakerDeathStage,shakerDeathGeometry,2048);
+    PlayerSimulation dyingShaker(shakerDeathStage,shakerDeathGeometry,shakerDeathPaint);
+    dyingShaker.setLoadout("shooter","shaker");
+    dyingShaker.spawnAt({0,0,0},0);
+    dyingShaker.state.invuln=0.0;
+    dyingShaker.input.sub=true;
+    for(int frame=0;frame<240 && dyingShaker.combatPose().shakerCharge<0.5;++frame)dyingShaker.tick(shakerStep);
+    require(dyingShaker.combatPose().shakerCharging,
+          "Shaker death regression needs a held gameplay charge before any audio frame observes it");
+    require(dyingShaker.damage(1000.0),"A lethal hit must splat an actively charging Shaker actor");
+    const auto deathEvents=dyingShaker.combatWorld().takeVisualEvents();
+    require(std::count_if(deathEvents.begin(),deathEvents.end(),[](const auto& event) {
+              return event.kind=="special_audio" && event.source=="shaker_fizzle";
+          })==1,
+          "Shaker death must emit exactly one fizzle from the gameplay splat hook");
+    if(failures)return 1;
+    std::cout<<"Shaker charge cues and death fizzle follow gameplay transitions\n";
 }

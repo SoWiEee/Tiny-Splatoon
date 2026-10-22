@@ -1069,7 +1069,9 @@ void CombatWorld::updateDevices(double dt) {
                 if(directHit) {
                     applyHit(*d.owner,*directHit,s.number("directDamage"),d.kind);
                     track(*directHit,d.team,s.number("directMark"));
-                    deviceCue("device_hit",d);
+                    WorldVisualEvent event;event.kind="device_hit";event.pos=directHit->isLocal()?glm::dvec3(0.0):d.pos;
+                    event.team=d.team;event.source="tracer";event.sourceLocal=d.owner->isLocal();event.sourceVictimLocal=directHit->isLocal();
+                    emitVisual(std::move(event));
                     d.tagged.push_back(directHit);d.live=false;continue;
                 }
                 if(blockShot(prev,segmentEnd,d.team,s.number("directDamage"))) {d.pos=segmentEnd;d.live=false;continue;}
@@ -1082,13 +1084,21 @@ void CombatWorld::updateDevices(double dt) {
                 for(auto* e:actors_) {
                     if(!e || e->team()==d.team || !e->state.alive || std::find(d.tagged.begin(),d.tagged.end(),e)!=d.tagged.end()) continue;
                     const auto target=e->visualPos();
-                    bool touched=false;
+                    bool touched=false;glm::dvec3 trailHitPosition=d.pos;
                     for(std::size_t i=1;i<d.trailPoints.size();++i) {
                         const auto& a=d.trailPoints[i-1];const auto& b=d.trailPoints[i];
                         if(time_-a.second>s.number("trailLife")) continue;
-                        if(StageGeometry::segmentCapsuleDist(a.first,b.first,target,e->hitRadius(),e->hitHeight()).dist<e->hitRadius()+s.number("trailRadius")) {touched=true;break;}
+                        const auto trailHit=StageGeometry::segmentCapsuleDist(a.first,b.first,target,e->hitRadius(),e->hitHeight());
+                        if(trailHit.dist<e->hitRadius()+s.number("trailRadius")) {
+                            touched=true;trailHitPosition=a.first+(b.first-a.first)*trailHit.t;break;
+                        }
                     }
-                    if(touched) {applyHit(*d.owner,*e,s.number("trailDamage"),d.kind);track(*e,d.team,s.number("trailMark"));d.tagged.push_back(e);}
+                    if(touched) {
+                        applyHit(*d.owner,*e,s.number("trailDamage"),d.kind);track(*e,d.team,s.number("trailMark"));d.tagged.push_back(e);
+                        WorldVisualEvent event;event.kind="device_hit";event.pos=e->isLocal()?glm::dvec3(0.0):trailHitPosition;
+                        event.team=d.team;event.source="tracer_trail";event.sourceLocal=d.owner->isLocal();event.sourceVictimLocal=e->isLocal();
+                        emitVisual(std::move(event));
+                    }
                 }
                 if(hit.hit) {
                     paint(*d.owner,hit.point+hit.normal*0.1,s.number("puddleRadius"),d.owner->random(),{},d.special);

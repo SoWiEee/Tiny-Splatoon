@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -30,6 +31,7 @@ struct WorldObjectView {
     glm::dvec3 pos{0.0}, previous{0.0}, target{0.0}, mouth{0.0}, vel{0.0}, direction{0.0,0.0,1.0};
     double age = 0.0, timer = 0.0, radius = 0.0, range = 0.0, charge = 0.0;
     bool held = false;
+    std::uint64_t id = 0;
 };
 
 class WorldSpecials {
@@ -82,6 +84,7 @@ private:
         double directDamage = 0.0;
         bool live = true, held = false, audioWhistled = false;
         std::vector<PlayerSimulation*> tagged;
+        std::uint64_t id = 0;
     };
 
     void throwBarrage(PlayerSimulation& actor, ActorSpecial& special);

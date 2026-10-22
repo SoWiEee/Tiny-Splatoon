@@ -34,8 +34,9 @@ struct WorldTickGuard {
     bool& active_;
     bool previous_;
 };
-void emitSpecialAudio(CombatWorld& world, std::string_view source, glm::dvec3 pos, int team, double charge = 0.0) {
-    world.emitVisual({"special_audio", pos, {0.0, 1.0, 0.0}, 0.0, team, charge, 0.08, 0.0, std::string(source)});
+void emitSpecialAudio(CombatWorld& world, std::string_view source, glm::dvec3 pos, int team,
+                      double charge = 0.0, std::uint64_t id = 0) {
+    world.emitVisual({"special_audio", pos, {0.0, 1.0, 0.0}, 0.0, team, charge, 0.08, 0.0, std::string(source), id});
 }
 }
 
@@ -577,6 +578,7 @@ bool WorldSpecials::weapon(PlayerSimulation& actor, double dt, bool fire, bool f
             || special.elapsed >= def.number("holdTime", 6.0)) {
             WorldObject speaker;
             speaker.owner = &actor;
+            speaker.id = world_.allocateId();
             speaker.kind = "speaker";
             speaker.phase = "charge";
             const double yaw = actor.input.aimYaw;
@@ -1111,6 +1113,7 @@ void WorldSpecials::tickWail(WorldObject& object, double dt) {
         if (object.age >= def.number("charge", 1.3)) {
             object.phase = "blast";
             object.age = 0.0;
+            emitSpecialAudio(world_, "wail_blast_start", object.pos, object.owner->team(), 0.0, object.id);
         }
         return;
     }
@@ -1127,6 +1130,7 @@ void WorldSpecials::tickWail(WorldObject& object, double dt) {
         if (object.age >= def.number("blast", 3.2)) {
             object.phase = "fade";
             object.age = 0.0;
+            emitSpecialAudio(world_, "wail_blast_stop", object.pos, object.owner->team(), 0.0, object.id);
         }
         return;
     }
@@ -1624,7 +1628,7 @@ std::vector<WorldObjectView> WorldSpecials::visualObjects() const {
         if (!object.live || !object.owner) continue;
         result.push_back({object.kind,object.phase,object.owner->team(),object.pos,object.previous,
                           object.target,object.mouth,object.vel,object.direction,object.age,
-                          object.timer,object.radius,object.range,object.charge,object.held});
+                          object.timer,object.radius,object.range,object.charge,object.held,object.id});
     }
     return result;
 }
@@ -1637,7 +1641,11 @@ void WorldSpecials::splat(PlayerSimulation& actor) {
 void WorldSpecials::cleanup(PlayerSimulation& actor) {
     actors_.erase(&actor);
     shieldHitTimes_.erase(&actor);
-    for (auto& object : objects_) if (object.owner == &actor) object.live = false;
+    for (auto& object : objects_) if (object.live && object.owner == &actor) {
+        if (object.kind == "speaker" && object.phase == "blast")
+            emitSpecialAudio(world_, "wail_blast_stop", object.pos, actor.team(), 0.0, object.id);
+        object.live = false;
+    }
     if (!tickingWorld_) {
         objects_.erase(std::remove_if(objects_.begin(), objects_.end(), [](const WorldObject& object) {
             return !object.live || !object.owner;

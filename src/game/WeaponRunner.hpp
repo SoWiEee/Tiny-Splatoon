@@ -30,6 +30,8 @@ struct CombatPose {
     bool canopyOpening=false;
     std::string canopyState="ready";
     double bladeFlashTime=99.0,mittsLandTime=99.0;
+    bool shakerCharging = false;
+    double shakerCharge = 0.0;
 };
 
 enum class CanopyState { Ready, Broken, Launched };

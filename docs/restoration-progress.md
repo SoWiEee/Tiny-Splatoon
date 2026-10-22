@@ -74,6 +74,14 @@
 
 ## 尚未完成的驗收與工作
 
+### 音訊補驗完成（2026-10-22）
+
+- ✅ Shaker 手持充能 loop／半滿與全滿 clink／死亡 fizzle、Tracer 尾跡命中與本機受擊定位、Wail 雙喇叭獨立 loop／階段邊界／暫停及清場已接入並通過針對性回歸。
+- ✅ ZoneHum live plaza send／stereo return 和原生音樂 riser wet tail 接入；固定 Web Audio fixtures 比對、乾濕分流、非固定讀取大小與重複清理通過。完整來源壓縮器／HRTF 與主觀聽感仍待對照。
+- ✅ Release 全目標建置、17 項玩法／來源回歸、3 項 GPU／入口、WeaponRunner／音訊引擎／原生混響各 1 項與來源混響唯讀重渲染通過；詳見[驗收紀錄](acceptance-2026-10-22.md)。
+
+### 保留工作
+
 - 線上房間／同步／斷線與換主等 NET-01–12 尚未移植；GameNetworkingSockets 依賴存在不等於連線可用。
 - 固定來源畫面、完整 Boss hazard／live crablet 視覺、主觀音訊、跨 GPU／品質及最壞視效負載仍待驗收；QA-12 尚未完成。實體手把手感、觸控與震動後端也尚未驗收。
 - splat-ref 仍是來源對照依據；原生遊戲執行已獨立，但測試／fixture 與來源退役條件見[下一輪候選](next-round-backlog.md)。

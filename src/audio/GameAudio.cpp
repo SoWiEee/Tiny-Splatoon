@@ -195,13 +195,15 @@ void GameAudio::BeginMatch(MatchSimulation& match) {
     if (match.boss()) Play("boss_title");
 }
 
-void GameAudio::StopLoops() {
+void GameAudio::StopLoops(bool preserveWail) {
     for (const auto& [actor, loop] : actorLoops_) engine_.StopLoop(loop.key, 0.2);
     actorLoops_.clear();
     for (const auto& [actor, loop] : weaponLoops_) engine_.StopLoop(loop.key, 0.2);
     weaponLoops_.clear();
     for(const auto& [id,state]:deviceStates_)if(!state.loop.empty())engine_.StopLoop("device:"+std::to_string(id),.15);
     deviceStates_.clear();
+    for (const auto& item : wailLoops_) engine_.StopLoop("wail:" + std::to_string(item.first), 0.3);
+    if (!preserveWail) wailLoops_.clear();
     for (const auto* key : {"boss:sweep", "boss:gallop", "boss:frenzy", "boss:dizzy"}) engine_.StopLoop(key, 0.2);
     bossLoop_.clear();
 }
@@ -215,7 +217,7 @@ void GameAudio::Pause() {
     if (pausedAudio_) return;
     pausedAudio_ = true;
     ClearBossPendingAudio();
-    StopLoops();
+    StopLoops(true);
     StopZoneLoops();
 }
 
@@ -242,6 +244,9 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
     auto& previous = stateIt->second;
     const auto combat=actor.combatPose();
     const auto canopy=combat.canopyState;
+    const auto kind = actor.weaponProfile().kind;
+    const bool nearActor = actor.isLocal() || !hasListenerPosition_ ||
+        DistanceSquared(Position(actor.state.pos), listenerPosition_) <= 40.0 * 40.0;
     if(!inserted&&actor.mainId()=="brolly"&&previous.canopy!=canopy&&!resumeLoops_){
         if(canopy=="ready"&&actor.state.alive)Play("brolly_regrow",&actor,.6);
         else if(canopy=="launched")Play("brolly_launch",&actor,.8);
@@ -283,7 +288,6 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
         } else if (previous.specialActive && !pose.active && actor.state.alive) {
             Play("special_end", &actor, 0.7);
         }
-        const auto kind = actor.weaponProfile().kind;
         if (!resumeLoops_) {
             if (kind == "bow") {
                 if (previous.bowRingEvents < 1 && combat.bowRingEvents >= 1 && actor.isLocal()) Play("bow_ring1", &actor, 0.65);
@@ -311,11 +315,9 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
         previous.streaming = combat.streaming;
     }
 
-    const auto kind = actor.weaponProfile().kind;
-    const bool nearActor = actor.isLocal() || !hasListenerPosition_ ||
-        DistanceSquared(Position(actor.state.pos), listenerPosition_) <= 40.0 * 40.0;
     std::string desiredWeapon;
-    if (actor.state.alive && nearActor && combat.charging) {
+    if (actor.state.alive && actor.isLocal() && combat.shakerCharging) desiredWeapon = "shaker_fizz";
+    else if (actor.state.alive && nearActor && combat.charging) {
         if (kind == "charger") desiredWeapon = "charger_charge";
         else if (kind == "spinner") desiredWeapon = "splatling_spin";
         else if (kind == "bow") desiredWeapon = "bow_draw";
@@ -325,16 +327,23 @@ void GameAudio::UpdateActorAudio(PlayerSimulation& actor) {
     if (actor.state.alive && nearActor && kind == "spinner" && combat.streaming) desiredWeapon = "splatling_spin";
     auto weaponLoop = weaponLoops_.find(&actor);
     if (weaponLoop != weaponLoops_.end() && weaponLoop->second.cue != desiredWeapon) {
-        engine_.StopLoop(weaponLoop->second.key, 0.18);
+        engine_.StopLoop(weaponLoop->second.key, weaponLoop->second.cue == "shaker_fizz" ? 0.1 : 0.18);
         weaponLoops_.erase(weaponLoop);
         weaponLoop = weaponLoops_.end();
     }
     if (!desiredWeapon.empty()) {
         const std::string key = "weapon:" + std::to_string(reinterpret_cast<std::uintptr_t>(&actor)) + ':' + desiredWeapon;
         AudioLoopOptions options;
-        options.volume = kind == "charger" ? (actor.isLocal() ? 0.55 : 0.35) :
-            kind == "spinner" ? (actor.isLocal() ? 0.6 : 0.4) :
-            kind == "mitts" ? (actor.isLocal() ? 0.5 : 0.35) : (actor.isLocal() ? 0.5 : 0.32);
+        if (desiredWeapon == "shaker_fizz") {
+            const double charge = std::clamp(combat.shakerCharge, 0.0, 1.0);
+            const bool full = charge >= 1.0;
+            options.volume = 0.3 + 0.8 * charge + (full ? 0.25 : 0.0);
+            options.pitch = 0.85 + 0.55 * charge + (full ? 0.15 * std::sin(match_->world().time() * 9.0) : 0.0);
+        } else {
+            options.volume = kind == "charger" ? (actor.isLocal() ? 0.55 : 0.35) :
+                kind == "spinner" ? (actor.isLocal() ? 0.6 : 0.4) :
+                kind == "mitts" ? (actor.isLocal() ? 0.5 : 0.35) : (actor.isLocal() ? 0.5 : 0.32);
+        }
         if (desiredWeapon == "charger_charge") options.pitch = 1.0 + 1.5 * combat.charge;
         else if (desiredWeapon == "splatling_spin") options.pitch = combat.streaming ? 1.5 : 0.6 + 0.85 * combat.charge;
         else if (desiredWeapon == "bow_draw") options.pitch = 0.6 + 0.9 * combat.charge;
@@ -418,6 +427,25 @@ void GameAudio::UpdateDeviceAudio(MatchSimulation& match){
         old={d.state,loop,d.hopping,d.uses};
     }
     for(auto it=deviceStates_.begin();it!=deviceStates_.end();)if(!live.count(it->first)){if(!it->second.loop.empty())engine_.StopLoop("device:"+std::to_string(it->first),.15);it=deviceStates_.erase(it);}else ++it;
+}
+
+void GameAudio::UpdateWailAudio(MatchSimulation& match) {
+    std::unordered_set<std::uint64_t> active;
+    for (const auto& object : match.world().visualObjects()) {
+        if (object.kind != "speaker" || object.phase != "blast" || !object.id) continue;
+        active.insert(object.id);
+        wailLoops_.insert_or_assign(object.id, Position(object.pos));
+    }
+    for (auto it = wailLoops_.begin(); it != wailLoops_.end();) {
+        if (!active.count(it->first)) {
+            engine_.StopLoop("wail:" + std::to_string(it->first), 0.3);
+            it = wailLoops_.erase(it);
+            continue;
+        }
+        AudioLoopOptions options; options.volume = 1.0; options.pos = it->second;
+        engine_.StartLoop("wail:" + std::to_string(it->first), "wail_blast", options);
+        ++it;
+    }
 }
 
 void GameAudio::UpdateWorldAudio(double dt, MatchSimulation& match) {
@@ -723,7 +751,33 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
             options.volume = 1.0; options.pitch = 0.6; engine_.Play("bomb_beep", options);
         }
         else if (event.kind == "special_audio") {
-            if (event.source == "bomb_throw") {
+            if (event.source == "wail_blast_start" && event.id) {
+                wailLoops_.insert_or_assign(event.id, Position(event.pos));
+            }
+            else if (event.source == "wail_blast_stop" && event.id) {
+                engine_.StopLoop("wail:" + std::to_string(event.id), 0.3);
+                wailLoops_.erase(event.id);
+            }
+            else if (event.source == "shaker_fizzle") {
+                const bool nearActor = event.sourceLocal || !hasListenerPosition_ ||
+                    DistanceSquared(Position(event.pos), listenerPosition_) <= 30.0 * 30.0;
+                if (nearActor) {
+                    if (event.sourceLocal) options.pos.reset();
+                    options.volume = event.sourceLocal ? 0.8 : 0.6;
+                    engine_.Play("shaker_fizzle", options);
+                }
+            }
+            else if (event.source == "shaker_clink" || event.source == "shaker_clink_max") {
+                const bool nearActor = event.sourceLocal || !hasListenerPosition_ ||
+                    DistanceSquared(Position(event.pos), listenerPosition_) <= 30.0 * 30.0;
+                if (nearActor && !resumeLoops_) {
+                    if (event.sourceLocal) options.pos.reset();
+                    options.volume = event.sourceLocal ? 1.0 : 0.75;
+                    options.pitch = event.source == "shaker_clink_max" ? 1.0 : 0.94;
+                    engine_.Play(event.source, options);
+                }
+            }
+            else if (event.source == "bomb_throw") {
                 options.volume = 0.65; options.pitch = event.charge > 0.0 ? event.charge : 1.0;
                 engine_.Play("bomb_throw", options);
             }
@@ -740,7 +794,19 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
             else if (event.source == "jet_end") { options.volume = 0.7; engine_.Play("jet_end", options); }
         }
         else if (event.kind == "device_hit" && event.source == "tracer") {
-            options.volume = 0.9; engine_.Play("tracer_hit", options);
+            const bool audible = event.sourceLocal || event.sourceVictimLocal || !hasListenerPosition_ ||
+                DistanceSquared(Position(event.pos), listenerPosition_) <= 30.0 * 30.0;
+            if (audible) {
+                if (event.sourceVictimLocal) options.pos.reset();
+                options.volume = 0.9; engine_.Play("tracer_hit", options);
+            }
+        }
+        else if (event.kind == "device_hit" && event.source == "tracer_trail") {
+            const bool audible = event.sourceLocal || event.sourceVictimLocal;
+            if (audible) {
+                if (event.sourceVictimLocal) options.pos.reset();
+                options.volume = 0.55; options.pitch = 1.3; engine_.Play("tracer_hit", options);
+            }
         }
         else if (event.kind == "device_destroy") {
             if (event.source == "torpedo") {
@@ -806,6 +872,7 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
         else if (event.kind == "stormStart") { options.volume = 0.65; engine_.Play("storm_thunder", options); }
         else if (event.kind == "burst") { options.volume = 0.55; engine_.Play("splat_big", options); }
     }
+    UpdateWailAudio(match);
     UpdateBoss(dt, match);
     resumeLoops_ = false;
     matchPhase_ = phaseValue;

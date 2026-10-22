@@ -55,4 +55,14 @@
 - MSVC x64 Release 全目標建置通過。CPU／來源檢查 **28/28** 通過（80.00 秒，三項並行）；GPU／UI／音訊／正式入口 **9/9** 通過（55.71 秒，依序執行）。紀錄在 `build/acceptance-device-respawn-cpu.log` 與 `build/acceptance-device-respawn-gpu-audio.log`。來源檔案與 `reference-baseline.sha256` 未變更，未重跑未受影響的全 83 項或重新匯出音樂／貼圖。
 - 人工看圖另發現 map marker 陰影合成會造成原點殘影與白色方塊；移除標記／本機 Actor 的裝飾陰影後，UI 互動補驗 **1/1** 通過。新測試同時檢查實際 framebuffer 中的綠色標記、白色數字、原點無殘影及標記座標。已檢視 `build/captures/ui/jump-map-1280x720.png` 與 `jump-map-1920x1080.png`，三名隊友、生點與訊標均正常顯示；面板改為不透明，避免背後計分穿透。
 
-仍保留手持 Shaker 充能、Tracer 尾跡命中音訊、Wail 持續音邊界、部分相機距離 gating、ZoneHum 混響與 Boss 細分事件，以及檢查表內標出的材質／動作與完整生命週期圖像差異。逐事件播放成功不等於主觀聽感或 Web Audio 處理一致。
+上述檢查點仍保留的 Shaker／Tracer／Wail／ZoneHum 音訊差異，於下節補驗；Boss 細分事件、其他距離 gating，以及檢查表內的材質／動作與完整生命週期圖像差異仍保留。
+
+## 後續整合：充能、尾跡、持續音與即時混響
+
+- Shaker 使用實際玩法充能狀態控制本機 fizz，50%／100% 跨門檻發出 clink，死亡中斷由模擬產生 fizzle。測試涵蓋音訊尚未觀察到手持狀態就死亡，以及暫停／恢復／清場。
+- Tracer 直接與尾跡命中分開路由；尾跡僅在持有者或受擊者為本機時發聲，直接命中另保留 30 m 相機距離條件。本機受擊聲不定位，其餘尾跡使用最近接觸點與來源音量／音高。
+- Wail 每座喇叭有獨立且不重用的 ID，charge→blast 啟動 loop，blast→fade／死亡清理採 0.3 s 淡出；快照補齊無事件清場及暫停恢復。兩座同一持有者喇叭不互相覆蓋。
+- ZoneHum 接入前置於乾聲空間化的 send 和共用 stereo plaza return；來源 impulse／normalize／距離 send 及原生 music riser 的 wet tail 已接入。已烘焙處理的音訊資產不再額外混響。完整瀏覽器壓縮器、HRTF 與主觀定位仍未宣稱一致。
+- 獨立 Web Audio fixtures 已重新唯讀渲染檢查；原生 raw IR 容差 1e-7、wet 容差 3e-6，不允許位移。乾／濕分流、零 send、非有限輸入、重置、重複清理、256／480-frame quantum 與不規則讀取通過。480-frame graph 渲染 73,023 frames 花 0.0347 秒；這是離線 convolution 校準，不能代表完整遊戲 FPS 或音訊裝置的最壞 callback 延遲。
+- MSVC Release 全目標建置通過；受影響玩法／來源資產回歸 **17/17**（44.61 秒）、GPU／原生入口 **3/3**（15.07 秒）、WeaponRunner **1/1**（2.75 秒）、音訊引擎 **1/1**（28.29 秒）、原生混響 **1/1**（2.40 秒）及來源混響 fixture 唯讀檢查通過。整合時修正節點重複 uninit 與測試把模擬時間當音效播放時間的問題；沒有放寬比對容差。
+- 紀錄：`build/acceptance-audio-finish-regression.log`、`build/acceptance-audio-finish-render-entry.log`、`build/acceptance-audio-finish-engine.log`；混響 fixture 來源 hash 與匯出指令見[fixture 契約](../tests/fixtures/audio-reverb-source.md)。未重跑完整測試集或整庫音樂重新合成；參考來源及基準未修改。

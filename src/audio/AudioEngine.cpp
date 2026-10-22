@@ -1,4 +1,5 @@
 #include "AudioEngine.hpp"
+#include "NativeReverb.hpp"
 #include "ZoneHum.hpp"
 
 #include <algorithm>
@@ -46,6 +47,13 @@ std::string MiniaudioError(const char* operation, ma_result result) {
 }
 double ClampFinite(double value, double fallback = 0.0) {
     return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : fallback;
+}
+double Distance(AudioPosition a, AudioPosition b) {
+    const double x = a.x - b.x, y = a.y - b.y, z = a.z - b.z;
+    return std::sqrt(x * x + y * y + z * z);
+}
+double ReverbSendScale(double distance) {
+    return std::sqrt(3.0 / (3.0 + 1.2 * std::max(0.0, distance - 3.0)));
 }
 std::uint32_t MulberryNext(std::uint32_t& state) {
     state += 0x6D2B79F5u;
@@ -123,10 +131,15 @@ struct AudioEngine::Impl {
     struct Voice {
         ma_audio_buffer_ref source{};
         ma_sound sound{};
+        NativeReverbSend reverbSend;
         bool sourceInitialized = false, soundInitialized = false, active = false, stopping = false;
         std::string name, loopKey;
         std::uint64_t serial = 0;
         double stopAt = 0;
+        int reverbSlot = -1;
+        double reverbBaseSend = 0;
+        AudioPosition position{};
+        bool hasPosition = false;
         std::unique_ptr<HumSource> hum;
     };
     struct MusicVoice {
@@ -160,6 +173,10 @@ struct AudioEngine::Impl {
     ma_engine engine{};
     ma_sound_group music{}, sfx{};
     bool engineInitialized = false, musicInitialized = false, sfxInitialized = false;
+    NativeReverb reverb;
+    bool reverbReady = false;
+    std::array<bool, NativeReverb::kSendCount> reverbSendUsed{};
+    AudioPosition listenerPosition{};
     std::array<Voice, kVoiceLimit + kLoopLimit> voices{};
     std::array<MusicVoice, kMusicVoices> musicVoices{};
     MusicVoice transitionRiser{};
@@ -281,12 +298,22 @@ struct AudioEngine::Impl {
     void StopVoice(Voice& voice) {
         if (voice.soundInitialized) { ma_sound_stop(&voice.sound); ma_sound_uninit(&voice.sound); voice.soundInitialized = false; }
         if (voice.sourceInitialized) { ma_audio_buffer_ref_uninit(&voice.source); voice.sourceInitialized = false; }
+        if (voice.reverbSlot >= 0) {
+            const auto send = static_cast<std::size_t>(voice.reverbSlot);
+            reverb.SetSendGain(send, 0.0f);
+            voice.reverbSend.Shutdown();
+            if (send < reverbSendUsed.size()) reverbSendUsed[send] = false;
+            voice.reverbSlot = -1;
+        } else {
+            voice.reverbSend.Shutdown();
+        }
         voice.hum.reset();
         if (!voice.loopKey.empty()) {
             const auto it = loopSlots.find(voice.loopKey);
             if (it != loopSlots.end() && it->second == static_cast<std::size_t>(&voice - voices.data())) loopSlots.erase(it);
         }
         voice.active = voice.stopping = false; voice.serial = 0; voice.stopAt = 0; voice.name.clear(); voice.loopKey.clear();
+        voice.reverbBaseSend = 0; voice.position = {}; voice.hasPosition = false;
     }
     void StopMusicVoice(MusicVoice& voice) {
         if (voice.initialized) { ma_sound_stop(&voice.sound); ma_sound_uninit(&voice.sound); voice.initialized = false; }
@@ -295,22 +322,25 @@ struct AudioEngine::Impl {
         voice.active = false; voice.looping = true; voice.recording=false;voice.track.clear(); voice.stopAt = 0;
     }
     bool PlayMusicRiser(double duration) {
-        constexpr double sampleRate = 48000.0, pi = 3.14159265358979323846;
+        constexpr ma_uint32 sampleRate = 48000;
+        constexpr double pi = 3.14159265358979323846;
+        if (transitionRiser.active && !ma_sound_at_end(&transitionRiser.sound)) return true;
+        const auto startFrame = ma_engine_get_time_in_pcm_frames(&engine) + static_cast<ma_uint64>(sampleRate * 0.02);
         duration = std::clamp(std::isfinite(duration) ? duration : 0.0, 0.27, 1.70);
-        const auto frames = static_cast<ma_uint64>(std::ceil((duration + 0.06) * sampleRate));
+        const auto synthFrames = static_cast<ma_uint64>(std::ceil((duration + 0.06) * sampleRate));
         StopMusicVoice(transitionRiser);
         auto& voice = transitionRiser;
-        voice.pcm.resize(static_cast<std::size_t>(frames) * 2);
+        std::vector<float> monoInput(static_cast<std::size_t>(synthFrames), 0.0f);
         const auto& noise = SourceWhiteNoise();
         std::uint32_t noiseState = 1234;
         const auto noiseOffset = static_cast<std::size_t>(MulberryUnit(noiseState) * 1.9f * sampleRate);
         double phase = 0;
-        BiquadState bandpass, lowpass, highpass;
+        BiquadState bandpass, lowpass;
         const double hpW = 2.0 * pi * 30.0 / sampleRate, hpCos = std::cos(hpW), hpAlpha = std::sin(hpW) / (2.0 * 0.707);
         const double hpA0 = 1.0 + hpAlpha;
         const double hpB0 = (1.0 + hpCos) * 0.5 / hpA0, hpB1 = -(1.0 + hpCos) / hpA0, hpB2 = hpB0;
         const double hpA1 = -2.0 * hpCos / hpA0, hpA2 = (1.0 - hpAlpha) / hpA0;
-        for (ma_uint64 i = 0; i < frames; ++i) {
+        for (ma_uint64 i = 0; i < synthFrames; ++i) {
             const double t = static_cast<double>(i) / sampleRate;
             const double sweepT = std::min(1.0, t / duration);
             const double noiseHz = 400.0 * std::pow(7000.0 / 400.0, sweepT);
@@ -333,19 +363,35 @@ struct AudioEngine::Impl {
             const double lpA1 = -2.0 * lpCos / lpA0, lpA2 = (1.0 - lpAlpha) / lpA0;
             const double sawValue = lowpass.Process(saw, lpB0, lpB1, lpB2, lpA1, lpA2) * sawEnvelope;
 
-            // The source sends both voices through the music mix, −18 dB/3:1 compressor,
-            // 0.42 music output, then the app's glue/limiter master chain.
-            double sample = highpass.Process((noiseValue + sawValue) * 0.22, hpB0, hpB1, hpB2, hpA1, hpA2);
-            sample = CompressDb(sample, -18.0, 10.0, 3.0) * 0.42;
-            sample = CompressDb(sample, -12.0, 8.0, 3.0);
-            sample = CompressDb(sample, -2.0, 0.0, 20.0);
-            const auto pcm = static_cast<std::int16_t>(std::clamp(sample, -1.0, 1.0) * 32767.0);
-            voice.pcm[static_cast<std::size_t>(i) * 2] = pcm;
-            voice.pcm[static_cast<std::size_t>(i) * 2 + 1] = pcm;
+            monoInput[static_cast<std::size_t>(i)] = static_cast<float>((noiseValue + sawValue) * 0.22);
         }
-        ma_result result = ma_audio_buffer_ref_init(ma_format_s16, 2, voice.pcm.data(), frames, &voice.source);
+
+        const auto wet = NativeReverb::ConvolveMusicRiser(monoInput, sampleRate);
+        if (wet.empty() || (wet.size() & 1u) != 0) {
+            error = "Source music riser reverb render failed";
+            return false;
+        }
+        const auto renderFrames = static_cast<ma_uint64>(wet.size() / 2);
+        voice.pcm.resize(static_cast<std::size_t>(renderFrames) * 2);
+        BiquadState highpassLeft, highpassRight;
+        for (ma_uint64 i = 0; i < renderFrames; ++i) {
+            const double dry = i < synthFrames ? monoInput[static_cast<std::size_t>(i)] : 0.0;
+            double left = highpassLeft.Process(dry + wet[static_cast<std::size_t>(i) * 2], hpB0, hpB1, hpB2, hpA1, hpA2);
+            double right = highpassRight.Process(dry + wet[static_cast<std::size_t>(i) * 2 + 1], hpB0, hpB1, hpB2, hpA1, hpA2);
+            // The source sends the dry and wet mix through the music compressor,
+            // music level, and then the app's glue/limiter master chain.
+            left = CompressDb(left, -18.0, 10.0, 3.0) * 0.42;
+            right = CompressDb(right, -18.0, 10.0, 3.0) * 0.42;
+            left = CompressDb(left, -12.0, 8.0, 3.0);
+            right = CompressDb(right, -12.0, 8.0, 3.0);
+            left = CompressDb(left, -2.0, 0.0, 20.0);
+            right = CompressDb(right, -2.0, 0.0, 20.0);
+            voice.pcm[static_cast<std::size_t>(i) * 2] = static_cast<std::int16_t>(std::clamp(left, -1.0, 1.0) * 32767.0);
+            voice.pcm[static_cast<std::size_t>(i) * 2 + 1] = static_cast<std::int16_t>(std::clamp(right, -1.0, 1.0) * 32767.0);
+        }
+        ma_result result = ma_audio_buffer_ref_init(ma_format_s16, 2, voice.pcm.data(), renderFrames, &voice.source);
         if (result != MA_SUCCESS) { voice.pcm.clear(); error = MiniaudioError("ma_audio_buffer_ref_init(music riser)", result); return false; }
-        voice.source.sampleRate = static_cast<ma_uint32>(sampleRate); voice.sourceInitialized = true;
+        voice.source.sampleRate = sampleRate; voice.sourceInitialized = true;
         result = ma_sound_init_from_data_source(&engine, reinterpret_cast<ma_data_source*>(&voice.source),
             MA_SOUND_FLAG_NO_SPATIALIZATION, &music, &voice.sound);
         if (result != MA_SUCCESS) { error = MiniaudioError("ma_sound_init_from_data_source(music riser)", result); StopMusicVoice(voice); return false; }
@@ -354,8 +400,6 @@ struct AudioEngine::Impl {
         voice.track = "source-riser";
         voice.serial = ++serial;
         ma_sound_set_volume(&voice.sound, 1.0f);
-        const auto startFrame = ma_engine_get_time_in_pcm_frames(&engine) +
-            static_cast<ma_uint64>(ma_engine_get_sample_rate(&engine) * 0.02);
         ma_sound_set_start_time_in_pcm_frames(&voice.sound, startFrame);
         const ma_result startResult = ma_sound_start(&voice.sound);
         if (startResult != MA_SUCCESS) {
@@ -375,6 +419,8 @@ struct AudioEngine::Impl {
         for (auto& voice : voices) StopVoice(voice);
         for (auto& voice : musicVoices) StopMusicVoice(voice);
         StopMusicVoice(transitionRiser);
+        reverb.Shutdown();
+        reverbReady = false;
         if (sfxInitialized) { ma_sound_group_uninit(&sfx); sfxInitialized = false; }
         if (musicInitialized) { ma_sound_group_uninit(&music); musicInitialized = false; }
         if (engineInitialized) { ma_engine_uninit(&engine); engineInitialized = false; }
@@ -393,12 +439,24 @@ double AudioEngine::VolumeGain(double value) {
 bool AudioEngine::Initialize() {
     if (impl_->initialized) return true;
     impl_->error.clear();
-    ma_result result = ma_engine_init(nullptr, &impl_->engine);
+    auto engineConfig = ma_engine_config_init();
+    engineConfig.sampleRate = 48000;
+    engineConfig.channels = 2;
+    engineConfig.periodSizeInFrames = 256;
+    ma_result result = ma_engine_init(&engineConfig, &impl_->engine);
     if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_engine_init", result); impl_->Shutdown(); return false; }
     impl_->engineInitialized = true;
     result = ma_sound_group_init(&impl_->engine, 0, nullptr, &impl_->sfx);
     if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_sound_group_init(SFX)", result); impl_->Shutdown(); return false; }
     impl_->sfxInitialized = true;
+    result = impl_->reverb.Initialize(ma_engine_get_node_graph(&impl_->engine),
+        reinterpret_cast<ma_node*>(&impl_->sfx), ma_engine_get_sample_rate(&impl_->engine));
+    if (result == MA_SUCCESS) {
+        impl_->reverbReady = true;
+        impl_->reverbSendUsed.fill(false);
+    } else {
+        impl_->error = MiniaudioError("NativeReverb::Initialize", result);
+    }
     result = ma_sound_group_init(&impl_->engine, 0, nullptr, &impl_->music);
     if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_sound_group_init(music)", result); impl_->Shutdown(); return false; }
     impl_->musicInitialized = true; impl_->initialized = true;
@@ -489,13 +547,54 @@ bool AudioEngine::StartLoop(std::string_view key, std::string_view name, const A
         if(result!=MA_SUCCESS){impl_->error=MiniaudioError("ma_audio_buffer_ref_init(loop)",result);impl_->StopVoice(*slot);return false;}
         slot->source.sampleRate=clip->metadata.sampleRate;slot->sourceInitialized=true;dataSource=reinterpret_cast<ma_data_source*>(&slot->source);
     }
-    result = ma_sound_init_from_data_source(&impl_->engine, dataSource,
-        options.pos ? 0 : MA_SOUND_FLAG_NO_SPATIALIZATION, &impl_->sfx, &slot->sound);
+    bool useReverbSend = false;
+    if (name == "zone_hum" && impl_->reverbReady) {
+        for (std::size_t send = 0; send < impl_->reverbSendUsed.size(); ++send) {
+            if (!impl_->reverbSendUsed[send]) {
+                impl_->reverbSendUsed[send] = true;
+                slot->reverbSlot = static_cast<int>(send);
+                break;
+            }
+        }
+        if (slot->reverbSlot >= 0) {
+            const AudioPosition position = options.pos.value_or(AudioPosition{});
+            const ma_vec3f nativePosition{static_cast<float>(position.x), static_cast<float>(position.y), static_cast<float>(position.z)};
+            result = slot->reverbSend.Initialize(ma_engine_get_node_graph(&impl_->engine), impl_->reverb.node(),
+                static_cast<std::size_t>(slot->reverbSlot), reinterpret_cast<ma_node*>(&impl_->sfx),
+                &impl_->engine.listeners[0], ma_engine_get_channels(&impl_->engine), impl_->engine.monoExpansionMode,
+                ma_engine_get_sample_rate(&impl_->engine), options.pos ? MA_TRUE : MA_FALSE, nativePosition);
+            if (result == MA_SUCCESS) {
+                useReverbSend = true;
+                slot->position = position;
+                slot->hasPosition = options.pos.has_value();
+                const double distance = options.pos ? Distance(position, impl_->listenerPosition) : 0.0;
+                slot->reverbBaseSend = 0.12 + std::min(0.45, std::max(0.0, (distance - 4.0) * 0.025));
+                impl_->reverb.SetSendGain(static_cast<std::size_t>(slot->reverbSlot),
+                    static_cast<float>(slot->reverbBaseSend * ReverbSendScale(distance)));
+            } else {
+                slot->reverbSend.Shutdown();
+                impl_->reverbSendUsed[static_cast<std::size_t>(slot->reverbSlot)] = false;
+                slot->reverbSlot = -1;
+                impl_->error = MiniaudioError("NativeReverbSend::Initialize", result);
+            }
+        }
+    }
+    if (useReverbSend) {
+        auto config = ma_sound_config_init_2(&impl_->engine);
+        config.pDataSource = dataSource;
+        config.pInitialAttachment = slot->reverbSend.inputNode();
+        config.flags = MA_SOUND_FLAG_NO_SPATIALIZATION;
+        config.channelsOut = MA_SOUND_SOURCE_CHANNEL_COUNT;
+        result = ma_sound_init_ex(&impl_->engine, &config, &slot->sound);
+    } else {
+        result = ma_sound_init_from_data_source(&impl_->engine, dataSource,
+            options.pos ? 0 : MA_SOUND_FLAG_NO_SPATIALIZATION, &impl_->sfx, &slot->sound);
+    }
     if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_sound_init_from_data_source(loop)", result); impl_->StopVoice(*slot); return false; }
     slot->soundInitialized = true; ma_sound_set_looping(&slot->sound, MA_TRUE);
     ma_sound_set_volume(&slot->sound, static_cast<float>(std::clamp(options.volume, 0.0, 1.0)));
     ma_sound_set_pitch(&slot->sound, static_cast<float>(std::clamp(options.pitch, 0.05, 4.0)));
-    if (options.pos) ma_sound_set_position(&slot->sound, static_cast<float>(options.pos->x), static_cast<float>(options.pos->y), static_cast<float>(options.pos->z));
+    if (options.pos && !useReverbSend) ma_sound_set_position(&slot->sound, static_cast<float>(options.pos->x), static_cast<float>(options.pos->y), static_cast<float>(options.pos->z));
     result = ma_sound_start(&slot->sound);
     if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_sound_start(loop)", result); impl_->StopVoice(*slot); return false; }
     slot->active = true; slot->name = std::string(name); slot->loopKey = std::string(key); slot->serial = ++impl_->serial;
@@ -513,7 +612,19 @@ bool AudioEngine::UpdateLoop(std::string_view key, const AudioLoopOptions& optio
     voice.stopping = false; voice.stopAt = 0;
     ma_sound_set_volume(&voice.sound, static_cast<float>(std::clamp(options.volume, 0.0, 1.0)));
     ma_sound_set_pitch(&voice.sound, static_cast<float>(std::clamp(options.pitch, 0.05, 4.0)));
-    if (options.pos) ma_sound_set_position(&voice.sound, static_cast<float>(options.pos->x), static_cast<float>(options.pos->y), static_cast<float>(options.pos->z));
+    if (options.pos) {
+        if (voice.reverbSlot >= 0) {
+            voice.position = *options.pos;
+            voice.hasPosition = true;
+            voice.reverbSend.SetPosition({static_cast<float>(options.pos->x), static_cast<float>(options.pos->y), static_cast<float>(options.pos->z)});
+            voice.reverbSend.SetSpatialized(MA_TRUE);
+            const double distance = Distance(voice.position, impl_->listenerPosition);
+            impl_->reverb.SetSendGain(static_cast<std::size_t>(voice.reverbSlot),
+                static_cast<float>(voice.reverbBaseSend * ReverbSendScale(distance)));
+        } else {
+            ma_sound_set_position(&voice.sound, static_cast<float>(options.pos->x), static_cast<float>(options.pos->y), static_cast<float>(options.pos->z));
+        }
+    }
     return true;
 }
 
@@ -535,9 +646,16 @@ void AudioEngine::SetListener(AudioPosition position, AudioPosition forward, Aud
     if (!finite(position)) return;
     if (!finite(forward) || (forward.x == 0 && forward.y == 0 && forward.z == 0)) forward = {0, 0, -1};
     if (!finite(up) || (up.x == 0 && up.y == 0 && up.z == 0)) up = {0, 1, 0};
+    impl_->listenerPosition = position;
     ma_engine_listener_set_position(&impl_->engine, 0, static_cast<float>(position.x), static_cast<float>(position.y), static_cast<float>(position.z));
     ma_engine_listener_set_direction(&impl_->engine, 0, static_cast<float>(forward.x), static_cast<float>(forward.y), static_cast<float>(forward.z));
     ma_engine_listener_set_world_up(&impl_->engine, 0, static_cast<float>(up.x), static_cast<float>(up.y), static_cast<float>(up.z));
+    for (auto& voice : impl_->voices) {
+        if (!voice.active || voice.reverbSlot < 0) continue;
+        const double distance = voice.hasPosition ? Distance(voice.position, position) : 0.0;
+        impl_->reverb.SetSendGain(static_cast<std::size_t>(voice.reverbSlot),
+            static_cast<float>(voice.reverbBaseSend * ReverbSendScale(distance)));
+    }
 }
 
 bool AudioEngine::PlayMusic(std::string_view track, double fadeSeconds) {
@@ -548,11 +666,9 @@ bool AudioEngine::PlayMusic(std::string_view track, double fadeSeconds) {
     if (impl_->pendingMusic && impl_->pendingMusic->track == track) return true;
     if (impl_->currentMusic < kMusicVoices && impl_->musicVoices[impl_->currentMusic].active && impl_->musicVoices[impl_->currentMusic].track == track) {
         impl_->pendingMusic.reset();
-        impl_->StopMusicVoice(impl_->transitionRiser);
         return true;
     }
     impl_->pendingMusic.reset();
-    impl_->StopMusicVoice(impl_->transitionRiser);
     if (!impl_->atMusicBoundary && fade > 0 && impl_->currentMusic < kMusicVoices) {
         auto& current = impl_->musicVoices[impl_->currentMusic];
         const auto currentMeta = impl_->musicCatalog.find(current.track);
@@ -567,8 +683,9 @@ bool AudioEngine::PlayMusic(std::string_view track, double fadeSeconds) {
                 std::ceil((static_cast<double>(cursor) + sampleRate * 0.12 - sourceGridOffset) / barFrames) * barFrames;
             const double wait = std::max(0.0, (target - static_cast<double>(cursor)) / sampleRate);
             if (wait > 0.01) {
+                const double transitionStartAt = impl_->Now() + wait;
                 if (wait > 0.3 && !impl_->PlayMusicRiser(wait - 0.03)) return false;
-                impl_->pendingMusic = Impl::PendingMusic{std::string(track), fade, impl_->Now() + wait};
+                impl_->pendingMusic = Impl::PendingMusic{std::string(track), fade, transitionStartAt};
                 return true;
             }
         }
@@ -621,7 +738,6 @@ bool AudioEngine::PlayMusic(std::string_view track, double fadeSeconds) {
 
 void AudioEngine::StopMusic(double fadeSeconds) {
     impl_->pendingMusic.reset();
-    impl_->StopMusicVoice(impl_->transitionRiser);
     if (impl_->currentMusic >= kMusicVoices) return;
     auto& voice = impl_->musicVoices[impl_->currentMusic];
     if (!voice.active) { impl_->currentMusic = kMusicVoices; return; }
@@ -671,6 +787,7 @@ void AudioEngine::Clear() {
     for (auto& voice : impl_->voices) impl_->StopVoice(voice);
     for (auto& voice : impl_->musicVoices) impl_->StopMusicVoice(voice);
     impl_->StopMusicVoice(impl_->transitionRiser);
+    if (impl_->reverbReady) impl_->reverb.Reset();
     impl_->currentMusic = kMusicVoices;
 }
 

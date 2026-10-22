@@ -42,6 +42,8 @@ bool WeaponRunner::busy() const {
 CombatPose WeaponRunner::pose() const {
     CombatPose p; p.firing=firingT_>0 || charging_ || flick_>=0 || rolling_ || burstT_>0 || turret_;
     p.charging=charging_;p.rolling=rolling_;p.subAim=aimingSub_;p.charge=charge_;p.firingTime=firingT_;p.dodgeTime=dodgeT_;
+    p.shakerCharging=actor_.state.alive&&!actor_.state.squid&&aimingSub_&&actor_.subId()=="shaker";
+    p.shakerCharge=p.shakerCharging?subCharge_:0.0;
     if(actor_.mainId()=="blade") {p.charging=bladeCharging_;p.charge=bladeCharge_;p.firing=p.firing || bladeSwing_.active;p.actionYaw=bladeSwing_.yaw;}
     if(actor_.mainId()=="mitts") {p.charging=mittsCharging_;p.charge=mittsCharge_;p.leaping=mittsLeaping_;p.mittsLeapEvents=mittsLeapEvents_;p.firing=p.firing || mittsLeaping_ || mittsCharging_ || mittsLandTime_<0.35;p.guard=firingT_>0.1;}
     if(actor_.mainId()=="bow") p.bowRing=bowRing_;
@@ -182,6 +184,7 @@ void WeaponRunner::tick(double dt,bool fire,bool pressed,bool sub,bool subReleas
         if(actor_.subId()=="shaker") {subCharge_=0;subChargeBudget_=0.1;subAimYaw_=actor_.input.aimYaw;subWagTime_=9;subLookSign_=0;}
     }
     const auto& subDef=actor_.subWeapon();
+    const double previousSubCharge = subCharge_;
     if(sub && actor_.subId()=="shaker" && actor_.state.ink>=subDef.number("inkCost")) {
         const double move=std::clamp((std::hypot(actor_.state.vel.x,actor_.state.vel.z)-1.0)/5.0,0.0,1.0);
         double add=(dt/subDef.number("chargeTime"))*(1.0+subDef.number("moveBoost")*move);
@@ -197,6 +200,20 @@ void WeaponRunner::tick(double dt,bool fire,bool pressed,bool sub,bool subReleas
         }
         subChargeBudget_=std::min(0.3,subChargeBudget_+subDef.number("maxRate")*dt);
         add=std::min(add,subChargeBudget_);subChargeBudget_-=add;subCharge_=std::min(1.0,subCharge_+add);
+    }
+    if (actor_.subId() == "shaker") {
+        const auto level = [](double charge) { return charge >= 1.0 ? 3 : charge >= 0.5 ? 2 : 1; };
+        const int oldLevel = level(previousSubCharge), newLevel = level(subCharge_);
+        if (aimingSub_ && newLevel > oldLevel) {
+            WorldVisualEvent event;
+            event.kind = "special_audio";
+            event.source = newLevel >= 3 ? "shaker_clink_max" : "shaker_clink";
+            event.pos = actor_.state.pos + glm::dvec3(0.0, 1.2, 0.0);
+            event.team = actor_.team();
+            event.charge = newLevel;
+            event.sourceLocal = actor_.isLocal();
+            actor_.world_->emitVisual(std::move(event));
+        }
     }
     if(aimingSub_)actor_.fireFacing_=0.3;
     if(subReleased && aimingSub_ && !actor_.state.squid) {

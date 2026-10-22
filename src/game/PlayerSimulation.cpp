@@ -119,6 +119,7 @@ bool PlayerSimulation::damageFromCombat(double amount, PlayerSimulation* attacke
 }
 
 void PlayerSimulation::splat(bool water) {
+    const bool shakerFizzle = runner_.pose().shakerCharging;
     ++deaths_;
     superJump_.reset();
     state.alive = false;
@@ -127,6 +128,15 @@ void PlayerSimulation::splat(bool water) {
     const bool activeSpecial = world_->specials_.pose(*this).active;
     state.specialCharge = activeSpecial ? weapon().number("specialCost", 190.0) * 0.5 : state.specialCharge * 0.5;
     state.climbing = false;
+    if (shakerFizzle) {
+        WorldVisualEvent event;
+        event.kind = "special_audio";
+        event.pos = state.pos + glm::dvec3(0.0, 1.2, 0.0);
+        event.team = team_;
+        event.source = "shaker_fizzle";
+        event.sourceLocal = local_;
+        world_->emitVisual(std::move(event));
+    }
     world_->specials_.splat(*this);
     world_->cleanup(*this); runner_.reset();
     if(splatSink_)splatSink_(water);

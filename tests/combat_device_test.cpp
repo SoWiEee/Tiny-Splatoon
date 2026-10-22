@@ -18,12 +18,14 @@ void check(bool condition,const char* message) {
     if(!condition) throw std::runtime_error(message);
 }
 
-void runTracerContact(double sideOffset,double expectedDamage,double expectedMark) {
+void runTracerContact(double sideOffset,double expectedDamage,double expectedMark,
+                      bool ownerLocal=false,bool victimLocal=false) {
     StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
     StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
     PlayerSimulation owner(stage,geometry,paint,0,&world),victim(stage,geometry,paint,1,&world);
     owner.setLoadout("brolly");owner.state.pos={0,0,0};owner.state.invuln=0;owner.input.aimYaw=0;owner.input.aimPitch=0;
     victim.state.pos={sideOffset,0,4};victim.state.invuln=0;
+    owner.setLocal(ownerLocal);victim.setLocal(victimLocal);
 
     // Source fixture: config.js SUBS.tracer directDamage=35/directMark=9 and
     // trailDamage=22/trailMark=3; tracer.js tests the direct capsule before its
@@ -32,6 +34,22 @@ void runTracerContact(double sideOffset,double expectedDamage,double expectedMar
     for(int i=0;i<30 && victim.state.hp>100-expectedDamage;++i) world.tick(1.0/60.0);
     check(std::abs(victim.state.hp-(100-expectedDamage))<1e-8,"Tracer hit damage diverged from the source fixture");
     check(std::abs(victim.state.track-expectedMark)<1e-8 && victim.state.trackTeam==owner.team(),"Tracer mark duration/team diverged from the source fixture");
+    const auto events=world.takeVisualEvents();
+    const auto hitEvents=std::count_if(events.begin(),events.end(),[&](const auto& event) {
+        return event.kind=="device_hit" && (event.source=="tracer" || event.source=="tracer_trail");
+    });
+    const auto hit=std::find_if(events.begin(),events.end(),[&](const auto& event) {
+        return event.kind=="device_hit" && (event.source=="tracer" || event.source=="tracer_trail");
+    });
+    const std::string expectedSource=expectedDamage==35.0?"tracer":"tracer_trail";
+    check(hitEvents==1 && hit!=events.end() && hit->source==expectedSource,
+          "Tracer direct/trail hit must emit exactly one distinct source audio event per contact");
+    if(hit==events.end())return;
+    check(hit->sourceLocal==ownerLocal && hit->sourceVictimLocal==victimLocal,
+          "Tracer hit audio must preserve the local owner/victim playback gates");
+    if(victimLocal)
+        check(glm::length(hit->pos-glm::dvec3(0.0))<1e-12,
+              "Tracer victim-local audio event must omit its spatial source position");
 }
 
 void checkBrollyConfig() {
@@ -443,6 +461,8 @@ int main() {
         checkBrollyConfig();
         runTracerContact(0.0,35.0,9.0);
         runTracerContact(0.68,22.0,3.0);
+        runTracerContact(0.68,22.0,3.0,true,false);
+        runTracerContact(0.68,22.0,3.0,false,true);
         runBrollyShield();
         runPlacementOrder();
         runDeviceWarningLifecycle();

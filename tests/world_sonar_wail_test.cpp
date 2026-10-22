@@ -211,10 +211,32 @@ void testWail(const StageData& stage) {
           "Wail source noSquid/aimFace state was absent from its public pose");
     check(framesToWailPlacement(specials, *owner, true) == wail.pressFrames,
           "Wail press timing differs from the source snapshot");
+    const auto placedSpeaker = specials.visualObjects();
+    const auto chargeSpeaker = std::find_if(placedSpeaker.begin(), placedSpeaker.end(), [](const auto& object) {
+        return object.kind == "speaker" && object.phase == "charge";
+    });
+    check(chargeSpeaker != placedSpeaker.end() && chargeSpeaker->id != 0,
+          "Placed Wail speaker must expose its stable audio identity while charging");
+    const auto firstSpeakerId = chargeSpeaker == placedSpeaker.end() ? 0 : chargeSpeaker->id;
     for (int frame = 0; frame < wail.stepChargeFrames; ++frame)
         specials.tickWorld(dt);
+    const auto startEvents = world.takeVisualEvents();
+    check(std::count_if(startEvents.begin(), startEvents.end(), [&](const auto& event) {
+              return event.kind == "special_audio" && event.source == "wail_blast_start" && event.id == firstSpeakerId;
+          }) == 1,
+          "Wail must emit exactly one blast-start event carrying its speaker identity");
+    const auto blastingSpeaker = specials.visualObjects();
+    check(std::any_of(blastingSpeaker.begin(), blastingSpeaker.end(), [&](const auto& object) {
+              return object.kind == "speaker" && object.phase == "blast" && object.id == firstSpeakerId;
+          }),
+          "Wail audio start must coincide with the actual speaker blast phase");
     for (int frame = 0; frame < wail.stepBlastFrames; ++frame)
         specials.tickWorld(dt);
+    const auto stopEvents = world.takeVisualEvents();
+    check(std::count_if(stopEvents.begin(), stopEvents.end(), [&](const auto& event) {
+              return event.kind == "special_audio" && event.source == "wail_blast_stop" && event.id == firstSpeakerId;
+          }) == 1,
+          "Wail must emit exactly one blast-stop event when the source blast phase ends");
     const double damage = 5000.0 - target->state.hp;
     check(damage > 0.0 && close(damage, wail.steppedLineDamage, 1e-6),
           "Wail failed to damage a target behind the source-blocking wall");
@@ -266,12 +288,52 @@ void testWail(const StageData& stage) {
     cleanupTarget->state.pos = cleanupMouth + cleanupDirection * 18.0 - glm::dvec3(0.0, 0.8, 0.0);
     check(cleanupSpecials.activate(*cleanupOwner, "wail"), "Cleanup Wail did not activate");
     check(framesToWailPlacement(cleanupSpecials, *cleanupOwner, true) == wail.pressFrames,
-          "Cleanup Wail did not place on the source press frame");
+          "First cleanup Wail did not place on the source press frame");
+    const auto firstCleanupSpeakerViews = cleanupSpecials.visualObjects();
+    const auto firstCleanupSpeaker = std::find_if(firstCleanupSpeakerViews.begin(), firstCleanupSpeakerViews.end(), [](const auto& object) {
+        return object.kind == "speaker" && object.phase == "charge";
+    });
+    check(firstCleanupSpeaker != firstCleanupSpeakerViews.end() && firstCleanupSpeaker->id != 0,
+          "First cleanup Wail needs a stable speaker identity");
+    const auto firstCleanupSpeakerId = firstCleanupSpeaker == firstCleanupSpeakerViews.end() ? 0 : firstCleanupSpeaker->id;
+    for (int frame = 0; frame < wail.stepChargeFrames; ++frame) cleanupSpecials.tickWorld(dt);
+    auto cleanupEvents = cleanupWorld.takeVisualEvents();
+    check(std::any_of(cleanupEvents.begin(), cleanupEvents.end(), [&](const auto& event) {
+              return event.source == "wail_blast_start" && event.id == firstCleanupSpeakerId;
+          }), "First cleanup speaker must actually enter blast before a second is placed");
+
+    cleanupOwner->state.specialCharge = cleanupOwner->weapon().number("specialCost", 190.0);
+    check(cleanupSpecials.activate(*cleanupOwner, "wail"), "Second cleanup Wail did not activate for the same owner");
+    check(framesToWailPlacement(cleanupSpecials, *cleanupOwner, true) == wail.pressFrames,
+          "Second cleanup Wail did not place on the source press frame");
+    const auto secondCleanupSpeakerViews = cleanupSpecials.visualObjects();
+    const auto secondCleanupSpeaker = std::find_if(secondCleanupSpeakerViews.begin(), secondCleanupSpeakerViews.end(), [&](const auto& object) {
+        return object.kind == "speaker" && object.phase == "charge" && object.id != firstCleanupSpeakerId;
+    });
+    check(secondCleanupSpeaker != secondCleanupSpeakerViews.end() && secondCleanupSpeaker->id != 0,
+          "A second placed Wail from the same owner must have an independent stable identity");
+    const auto secondCleanupSpeakerId = secondCleanupSpeaker == secondCleanupSpeakerViews.end() ? 0 : secondCleanupSpeaker->id;
+    for (int frame = 0; frame < wail.stepChargeFrames; ++frame) cleanupSpecials.tickWorld(dt);
+    cleanupEvents = cleanupWorld.takeVisualEvents();
+    check(std::any_of(cleanupEvents.begin(), cleanupEvents.end(), [&](const auto& event) {
+              return event.source == "wail_blast_start" && event.id == secondCleanupSpeakerId;
+          }), "Second cleanup speaker must emit a blast-start event under its own identity");
+    const double hpBeforeCleanup = cleanupTarget->state.hp;
     cleanupSpecials.cleanup(*cleanupOwner);
+    cleanupEvents = cleanupWorld.takeVisualEvents();
+    check(std::count_if(cleanupEvents.begin(), cleanupEvents.end(), [](const auto& event) {
+              return event.kind == "special_audio" && event.source == "wail_blast_stop";
+          }) == 2,
+          "Owner cleanup must stop every active Wail speaker loop, even for multiple speakers");
+    check(std::count_if(cleanupEvents.begin(), cleanupEvents.end(), [&](const auto& event) {
+              return event.source == "wail_blast_stop" &&
+                     (event.id == firstCleanupSpeakerId || event.id == secondCleanupSpeakerId);
+          }) == 2,
+          "Wail cleanup stop events must address both independent speaker identities");
     for (int frame = 0; frame < wail.stepChargeFrames + wail.stepBlastFrames; ++frame)
         cleanupSpecials.tickWorld(dt);
-    check(close(cleanupTarget->state.hp, 5000.0),
-          "Wail beam continued damaging after owner cleanup before charge completed");
+    check(close(cleanupTarget->state.hp, hpBeforeCleanup),
+          "Wail beam continued damaging after owner teardown stopped its active speakers");
     std::cout << "Sonar and Wail match actual source state, timing, movement, ink, and wall-piercing snapshots\n";
 }
 

@@ -7,11 +7,13 @@
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/ReferenceData.hpp"
 #include "../src/world/StageGeometry.hpp"
+#include "sonar_wail_source_fixtures.hpp"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
@@ -51,8 +53,9 @@ int main(int argc, char** argv) {
             require(audio.Metadata(name).has_value(), "Weapon, active-special, Boss, and UI cues must resolve by source name");
         require(audio.Metadata("swim")->loopable && audio.Metadata("climb")->loopable &&
                 audio.Metadata("enemy_ink_sizzle")->loopable && audio.Metadata("harbor_ambience")->loopable &&
-                audio.Metadata("splatling_spin")->loopable && audio.Metadata("boss_dizzy")->loopable,
-            "Actor, world and Boss loop beds must preserve their source loop declarations");
+                audio.Metadata("splatling_spin")->loopable && audio.Metadata("boss_dizzy")->loopable &&
+                audio.Metadata("shaker_fizz")->loopable && audio.Metadata("wail_blast")->loopable,
+            "Actor, weapon, world, Special and Boss loops must preserve their source loop declarations");
         require(!audio.Metadata("crab_gatling")->loopable, "One-shot source cues must not be promoted to loop beds");
         require(!audio.Metadata("not_a_source_clip").has_value(), "Unknown names must not silently resolve to substitutes");
         require(AudioEngine::VolumeGain(0) == 0, "Zero volume must produce digital silence");
@@ -371,11 +374,24 @@ int main(int argc, char** argv) {
         addRoute("special_warning/booyah", "special_warning", "booyah", 1, {"bomb_beep"});
         addRoute("special_audio/bomb_throw", "special_audio", "bomb_throw", 1, {"bomb_throw"}, 1.0);
         addRoute("special_audio/bomb_throw burst pitch", "special_audio", "bomb_throw", 1, {"bomb_throw"}, 1.2);
+        addRoute("special_audio/shaker fizzle", "special_audio", "shaker_fizzle", 1, {"shaker_fizzle"});
+        addRoute("special_audio/shaker charge clink", "special_audio", "shaker_clink", 1, {"shaker_clink"});
+        addRoute("special_audio/shaker max clink", "special_audio", "shaker_clink_max", 1, {"shaker_clink_max"});
         for (const char* source : {"sonar_ping", "sonar_mark", "strike_whistle", "zip_latch", "zip_pull",
                  "shield_hit", "shield_pop", "crab_hit", "crab_break", "booyah_cheer", "jet_end"})
             addRoute(std::string("special_audio/") + source, "special_audio", source, 1, {source});
         addRoute("special_audio/jet_boost is not a producer tag", "special_audio", "jet_boost", 0, {});
         addRoute("device_hit/tracer", "device_hit", "tracer", 1, {"tracer_hit"});
+        addRoute("device_hit/tracer trail near camera stays silent", "device_hit", "tracer_trail", 0, {"tracer_hit"});
+        addRoute("device_hit/tracer trail local owner", "device_hit", "tracer_trail", 1, {"tracer_hit"});
+        routes.back().event.sourceLocal = true;
+        routes.back().event.pos = {80.0, 0.0, 80.0};
+        addRoute("device_hit/tracer trail local victim", "device_hit", "tracer_trail", 1, {"tracer_hit"});
+        routes.back().event.sourceVictimLocal = true;
+        routes.back().event.pos = {80.0, 0.0, 80.0};
+        addRoute("device_hit/tracer direct remote near camera", "device_hit", "tracer", 1, {"tracer_hit"});
+        addRoute("device_hit/tracer direct remote out of range", "device_hit", "tracer", 0, {"tracer_hit"});
+        routes.back().event.pos = {80.0, 0.0, 80.0};
         addRoute("device_destroy/torpedo", "device_destroy", "torpedo", 2, {"splat_small", "torpedo_pop"});
         addRoute("device_destroy/waddle flight", "device_destroy", "waddle", 1, {"splat_small"}, 0.0);
         addRoute("device_destroy/waddle armed", "device_destroy", "waddle", 1, {"splat_small"}, 1.0);
@@ -432,6 +448,190 @@ int main(int argc, char** argv) {
                     std::to_string(after >= before ? after - before : 0));
         }
         routeDirector.EndMatch();
+
+        MatchOptions wailOptions; wailOptions.practice = true; wailOptions.special = "wail";
+        MatchSimulation wailMatch(*stage, geometry, paint, nav, wailOptions);
+        GameAudio wailDirector(directorEngine);
+        const auto wailDt = 1.0 / 60.0;
+        wailDirector.BeginMatch(wailMatch);
+        wailDirector.Update(wailDt, wailMatch, {}, listener, forward);
+        const auto wailReadyCue = directorEngine.Metadata("ready");
+        require(wailReadyCue.has_value(), "Wail lifecycle test needs the match-ready cue duration");
+        double wailIntroCueSeconds = wailReadyCue->durationSeconds;
+        if (wailMatch.phase() == MatchPhase::Playing) {
+            const auto goCue = directorEngine.Metadata("go_horn");
+            require(goCue.has_value(), "A playing Wail match needs the go-horn cue duration");
+            wailIntroCueSeconds = std::max(wailIntroCueSeconds, goCue->durationSeconds);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((wailIntroCueSeconds + 0.25) * 1000.0)));
+        directorEngine.Update();
+        wailDirector.Update(wailDt, wailMatch, {}, listener, forward);
+        const auto voicesBeforeWail = directorEngine.ActiveVoices();
+
+        auto& wailActor = wailMatch.local();
+        const double wailSpecialCost = wailActor.specialWeapon().number("specialCost", 190.0);
+        const auto activateAndPlaceWail = [&] {
+            wailActor.state.specialCharge = wailSpecialCost;
+            wailActor.input.special = true;
+            wailMatch.tick(wailDt);
+            wailActor.input.special = false;
+            for (int frame = 0; frame < test::wailSourceFixture.pressFrames; ++frame)
+                wailMatch.tick(wailDt);
+            wailActor.input.fire = true;
+            wailMatch.tick(wailDt);
+            wailActor.input.fire = false;
+            const auto placed = wailMatch.world().visualObjects();
+            const auto speaker = std::find_if(placed.begin(), placed.end(), [](const auto& object) {
+                return object.kind == "speaker" && object.phase == "charge";
+            });
+            require(speaker != placed.end() && speaker->id != 0,
+                    "Wail match input must place a real charging speaker with a stable identity");
+            return speaker == placed.end() ? std::uint64_t{} : speaker->id;
+        };
+        const auto tickUntilBlast = [&](std::uint64_t speakerId) {
+            for (int frame = 0; frame < test::wailSourceFixture.stepChargeFrames + 5; ++frame) {
+                const auto objects = wailMatch.world().visualObjects();
+                if (std::any_of(objects.begin(), objects.end(), [&](const auto& object) {
+                        return object.kind == "speaker" && object.phase == "blast" && object.id == speakerId;
+                    })) return;
+                wailMatch.tick(wailDt);
+            }
+            require(false, "Placed Wail speaker must reach its source blast phase");
+        };
+
+        const auto firstWailId = activateAndPlaceWail();
+        tickUntilBlast(firstWailId);
+        auto wailEvents = wailMatch.world().takeVisualEvents();
+        require(std::count_if(wailEvents.begin(), wailEvents.end(), [&](const auto& event) {
+                    return event.kind == "special_audio" && event.source == "wail_blast_start" && event.id == firstWailId;
+                }) == 1, "First real Wail speaker must emit one identified blast-start event");
+        wailDirector.Update(wailDt, wailMatch, wailEvents, listener, forward);
+        require(directorEngine.ActiveVoices() == voicesBeforeWail + 1,
+                "Wail blast start must create one continuous source loop");
+        wailDirector.Update(wailDt, wailMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == voicesBeforeWail + 1,
+                "Repeated snapshots must update the same Wail loop without duplicating it");
+
+        wailMatch.world().clear();
+        wailDirector.Update(wailDt, wailMatch, {}, listener, forward);
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == voicesBeforeWail,
+                "World clear must reconcile away an active Wail loop without a stop event");
+
+        const auto replacementWailId = activateAndPlaceWail();
+        require(replacementWailId != firstWailId, "Wail speaker identity must not be reused after world clear");
+        tickUntilBlast(replacementWailId);
+        wailEvents = wailMatch.world().takeVisualEvents();
+        require(std::count_if(wailEvents.begin(), wailEvents.end(), [&](const auto& event) {
+                    return event.kind == "special_audio" && event.source == "wail_blast_start" && event.id == replacementWailId;
+                }) == 1, "Replacement Wail speaker must start under its new identity after world clear");
+        wailDirector.Update(wailDt, wailMatch, wailEvents, listener, forward);
+        require(directorEngine.ActiveVoices() == voicesBeforeWail + 1,
+                "A replacement Wail speaker must start one clean loop after world clear");
+
+        const auto secondWailId = activateAndPlaceWail();
+        require(secondWailId != replacementWailId,
+                "Two Wail speakers placed by one owner must not share a loop identity");
+        tickUntilBlast(secondWailId);
+        wailEvents = wailMatch.world().takeVisualEvents();
+        require(std::count_if(wailEvents.begin(), wailEvents.end(), [&](const auto& event) {
+                    return event.kind == "special_audio" && event.source == "wail_blast_start" && event.id == secondWailId;
+                }) == 1, "Second Wail speaker from the same owner must start under its own identity");
+        wailDirector.Update(wailDt, wailMatch, wailEvents, listener, forward);
+        require(directorEngine.ActiveVoices() == voicesBeforeWail + 2,
+                "Two simultaneous Wail speakers from one owner must keep two independent loops");
+
+        wailDirector.Pause();
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        directorEngine.Update();
+        const auto voicesWhilePaused = directorEngine.ActiveVoices();
+        require(voicesWhilePaused <= voicesBeforeWail,
+                "Pause must stop both Wail loops while retaining only the non-Wail baseline");
+        wailDirector.Update(wailDt, wailMatch, {}, listener, forward);
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == voicesBeforeWail + 2,
+                "Wail snapshot reconciliation must restore each loop once after pause without replaying a start cue");
+
+        wailActor.state.invuln = 0.0;
+        require(wailActor.damage(1000.0), "A lethal hit must exercise Wail speaker teardown");
+        wailEvents = wailMatch.world().takeVisualEvents();
+        require(std::count_if(wailEvents.begin(), wailEvents.end(), [](const auto& event) {
+                    return event.kind == "special_audio" && event.source == "wail_blast_stop";
+                }) == 2, "Wail death cleanup must stop both active speaker loops");
+        wailDirector.Update(wailDt, wailMatch, wailEvents, listener, forward);
+        const auto splatCue = directorEngine.Metadata("splatted_self");
+        require(splatCue.has_value(), "Wail death teardown needs the local splat cue duration");
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((splatCue->durationSeconds + 0.25) * 1000.0)));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == voicesBeforeWail,
+                "Death cleanup must fade every Wail loop after the local splat cue ends");
+        wailDirector.EndMatch();
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == 0,
+                "Match teardown must clear the Wail loops and world ambience without leaving dangling voices");
+
+        MatchOptions shakerOptions; shakerOptions.practice = true; shakerOptions.sub = "shaker";
+        MatchSimulation shakerMatch(*stage, geometry, paint, nav, shakerOptions);
+        GameAudio shakerDirector(directorEngine);
+        shakerDirector.BeginMatch(shakerMatch);
+        shakerDirector.Update(wailDt, shakerMatch, {}, listener, forward);
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((wailIntroCueSeconds + 0.25) * 1000.0)));
+        directorEngine.Update();
+        shakerDirector.Update(wailDt, shakerMatch, {}, listener, forward);
+        const auto voicesBeforeShaker = directorEngine.ActiveVoices();
+        auto& shakerActor = shakerMatch.local();
+        shakerActor.input.sub = true;
+        for (int frame = 0; frame < 240 && shakerActor.combatPose().shakerCharge < 1.0; ++frame) {
+            shakerMatch.tick(wailDt);
+            const auto events = shakerMatch.world().takeVisualEvents();
+            shakerDirector.Update(wailDt, shakerMatch, events, listener, forward);
+        }
+        require(shakerActor.combatPose().shakerCharging && shakerActor.combatPose().shakerCharge >= 1.0,
+                "Local Shaker gameplay must hold a fully charged state while its loop is active");
+        const auto maxClink = directorEngine.Metadata("shaker_clink_max");
+        require(maxClink.has_value(), "Shaker loop lifecycle test needs the max-charge clink metadata");
+        // The audio device advances in wall time independently of simulation ticks.
+        const auto halfClink = directorEngine.Metadata("shaker_clink");
+        require(halfClink.has_value(), "Shaker loop lifecycle test needs the half-charge clink metadata");
+        std::this_thread::sleep_for(std::chrono::duration<double>(std::max(maxClink->durationSeconds, halfClink->durationSeconds) + 0.15));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == voicesBeforeShaker + 1,
+                "Held Shaker should keep one fizz loop after its threshold clinks finish");
+        shakerDirector.Pause();
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == voicesBeforeShaker,
+                "Pause must stop the held Shaker fizz loop");
+        shakerDirector.Update(wailDt, shakerMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == voicesBeforeShaker + 1,
+                "The next update must restore one Shaker fizz loop without replaying a threshold clink");
+        shakerDirector.Update(wailDt, shakerMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == voicesBeforeShaker + 1,
+                "Repeated held-charge snapshots must update one Shaker loop without duplicating sound");
+
+        shakerActor.state.invuln = 0.0;
+        require(shakerActor.damage(1000.0), "A lethal hit must exercise held Shaker audio cleanup");
+        auto shakerDeathEvents = shakerMatch.world().takeVisualEvents();
+        require(std::count_if(shakerDeathEvents.begin(), shakerDeathEvents.end(), [](const auto& event) {
+                    return event.kind == "special_audio" && event.source == "shaker_fizzle";
+                }) == 1, "A death between audio updates must preserve one Shaker fizzle event");
+        shakerDirector.Update(wailDt, shakerMatch, shakerDeathEvents, listener, forward);
+        const auto selfSplatCue = directorEngine.Metadata("splatted_self");
+        const auto fizzleCue = directorEngine.Metadata("shaker_fizzle");
+        require(selfSplatCue && fizzleCue, "Held Shaker death needs splat and fizzle cue metadata");
+        const auto deathCueSeconds = std::max(selfSplatCue->durationSeconds, fizzleCue->durationSeconds);
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>((deathCueSeconds + 0.25) * 1000.0)));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == voicesBeforeShaker,
+                "Death must stop the held Shaker fizz loop after its one-shot cues end");
+        shakerDirector.EndMatch();
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        directorEngine.Update();
+        require(directorEngine.ActiveVoices() == 0,
+                "Shaker match teardown must stop the fizz loop and ambience without dangling voices");
 
         AudioLoopOptions zoneLoop;zoneLoop.volume=.1;zoneLoop.zoneHum=AudioLoopOptions::ZoneHumParameters{0,0};
         require(audio.StartLoop("zone-test","zone_hum",zoneLoop),"The procedural zone hum source must start on miniaudio");
