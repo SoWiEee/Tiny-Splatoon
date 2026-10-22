@@ -151,10 +151,22 @@ int main() {
 
             const auto initialDeviceCount = world.devices().size();
             bool sub = false, subReleased = true;
+            (void)world.takeVisualEvents();
             check(!specials.weapon(*barrage, 1.0 / 60.0, false, false, sub, subReleased),
                   "Barrage consumed main-weapon input");
             check(!sub && !subReleased && world.devices().size() == initialDeviceCount + 1,
                   "Barrage did not intercept the sub release and create one special device");
+            auto throwEvents = world.takeVisualEvents();
+            const auto throwCue = std::find_if(throwEvents.begin(), throwEvents.end(), [](const auto& event) {
+                return event.kind == "special_audio" && event.source == "bomb_throw";
+            });
+            check(std::count_if(throwEvents.begin(), throwEvents.end(), [](const auto& event) {
+                    return event.kind == "special_audio" && event.source == "bomb_throw";
+                  }) == 1 && throwCue != throwEvents.end()
+                  && glm::length(throwCue->pos - barrage->state.pos) < 1e-12
+                  && throwCue->team == barrage->team()
+                  && std::abs(throwCue->charge - (bombKind == "burst" ? 1.2 : 1.0)) < 1e-12,
+                  "Barrage throw did not emit one positioned source cue with the subvariant pitch");
             const auto& first = world.devices().back();
             check(first.owner == barrage.get() && first.special && first.kind == bombKind && first.state == "fly",
                   "Barrage created a device with incorrect owner, kind, or special state");
@@ -176,6 +188,11 @@ int main() {
             specials.weapon(*barrage, source.interval * 0.5 + 1e-6, false, false, sub, subReleased);
             check(world.devices().size() == afterFirst + 1,
                   "Barrage did not accept another throw after the source gap elapsed");
+            throwEvents = world.takeVisualEvents();
+            check(std::count_if(throwEvents.begin(), throwEvents.end(), [](const auto& event) {
+                    return event.kind == "special_audio" && event.source == "bomb_throw";
+                  }) == 1,
+                  "Barrage follow-up throw did not emit its own source cue");
 
             barrage->state.specialCharge = 13.0;
             specials.splat(*barrage);

@@ -246,6 +246,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     CharacterArt art(characterAssets,true,true);
     const std::string matchId=std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
     WorldEffects worldEffects(art.data());
+    worldEffects.SetPaintSurface(&paint);
     DeviceRenderer deviceRenderer(characterAssets.parent_path()/"devices");
     worldEffects.SetDeviceRenderer(&deviceRenderer);
     ProjectileRenderer projectileRenderer(characterAssets.parent_path()/"projectiles",true);
@@ -290,6 +291,8 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     PlayerController controller;
     GLFWgamepadstate pad{};
     bool hasPad=false,usingPad=false;
+    bool jumpMapOpen=false;
+    std::array<bool,10> jumpTargetWasHeld{};
     auto captureMouse=[&](bool capture) {
         fireBlocked=true;
         pendingMouseX=pendingMouseY=0;
@@ -317,6 +320,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     auto tick=[&] {
         auto& local=match.local();
         auto& input=local.input;
+        controller.ValidateSuperJumpQueue(match);
         input={};
         if(benchmark) {
             const double phase=(static_cast<double>(simulationStep)+options.benchmarkSeed*31.0)/90.0;
@@ -346,28 +350,29 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             controls.right=glfwGetKey(window,GLFW_KEY_D)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_RIGHT)==GLFW_PRESS;
             controls.gamepadConnected=hasPad;controls.usingPad=usingPad;
             if(hasPad){controls.leftStickX=pad.axes[GLFW_GAMEPAD_AXIS_LEFT_X];controls.leftStickY=pad.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];controls.rightStickX=pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];controls.rightStickY=pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];}
-            controls.fire=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS||(hasPad&&pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]>-.4f);
+            if(jumpMapOpen)controls={};
+            controls.fire=!jumpMapOpen&&(glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS||(hasPad&&pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]>-.4f));
             controller.Update(dt,controls,nativeApp?ui.profile().settings:PlayerSettings{},match,camera,geometry);
             const auto& pose=camera.pose();
             const glm::dvec3 forward(std::sin(camera.yaw),0,std::cos(camera.yaw));
             const glm::dvec3 right(-std::cos(camera.yaw),0,std::sin(camera.yaw));
-            input.jump=glfwGetKey(window,GLFW_KEY_SPACE)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_A]);
-            input.squid=glfwGetKey(window,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS||(hasPad&&pad.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]>-.4f);
+            input.jump=!jumpMapOpen&&(glfwGetKey(window,GLFW_KEY_SPACE)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_A]));
+            input.squid=!jumpMapOpen&&(glfwGetKey(window,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS||(hasPad&&pad.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]>-.4f));
             const bool left=controls.fire;
             if(!left) fireBlocked=false;
-            input.fire=left&&!fireBlocked;
-            const bool sub=glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER]);
+            input.fire=!jumpMapOpen&&left&&!fireBlocked;
+            const bool sub=!jumpMapOpen&&(glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER]));
             input.sub=sub;
-            if(subResumeSync) {
+            if(subResumeSync&&!jumpMapOpen) {
                 if(!sub) {
                     input.sub=false;input.squid=true;input.move=glm::dvec3(0);input.fire=false;
                     subResumeSync=false;
                 }
             }
-            const bool special=glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS||(hasPad&&(pad.buttons[GLFW_GAMEPAD_BUTTON_Y]||pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_THUMB]));
+            const bool special=!jumpMapOpen&&(glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS || glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS||(hasPad&&(pad.buttons[GLFW_GAMEPAD_BUTTON_Y]||pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_THUMB])));
             input.special=special&&!specialResumeBlock;
             if(specialResumeBlock&&!special) specialResumeBlock=false;
-            const bool cheer=glfwGetKey(window,GLFW_KEY_C)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_DPAD_UP]);
+            const bool cheer=!jumpMapOpen&&(glfwGetKey(window,GLFW_KEY_C)==GLFW_PRESS||(hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_DPAD_UP]));
             input.cheer=cheer&&!cheerWas;
             cheerWas=cheer;
             const auto hit=geometry.raycast(pose.eye,pose.forward,90.0,true);
@@ -375,7 +380,14 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             input.hasAimPoint=true;
             input.aimYaw=camera.yaw;
             input.aimPitch=camera.pitch;
-            const bool mapTarget=local.specialPose().mapTarget;
+            for(int digit=0;digit<=9;++digit){
+                const bool held=glfwGetKey(window,GLFW_KEY_0+digit)==GLFW_PRESS;
+                if(jumpMapOpen&&held&&!jumpTargetWasHeld[static_cast<std::size_t>(digit)]){
+                    controller.SelectSuperJumpMapTarget(match,digit);
+                }
+                jumpTargetWasHeld[static_cast<std::size_t>(digit)]=held;
+            }
+            const bool mapTarget=!jumpMapOpen&&local.specialPose().mapTarget;
             input.hasMapTarget=mapTarget;
             if(mapTarget) input.mapTarget=input.aimPoint;
             input.specialConfirm=mapTarget&&left&&!fireBlocked&&!leftWas;
@@ -393,8 +405,12 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             previousPhase=match.phase();
         }
         auto& player=match.local();
-        if(!previousAlive&&player.state.alive)screenController.Respawn();
+        if(!previousAlive&&player.state.alive){
+            screenController.Respawn();
+            controller.LaunchQueuedSuperJump(match);
+        }
         previousAlive=player.state.alive;
+        if(jumpMapOpen&&match.phase()!=MatchPhase::Playing){jumpMapOpen=false;if(!paused)captureMouse(false);}
         const auto special=player.specialPose();
         if(special.active&&!previousSpecial)screenController.Special(special.kind);
         previousSpecial=special.active;
@@ -459,7 +475,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         live->scene.team=actor->team();
         live->scene.lifeLevel=2;
         live->scene.cameraPosition=overviewEye;
-        live->scene.footstep=[actor,&gameAudio](int,glm::dvec3 position,double speed){gameAudio.Footstep(*actor,{position.x,position.y,position.z},speed);};
+        live->scene.footstep=[actor,&gameAudio,&worldEffects](int,glm::dvec3 position,double speed){worldEffects.Footstep(*actor,position,speed);gameAudio.Footstep(*actor,{position.x,position.y,position.z},speed);};
         live->scene.actors.resize(match.actors().size());
         live->scene.raycast=[&geometry](glm::dvec3 origin,glm::dvec3 direction,double distance) {
             const auto hit=geometry.raycast(origin,direction,distance,true);
@@ -576,6 +592,13 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             if(gear&&!gearWas&&!paused){pauseMatch();ui.ShowPracticeGear();}
             gearWas=gear;
             if(!paused&&match.phase()==MatchPhase::Playing&&!glfwGetWindowAttrib(window,GLFW_FOCUSED)) pauseMatch();
+            const bool mapHeld=!paused&&match.phase()==MatchPhase::Playing&&!match.local().specialPose().mapTarget&&
+                (glfwGetKey(window,GLFW_KEY_TAB)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_M)==GLFW_PRESS);
+            if(mapHeld!=jumpMapOpen){
+                jumpMapOpen=mapHeld;
+                if(jumpMapOpen)captureMouse(false);
+                else if(!paused&&match.phase()==MatchPhase::Playing)captureMouse(true);
+            }
             if(!paused && match.phase()==MatchPhase::Playing) {
                 double x=0.0,y=0.0;
                 glfwGetCursorPos(window,&x,&y);
@@ -724,8 +747,16 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                     showcase->drawPodium(podium,won,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);
             }
             const bool gearOpen=options.practice&&ui.preview().screen==UiScreen::PracticeGear;
+            std::vector<UiJumpMapTarget> jumpTargets;
+            if(jumpMapOpen){
+                for(const auto& target:controller.SuperJumpMapTargets(match))
+                    jumpTargets.push_back({target.key,target.x,target.z,target.label,target.available});
+            }
+            ui.SetJumpMap(jumpMapOpen,std::move(jumpTargets),controller.QueuedSuperJumpKey(),controller.QueuedSuperJumpLabel());
             if(gearOpen&&showcase){const auto p=ui.preview();if(p.width>0&&p.height>0)showcase->drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);}
             const auto hudAction=gearOpen?ui.RenderMenu(width,height):ui.RenderHud(stage,paint,match,width,height,paused,nativeApp,options.practice);
+            const int jumpMapSelection=ui.TakeJumpMapSelection();
+            if(jumpMapSelection>=0)controller.SelectSuperJumpMapTarget(match,jumpMapSelection);
             if(hudAction==UiAction::Resume){
                 if(options.practice){
                     auto& local=match.local();const auto& profile=ui.profile();

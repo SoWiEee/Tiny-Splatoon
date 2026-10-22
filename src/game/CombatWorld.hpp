@@ -55,7 +55,7 @@ struct CombatDevice {
     glm::dvec3 C{0.0}, N{0.0,0.0,1.0};
     double R = 0.0, left = 0.0, planeOff = 0.0, halfW = 0.0, speed = 0.0;
     double aimY = 0.0, senseRadius = 0.0, lockRange = 0.0, trigger = 0.0, commitDist = 0.0, creep = 0.0;
-    double fuse = -1.0, pulse = 0.0, spin = 0.0, trail = 0.0, heading = 0.0, stuck = 0.0;
+    double fuse = -1.0, pulse = 0.0, pulsePeriod = 0.45, spin = 0.0, trail = 0.0, heading = 0.0, stuck = 0.0;
     double walkTime = 0.0, travel = 0.0, lostTime = 0.0;
     double repath = 0.0, progressTime = 0.0, progressX = 0.0, progressZ = 0.0;
     double hopTime = 0.0, hopDuration = 0.5;
@@ -69,6 +69,7 @@ struct CombatDevice {
     std::size_t pathIndex = 0;
     std::vector<std::pair<glm::dvec3,double>> trailPoints;
     int uses = 0;
+    int blastCount = 0;
     bool special = false;
     std::vector<PlayerSimulation*> tagged;
 };

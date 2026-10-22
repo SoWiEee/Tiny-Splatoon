@@ -1,4 +1,5 @@
 #include "SwimWake.hpp"
+#include "PaintRipples.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -27,7 +28,14 @@ bool same(const restoration::SwimWakeUniforms& a, const restoration::SwimWakeUni
 
 int main() {
     try {
-        using namespace restoration;
+        using namespace restoration;        PaintRipples ripples;
+        check(ripples.add({{0,0,0},0.01,0.1,1,0.7},1.0,{glm::dvec3(0,2,0)}),"Near paint ripple should be accepted");
+        check(ripples.near({0.1,0,0},1,1.1),"Impact ripple clustering must find a recent nearby packet");
+        check(!ripples.add({{100,0,0},0.02,0.1,1,0.7},1.1,{glm::dvec3(0)}),"Far paint ripples should be culled");
+        for(int i=1;i<24;++i)check(ripples.add({{double(i),0,0},0.01,0.1,1,0.7},1.0),"Ripple table should fill its source capacity");
+        check(!ripples.add({{0,0,0},0.0001,0.1,1,0.7},1.1),"A weak ripple must not evict a stronger live packet");
+        check(ripples.add({{0,0,0},0.0001,0.1,1,0.7},2.0),"Expired paint ripple slots must be reusable");
+        ripples.reset();check(std::all_of(ripples.parameters().begin(),ripples.parameters().end(),[](double x){return x==0;}),"Reset must clear paint ripple parameters");
         int localId = 0, botAId = 0, botBId = 0, botCId = 0, botDId = 0;
         std::vector<SwimWakeActor> actors{
             {&botAId, {8.0, 0.0, 0.0}, {0.0, 0.0, 4.0}, true, false, true, false},

@@ -44,3 +44,15 @@
 - 入墨／出墨使用來源 ring fallback，正式 paint-ripple 回呼尚未接入；道具旋轉、次級動作與全武器／特殊技能的視效矩陣仍未完成。
 - Boss impact／腳步／階段和暈眩事件時序、Barrage 隨機細節、XP 音高／音量、Zone hum 混響／空間化及主觀定位仍待來源對照。
 - 線上多人、觸控／震動後端、跨 GPU 與最壞負載 QA 未完成。保留 splat-ref，沒有宣稱 100% 還原。
+
+## 後續整合：道具預警、步行濺墨與復活彈射
+
+- 全部 15 副武器與 19 特殊技能已建立[來源生命週期檢查表](device-special-lifecycle-audit.md)。表內明列哪些是來源程式核對、哪些有行為 fixture，哪些只有模型 GPU 檢查；不據此宣稱全裝備完整視效一致。
+- 本輪修正黏彈預警、地雷動畫時鐘、Booyah 光暈與迴旋鏢接觸／引爆，補齊安放、預警、命中、破壞與實際 Bomb Rush 投擲事件。音訊測試逐事件隔離計數，包含零聲部的 Crab／Jetpack impact 與雙聲部的 Torpedo，保留來源 cue 的最小重播間隔。
+- 步行不再使用爆炸殼或落地圓環 fallback；落地墨滴只寫 cosmetic Speck，ownership grid／計分版本維持不變。入墨／出墨、腳步與墨滴碰撞已接正式 paint-ripple，取代前述「保留差異」中的未接回呼。來源配方擴為 13 個，原容差與來源基準不變。
+- Glow 的 source kinds 改走加色繪製，並完整還原呼叫端 RGB／alpha blend 狀態。負向控制把加色暫改一般 alpha 時，GPU 檢查確實失敗；恢復正確程式後通過。正式地形 GPU 檢查亦驗證相同墨水／時鐘下的 transient ripple 可見像素差。
+- 彈射地圖採按住 Tab／M；有效／失效隊友、訊標、生點、陣亡預選／清除／復活發射及訊標落地扣次數均有控制器／UI 檢查。README 與遊戲操作說明同步更新。
+- MSVC x64 Release 全目標建置通過。CPU／來源檢查 **28/28** 通過（80.00 秒，三項並行）；GPU／UI／音訊／正式入口 **9/9** 通過（55.71 秒，依序執行）。紀錄在 `build/acceptance-device-respawn-cpu.log` 與 `build/acceptance-device-respawn-gpu-audio.log`。來源檔案與 `reference-baseline.sha256` 未變更，未重跑未受影響的全 83 項或重新匯出音樂／貼圖。
+- 人工看圖另發現 map marker 陰影合成會造成原點殘影與白色方塊；移除標記／本機 Actor 的裝飾陰影後，UI 互動補驗 **1/1** 通過。新測試同時檢查實際 framebuffer 中的綠色標記、白色數字、原點無殘影及標記座標。已檢視 `build/captures/ui/jump-map-1280x720.png` 與 `jump-map-1920x1080.png`，三名隊友、生點與訊標均正常顯示；面板改為不透明，避免背後計分穿透。
+
+仍保留手持 Shaker 充能、Tracer 尾跡命中音訊、Wail 持續音邊界、部分相機距離 gating、ZoneHum 混響與 Boss 細分事件，以及檢查表內標出的材質／動作與完整生命週期圖像差異。逐事件播放成功不等於主觀聽感或 Web Audio 處理一致。

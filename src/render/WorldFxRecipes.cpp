@@ -46,9 +46,34 @@ void eraseAt(std::vector<WorldFxParticle>& items,std::size_t i,WorldFxShape shap
 std::size_t countShape(const std::vector<WorldFxParticle>& items,WorldFxShape shape){return std::count_if(items.begin(),items.end(),[&](const auto& x){return x.shape==shape;});}
 }
 
-std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3 pos,glm::dvec3 normal,glm::dvec3 color,double radius,std::uint32_t& rng,double waterY,glm::dvec3 camera){
+std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3 pos,glm::dvec3 normal,glm::dvec3 color,double radius,std::uint32_t& rng,double waterY,glm::dvec3 camera,const WorldFxRippleSink& ripple){
     std::vector<WorldFxParticle> out;normal=normalized(normal);const glm::dvec3 up(0,1,0),white(1);
-    if(name=="formPop"){
+    if(name=="footstepOwn"||name=="footstepEnemy"||name=="footstepDry"){
+        const double speed=radius,dx=normal.x,dz=normal.z;
+        if(name=="footstepDry"){
+            if(speed<3.2)return out;
+            const glm::dvec3 dust(0.4793201830913402,0.3967552307153359,0.2746773120495699);
+            const glm::dvec3 grain(0.48514994004665124,0.4232676699760063,0.33245153633549385);
+            const double vx=-dx*0.6+(rand01(rng)-0.5)*0.3,vy=0.3+rand01(rng)*0.2,vz=-dz*0.6+(rand01(rng)-0.5)*0.3;
+            const double s0=0.1+rand01(rng)*0.05,s1=0.34+rand01(rng)*0.14,life=0.5+rand01(rng)*0.2;
+            sprite(out,WorldFxShape::Puff,{pos.x-dx*0.1,pos.y+0.08,pos.z-dz*0.1},{vx,vy,vz},dust,s0,s1,life,0.42,rng,3.2,0.15,4,0.04,1.2);
+            const auto heading=normalized(glm::dvec3(-dx*0.7,0.75,-dz*0.7));
+            for(int i=0;i<2;++i){const auto d=cone(heading,0.9,rng);const double sp=1.5*(0.6+rand01(rng)*0.7),size=0.01+rand01(rng)*0.012,l=0.3+rand01(rng)*0.2;drop(out,pos+up*0.03,d*sp,grain,size,l,1.1,1,F_NOCOL|F_MATTE,rng);}
+            return out;
+        }
+        const bool own=name=="footstepOwn";const double k=std::clamp(speed/7.0,0.3,1.2);
+        const auto heading=normalized(glm::dvec3(-dx*0.55,1,-dz*0.55));
+        const int n=own?std::max(1,int(std::floor(2+2.5*k+0.5))):3;
+        for(int i=0;i<n;++i){const auto d=cone(heading,own?0.75:0.6,rng);const double sp=own?1.4+rand01(rng)*1.5*k:0.9+rand01(rng)*0.9;const double size=own?0.018+rand01(rng)*0.022:0.026+rand01(rng)*0.022;drop(out,pos+up*0.03,d*sp,color,size,0.6,own?1:1.3,own?1.2:0.8,0,rng);}
+        const auto point=pos+up*0.01;
+        const double amp=own?0.0035+0.002*k:0.003,wl=own?0.1:0.08,sp=own?0.9:0.55,life=own?0.55:0.5;
+        if(ripple)ripple(point,amp,wl,sp,life);else ring(out,point,up,own?mix(color,white,0.2):color,sp*life*0.8+0.1,life*0.7,1,0.45,1,rng);
+        if(!own){
+            const auto bubble=mix(color,white,0.35)*1.3;const int count=1+(rand01(rng)<0.5?1:0);
+            for(int i=0;i<count;++i){const double a=rand01(rng)*tau,r=0.12+rand01(rng)*0.25,vy=0.22+rand01(rng)*0.2,s0=0.035+rand01(rng)*0.03,s1=0.07+rand01(rng)*0.03,l=0.28+rand01(rng)*0.18;sprite(out,WorldFxShape::Glow,{pos.x+std::cos(a)*r,pos.y+0.04,pos.z+std::sin(a)*r},{0,vy,0},bubble,s0,s1,l,0.85,rng,1,0,21,0.05,0);}
+            if(rand01(rng)<0.3){const double ox=(rand01(rng)-0.5)*0.3,oz=(rand01(rng)-0.5)*0.3,vx=(rand01(rng)-0.5)*0.4,vy=0.8+rand01(rng)*0.6,vz=(rand01(rng)-0.5)*0.4,size=0.018+rand01(rng)*0.012;drop(out,pos+glm::dvec3(ox,0.04,oz),{vx,vy,vz},color,size,0.4,1,1,F_QUIET,rng);}
+        }
+    }else if(name=="formPop"){
         const bool toSquid=radius>0.5;const double y=pos.y+(toSquid?0.35:0.55);
         const auto puffColor=mix(color,white,0.35);
         sprite(out,WorldFxShape::Puff,{pos.x,y,pos.z},{0,toSquid?-0.2:0.6,0},puffColor,0.22,0.62,0.26,0.38,rng,5);
@@ -79,7 +104,8 @@ std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3
         }
         if(speed>3)shell(out,{pos.x,pos.y+0.04,pos.z},color,0.12,0.34+std::min(0.25,speed*0.02),0.06,0.2,0.95,0,0,0.2,up,1,rng);
         const auto rippleColor=mix(color,white,0.2);
-        ring(out,p,up,rippleColor,1.5*0.85*0.8+0.1,0.85*0.7,1,0.45,1,rng);
+        if(ripple)ripple(p,0.008+std::min(0.006,speed*0.0006),0.15,1.5,0.85);
+        else ring(out,p,up,rippleColor,1.5*0.85*0.8+0.1,0.85*0.7,1,0.45,1,rng);
         const auto bubbleColor=mix(color,white,0.55)*1.1;
         for(int i=0;i<3;i++){
             const double ox=(rand01(rng)-0.5)*0.5,oy=0.05+rand01(rng)*0.05,oz=(rand01(rng)-0.5)*0.5;
@@ -98,7 +124,8 @@ std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3
             drop(out,{pos.x+ox,pos.y+0.08,pos.z+oz},d*speed,color,size,0.9,1,1.3,0,rng);
         }
         const auto rippleColor=mix(color,white,0.2);
-        ring(out,{pos.x,pos.y+0.01,pos.z},up,rippleColor,1.3*0.75*0.8+0.1,0.75*0.7,1,0.45,1,rng);
+        if(ripple)ripple({pos.x,pos.y+0.01,pos.z},0.007,0.14,1.3,0.75);
+        else ring(out,{pos.x,pos.y+0.01,pos.z},up,rippleColor,1.3*0.75*0.8+0.1,0.75*0.7,1,0.45,1,rng);
     }else if(name=="wake"){
         if(glm::dot(pos-camera,pos-camera)>=45.0*45.0)return out;
         const glm::dvec3 dir=normalized(normal),right(dir.z,0,-dir.x);
@@ -170,7 +197,7 @@ std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3
     return out;
 }
 
-void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& p,double seconds,std::uint32_t& rng,const WorldFxCollider& collider,float waterY,bool onSpeck,bool paintEffects){
+void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& p,double seconds,std::uint32_t& rng,const WorldFxCollider& collider,float waterY,bool onSpeck,bool paintEffects,const WorldFxSpeckSink& speck,const WorldFxRippleSink& ripple){
     const double dt=std::clamp(seconds,0.0,0.05);if(dt<=0)return;int checks=0;
     // drops run before the other pools; collision callbacks can append rings
     for(std::size_t i=0;i<p.size();){auto& x=p[i];if(x.shape!=WorldFxShape::Drop){++i;continue;}
@@ -180,7 +207,10 @@ void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& p,double seconds,std::uin
         if(!(int(x.flags)&F_NOCOL)&&collider&&checks<1100){++checks;WorldFxHit hit;if(collider(old,next,hit)){
             const auto landed=x;
             if(!(int(landed.flags)&F_MATTE)){
-                if(!onSpeck&&!(int(landed.flags)&F_PAINT))ring(p,hit.point,hit.normal,landed.color,landed.radius*2.3+0.03,0.2+landed.radius*0.6,2,0.95,1,rng);
+                if(speck&&!(int(landed.flags)&F_PAINT)&&landed.radius>0.012)speck(hit,landed.color,landed.radius);
+                if(ripple&&!(int(landed.flags)&F_PAINT)&&((int(landed.flags)&F_RING)||landed.radius>0.03))ripple(hit.point,0.0016+landed.radius*0.05,0.07+landed.radius*0.5,0.75,0.42);
+                if(!onSpeck&&!speck&&!(int(landed.flags)&F_PAINT)&&!(int(landed.flags)&F_QUIET))ring(p,hit.point,hit.normal,landed.color,landed.radius*2.3+0.03,0.2+landed.radius*0.6,2,0.95,1,rng);
+                if(int(landed.flags)&F_QUIET){eraseAt(p,i,WorldFxShape::Drop);continue;}
                 if(landed.radius>0.075&&countShape(p,WorldFxShape::Drop)<2592&&rand01(rng)<0.6){const int n=1+(rand01(rng)<0.5?1:0);for(int k=0;k<n;k++){const glm::vec3 d=cone(hit.normal,1.15,rng);const double sp=1.3+rand01(rng)*1.9;drop(p,{f32(hit.point.x+hit.normal.x*0.03),f32(hit.point.y+hit.normal.y*0.03),f32(hit.point.z+hit.normal.z*0.03)},{f32(d.x*sp),f32(d.y*sp),f32(d.z*sp)},landed.color,landed.radius*0.3,0.45,1,1,F_NOCOL,rng);}}
             }
             eraseAt(p,i,WorldFxShape::Drop);continue;

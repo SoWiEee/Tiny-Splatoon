@@ -17,6 +17,7 @@ namespace restoration {
 
 class FacePaint;
 class WorldSpecials;
+class PlayerSimulation;
 struct EquipmentData;
 
 struct PlayerInput {
@@ -34,6 +35,8 @@ struct SuperJumpState {
     bool flight = false, home = false;
     double elapsed = 0.0, duration = 0.0;
     glm::dvec3 from{0.0}, to{0.0}, target{0.0};
+    PlayerSimulation* actorTarget = nullptr;
+    std::uint64_t beaconId = 0;
 };
 
 struct PlayerState {
@@ -70,6 +73,7 @@ public:
     const EquipmentData& specialWeapon() const;
     CombatWorld& combatWorld() { return *world_; }
     void setCanRespawn(bool value) { canRespawn_ = value; }
+    bool canRespawn() const { return canRespawn_; }
     void setRandomSource(std::function<double()> source) { randomSource_ = std::move(source); }
     void setBotControlled(bool value) { botControlled_ = value; }
     bool botControlled() const { return botControlled_; }
@@ -81,6 +85,8 @@ public:
     void setSplatSink(std::function<void(bool)> sink) { splatSink_ = std::move(sink); }
     void spawnAt(glm::dvec3 pos, double yaw);
     bool superJump(glm::dvec3 destination, bool instant = false, bool home = false);
+    bool superJumpToActor(PlayerSimulation& target,bool allowJumpingTarget=false);
+    bool superJumpToBeacon(std::uint64_t beaconId);
     glm::dvec3 jumpAnchor() const;
     const std::optional<SuperJumpState>& superJumpState() const { return superJump_; }
     void tick(double dt);

@@ -190,6 +190,38 @@ bool PlayerSimulation::superJump(glm::dvec3 destination, bool instant, bool home
     state.climbing = false;
     climbSpeed_ = 0.0;
     runner_.reset();
+    triggerPose({"special_leap"});
+    return true;
+}
+
+bool PlayerSimulation::superJumpToActor(PlayerSimulation& target,bool allowJumpingTarget) {
+    if (&target == this || target.team() != team_ || !target.state.alive || (target.superJump_&&!allowJumpingTarget)) return false;
+    if (!state.alive || superJump_ || world_->specials_.pose(*this).active || !canRespawn_) return false;
+    SuperJumpState jump;
+    jump.actorTarget = &target;
+    jump.target = target.jumpAnchor();
+    superJump_ = jump;
+    state.squid = true;
+    state.climbing = false;
+    climbSpeed_ = 0.0;
+    runner_.reset();
+    triggerPose({"special_leap"});
+    return true;
+}
+
+bool PlayerSimulation::superJumpToBeacon(std::uint64_t beaconId) {
+    glm::dvec3 destination;
+    if (!beaconId || !world_->beaconAnchor(team_, beaconId, destination)) return false;
+    if (!state.alive || superJump_ || world_->specials_.pose(*this).active || !canRespawn_) return false;
+    SuperJumpState jump;
+    jump.target = destination;
+    jump.beaconId = beaconId;
+    superJump_ = jump;
+    state.squid = true;
+    state.climbing = false;
+    climbSpeed_ = 0.0;
+    runner_.reset();
+    triggerPose({"special_leap"});
     return true;
 }
 
@@ -209,6 +241,30 @@ void PlayerSimulation::updateSuperJump(double dt) {
         const int sample = ground_.hit && ground_.face >= 0 ? paint_.sample(ground_.face, ground_.u, ground_.v) : 0;
         state.groundTeam = sample == 0 ? 0 : sample - 1 == team_ ? 1 : 2;
         if (jump.elapsed > 0.75) {
+            if (jump.actorTarget) {
+                if (!jump.actorTarget->state.alive || jump.actorTarget->team() != team_) {
+                    superJump_.reset();
+                    state.vel = glm::dvec3(0.0);
+                    state.squid = false;
+                    return;
+                }
+                const glm::dvec3 anchor = jump.actorTarget->jumpAnchor();
+                const double dx = state.pos.x - anchor.x, dz = state.pos.z - anchor.z;
+                const double distance = std::hypot(dx, dz);
+                const double invDistance = distance > 1e-6 ? 1.0 / distance : 1.0;
+                glm::dvec3 landing(anchor.x + dx * invDistance * 1.1, anchor.y + 0.6,
+                                   anchor.z + dz * invDistance * 1.1);
+                const auto ground = geometry_.groundProbe(landing.x, landing.y, landing.z, 0.1, 2.5, 0.24, true);
+                if (ground.hit && ground.normal.y > 0.6 &&
+                    !geometry_.pointInside({landing.x, ground.y + 0.5, landing.z}, 0.3))
+                    landing.y = ground.y;
+                jump.target = landing;
+            } else if (jump.beaconId && !world_->beaconAnchor(team_, jump.beaconId, jump.target)) {
+                superJump_.reset();
+                state.vel = glm::dvec3(0.0);
+                state.squid = false;
+                return;
+            }
             jump.from = state.pos;
             jump.to = jump.target;
             jump.flight = true;
@@ -226,6 +282,7 @@ void PlayerSimulation::updateSuperJump(double dt) {
     state.pos = position;
     state.squid = k <= 0.82;
     if (k >= 1.0) {
+        const std::uint64_t beaconId = jump.beaconId;
         superJump_.reset();
         state.vel = {0.0, -12.0, 0.0};
         state.squid = false;
@@ -238,6 +295,7 @@ void PlayerSimulation::updateSuperJump(double dt) {
             if (!state.grounded) state.vel.y = -6.0;
         }
         world_->paint(*this, state.pos + glm::dvec3(0.0, 0.3, 0.0), 1.4, random());
+        if (beaconId) world_->consumeBeacon(*this, beaconId);
     }
 }
 

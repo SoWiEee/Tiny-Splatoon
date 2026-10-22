@@ -367,6 +367,11 @@ void booyahOracle() {
     near(damageTaken(outside), source.outsideDamage, "Booyah outside-radius damage");
     check(orbFrames == source.orbLandingFrames + source.fuseFrames,
           "Booyah flight/fuse differs from its source fixed-step lifetime");
+    const auto visualEvents=scene.world.takeVisualEvents();
+    check(std::count_if(visualEvents.begin(),visualEvents.end(),[&owner](const auto& event){return event.kind=="special_warning"&&event.source=="booyah"&&event.team==owner.team();})==1,
+          "Booyah orb landing did not emit one source warning cue");
+    check(std::count_if(visualEvents.begin(),visualEvents.end(),[&owner](const auto& event){return event.kind=="explosion"&&event.source=="booyah"&&event.team==owner.team();})==1,
+          "Booyah orb detonation did not preserve its source ID on one explosion event");
 }
 
 void zipcasterOracle() {

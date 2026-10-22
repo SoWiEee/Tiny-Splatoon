@@ -8,6 +8,7 @@
 #include "CharacterShader.hpp"
 #include "CharacterRenderData.hpp"
 #include "SwimWake.hpp"
+#include "PaintRipples.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -183,6 +184,8 @@ struct StageRenderer::Source {
     std::vector<Growing> growing;
     std::vector<Flood> floods;
     SwimWake swimWake;
+    PaintRipples ripples;
+    std::optional<glm::dvec3> rippleCamera;
     std::unique_ptr<CharacterShader> floodShader;
     GLuint floodVao=0,floodVbo=0;
     std::vector<AtlasRect> atlasRects;
@@ -283,7 +286,7 @@ struct StageRenderer::Source {
 
     void clearInk(){
         GLStateGuard state;glBindFramebuffer(GL_FRAMEBUFFER,framebuffer);glViewport(0,0,atlasSize,atlasSize);glDisable(GL_SCISSOR_TEST);glDisable(GL_BLEND);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
-        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glBindTexture(GL_TEXTURE_2D,atlas);glGenerateMipmap(GL_TEXTURE_2D);growing.clear();floods.clear();swimWake.reset();clock=0;dryAcc=0;
+        glClearColor(0,0,0,0);glClear(GL_COLOR_BUFFER_BIT);glBindTexture(GL_TEXTURE_2D,atlas);glGenerateMipmap(GL_TEXTURE_2D);growing.clear();floods.clear();swimWake.reset();ripples.reset();clock=0;dryAcc=0;
     }
     ShaderEntry& getShader(const std::string& name){
         auto found=shaders.find(name);if(found!=shaders.end())return found->second;
@@ -355,6 +358,7 @@ struct StageRenderer::Source {
         const auto& values=swimWake.uniformValues();
         entry.shader->uniform("uWake",values.points);entry.shader->uniform("uWakeB",values.bounds);
         entry.shader->uniform("uSwimH",values.heads);entry.shader->uniform("uSwimF",values.forwards);
+        entry.shader->uniform("uRip",ripples.positions());entry.shader->uniform("uRipP",ripples.parameters());
     }
     void applyShadow(ShaderEntry& entry,const DirectionalShadow* shadow){
         auto& shader=*entry.shader;
@@ -542,6 +546,11 @@ struct StageRenderer::Source {
         for(auto& flood:paint.takeVisualFloods())queueFlood(stage,paint,std::move(flood));
         for(const auto& item:incoming){const int kind=static_cast<int>(item.kind);if(kind<0||kind>7)continue;const double duration=item.kind==SplatKind::Speck?.05:.085+std::min(.22,item.radius*.075);const bool canDrip=item.kind!=SplatKind::Speck&&item.kind!=SplatKind::Roll;growing.push_back({item,0,duration,canDrip?1.1+std::min(2.2,item.radius*1.5):0});}
         dt=std::clamp(dt,0.0,.25);clock+=dt;dryAcc+=dt;
+        for(const auto& ripple:paint.takeVisualRipples())ripples.add(ripple,clock,rippleCamera);
+        for(const auto& splat:incoming)if(!splat.cosmetic&&splat.radius>=0.15&&!ripples.near(splat.center,splat.radius,clock)){
+            const double r=std::min(splat.radius,3.0);
+            ripples.add({splat.center,0.0038+0.0036*r,0.1+0.05*r,0.85+0.35*r,0.55+0.2*r},clock,rippleCamera);
+        }
         std::vector<PaintVertex> vertices;vertices.reserve(growing.size()*24*6);std::vector<std::size_t> expired;
         for(std::size_t i=0;i<growing.size();++i){auto& g=growing[i];
             const bool settle=std::any_of(floods.begin(),floods.end(),[&](const Flood& f){const auto& r=f.request;const auto& s=g.splat;const double reach=r.reach+s.radius*(g.dripDur?3.9:2.75)+.5;return std::hypot(s.center.x-r.center.x,s.center.z-r.center.z)<reach&&s.center.y>r.y0-4&&s.center.y<r.y1+4;});
@@ -762,6 +771,7 @@ void StageRenderer::UpdateSwimWake(double dt,const CombatWorld& world,glm::dvec3
             actors.push_back({actor,state.pos,state.vel,state.alive,actor->isLocal(),
                 squidForm&&state.submerged,squidForm&&state.climbing});
         }
+        source_->rippleCamera=camera;
         source_->swimWake.update(dt,source_->clock,actors,camera);
     }
 glm::vec4 StageRenderer::ReadVisualInk(int faceId,double u,double v) const {

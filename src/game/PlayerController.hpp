@@ -1,6 +1,9 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace restoration {
 
@@ -9,6 +12,17 @@ class MatchSimulation;
 class FollowCamera;
 class StageGeometry;
 class PlayerSimulation;
+
+enum class SuperJumpMapTargetKind { Ally, Base, Beacon };
+struct SuperJumpMapTarget {
+    int key=0;
+    SuperJumpMapTargetKind kind=SuperJumpMapTargetKind::Ally;
+    PlayerSimulation* actor=nullptr;
+    std::uint64_t beaconId=0;
+    double x=0.0,y=0.0,z=0.0;
+    bool available=false;
+    std::string label;
+};
 
 // One desktop input snapshot, taken once by the platform layer. Gamepad axes use
 // GLFW's standard order: left X/Y followed by right X/Y, with triggers kept
@@ -37,6 +51,14 @@ class PlayerController {
 public:
     void Update(double dt, const ControllerInput& input, const PlayerSettings& settings,
                 MatchSimulation& match, FollowCamera& camera, const StageGeometry& geometry);
+    std::vector<SuperJumpMapTarget> SuperJumpMapTargets(MatchSimulation& match) const;
+    bool SelectSuperJumpMapTarget(MatchSimulation& match,int key);
+    void ValidateSuperJumpQueue(MatchSimulation& match);
+    bool LaunchQueuedSuperJump(MatchSimulation& match);
+    bool HasQueuedSuperJump() const { return hasQueuedJump_; }
+    int QueuedSuperJumpKey() const { return hasQueuedJump_?queuedJump_.key:-1; }
+    const std::string& QueuedSuperJumpLabel() const { return queuedJump_.label; }
+    void ClearQueuedSuperJump() { hasQueuedJump_=false;queuedJump_={}; }
 
 private:
     struct AssistState {
@@ -48,6 +70,8 @@ private:
     double edgeTime_ = 0.0;
     double padLookX_ = 0.0, padLookY_ = 0.0;
     AssistState assist_{};
+    SuperJumpMapTarget queuedJump_{};
+    bool hasQueuedJump_=false;
 };
 
 } // namespace restoration

@@ -7,6 +7,7 @@
 #include "PlayerSimulation.hpp"
 #include "ArsenalData.hpp"
 #include "CharacterData.hpp"
+#include "FacePaint.hpp"
 #include "../game/WorldFxAssetData.hpp"
 #include "../world/StageGeometry.hpp"
 #include <glad/glad.h>
@@ -92,8 +93,13 @@ void main(){float r=length(uv),a=0;vec3 c=col;float t=clamp(age,0,1);
    c=mix(c,vec3(0.48,0.66,0.95),rim*0.26);c+=vec3(1.0,0.95,0.82)*pow(max(1.0-length(uv-vec2(-0.28,0.33))*2.6,0),18.0)*1.7;
  }else if(shape==1.0){float n=noise(uv*3.1+seed*19.0+t*1.5);float edge=0.58+(n-0.5)*0.35;
    a=smoothstep(1.0,edge*0.7,r+(n-0.5)*0.2)*(1.0-t*t);c*=0.76+0.28*uv.y+0.15*n;
- }else if(shape==2.0){float cross=max(exp(-abs(uv.x)*22.0)*exp(-abs(uv.y)*2.6),exp(-abs(uv.y)*22.0)*exp(-abs(uv.x)*2.6));
-   a=(cross+pow(max(1.0-r,0.0),3.0)*0.45+pow(max(1.0-r*3.2,0.0),2.0))*(1.0-t);c*=1.8;
+ }else if(shape==2.0){
+   float kind=floor(style/10.0+0.001),core=style-kind*10.0;
+   if(kind<0.5){float g=pow(max(1.0-r,0.0),2.2),hot=pow(max(1.0-r*1.8,0.0),3.0);c=col*g+vec3(1.0,0.97,0.92)*hot*core;}
+   else if(kind<1.5){float cr=max(exp(-abs(uv.x)*22.0)*exp(-abs(uv.y)*2.6),exp(-abs(uv.y)*22.0)*exp(-abs(uv.x)*2.6));vec2 d=vec2(uv.x+uv.y,uv.x-uv.y)*0.7071;float dg=max(exp(-abs(d.x)*30.0)*exp(-abs(d.y)*6.0),exp(-abs(d.y)*30.0)*exp(-abs(d.x)*6.0))*0.4;float halo=pow(max(1.0-r,0.0),3.0)*0.45,hot=pow(max(1.0-r*3.2,0.0),2.0);c=col*(cr+dg+halo)+vec3(1.0,0.98,0.95)*hot*core;}
+   else if(kind<2.5){float rim=smoothstep(0.16,0.0,abs(r-0.8))*0.8+smoothstep(0.5,0.95,r)*step(r,0.9)*0.25;float hl=smoothstep(0.24,0.0,length(uv-vec2(-0.3,0.34)));c=col*rim+vec3(1.0)*hl*(0.6+core*0.2);}
+   else{float rim=exp(-pow((r-0.78)*7.0,2.0));c=col*rim+vec3(1.0)*rim*rim*core*0.3;}
+   outColor=vec4(c*alpha,1.0);return;
  }else if(shape==3.0){float ang=atan(uv.y,uv.x),wob=(noise(vec2(cos(ang),sin(ang))*3.0+seed*53.0)-0.5)*0.1;
    if(style<0.5){float outer=0.93+wob,w=mix(0.34,0.07,t);a=smoothstep(outer+0.02,outer-0.02,r)*smoothstep(outer-w-0.03,outer-w+0.02,r)*pow(1.0-t,1.3);}
    else if(style<1.5){a=smoothstep(0.98,0.86,r)*smoothstep(0.74,0.84,r)*pow(1.0-t,2.0);c=mix(c,vec3(1),0.35);}
@@ -272,14 +278,31 @@ void WorldEffects::emitSpecial(const char* kind,glm::vec3 pos,glm::vec3 normal,g
     const std::string_view recipe(kind);
     if(recipe=="burst"||recipe=="explosion"||recipe=="slamWave"||recipe=="stormStart"||
        recipe=="formPop"||recipe=="dive"||recipe=="emerge"||recipe=="wake") {
-        auto particles=BuildWorldFxRecipe(recipe,pos,normal,color,radius,random_,-1.6f,camera);
+        WorldFxRippleSink ripple;
+        if(paint_)ripple=[this](glm::dvec3 p,double a,double w,double s,double l){paint_->requestVisualRipple({p,a,w,s,l});};
+        auto particles=BuildWorldFxRecipe(recipe,pos,normal,color,radius,random_,-1.6f,camera,ripple);
         for(auto& particle:particles)spawn(std::move(particle));
     } else if(std::strcmp(kind,"beam")==0)
         spawn({Shape::Beam,pos,{},normal,color,0.16f,radius,0,0.12f,0.9f,0,random()});
 }
 
+void WorldEffects::Footstep(const PlayerSimulation& actor,glm::dvec3 position,double speed){
+    auto& previous=actors_[&actor];previous.footsteps=true;
+    const auto& state=actor.state;
+    if(!state.alive||glm::distance(position,camera_)>(state.groundTeam?28.0:18.0))return;
+    glm::dvec3 heading(state.vel.x,0,state.vel.z);
+    if(glm::length2(heading)>1e-12)heading=glm::normalize(heading);else heading={std::sin(state.yaw),0,std::cos(state.yaw)};
+    const char* recipe=state.groundTeam==0?"footstepDry":state.groundTeam==2?"footstepEnemy":"footstepOwn";
+    const auto color=ink(state.groundTeam==2?1-actor.team():actor.team());
+    WorldFxRippleSink ripple;
+    if(paint_)ripple=[this](glm::dvec3 p,double a,double w,double s,double l){paint_->requestVisualRipple({p,a,w,s,l});};
+    auto particles=BuildWorldFxRecipe(recipe,position,heading,color,speed,random_,-1.6,camera_,ripple);
+    for(auto& particle:particles)spawn(std::move(particle));
+}
+
 void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) {
     const float dt=std::clamp(float(seconds),0.0f,0.05f);
+    camera_=camera;
     time_+=dt;
     world_.clear();
     const auto near=[&](glm::dvec3 at,double range){return glm::length2(at-camera)<range*range;};
@@ -287,6 +310,8 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
 
     lastEvents_=combat.takeVisualEvents();
     for(const auto& event:lastEvents_) {
+        if(event.kind=="device_arm"||event.kind=="device_warning"||event.kind=="device_hit"||event.kind=="device_destroy"
+           ||event.kind=="special_warning"||event.kind=="special_audio"||event.kind=="bubble_pop")continue;
         if(event.kind=="beam")continue; // Source charger ribbons are owned by ProjectileRenderer.
         if(!near(event.pos,65))continue;
         emitSpecial(event.kind.c_str(),glm::vec3(event.pos),glm::vec3(event.normal),ink(event.team),float(event.radius),glm::vec3(camera));
@@ -308,12 +333,12 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
         const glm::vec3 pos(actor->visualPos()),color=ink(actor->team());
         if(old.initialized) {
             const double distance=glm::length(glm::dvec2(s.pos.x-old.pos.x,s.pos.z-old.pos.z));
-            if(s.alive&&s.grounded&&near(s.pos,24)&&!s.submerged&&!pose.body) {
+            if(!old.footsteps&&s.alive&&s.grounded&&near(s.pos,24)&&!s.squid&&!pose.active&&!superJump) {
                 old.step+=distance;
                 if(old.step>0.65) {
                     old.step=0;
-                    if(s.groundTeam==0)spawn({Shape::Puff,pos+glm::vec3(0,0.06f,0),{},glm::vec3(0,1,0),glm::vec3(0.48f,0.43f,0.36f),0.24f,0,0,0.55f,0.4f,0,random()});
-                    else burst(pos+glm::vec3(0,0.03f,0),{0,1,0},s.groundTeam==2?ink(1-actor->team()):color,0.045f,4);
+                    Footstep(*actor,actor->visualPos(),std::hypot(s.vel.x,s.vel.z));
+                    old.footsteps=false; // polling remains available until an actual foot-plant event arrives.
                 }
             }
             if(transitions.formPop)
@@ -454,8 +479,13 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
         }
         else if(object.kind=="crabShell")add({Shape::Orb,pos,{},{0,1,0},col,0.28f,0,age,1,1,0,0});
         else if(object.kind=="orb") {
-            add({Shape::Orb,pos,{},{0,1,0},col,0.5f,0,0,1,1,0,0});
-            add({Shape::Bubble,pos,{},{0,1,0},col,0.85f,0,0,1,0.6f,0,0});
+            const float fuse=std::max(float(object.range),0.001f);
+            const float k=object.phase=="fuse"?clamp01(age/fuse):0.0f;
+            const float orbRadius=0.5f+std::sin(age*30.0f)*0.05f*k;
+            const float haloRadius=0.8f+(r-0.8f)*k*k;
+            const float haloAlpha=object.phase=="fuse"?0.35f+0.3f*std::abs(std::sin(age*(6.0f+k*20.0f))):0.6f;
+            add({Shape::Orb,pos,{},{0,1,0},col,orbRadius,0,age,1,1,0,0});
+            add({Shape::Bubble,pos,{},{0,1,0},col,haloRadius,0,age,1,haloAlpha,0,0});
         } else if(object.kind=="jetpackShot")add({Shape::Orb,pos,{},{0,1,0},col,0.28f,0,0,1,1,0,0});
     }
     for(const auto& device:combat.devices()) {
@@ -475,7 +505,18 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
         if(!result.hit)return false;
         hit.point=glm::vec3(result.point);hit.normal=glm::vec3(result.normal);return true;
     };
-    UpdateWorldFxRecipe(live_,dt,random_,collider,-1.6f);
+    WorldFxSpeckSink speck;WorldFxRippleSink ripple;
+    if(paint_){
+        speck=[&](const WorldFxHit& hit,glm::vec3 color,float size){
+            if(size<0.014f||glm::distance(glm::dvec3(hit.point),camera)>26.0)return;
+            const double d0=glm::length2(color-ink(0)),d1=glm::length2(color-ink(1));
+            if(std::min(d0,d1)>0.01)return;
+            SplatOptions options;options.kind=SplatKind::Speck;options.cosmetic=true;
+            paint_->splat(glm::dvec3(hit.point)+glm::dvec3(hit.normal)*0.04,std::min(0.11,double(size)*1.7),d0<d1?0:1,random(),options);
+        };
+        ripple=[this](glm::dvec3 p,double a,double w,double s,double l){paint_->requestVisualRipple({p,a,w,s,l});};
+    }
+    UpdateWorldFxRecipe(live_,dt,random_,collider,-1.6f,paint_!=nullptr,true,speck,ripple);
 }
 
 void WorldEffects::Clear(){live_.clear();world_.clear();lastEvents_.clear();actors_.clear();time_=0;}
@@ -554,12 +595,12 @@ int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& project
         ||shape==Shape::WarningRing||shape==Shape::SourceBeam;};
     if(std::none_of(world_.begin(),world_.end(),[&](const auto& item){return isSource(item.shape);}))return 0;
     initSourceGpu();
-    GLint oldProgram=0,oldVao=0,oldBuffer=0,oldSrc=0,oldDst=0;
+    GLint oldProgram=0,oldVao=0,oldBuffer=0,oldSrc=0,oldDst=0,oldSrcAlpha=0,oldDstAlpha=0,oldEquation=0,oldEquationAlpha=0;
     GLboolean oldDepth=GL_TRUE;const GLboolean blended=glIsEnabled(GL_BLEND),culled=glIsEnabled(GL_CULL_FACE);
     glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&oldVao);
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&oldBuffer);glGetIntegerv(GL_BLEND_SRC_RGB,&oldSrc);glGetIntegerv(GL_BLEND_DST_RGB,&oldDst);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&oldBuffer);glGetIntegerv(GL_BLEND_SRC_RGB,&oldSrc);glGetIntegerv(GL_BLEND_DST_RGB,&oldDst);glGetIntegerv(GL_BLEND_SRC_ALPHA,&oldSrcAlpha);glGetIntegerv(GL_BLEND_DST_ALPHA,&oldDstAlpha);glGetIntegerv(GL_BLEND_EQUATION_RGB,&oldEquation);glGetIntegerv(GL_BLEND_EQUATION_ALPHA,&oldEquationAlpha);
     glGetBooleanv(GL_DEPTH_WRITEMASK,&oldDepth);
-    glEnable(GL_BLEND);glDisable(GL_CULL_FACE);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);glDisable(GL_CULL_FACE);glBlendEquation(GL_FUNC_ADD);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(sourceProgram_);
     const GLint modelLoc=glGetUniformLocation(sourceProgram_,"uModel"),viewLoc=glGetUniformLocation(sourceProgram_,"uView");
     const GLint projectionLoc=glGetUniformLocation(sourceProgram_,"uProjection"),normalLoc=glGetUniformLocation(sourceProgram_,"uNormalMatrix");
@@ -662,44 +703,52 @@ int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& project
         }
     }
     glBindBuffer(GL_ARRAY_BUFFER,GLuint(oldBuffer));glBindVertexArray(GLuint(oldVao));glUseProgram(GLuint(oldProgram));
-    glDepthMask(oldDepth);glBlendFunc(GLenum(oldSrc),GLenum(oldDst));
+    glDepthMask(oldDepth);glBlendFuncSeparate(GLenum(oldSrc),GLenum(oldDst),GLenum(oldSrcAlpha),GLenum(oldDstAlpha));glBlendEquationSeparate(GLenum(oldEquation),GLenum(oldEquationAlpha));
     if(culled)glEnable(GL_CULL_FACE);if(!blended)glDisable(GL_BLEND);
     return drawCalls;
 }
 
 int WorldEffects::Draw(const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const CharacterLightState* lights) {
     if(live_.empty()&&world_.empty())return 0;
-    std::vector<Vertex> vertices;vertices.reserve(live_.size()+world_.size());
+    std::vector<Vertex> vertices,glows;vertices.reserve(live_.size()+world_.size());
     const auto sourceShape=[](WorldFxShape shape){return shape==Shape::Swirl||shape==Shape::Bubble||shape==Shape::Orb
         ||shape==Shape::Stamp||shape==Shape::Speaker||shape==Shape::Missile||shape==Shape::Cloud
         ||shape==Shape::WarningRing||shape==Shape::SourceBeam;};
     const auto collect=[&](const std::vector<Item>& items) {
         for(const auto& p:items) {
             if(sourceShape(p.shape)||p.radius<=0||p.alpha<=0)continue;
-            vertices.push_back({glm::vec4(p.pos,p.radius),glm::vec4(unit(p.normal),p.length),
-                glm::vec4(p.color,p.alpha),glm::vec4(float(static_cast<int>(p.shape)),
-                    p.life>0?clamp01(p.age/p.life):0,p.style,p.seed),glm::vec4(p.vel,0)});
+            const bool glow=p.shape==Shape::Glow;
+            auto& batch=glow?glows:vertices;
+            batch.push_back({glm::vec4(p.pos,glow?p.renderRadius:p.radius),glm::vec4(unit(p.normal),p.length),
+                glm::vec4(p.color,glow?p.renderAlpha:p.alpha),glm::vec4(float(static_cast<int>(p.shape)),
+                    p.life>0?clamp01(p.age/p.life):0,glow?p.kind:p.style,p.seed),glm::vec4(p.vel,0)});
         }
     };
     collect(live_);collect(world_);
     int calls=0;
-    if(!vertices.empty()){
+    if(!vertices.empty()||!glows.empty()){
         initGpu();
-        GLint oldProgram=0,oldVao=0,oldBuffer=0,oldSrc=0,oldDst=0;
+        GLint oldProgram=0,oldVao=0,oldBuffer=0,oldSrc=0,oldDst=0,oldSrcAlpha=0,oldDstAlpha=0,oldEquation=0,oldEquationAlpha=0;
         GLboolean oldDepth=GL_TRUE;
         const GLboolean blended=glIsEnabled(GL_BLEND),culled=glIsEnabled(GL_CULL_FACE);
         glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&oldVao);
-        glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&oldBuffer);glGetIntegerv(GL_BLEND_SRC_RGB,&oldSrc);glGetIntegerv(GL_BLEND_DST_RGB,&oldDst);
+        glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&oldBuffer);glGetIntegerv(GL_BLEND_SRC_RGB,&oldSrc);glGetIntegerv(GL_BLEND_DST_RGB,&oldDst);glGetIntegerv(GL_BLEND_SRC_ALPHA,&oldSrcAlpha);glGetIntegerv(GL_BLEND_DST_ALPHA,&oldDstAlpha);glGetIntegerv(GL_BLEND_EQUATION_RGB,&oldEquation);glGetIntegerv(GL_BLEND_EQUATION_ALPHA,&oldEquationAlpha);
         glGetBooleanv(GL_DEPTH_WRITEMASK,&oldDepth);
-        glEnable(GL_BLEND);glDisable(GL_CULL_FACE);glDepthMask(GL_FALSE);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);glDisable(GL_CULL_FACE);glDepthMask(GL_FALSE);glBlendEquation(GL_FUNC_ADD);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);glUniformMatrix4fv(glGetUniformLocation(program_,"view"),1,GL_FALSE,glm::value_ptr(view));
         glUniformMatrix4fv(glGetUniformLocation(program_,"projection"),1,GL_FALSE,glm::value_ptr(projection));
         glUniform1f(glGetUniformLocation(program_,"time"),time_);
         glBindVertexArray(vao_);glBindBuffer(GL_ARRAY_BUFFER,vbo_);
         glBufferData(GL_ARRAY_BUFFER,GLsizeiptr(vertices.size()*sizeof(Vertex)),vertices.data(),GL_STREAM_DRAW);
-        glDrawArrays(GL_POINTS,0,GLsizei(vertices.size()));
+        if(!vertices.empty())glDrawArrays(GL_POINTS,0,GLsizei(vertices.size()));
+        if(!glows.empty()){
+            // fx.js GLOW_FRAG emits premultiplied light into an additive pass.
+            glBlendFunc(GL_ONE,GL_ONE);
+            glBufferData(GL_ARRAY_BUFFER,GLsizeiptr(glows.size()*sizeof(Vertex)),glows.data(),GL_STREAM_DRAW);
+            glDrawArrays(GL_POINTS,0,GLsizei(glows.size()));
+        }
         glBindBuffer(GL_ARRAY_BUFFER,GLuint(oldBuffer));glBindVertexArray(GLuint(oldVao));glUseProgram(GLuint(oldProgram));
-        glDepthMask(oldDepth);glBlendFunc(GLenum(oldSrc),GLenum(oldDst));
+        glDepthMask(oldDepth);glBlendFuncSeparate(GLenum(oldSrc),GLenum(oldDst),GLenum(oldSrcAlpha),GLenum(oldDstAlpha));glBlendEquationSeparate(GLenum(oldEquation),GLenum(oldEquationAlpha));
         if(culled)glEnable(GL_CULL_FACE);if(!blended)glDisable(GL_BLEND);
         ++calls;
     }

@@ -236,6 +236,115 @@ int main() {
         check(&local == &harness.match.local(), "match fixture retains its local actor");
     }
 
+    {
+        Harness harness(false);
+        harness.match.startPlaying();
+        auto& local=harness.match.local();
+        PlayerSimulation* ally=nullptr;
+        for(std::size_t i=1;i<harness.match.actors().size();++i)
+            if(harness.match.actors()[i]->team()==local.team()){ally=harness.match.actors()[i].get();break;}
+        check(ally!=nullptr,"Super Jump map fixture has an allied target");
+        if(ally){
+            local.spawnAt({0,0,0},0);local.state.invuln=0;
+            ally->spawnAt({7,0,8},0);ally->state.invuln=0;
+            PlayerController controller;
+            const auto targets=controller.SuperJumpMapTargets(harness.match);
+            check(targets.size()>=4&&targets[0].key==1&&targets[3].key==4,
+                  "Super Jump map numbers three allies before the team base");
+            check(controller.SelectSuperJumpMapTarget(harness.match,1),"number key selection starts a live ally jump");
+            check(local.superJumpState()&&local.superJumpState()->actorTarget==ally&&!local.superJumpState()->flight,
+                  "live ally selection enters the charge phase and retains its dynamic target");
+            for(int i=0;i<91;++i)local.tick(dt);
+            check(local.superJumpState()&&local.superJumpState()->flight,
+                  "ally jump transitions from charge to flight");
+            for(int i=91;i<360;++i)local.tick(dt);
+            check(!local.superJumpState()&&glm::distance(local.state.pos,ally->state.pos)>0.7&&
+                  glm::distance(local.state.pos,ally->state.pos)<1.7,
+                  "ally jump lands beside the teammate and completes its landing");
+
+            local.setCanRespawn(false);
+            check(!controller.SelectSuperJumpMapTarget(harness.match,4)&&!local.superJumpState(),
+                  "disabled respawn gate rejects the live base jump");
+            local.setCanRespawn(true);
+        }
+    }
+
+    {
+        Harness harness(false);
+        harness.match.startPlaying();
+        auto& local=harness.match.local();
+        PlayerSimulation* ally=harness.match.actors()[1].get();
+        ally->state.invuln=0;
+        local.state.invuln=0;
+        PlayerController controller;
+        check(ally->superJump({4.0,0.0,9.0}),"queue fixture starts a teammate Super Jump");
+        check(local.damage(200)&&!local.state.alive,"queue fixture enters the splatted state");
+        const auto queuedTargets=controller.SuperJumpMapTargets(harness.match);
+        check(!queuedTargets.empty()&&queuedTargets[0].available,
+              "a living teammate mid-Super Jump remains selectable for a respawn plan");
+        check(controller.SelectSuperJumpMapTarget(harness.match,1)&&controller.HasQueuedSuperJump()&&
+              !local.superJumpState(),"dead target selection queues a respawn jump without launching early");
+        check(ally->damage(200)&&!ally->state.alive,"queued teammate can be splatted before respawn");
+        controller.ValidateSuperJumpQueue(harness.match);
+        check(!controller.HasQueuedSuperJump(),"queued jump is cancelled when its teammate is splatted");
+        check(controller.SelectSuperJumpMapTarget(harness.match,2)&&controller.HasQueuedSuperJump(),
+              "dead player can choose another available teammate");
+        check(controller.SelectSuperJumpMapTarget(harness.match,4)&&!controller.HasQueuedSuperJump(),
+              "choosing base clears the queued jump");
+    }
+
+    {
+        Harness harness(false);
+        harness.match.startPlaying();
+        auto& local=harness.match.local();
+        PlayerSimulation* ally=nullptr;
+        for(std::size_t i=1;i<harness.match.actors().size();++i)
+            if(harness.match.actors()[i]->team()==local.team()){ally=harness.match.actors()[i].get();break;}
+        if(ally){
+            ally->spawnAt({5,0,9},0);ally->state.invuln=0;
+            local.state.invuln=0;
+            PlayerController controller;
+            check(local.damage(200)&&controller.SelectSuperJumpMapTarget(harness.match,1),
+                  "respawn jump target is saved while splatted");
+            for(int i=0;i<680&&!local.state.alive;++i)local.tick(dt);
+            check(local.state.alive&&controller.LaunchQueuedSuperJump(harness.match),
+                  "queued jump launches only after the normal respawn completes");
+            check(local.superJumpState()&&local.superJumpState()->actorTarget==ally,
+                  "respawn launch preserves the selected teammate target");
+            for(int i=0;i<91;++i)local.tick(dt);
+            check(local.superJumpState()&&local.superJumpState()->flight,
+                  "queued jump follows the same charge and flight path as a live selection");
+            for(int i=91;i<360;++i)local.tick(dt);
+            check(!local.superJumpState()&&glm::distance(local.state.pos,ally->state.pos)<1.7,
+                  "queued jump completes at the selected teammate");
+        }
+    }
+
+    {
+        Harness harness(false);
+        harness.match.startPlaying();
+        auto& local=harness.match.local();
+        local.setLoadout("shooter","beacon","slam");
+        local.combatWorld().deploy(local,"beacon");
+        const auto& devices=harness.match.world().devices();
+        const auto beacon=std::find_if(devices.begin(),devices.end(),[](const auto& device){return device.kind=="beacon"&&device.live;});
+        check(beacon!=devices.end(),"map fixture deploys a live team jump beacon");
+        if(beacon!=devices.end()){
+            const auto beaconId=beacon->id;const int uses=beacon->uses;
+            PlayerController controller;
+            const auto targets=controller.SuperJumpMapTargets(harness.match);
+            check(targets.size()>=5&&targets[4].key==5&&targets[4].beaconId==beaconId,
+                  "map lists live team beacons after allies and base");
+            check(controller.SelectSuperJumpMapTarget(harness.match,5)&&local.superJumpState()&&
+                  local.superJumpState()->beaconId==beaconId,
+                  "number key selection starts a beacon jump to the chosen device id");
+            for(int i=0;i<300;++i)local.tick(dt);
+            const auto consumed=std::find_if(devices.begin(),devices.end(),[&](const auto& device){return device.id==beaconId;});
+            check(consumed!=devices.end()&&consumed->uses==uses-1,
+                  "beacon use is consumed after the jump lands");
+        }
+    }
+
     if (failures) return 1;
     std::cout << "Native controller movement, look curves, and aim assist passed\n";
     return 0;

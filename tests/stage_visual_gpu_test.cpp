@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
         check(changedPixels > 100, "Ink wet-to-dry source shading did not change enough visible render pixels");
 
         renderer.reset();
-        const auto renderSwimScenario = [&](bool submerged, const std::filesystem::path& output) {
+        const auto renderSwimScenario = [&](bool submerged, const std::filesystem::path& output, bool ripple=false) {
             FacePaint scenarioPaint(*stage, geometry);
             check(scenarioPaint.splat(center + glm::dvec3(0, 0.03, 0), 1.3, 0, 0.37, options) > 0.0,
                   "CPU gameplay swim fixture failed to record its floor splat");
@@ -165,6 +165,7 @@ int main(int argc, char** argv) {
                 swimmer->state.squid = true;
                 swimmer->state.submerged = true;
             }
+            if(ripple)scenarioPaint.requestVisualRipple({center,0.012,0.15,1.5,0.85});
             for (int frame = 0; frame < 7; ++frame) {
                 scenarioRenderer.UploadInk(*stage, scenarioPaint, 0.05);
                 if (swimmer) {
@@ -181,7 +182,11 @@ int main(int argc, char** argv) {
             if (std::abs(static_cast<int>(wakeImage[i]) - noWakeImage[i]) +
                 std::abs(static_cast<int>(wakeImage[i + 1]) - noWakeImage[i + 1]) +
                 std::abs(static_cast<int>(wakeImage[i + 2]) - noWakeImage[i + 2]) > 12) ++visibleWakePixels;
-        check(visibleWakePixels > 20, "Production level shader did not visibly render the submerged swim wake");
+        check(visibleWakePixels > 20, "Production level shader did not visibly render the submerged swim wake");        const Pixels rippleImage=renderSwimScenario(false,outputRoot/"stage-ink-ripple.png",true);
+        std::size_t ripplePixels=0;
+        for(std::size_t i=0;i<rippleImage.size();i+=4)
+            if(std::abs(int(rippleImage[i])-noWakeImage[i])+std::abs(int(rippleImage[i+1])-noWakeImage[i+1])+std::abs(int(rippleImage[i+2])-noWakeImage[i+2])>8)++ripplePixels;
+        check(ripplePixels>20,"Production ink surface must visibly carry footstep/dive ripple packets");
         std::cout << "STAGE_VISUAL_GPU sourcePbr=pass capturedMaps=pass bevels=sourceGeometry inkWet=" << inkWet
                   << " inkDry=" << inkDry << " visibleInkPixels=" << changedPixels << " visibleWakePixels=" << visibleWakePixels
                   << " renderer=" << glGetString(GL_RENDERER) << '\n';

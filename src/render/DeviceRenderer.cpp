@@ -122,6 +122,10 @@ struct DeviceRenderer::Impl {
                 if(kind=="brolly"&&n.tag=="inner"){local[3].y=.76+(device->h0-.76)*std::max(0.,1-age/.22)+.012*std::sin(age*11);local=rotate(local,0,0,.035*std::sin(age*7.3));}
                 if(n.tag=="spin")local=rotate(local,0,kind=="boomerang"&&motionState?motionState->spin:device->spin,0);
                 if(kind=="boomerang"&&n.tag=="tilt"&&motionState)local=rotate(local,motionState->tiltX,device->heading,motionState->tiltZ);
+                if(kind=="boomerang"&&n.tag=="blur"&&device->state=="armed"){
+                    const double k=std::clamp(device->age/std::max(device->timer,1e-9),0.,1.);
+                    local=glm::scale(local,glm::dvec3(1+.18*k));
+                }
                 if(kind=="waddle"){
                     const double k=std::min(1.2,(motionState?motionState->moveSpeed:speed)/std::max(.01,device->speed)),sw=std::sin((motionState?motionState->walk:0)*6.283185307179586);
                     if(n.tag=="rock")local=rotate(local,-.1*k,0,.17*sw*k);
@@ -143,12 +147,26 @@ struct DeviceRenderer::Impl {
         for(const auto i:render){const auto& n=nodes[i];auto& p=program(n.material);auto& shader=*p.shader;shader.use();
             for(const auto& [k,v]:p.defaults){
                 if(v.size()==3&&glm::length(glm::dvec3(v[0],v[1],v[2])-SourceInkColors[team==1?1:0])<1e-9){
-                    const auto color=InkColors[team==1?1:0];shader.uniform(k,{color.x,color.y,color.z});
+                    auto color=InkColors[team==1?1:0];
+                    if(kind=="boomerang"&&device&&device->state=="armed"&&n.tag=="blur")
+                        color*=1+1.4*std::clamp(device->age/std::max(device->timer,1e-9),0.,1.);
+                    shader.uniform(k,{color.x,color.y,color.z});
+                }else if(kind=="waddle"&&device&&n.tag=="lamp"&&k=="emissive"&&v.size()==3
+                    &&(device->state=="sense"||device->state=="wake"||device->state=="walk")){
+                    const double progress=device->state=="sense"?std::clamp(device->age/std::max(device->timer,1e-9),0.0,1.0):0.0;
+                    const double bright=device->pulse>device->pulsePeriod-0.08
+                        ?(device->state=="walk"?3.5:2.5+3.0*progress):0.25;
+                    auto emission=v;for(auto& value:emission)value*=bright/0.3;shader.uniform(k,emission);
                 }else shader.uniform(k,v);
             }
-            shader.uniform("uTime",age);shader.uniform("uT",age);shader.uniform("uAng",-age*(device?device->spin:1)*.12);shader.uniform("uAlpha",kind=="boomerang"?.72:1.0);shader.uniform("dfgLUT",6);shader.matrices(world[i],view,projection,eye);shader.lights(lights,view);
+            double alpha=kind=="boomerang"?.72:1.0;
+            if(kind=="boomerang"&&device&&device->state=="armed"&&n.tag=="blur"){
+                const double k=std::clamp(device->age/std::max(device->timer,1e-9),0.,1.);
+                alpha=.55+.35*std::abs(std::sin(device->age*(14+26*k)));
+            }
+            shader.uniform("uTime",age);shader.uniform("uT",age);shader.uniform("uAng",-age*(device?device->spin:1)*.12);shader.uniform("uAlpha",alpha);shader.uniform("dfgLUT",6);shader.matrices(world[i],view,projection,eye);shader.lights(lights,view);
             shader.uniform("uLife",phase);
-            const auto alpha=p.defaults.find("opacity");if(alpha!=p.defaults.end()&&alpha->second.size()==1)shader.uniform("opacity",alpha->second[0]*opacity);
+            const auto materialOpacity=p.defaults.find("opacity");if(materialOpacity!=p.defaults.end()&&materialOpacity->second.size()==1)shader.uniform("opacity",materialOpacity->second[0]*opacity);
             if(kind=="waddleRing"){shader.uniform("uGrow",std::clamp(age/.28,0.,1.));shader.uniform("uLock",phase);shader.uniform("uSweep",1-phase);shader.uniform("uAlpha",opacity);}
             if(kind=="torpedoRing")shader.uniform("uAlpha",opacity);
             if(motionState&&kind=="torpedo"){const auto emission=p.defaults.find("emissive");if(emission!=p.defaults.end()){auto v=emission->second;for(auto& x:v)x*=motionState->glow/1.2;shader.uniform("emissive",v);}}
@@ -228,7 +246,7 @@ int DeviceRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm
         else if(d.state=="fly")root=rotate(root,d.age*8,0,d.age*5);
         else if(d.kind=="sprinkler"||d.kind=="sticky")root*=glm::toMat4(glm::rotation(glm::dvec3(0,1,0),glm::normalize(d.normal)));
         else root=rotate(root,0,d.heading,0);
-        if(d.state=="stuck"&&d.fuse>0){const double k=std::clamp(d.timer/d.fuse,0.,1.);root=glm::scale(root,glm::dvec3(1+k*.3+std::sin(d.timer*40)*.025*k));}
+        if(d.state=="stuck"&&d.timer>0){const double k=std::clamp(d.age/d.timer,0.,1.);root=glm::scale(root,glm::dvec3(1+k*.3+std::sin(d.age*40)*.025*k));}
         if(d.kind=="mine"&&d.fuse>=0)root=glm::scale(root,glm::dvec3(1+std::sin(d.age*50)*.08));
         draws+=impl_->draw(d.kind,d.team,root,d.age,view,projection,eye,lights,depthOnly,&d);
         if(!depthOnly&&d.kind=="waddle"&&(d.state=="sense"||d.state=="wake"||d.state=="walk")){const double radius=d.senseRadius>0?d.senseRadius:GetEquipment(EquipmentCategory::Sub,"waddle").number("senseRadius");draws+=DrawModel("waddleRing",d.team,glm::translate(glm::dmat4(1),d.pos+glm::dvec3(0,.035,0))*glm::scale(glm::dmat4(1),glm::dvec3(radius)),d.age,view,projection,eye,lights,false,.75,d.locked?1:0);}

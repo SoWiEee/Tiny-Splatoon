@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 struct GLFWwindow;
 namespace restoration {
@@ -25,6 +26,12 @@ struct UiSetup {
     std::string stage="tidewater",mode="turf",main="shooter",sub="bomb",special="burst",difficulty="normal",theme="day";
     int duration=180;
     bool reducedMotion=false,practice=false;
+};
+struct UiJumpMapTarget {
+    int key=0;
+    double x=0.0,z=0.0;
+    std::string label;
+    bool available=false;
 };
 
 // The player interface shares the game's context; documents own presentation only.
@@ -50,6 +57,8 @@ public:
     void SetReward(MatchRewardResult reward);
     void SetSoundSink(std::function<void(const std::string&)> sink);
     void SetVolumeSink(std::function<void(float,float,float)> sink);
+    void SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel={});
+    int TakeJumpMapSelection();
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

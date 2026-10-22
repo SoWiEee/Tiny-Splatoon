@@ -189,4 +189,94 @@ void PlayerController::Update(double dt, const ControllerInput& input, const Pla
     actor.input.move = {sy * moveZ - cy * moveX, 0.0, cy * moveZ + sy * moveX};
 }
 
+std::vector<SuperJumpMapTarget> PlayerController::SuperJumpMapTargets(MatchSimulation& match) const {
+    std::vector<SuperJumpMapTarget> targets;
+    auto& local=match.local();
+    const bool canStart=local.state.alive&&local.canRespawn()&&!local.superJumpState()&&!local.specialPose().active;
+    int allyKey=1;
+    for(std::size_t index=0;index<match.actors().size()&&allyKey<=3;++index){
+        auto* actor=match.actors()[index].get();
+        if(actor==&local||actor->team()!=local.team())continue;
+        SuperJumpMapTarget target;
+        target.key=allyKey++;
+        target.kind=SuperJumpMapTargetKind::Ally;
+        target.actor=actor;
+        target.x=actor->state.pos.x;target.y=actor->state.pos.y;target.z=actor->state.pos.z;
+        target.available=actor->state.alive&&(!local.state.alive?local.canRespawn():!actor->superJumpState()&&canStart);
+        target.label="隊友 "+match.roster()[index].name;
+        targets.push_back(std::move(target));
+    }
+    SuperJumpMapTarget base;
+    base.key=4;base.kind=SuperJumpMapTargetKind::Base;
+    base.x=match.stage().spawnPads[local.team()].x;base.y=match.stage().spawnPads[local.team()].y;base.z=match.stage().spawnPads[local.team()].z;
+    base.available=local.state.alive?canStart:local.canRespawn();base.label="隊伍生點";targets.push_back(std::move(base));
+
+    std::vector<const CombatDevice*> beacons;
+    for(const auto& device:match.world().devices())
+        if(device.live&&device.kind=="beacon"&&device.team==local.team()&&device.uses>0)beacons.push_back(&device);
+    std::sort(beacons.begin(),beacons.end(),[](const auto* a,const auto* b){return a->id<b->id;});
+    if(beacons.size()>6)beacons.resize(6);
+    for(std::size_t i=0;i<beacons.size();++i){
+        const auto& device=*beacons[i];
+        SuperJumpMapTarget target;
+        target.key=static_cast<int>((i+5)%10);target.kind=SuperJumpMapTargetKind::Beacon;target.beaconId=device.id;
+        target.x=device.pos.x;target.y=device.pos.y;target.z=device.pos.z;
+        target.available=local.state.alive?canStart:local.canRespawn();
+        target.label="隊伍訊標 "+std::to_string(i+1)+"（"+std::to_string(device.uses)+"）";
+        targets.push_back(std::move(target));
+    }
+    return targets;
+}
+
+bool PlayerController::SelectSuperJumpMapTarget(MatchSimulation& match,int key) {
+    if(match.phase()!=MatchPhase::Playing||key<0||key>9)return false;
+    auto& local=match.local();
+    if(!local.canRespawn())return false;
+    const auto targets=SuperJumpMapTargets(match);
+    const auto found=std::find_if(targets.begin(),targets.end(),[&](const auto& target){return target.key==key;});
+    if(found==targets.end())return false;
+    if(found->kind==SuperJumpMapTargetKind::Base){
+        if(!local.state.alive){ClearQueuedSuperJump();return true;}
+        if(!found->available)return false;
+        return local.superJump({found->x,found->y,found->z});
+    }
+    if(!local.state.alive){
+        if(found->kind==SuperJumpMapTargetKind::Ally){
+            if(!found->actor||found->actor==&local||found->actor->team()!=local.team()||!found->actor->state.alive)return false;
+        }else{
+            glm::dvec3 anchor;
+            if(!match.world().beaconAnchor(local.team(),found->beaconId,anchor))return false;
+        }
+        queuedJump_=*found;hasQueuedJump_=true;return true;
+    }
+    if(!found->available)return false;
+    if(found->kind==SuperJumpMapTargetKind::Ally&&found->actor)return local.superJumpToActor(*found->actor);
+    if(found->kind==SuperJumpMapTargetKind::Beacon)return local.superJumpToBeacon(found->beaconId);
+    return false;
+}
+
+void PlayerController::ValidateSuperJumpQueue(MatchSimulation& match) {
+    if(!hasQueuedJump_)return;
+    if(match.phase()!=MatchPhase::Playing){ClearQueuedSuperJump();return;}
+    auto& local=match.local();
+    if(queuedJump_.kind==SuperJumpMapTargetKind::Ally){
+        if(!queuedJump_.actor||queuedJump_.actor==&local||queuedJump_.actor->team()!=local.team()||!queuedJump_.actor->state.alive)
+            ClearQueuedSuperJump();
+    }else if(queuedJump_.kind==SuperJumpMapTargetKind::Beacon){
+        glm::dvec3 anchor;
+        if(!match.world().beaconAnchor(local.team(),queuedJump_.beaconId,anchor))ClearQueuedSuperJump();
+    }else ClearQueuedSuperJump();
+}
+
+bool PlayerController::LaunchQueuedSuperJump(MatchSimulation& match) {
+    if(!hasQueuedJump_||match.phase()!=MatchPhase::Playing||!match.local().state.alive||!match.local().canRespawn())return false;
+    const auto queued=queuedJump_;
+    ClearQueuedSuperJump();
+    auto& local=match.local();
+    if(queued.kind==SuperJumpMapTargetKind::Ally&&queued.actor&&queued.actor->state.alive&&queued.actor->team()==local.team())
+        return local.superJumpToActor(*queued.actor,true);
+    if(queued.kind==SuperJumpMapTargetKind::Beacon)return local.superJumpToBeacon(queued.beaconId);
+    return false;
+}
+
 } // namespace restoration

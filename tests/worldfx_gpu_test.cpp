@@ -9,9 +9,12 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -123,6 +126,51 @@ int main() {
               "Wail firing did not place its source speaker prop");
 
         CharacterData characterData;
+        {
+            FacePaint walkPaint(*stage,geometry);
+            CombatWorld walkWorld(*stage,geometry,walkPaint);
+            PlayerSimulation walker(*stage,geometry,walkPaint,0,&walkWorld);
+            walker.spawnAt(anchor,0);
+            walker.state.grounded=true;walker.state.squid=false;walker.state.submerged=false;
+            walker.state.groundTeam=1;walker.state.vel={5,0,0};
+            WorldEffects steps(characterData);steps.SetPaintSurface(&walkPaint);
+            steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7));
+            walker.state.pos.x+=0.8;
+            steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7));
+            check(steps.counts().shells==0,"Wet footsteps must not emit a generic explosion shell on the floor");
+            check(!walkPaint.takeVisualRipples().empty(),"Wet foot plants must ripple the ink surface");
+            const auto gridBefore=walkPaint.grid();const auto versionBefore=walkPaint.version();
+            for(int i=0;i<90;++i)steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7));
+            const auto specks=walkPaint.takeVisualSplats();
+            check(!specks.empty(),"Landing walking droplets must enter the cosmetic paint atlas path");
+            check(std::all_of(specks.begin(),specks.end(),[](const auto& item){return item.cosmetic&&item.kind==SplatKind::Speck;}),"Walking droplets must remain cosmetic specks");
+            check(walkPaint.grid()==gridBefore&&walkPaint.version()==versionBefore,"Walking spray must not claim scoring ink cells");
+            check(steps.counts().rings==0,"Landed droplets must not leave circular fallback decals when paint is connected");
+            walker.state.groundTeam=2;steps.Footstep(walker,walker.state.pos,5);
+            walker.state.groundTeam=0;
+            const glm::vec3 closeEye=glm::vec3(walker.state.pos)+glm::vec3(0,0.7f,1.5f);
+            steps.Update(1.0/60.0,walkWorld,closeEye);
+            check(steps.counts().glows>0,"Enemy-ink footsteps must exercise the source bubble-glow draw path");
+            const auto closeView=glm::lookAt(closeEye,glm::vec3(walker.state.pos)+glm::vec3(0,0.05f,0),glm::vec3(0,1,0));
+            const auto closeProjection=glm::perspective(glm::radians(45.f),1.f,0.01f,20.f);
+            glViewport(0,0,128,128);glEnable(GL_DEPTH_TEST);glClearColor(.2f,.24f,.3f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            steps.Draw(closeView,closeProjection,closeEye);
+            std::vector<unsigned char> glowPixels(128*128*4);glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,glowPixels.data());
+            std::filesystem::create_directories("build/captures/worldfx");
+            stbi_flip_vertically_on_write(1);
+            check(stbi_write_png("build/captures/worldfx/footstep-glow.png",128,128,4,glowPixels.data(),128*4)!=0,"Could not save footstep glow evidence");
+            std::vector<glm::vec2> dropCenters;
+            for(const auto& particle:steps.liveItems())if(particle.shape==WorldFxShape::Drop){const auto clip=closeProjection*closeView*glm::vec4(particle.pos,1);if(clip.w>0)dropCenters.push_back((glm::vec2(clip)/clip.w*.5f+.5f)*128.f);}
+            int litPixels=0;
+            for(int y=0;y<128;++y)for(int x=0;x<128;++x){
+                const bool drop=std::any_of(dropCenters.begin(),dropCenters.end(),[&](auto c){return std::abs(c.x-(x+.5f))<7&&std::abs(c.y-(y+.5f))<7;});
+                if(drop)continue;
+                const auto offset=(y*128+x)*4;
+                check(glowPixels[offset+2]>=75,"Bubble glow quads must add light without dark rectangular backgrounds");
+                if(glowPixels[offset]>54||glowPixels[offset+1]>64||glowPixels[offset+2]>80)++litPixels;
+            }
+            check(litPixels>0,"Source bubble glows must remain visible outside the tiny droplet silhouettes");
+        }
         WorldEffects effects(characterData);
         const glm::dvec3 camera(anchor.x, anchor.y + 5.2, anchor.z - 11.5);
         effects.Update(1.0 / 60.0, world, camera);
@@ -144,7 +192,12 @@ int main() {
         const glm::vec3 target(anchor.x, anchor.y + 1.3, anchor.z + 1.0);
         const glm::mat4 view = glm::lookAt(eye, target, glm::vec3(0, 1, 0));
         const glm::mat4 projection = glm::perspective(glm::radians(58.0f), 1.0f, 0.1f, 80.0f);
+        glBlendFuncSeparate(GL_ONE,GL_ZERO,GL_ZERO,GL_ONE);
+        glBlendEquationSeparate(GL_FUNC_ADD,GL_MAX);
         const int drawCalls = effects.Draw(view, projection, eye);
+        GLint restoredAlphaSrc=0,restoredAlphaDst=0,restoredAlphaEquation=0;
+        glGetIntegerv(GL_BLEND_SRC_ALPHA,&restoredAlphaSrc);glGetIntegerv(GL_BLEND_DST_ALPHA,&restoredAlphaDst);glGetIntegerv(GL_BLEND_EQUATION_ALPHA,&restoredAlphaEquation);
+        check(restoredAlphaSrc==GL_ZERO&&restoredAlphaDst==GL_ONE&&restoredAlphaEquation==GL_MAX,"FX normal/additive passes must restore the caller's independent alpha blend state");
         check(drawCalls > 0, "WorldEffects submitted no real source mesh draws");
         std::vector<unsigned char> pixels(128 * 128 * 4);
         glReadPixels(0, 0, 128, 128, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());

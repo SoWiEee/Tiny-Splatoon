@@ -15,6 +15,8 @@ class CharacterData;
 struct WorldVisualEvent;
 struct CharacterLightState;
 class DeviceRenderer;
+class FacePaint;
+class PlayerSimulation;
 
 // fx.js' short-lived pools and specials.js' persistent world visuals, drawn inside the HDR scene.
 class WorldEffects {
@@ -30,6 +32,8 @@ public:
     void Update(double dt, CombatWorld& world, glm::dvec3 camera);
     int Draw(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camera,const CharacterLightState* lights=nullptr);
     void SetDeviceRenderer(DeviceRenderer* models){models_=models;}
+    void SetPaintSurface(FacePaint* paint){paint_=paint;}
+    void Footstep(const PlayerSimulation& actor,glm::dvec3 position,double speed);
     void Clear();
     Counts counts() const;
     const std::vector<Item>& liveItems() const { return live_; }
@@ -51,10 +55,12 @@ private:
     const GpuMesh& sourceMesh(const char* kind, const char* role);
     int drawSourceItems(const glm::mat4& view, const glm::mat4& projection,const glm::vec3& camera,const CharacterLightState* lights);
     DeviceRenderer* models_=nullptr;
+    FacePaint* paint_=nullptr;
+    glm::dvec3 camera_{0.0};
     const CharacterData* data_ = nullptr;
     std::vector<Item> live_, world_;
     std::vector<WorldVisualEvent> lastEvents_;
-    struct ActorState { glm::dvec3 pos{0}; double hp=100,charge=0,step=0,born=0,climbEnd=-9,wakeTimer=0; bool initialized=false,alive=true,squid=false,swimming=false,climbing=false,grounded=false; std::string special,phase; };
+    struct ActorState { glm::dvec3 pos{0}; double hp=100,charge=0,step=0,born=0,climbEnd=-9,wakeTimer=0; bool initialized=false,alive=true,squid=false,swimming=false,climbing=false,grounded=false,footsteps=false; std::string special,phase; };
     std::unordered_map<const void*,ActorState> actors_;
     std::uint32_t random_ = 0x6d2b79f5u;
     float time_ = 0;

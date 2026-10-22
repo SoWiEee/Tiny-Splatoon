@@ -108,9 +108,117 @@ void runPlacementOrder() {
     PlayerSimulation owner(stage,geometry,paint,0,&world);owner.setLoadout("shooter","mine","storm");owner.state.pos={0,0,0};owner.state.grounded=true;
     world.deploy(owner,"mine");
     check(world.devices().size()==1 && world.devices()[0].live,"First placed mine was not deployed on the source floor");
+    const auto armed=world.takeVisualEvents();
+    check(std::count_if(armed.begin(),armed.end(),[&owner](const auto& event){return event.kind=="device_arm"&&event.source=="mine"&&event.team==owner.team();})==1,
+          "Placed mine did not emit exactly one source arm cue");
     owner.state.pos={20,20,20};
     world.deploy(owner,"mine");
     check(world.devices().size()==1 && world.devices()[0].live,"Invalid mine placement replaced the existing mine before surface validation");
+    check(world.takeVisualEvents().empty(),"Rejected mine placement emitted an arm cue");
+}
+
+void runDeviceWarningLifecycle() {
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("shooter","mine","storm");owner.state.pos={0,0,0};owner.state.grounded=true;
+    enemy.state.pos={20,0,20};enemy.state.invuln=0;
+    const auto& mine=GetEquipment(EquipmentCategory::Sub,"mine");
+    const double dt=1.0/60.0;
+    world.deploy(owner,"mine");
+    const auto armEvents=world.takeVisualEvents();
+    check(armEvents.size()==1 && armEvents[0].kind=="device_arm"&&armEvents[0].source=="mine",
+          "Mine lifecycle did not start with one arm cue");
+    world.tick(mine.number("armTime")+dt);
+    check(world.devices().size()==1 && world.devices()[0].state=="mine"&&world.devices()[0].age>=mine.number("armTime"),
+          "Mine did not become active after its source arm delay");
+    check(world.takeVisualEvents().empty(),"Untriggered active mine emitted a warning");
+
+    const double ageBeforeTrigger=world.devices()[0].age;
+    enemy.state.pos=world.devices()[0].pos;
+    world.tick(dt);
+    const auto warningEvents=world.takeVisualEvents();
+    check(warningEvents.size()==1 && warningEvents[0].kind=="device_warning"&&warningEvents[0].source=="mine"
+          && warningEvents[0].team==owner.team(),"Triggered mine did not emit one source warning cue");
+    check(world.devices()[0].fuse==mine.number("delay")&&world.devices()[0].age>ageBeforeTrigger,
+          "Mine warning reset its source lifetime clock or failed to enter its delay state");
+
+    std::vector<WorldVisualEvent> detonationEvents;
+    for(int i=0;i<static_cast<int>(std::ceil(mine.number("delay")/dt))+3&&world.devices()[0].live;++i) {
+        world.tick(dt);
+        auto events=world.takeVisualEvents();
+        detonationEvents.insert(detonationEvents.end(),events.begin(),events.end());
+    }
+    check(!world.devices()[0].live,"Triggered mine did not clean up after its source fuse");
+    check(std::count_if(detonationEvents.begin(),detonationEvents.end(),[](const auto& event){return event.kind=="explosion"&&event.source=="mine";})==1,
+          "Mine detonation did not emit exactly one source explosion cue");
+
+    PlayerSimulation stickyOwner(stage,geometry,paint,0,&world);
+    stickyOwner.setLoadout("shooter","sticky","storm");stickyOwner.state.pos={-5,0,0};stickyOwner.state.grounded=true;
+    world.deploy(stickyOwner,"sticky");
+    std::vector<WorldVisualEvent> stickyEvents;
+    int ticks=0;
+    while(ticks<240 && (world.devices().empty() || world.devices().back().state!="stuck")) {
+        world.tick(dt);++ticks;
+        auto events=world.takeVisualEvents();
+        stickyEvents.insert(stickyEvents.end(),events.begin(),events.end());
+    }
+    check(!world.devices().empty()&&world.devices().back().state=="stuck","Sticky charge did not reach its source stuck phase");
+    check(std::count_if(stickyEvents.begin(),stickyEvents.end(),[](const auto& event){return event.kind=="device_arm"&&event.source=="sticky";})==1,
+          "Stuck sticky charge did not emit one arm cue");
+    for(int i=0;i<90 && std::count_if(stickyEvents.begin(),stickyEvents.end(),[](const auto& event){return event.kind=="device_warning"&&event.source=="sticky";})<2;++i) {
+        world.tick(dt);
+        auto events=world.takeVisualEvents();
+        stickyEvents.insert(stickyEvents.end(),events.begin(),events.end());
+    }
+    std::vector<double> warningProgress;
+    for(const auto& event:stickyEvents)if(event.kind=="device_warning"&&event.source=="sticky")warningProgress.push_back(event.charge);
+    check(warningProgress.size()>=2&&warningProgress[0]<warningProgress[1]&&warningProgress.back()<=1.0,
+          "Sticky fuse warnings did not report increasing source fuse progress");
+}
+
+void runBoomerangContactFuse() {
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),victim(stage,geometry,paint,1,&world);
+    owner.setLoadout("mitts","boomerang","slam");owner.state.pos={0,0,0};owner.state.invuln=0;owner.input.aimYaw=0;
+    victim.state.pos={0,0,3};victim.state.invuln=0;
+    const auto& source=GetEquipment(EquipmentCategory::Sub,"boomerang");
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,"boomerang");
+    for(int i=0;i<60&&world.devices().front().state!="armed";++i)world.tick(dt);
+    const auto& device=world.devices().front();
+    check(device.state=="armed"&&device.target==&victim&&std::abs(device.timer-source.number("hitFuse"))<1e-10,
+          "Boomerang contact did not enter the source armed fuse state");
+    check(victim.state.hp<100.0,"Boomerang contact did not apply the source arm hit");
+    std::vector<WorldVisualEvent> events=world.takeVisualEvents();
+    check(std::count_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_arm"&&e.source=="boomerang";})==1,
+          "Boomerang contact did not emit one visual arm transition");
+    const auto initialWarning=std::find_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_warning"&&e.source=="boomerang";});
+    check(initialWarning!=events.end()&&std::abs(initialWarning->charge)<1e-12,
+          "Boomerang arm beep did not report its initial fuse progress");
+    for(int i=0;i<static_cast<int>(std::ceil(source.number("hitFuse")/dt))+3&&device.live;++i) {
+        world.tick(dt);auto more=world.takeVisualEvents();events.insert(events.end(),more.begin(),more.end());
+    }
+    const auto warnings=std::count_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_warning"&&e.source=="boomerang";});
+    const auto blast=std::find_if(events.begin(),events.end(),[](const auto& e){return e.kind=="explosion"&&e.source=="boomerang";});
+    check(!device.live&&warnings>=2&&blast!=events.end()&&std::abs(blast->charge-1.0)<1e-12
+          &&std::abs(blast->radius-source.number("hitRadius"))<1e-10,
+          "Boomerang did not warn through its source fuse and finish with the full hit blast");
+}
+
+void runDeviceRayDestroyCue() {
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world);owner.setLoadout("shooter","torpedo","storm");owner.state.pos={0,0,0};
+    world.deploy(owner,"torpedo");
+    const auto device=world.devices().front();
+    world.blockRay(device.pos-glm::dvec3(0,0,1),{0,0,1},2.0,1,1000.0);
+    const auto events=world.takeVisualEvents();
+    check(!world.devices().front().live&&events.size()==1&&events[0].kind=="device_destroy"
+          &&events[0].source=="torpedo"&&events[0].team==owner.team(),
+          "Ray-destroyed torpedo did not emit one source-tagged device destroy event");
 }
 
 void runSeekerCommit() {
@@ -337,6 +445,9 @@ int main() {
         runTracerContact(0.68,22.0,3.0);
         runBrollyShield();
         runPlacementOrder();
+        runDeviceWarningLifecycle();
+        runBoomerangContactFuse();
+        runDeviceRayDestroyCue();
         runSeekerCommit();
         runBowTierOracle(12,0);
         runBowTierOracle(35,1);

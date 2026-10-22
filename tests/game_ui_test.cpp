@@ -1,6 +1,7 @@
 #include "GameUi.hpp"
 #include "ArsenalData.hpp"
 #include "MatchSimulation.hpp"
+#include "PlayerController.hpp"
 #include "ZoneControl.hpp"
 #include "FacePaint.hpp"
 #include "ReferenceData.hpp"
@@ -13,6 +14,7 @@
 #include <stb_image_write.h>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -21,12 +23,13 @@
 
 namespace {
 void Check(bool condition,const std::string& message){if(!condition)throw std::runtime_error(message);}
-void Capture(const std::filesystem::path& file,int width,int height){
+std::vector<unsigned char> Capture(const std::filesystem::path& file,int width,int height){
     std::filesystem::create_directories(file.parent_path());
     std::vector<unsigned char> pixels(width*height*3);
     glPixelStorei(GL_PACK_ALIGNMENT,1);glReadPixels(0,0,width,height,GL_RGB,GL_UNSIGNED_BYTE,pixels.data());
     stbi_flip_vertically_on_write(1);
     Check(stbi_write_png(file.string().c_str(),width,height,3,pixels.data(),width*3)!=0,"UI capture failed");
+    return pixels;
 }
 }
 int main(int argc,char** argv){
@@ -139,6 +142,175 @@ int main(int argc,char** argv){
         Check(!menu->IsVisible()&&hud->IsVisible(),"Starting a match must hide the menu and reveal the HUD");
         Check(hud->GetElementById("pause")->IsVisible(),"Pause overlay did not appear");
         Check(hud->GetElementById("minimap")->IsVisible()&&hud->GetElementById("fps")->IsVisible(),"Saved minimap and FPS preferences must apply to the HUD");
+        {
+            FacePaint jumpPaint(*stage,geometry);
+            MatchOptions jumpOptions; jumpOptions.duration=90; jumpOptions.seed=73;
+            MatchSimulation jumpMatch(*stage,geometry,jumpPaint,nav,jumpOptions);
+            jumpMatch.startPlaying();
+            PlayerController jumpController;
+            const auto& bounds=stage->bounds;
+            const auto mapPoint=[&](double x,double z){return glm::dvec3(bounds.x+x*(bounds.y-bounds.x),0.0,bounds.z+z*(bounds.w-bounds.z));};
+            auto& jumpLocal=jumpMatch.local();
+            jumpLocal.setLoadout("shooter","beacon","slam");
+            jumpLocal.spawnAt(mapPoint(.18,.78),0.0);
+            jumpLocal.combatWorld().deploy(jumpLocal,"beacon");
+            jumpLocal.state.pos=mapPoint(.5,.7);
+            const std::array<glm::dvec2,3> teammateMapPoints{{{.18,.2},{.82,.23},{.78,.78}}};
+            std::size_t teammatePoint=0;
+            for(std::size_t index=1;index<jumpMatch.actors().size()&&teammatePoint<teammateMapPoints.size();++index){
+                auto* actor=jumpMatch.actors()[index].get();
+                if(actor->team()!=jumpLocal.team())continue;
+                const auto& point=teammateMapPoints[teammatePoint++];
+                actor->spawnAt(mapPoint(point.x,point.y),0.0);
+            }
+            Check(teammatePoint==teammateMapPoints.size(),"Map capture fixture needs three allied target positions");
+            auto controllerTargets=[&]{return jumpController.SuperJumpMapTargets(jumpMatch);};
+            auto uiTargets=[&]{
+                std::vector<UiJumpMapTarget> targets;
+                for(const auto& target:controllerTargets())targets.push_back({target.key,target.x,target.z,target.label,target.available});
+                return targets;
+            };
+            auto renderJumpMap=[&](int width,int height,const char* filename){
+                const auto targets=uiTargets();
+                Check(targets.size()>=5&&targets[4].key==5,"Map captures should include the deployed beacon as target 5");
+                ui.SetJumpMap(true,targets);glfwSetTime(glfwGetTime()+.2);
+                glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                ui.RenderHud(*stage,jumpPaint,jumpMatch,width,height,false,true);
+                auto* panel=hud->GetElementById("minimap");
+                Check(panel->IsVisible()&&panel->IsClassSet("jump-map-open"),"Opening the Super Jump map must expand and show the minimap panel");
+                const auto mapSize=panel->GetBox().GetSize(Rml::BoxArea::Border);
+                const auto detailSize=hud->GetElementById("jump-map-help")->GetBox().GetSize(Rml::BoxArea::Border);
+                Check(mapSize.x>450.f&&detailSize.y>0.f,"Expanded Super Jump map should expose its map panel and instructions");
+                Check(hud->GetElementById("jump-map-legend")->GetInnerRML().find("jump-target-1")!=Rml::String::npos,"Expanded Super Jump map should list teammate targets");
+                auto* map=hud->GetElementById("minimap-map");
+                const auto mapOffset=map->GetAbsoluteOffset(Rml::BoxArea::Border);
+                const auto mapBounds=map->GetBox().GetSize(Rml::BoxArea::Border);
+                const double spanX=std::max(1e-6,bounds.y-bounds.x),spanZ=std::max(1e-6,bounds.w-bounds.z);
+                for(const auto& target:targets){
+                    const auto markerId="jump-map-marker-"+std::to_string(target.key);
+                    auto* marker=hud->GetElementById(markerId.c_str());
+                    Check(marker&&marker->GetInnerRML()==std::to_string(target.key%10),"Map marker must visibly print its target digit: "+markerId);
+                    if(!marker)continue;
+                    const auto markerOffset=marker->GetAbsoluteOffset(Rml::BoxArea::Border);
+                    const auto markerSize=marker->GetBox().GetSize(Rml::BoxArea::Border);
+                    const double left=std::clamp((target.x-bounds.x)/spanX*100.,3.,97.);
+                    const double top=std::clamp((bounds.w-target.z)/spanZ*100.,5.,95.);
+                    const double centerX=markerOffset.x+markerSize.x*.5,centerY=markerOffset.y+markerSize.y*.5;
+                    const double expectedX=mapOffset.x+mapBounds.x*left/100.,expectedY=mapOffset.y+mapBounds.y*top/100.;
+                    Check(markerOffset.x>=mapOffset.x-.5&&markerOffset.y>=mapOffset.y-.5&&
+                          markerOffset.x+markerSize.x<=mapOffset.x+mapBounds.x+.5&&
+                          markerOffset.y+markerSize.y<=mapOffset.y+mapBounds.y+.5,
+                          "Map target marker bounding rect must remain inside the minimap: "+markerId);
+                    Check(std::abs(centerX-expectedX)<3.0&&std::abs(centerY-expectedY)<3.0,
+                          "Map target marker must align with its projected target position: "+markerId);
+                }
+                const auto pixels=Capture(std::filesystem::path(argv[2])/filename,width,height);
+                const auto pixel=[&](int x,int y){
+                    x=std::clamp(x,0,width-1);y=std::clamp(y,0,height-1);
+                    const auto index=(static_cast<std::size_t>(height-1-y)*width+static_cast<std::size_t>(x))*3;
+                    return std::array<unsigned char,3>{pixels[index],pixels[index+1],pixels[index+2]};
+                };
+                int originGreenPixels=0;
+                for(int y=1;y<std::min(height,36);++y)for(int x=1;x<std::min(width,36);++x){
+                    const auto color=pixel(x,y);
+                    if(color[1]>65&&color[1]>color[0]*1.45&&color[1]>color[2]*1.08)++originGreenPixels;
+                }
+                Check(originGreenPixels<5,"Framebuffer must not draw a displaced green map marker at the window origin (pixels="+std::to_string(originGreenPixels)+")");
+                for(const auto& target:targets){
+                    const auto markerId="jump-map-marker-"+std::to_string(target.key);
+                    auto* marker=hud->GetElementById(markerId.c_str());
+                    if(!marker)continue;
+                    const auto offset=marker->GetAbsoluteOffset(Rml::BoxArea::Border);
+                    const auto size=marker->GetBox().GetSize(Rml::BoxArea::Border);
+                    const int left=static_cast<int>(std::floor(offset.x+size.x*.2));
+                    const int right=static_cast<int>(std::ceil(offset.x+size.x*.8));
+                    const int top=static_cast<int>(std::floor(offset.y+size.y*.2));
+                    const int bottom=static_cast<int>(std::ceil(offset.y+size.y*.8));
+                    const int digitLeft=static_cast<int>(std::floor(offset.x+size.x*.35));
+                    const int digitRight=static_cast<int>(std::ceil(offset.x+size.x*.65));
+                    const int digitTop=static_cast<int>(std::floor(offset.y+size.y*.25));
+                    const int digitBottom=static_cast<int>(std::ceil(offset.y+size.y*.75));
+                    int greenPixels=0,glyphWhitePixels=0;
+                    for(int y=top;y<bottom;++y)for(int x=left;x<right;++x){
+                        const auto color=pixel(x,y);
+                        if(color[1]>65&&color[1]>color[0]*1.45&&color[1]>color[2]*1.08)++greenPixels;
+                    }
+                    for(int y=digitTop;y<digitBottom;++y)for(int x=digitLeft;x<digitRight;++x){
+                        const auto color=pixel(x,y);
+                        if(color[0]>244&&color[1]>244&&color[2]>244)++glyphWhitePixels;
+                    }
+                    Check(greenPixels>=std::max(6,int(size.x*size.y*.05)),
+                          "Framebuffer must contain the green target face inside "+markerId+" (pixels="+std::to_string(greenPixels)+")");
+                    Check(glyphWhitePixels>=std::max(3,int(size.x*.15)),
+                          "Framebuffer must contain the white target digit inside "+markerId+" (pixels="+std::to_string(glyphWhitePixels)+")");
+                }
+            };
+            auto clickTarget=[&](int key){
+                const std::string id="jump-target-"+std::to_string(key);
+                auto* target=hud->GetElementById(id.c_str());
+                Check(target!=nullptr,"Super Jump target button is missing: "+id);
+                target->Click();
+                return ui.TakeJumpMapSelection();
+            };
+            auto setMapTargets=[&]{ui.SetJumpMap(true,uiTargets());glfwSetTime(glfwGetTime()+.2);};
+            auto* minimapPanel=hud->GetElementById("minimap");
+            renderJumpMap(1280,720,"jump-map-1280x720.png");
+            renderJumpMap(1920,1080,"jump-map-1920x1080.png");
+            Check(clickTarget(1)==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1),"Clicking a live teammate target must route into the controller and start the selected jump");
+            Check(jumpMatch.local().superJumpState()&&jumpMatch.local().superJumpState()->actorTarget==controllerTargets()[0].actor,"Teammate click must preserve the selected actor target");
+            jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
+            setMapTargets();
+            Check(clickTarget(4)==4&&jumpController.SelectSuperJumpMapTarget(jumpMatch,4),"Clicking the base target must route into the controller and start the base jump");
+            Check(jumpMatch.local().superJumpState()&&glm::distance(jumpMatch.local().superJumpState()->target,stage->spawnPads[jumpMatch.local().team()])<.01,"Base click must use the selected team's spawn pad");
+            jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
+
+            auto* ally=controllerTargets()[0].actor;
+            Check(ally!=nullptr,"Super Jump map fixture needs a teammate target");
+            ally->state.invuln=0;
+            Check(ally->damage(200)&&!ally->state.alive,"Disabled-target fixture should splat the selected teammate");
+            setMapTargets();
+            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(!controllerTargets()[0].available&&hud->GetElementById("jump-map-legend")->GetInnerRML().find("jump-target-1")!=Rml::String::npos&&hud->GetElementById("jump-map-legend")->GetInnerRML().find("unavailable")!=Rml::String::npos&&hud->GetElementById("jump-target-1")->HasAttribute("disabled"),"Dead teammates must remain listed with a visibly disabled target state");
+            const auto confirmsBeforeDeadClick=std::count(sounds.begin(),sounds.end(),"ui_confirm");
+            Check(clickTarget(1)==-1&&!jumpController.SelectSuperJumpMapTarget(jumpMatch,1)&&!jumpMatch.local().superJumpState()&&std::count(sounds.begin(),sounds.end(),"ui_confirm")==confirmsBeforeDeadClick,"Clicking an unavailable teammate must not start a jump or emit a confirm cue");
+            ally->spawnAt(stage->spawnPads[ally->team()]+glm::dvec3(2,0,0),0.0);
+
+            jumpMatch.local().setCanRespawn(false);
+            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(!controllerTargets()[3].available&&hud->GetElementById("jump-target-4")->HasAttribute("disabled"),"Respawn gating must disable the base target");
+            Check(clickTarget(4)==-1&&!jumpController.SelectSuperJumpMapTarget(jumpMatch,4)&&!jumpMatch.local().superJumpState(),"Clicking the gated base target must not start a jump");
+            jumpMatch.local().setCanRespawn(true);
+
+            jumpMatch.local().setLoadout("shooter","beacon","slam");
+            jumpMatch.local().combatWorld().deploy(jumpMatch.local(),"beacon");
+            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            const auto targetsWithBeacon=controllerTargets();
+            const auto beaconTarget=std::find_if(targetsWithBeacon.begin(),targetsWithBeacon.end(),[](const auto& target){return target.kind==SuperJumpMapTargetKind::Beacon;});
+            Check(beaconTarget!=targetsWithBeacon.end()&&beaconTarget->key==5,"The oldest live team beacon should be listed at key 5");
+            jumpMatch.local().setCanRespawn(false);
+            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(!controllerTargets()[4].available&&hud->GetElementById("jump-target-5")->HasAttribute("disabled"),"Respawn gating must disable the beacon target");
+            Check(clickTarget(5)==-1&&!jumpController.SelectSuperJumpMapTarget(jumpMatch,5),"Clicking a gated beacon must not start a jump");
+            jumpMatch.local().setCanRespawn(true);
+            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(clickTarget(5)==5&&jumpController.SelectSuperJumpMapTarget(jumpMatch,5),"Clicking the beacon target must route into the controller and start the beacon jump");
+            Check(jumpMatch.local().superJumpState()&&jumpMatch.local().superJumpState()->beaconId==beaconTarget->beaconId,"Beacon click must preserve the selected device id");
+
+            jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
+            setMapTargets();
+            jumpMatch.local().state.invuln=0;
+            Check(jumpMatch.local().damage(200)&&!jumpMatch.local().state.alive,"Dead-map fixture should splat the local player before choosing a queued target");
+            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(controllerTargets()[0].available&&!hud->GetElementById("jump-target-1")->HasAttribute("disabled"),"A living teammate remains available as a queued target while the local player is dead");
+            Check(clickTarget(1)==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1)&&jumpController.HasQueuedSuperJump()&&jumpController.QueuedSuperJumpKey()==1,"Clicking an available teammate while dead should queue that teammate's respawn jump");
+            jumpController.ClearQueuedSuperJump();
+            jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
+            setMapTargets();
+            hud->GetElementById("jump-target-1")->Click();
+            ui.SetJumpMap(false,{});
+            glfwSetTime(glfwGetTime()+.2);ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(!minimapPanel->IsClassSet("jump-map-open")&&ui.TakeJumpMapSelection()==-1,"Closing the map must collapse it and discard any pending target click");
+        }
         StageGeometry zonesGeometry(*zonesStage);FacePaint zonesPaint(*zonesStage,zonesGeometry);NavGraph zonesNav(*zonesStage,zonesGeometry);
         MatchOptions zonesOptions;zonesOptions.mode="zones";zonesOptions.duration=300;zonesOptions.seed=41;
         MatchSimulation zonesMatch(*zonesStage,zonesGeometry,zonesPaint,zonesNav,zonesOptions);

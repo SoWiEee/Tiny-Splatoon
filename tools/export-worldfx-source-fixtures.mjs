@@ -49,7 +49,7 @@ function pool(fx, name, immediate) {
 function snapshot(fx, immediate) {
   return Object.fromEntries(['drops', 'puffs', 'glows', 'rings', 'shells', 'beams'].map(name => [name, pool(fx, name, immediate)]));
 }
-for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart', 'rainSheet', 'formPop', 'dive', 'emerge', 'wake']) {
+for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart', 'rainSheet', 'formPop', 'dive', 'emerge', 'wake', 'footstepOwn', 'footstepEnemy', 'footstepDry']) {
   const fx = new FX(new THREE.Scene(), { quality: 1 });
   seed = 0x6d2b79f5;
   if (name === 'burst') fx.burst(origin, up, orange, { count: 12, size: 0.1 });
@@ -62,6 +62,7 @@ for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart'
   if (name === 'dive') fx.dive(origin, orange, 4);
   if (name === 'emerge') fx.emerge(origin, orange, 4);
   if (name === 'wake') fx.wake(origin, new THREE.Vector3(0, 0, 1), orange, 8);
+  if (name.startsWith('footstep')) fx.footstep(origin, orange, name === 'footstepOwn' ? 1 : name === 'footstepEnemy' ? 2 : 0, new THREE.Vector3(0, 0, 1), 5);
   const immediate = fx.stats();
   const immediatePools = snapshot(fx, true);
   fx.update(1 / 60);

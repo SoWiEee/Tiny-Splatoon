@@ -126,6 +126,7 @@ void GameAudio::Footstep(PlayerSimulation& actor, AudioPosition position, double
 
 void GameAudio::ActorTrigger(PlayerSimulation& actor, const CharacterTrigger& event) {
     const auto kind = actor.weaponProfile().kind;
+    const auto pose = actor.specialPose();
     const double amount = event.amount.value_or(1.0);
     if (event.name == "spawn") {
         auto& state = actorStates_[&actor];
@@ -133,7 +134,11 @@ void GameAudio::ActorTrigger(PlayerSimulation& actor, const CharacterTrigger& ev
         state.alive = true;
         return;
     }
-    if (event.name == "jump" || event.name == "special_leap") { Play(event.name == "jump" ? "jump" : "super_jump", &actor, actor.isLocal() ? 0.9 : 0.6); return; }
+    if (event.name == "jump" || event.name == "special_leap") {
+        if (event.name == "jump" && pose.active && pose.kind == "kraken") Play("kraken_jump", &actor, 0.8);
+        else Play(event.name == "jump" ? "jump" : "super_jump", &actor, actor.isLocal() ? 0.9 : 0.6);
+        return;
+    }
     if (event.name == "land") { Play("land", &actor, 1, std::clamp(0.75 + amount * 0.12, 0.7, 1.25)); return; }
     if (event.name == "hit") { Play(actor.isLocal() ? "hurt" : "ink_hit_body", &actor, actor.isLocal() ? 0.7 : 0.55); return; }
     if (event.name == "shoot" || event.name == "stream") {
@@ -144,7 +149,22 @@ void GameAudio::ActorTrigger(PlayerSimulation& actor, const CharacterTrigger& ev
         const char* sound = kind == "bow" ? "bow_loose" : kind == "charger" ? "shoot_charger" : "shoot_splatling";
         Play(sound, &actor, 0.65, std::clamp(1.08 - 0.16 * amount, 0.8, 1.15)); return;
     }
-    if (event.name == "throw") { Play(SubThrowSound(actor), &actor);if(actor.subId()=="torpedo")Play("bomb_throw",&actor,.6,.92);return; }
+    if (event.name == "throw") {
+        const auto special = actor.specialPose();
+        if (special.active && special.kind == "booyah") Play("booyah_throw", &actor, 0.9);
+        else if (special.active && special.kind == "stamp") Play("stamp_throw", &actor, 0.9);
+        else if (special.active && special.kind == "blower") Play("bubble_release", &actor, 0.7);
+        else if (actor.subId() == "torpedo") {
+            Play("bomb_throw", &actor, 0.6, 0.92); Play("torpedo_throw", &actor, 0.7);
+        } else if (actor.subId() == "tracer") Play("tracer_zap", &actor, 0.8);
+        else if (actor.subId() == "boomerang") Play("boomerang_throw", &actor, 0.8);
+        else if (actor.subId() == "waddle") Play("bomb_throw", &actor, 0.6, 1.08);
+        else if (actor.subId() == "burst") Play("bomb_throw", &actor, 0.65, 1.2);
+        else if (actor.subId() == "shaker")
+            Play("bomb_throw", &actor, 0.65, 0.95 + 0.06 * std::max(0.0, event.amount.value_or(0.0)));
+        else Play(SubThrowSound(actor), &actor, 0.65);
+        return;
+    }
     if (event.name == "flick") { Play("roller_flick", &actor, 0.8, event.side < 0 ? 1.08 : 1.0); return; }
     if (event.name == "slosh") { Play("slosh_throw", &actor, 0.65); return; }
     if (event.name == "blade_slash") { Play("blade_swish", &actor, 0.55, event.side < 0 ? 1.09 : 1.0); return; }
@@ -673,9 +693,109 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
 
     for (const auto& event : events) {
         AudioPlayOptions options; options.pos = Position(event.pos);
-        if (event.kind == "explosion") { options.volume = std::clamp(0.45 + event.radius * 0.08, 0.5, 1.0); engine_.Play("bomb_explode", options);
-            if(event.source=="torpedo")engine_.Play("torpedo_pop",options);
-            else if(event.source=="boomerang")engine_.Play("boomerang_burst",options);
+        if (event.kind == "device_arm") {
+            const char* cue = nullptr;
+            if (event.source == "mine") { cue = "bomb_beep"; options.volume = 0.5; options.pitch = 0.8; }
+            else if (event.source == "beacon") { cue = "bomb_beep"; options.volume = 0.5; options.pitch = 1.3; }
+            else if (event.source == "sticky") { cue = "bomb_beep"; options.volume = 0.55; }
+            else if (event.source == "sprinkler") { cue = "bomb_beep"; options.volume = 0.55; options.pitch = 1.4; }
+            else if (event.source == "shaker") { cue = "bomb_beep"; options.volume = 0.55; options.pitch = 1.25; }
+            else if (event.source == "scan") { cue = "special_activate"; options.volume = 0.45; options.pitch = 1.6; }
+            else if (event.source == "mist") { cue = "enemy_ink_sizzle"; options.volume = 0.7; options.pitch = 0.7; }
+            else if (event.source == "curtain") { cue = "swim_splash"; options.volume = 0.8; options.pitch = 0.8; }
+            if (cue) engine_.Play(cue, options);
+        }
+        else if (event.kind == "device_warning") {
+            const double k = std::clamp(event.charge, 0.0, 1.0);
+            if (event.source == "mine") { options.volume = 0.8; options.pitch = 1.5; engine_.Play("bomb_beep", options); }
+            else if (event.source == "sticky") {
+                options.volume = 0.3 + 0.4 * k; options.pitch = 1.0 + 0.3 * k;
+                engine_.Play("bomb_beep", options);
+            } else if (event.source == "waddle") {
+                options.volume = 0.3 + 0.35 * k; options.pitch = 1.05 + 0.3 * k;
+                engine_.Play("bomb_beep", options);
+            } else if (event.source == "boomerang") {
+                options.volume = 0.5 + 0.4 * k; options.pitch = 1.1 + 0.4 * k;
+                engine_.Play("bomb_beep", options);
+            }
+        }
+        else if (event.kind == "special_warning" && event.source == "booyah") {
+            options.volume = 1.0; options.pitch = 0.6; engine_.Play("bomb_beep", options);
+        }
+        else if (event.kind == "special_audio") {
+            if (event.source == "bomb_throw") {
+                options.volume = 0.65; options.pitch = event.charge > 0.0 ? event.charge : 1.0;
+                engine_.Play("bomb_throw", options);
+            }
+            else if (event.source == "sonar_ping") { options.volume = 0.9; engine_.Play("sonar_ping", options); }
+            else if (event.source == "sonar_mark") { options.volume = 0.8; engine_.Play("sonar_mark", options); }
+            else if (event.source == "strike_whistle") { options.volume = 0.9; engine_.Play("strike_whistle", options); }
+            else if (event.source == "zip_latch") { options.volume = 0.8; engine_.Play("zip_latch", options); }
+            else if (event.source == "zip_pull") { options.volume = 0.7; options.pitch = 0.8; engine_.Play("zip_pull", options); }
+            else if (event.source == "shield_hit") { options.volume = 0.6; engine_.Play("shield_hit", options); }
+            else if (event.source == "shield_pop") { options.volume = 0.6; engine_.Play("shield_pop", options); }
+            else if (event.source == "crab_hit") { options.volume = 0.5; engine_.Play("crab_hit", options); }
+            else if (event.source == "crab_break") { options.volume = 0.8; engine_.Play("crab_break", options); }
+            else if (event.source == "booyah_cheer") { options.volume = 0.7; engine_.Play("booyah_cheer", options); }
+            else if (event.source == "jet_end") { options.volume = 0.7; engine_.Play("jet_end", options); }
+        }
+        else if (event.kind == "device_hit" && event.source == "tracer") {
+            options.volume = 0.9; engine_.Play("tracer_hit", options);
+        }
+        else if (event.kind == "device_destroy") {
+            if (event.source == "torpedo") {
+                options.volume = 0.8; options.pitch = 0.75; engine_.Play("splat_small", options);
+                options.volume = 0.45; options.pitch = 1.6; engine_.Play("torpedo_pop", options);
+            } else if (event.source == "waddle") {
+                if (event.charge >= 0.5) { options.volume = 0.8; options.pitch = 1.3; }
+                else { options.volume = 0.5; options.pitch = 0.7; }
+                engine_.Play("splat_small", options);
+            } else if (event.source == "beacon" || event.source == "mine") {
+                options.volume = 0.7; options.pitch = 0.8; engine_.Play("splat_small", options);
+            } else {
+                // Other source subweapons use the shared destructible-device cue.
+                options.volume = 0.7; options.pitch = 0.8; engine_.Play("splat_small", options);
+            }
+        }
+        else if (event.kind == "bubble_pop" && event.source == "blower") {
+            options.volume = 0.7; engine_.Play("bubble_pop", options);
+        }
+        else if (event.kind == "explosion") {
+            const double genericVolume = std::clamp(0.45 + event.radius * 0.08, 0.5, 1.0);
+            options.volume = genericVolume;
+            if (event.source == "jetpack") {
+                // The source plays jet_fire when the shot is launched; it has no second blast cue.
+            } else if (event.source == "burst") {
+                options.volume = 0.6; options.pitch = 1.2; engine_.Play("blaster_boom", options);
+            } else if (event.source == "boomerang") {
+                if (event.charge >= 0.5) engine_.Play("bomb_explode", options);
+                else engine_.Play("boomerang_burst", options);
+            } else if (event.source == "booyah") {
+                options.volume = 1.0; engine_.Play("booyah_blast", options);
+            } else if (event.source == "strike") {
+                options.volume = 1.0; engine_.Play("strike_impact", options);
+            } else if (event.source == "stamp") {
+                options.volume = 0.85; engine_.Play("stamp_slam", options);
+            } else if (event.source == "kraken") {
+                options.volume = 0.9; engine_.Play("kraken_slam", options);
+            } else if (event.source == "blower") {
+                options.volume = 1.0; engine_.Play("bubble_blast", options);
+            } else if (event.source == "zipcaster") {
+                options.volume = 0.6; options.pitch = 1.25; engine_.Play("blaster_boom", options);
+            } else if (event.source == "shaker") {
+                options.volume = 0.62; options.pitch = 1.1 + 0.06 * std::max(0.0, event.charge);
+                engine_.Play("bomb_explode", options);
+            } else if (event.source == "torpedo") {
+                const bool full = event.charge >= 0.5;
+                options.volume = full ? 0.75 : 0.6; options.pitch = full ? 1.08 : 1.15;
+                engine_.Play("bomb_explode", options);
+                options.volume = full ? 0.9 : 0.6; options.pitch = full ? 1.0 : 1.12;
+                engine_.Play("torpedo_pop", options);
+            } else if (event.source == "crab") {
+                // Crab cannon shells have a launch cue but no source impact one-shot.
+            } else {
+                engine_.Play("bomb_explode", options);
+            }
         }
         else if (event.kind == "bulletImpact") { options.volume = 0.35; engine_.Play("ink_hit_wall", options); }
         else if (event.kind == "beam") {

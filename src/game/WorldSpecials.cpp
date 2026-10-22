@@ -24,12 +24,19 @@ bool supportedSpecial(std::string_view id) {
         || id == "barrage_seeker" || id == "barrage_mist" || id == "sonar" || id == "wail" || id == "kraken"
         || id == "strike" || id == "blower" || id == "jetpack" || id == "stamp" || id == "booyah" || id == "zipcaster" || id == "crab";
 }
+bool hasTransformEndingCue(std::string_view id) {
+    return id=="jetpack"||id=="crab"||id=="kraken"||id=="stamp"||id=="zipcaster"
+        ||id=="zooka"||id=="blower"||id=="bubbler";
+}
 struct WorldTickGuard {
     explicit WorldTickGuard(bool& active) : active_(active), previous_(active) { active_ = true; }
     ~WorldTickGuard() { active_ = previous_; }
     bool& active_;
     bool previous_;
 };
+void emitSpecialAudio(CombatWorld& world, std::string_view source, glm::dvec3 pos, int team, double charge = 0.0) {
+    world.emitVisual({"special_audio", pos, {0.0, 1.0, 0.0}, 0.0, team, charge, 0.08, 0.0, std::string(source)});
+}
 }
 
 WorldSpecials::WorldSpecials(CombatWorld& world) : world_(world) {}
@@ -201,6 +208,7 @@ bool WorldSpecials::activate(PlayerSimulation& actor, std::string_view id) {
     }
 
     actors_.emplace(&actor, std::move(special));
+    if (id == "sonar") emitSpecialAudio(world_, "sonar_ping", actor.state.pos, actor.team());
     return true;
 }
 
@@ -208,6 +216,7 @@ void WorldSpecials::cheer(PlayerSimulation& actor) {
     const auto previous = cheerTimes_.find(&actor);
     if (!actor.state.alive || world_.time_ - (previous != cheerTimes_.end() ? previous->second : -9.0) < 0.4) return;
     cheerTimes_[&actor] = world_.time_;
+    emitSpecialAudio(world_, "booyah_cheer", actor.state.pos, actor.team());
     const auto& def = GetEquipment(EquipmentCategory::Special, "booyah");
     bool helped = false;
     for (auto& [teammate, special] : actors_) {
@@ -255,6 +264,7 @@ void WorldSpecials::throwBarrage(PlayerSimulation& actor, ActorSpecial& special)
         device.creep = sub.number("creep");
     } else if (kind == "mist") device.fuse = sub.number("fuse");
     world_.devices_.push_back(std::move(device));
+    emitSpecialAudio(world_, "bomb_throw", actor.state.pos, actor.team(), kind == "burst" ? 1.2 : 1.0);
     special.cooldown = def.number("gap");
 }
 
@@ -263,6 +273,7 @@ bool WorldSpecials::body(PlayerSimulation& actor, double dt) {
     const auto active=actors_.find(&actor);
     if(active!=actors_.end() && active->second.duration>0 && active->second.elapsed>=active->second.duration
        && active->second.id!="slam" && active->second.id!="storm") {
+        if(actor.state.alive)emitSpecialAudio(world_,"special_end",actor.state.pos,actor.team());
         const bool jumpBack=active->second.jumpBack;const auto origin=active->second.origin;
         actors_.erase(active);
         if(jumpBack && actor.state.alive && glm::length(actor.state.pos-origin)>2.5) actor.superJump(origin,true,true);
@@ -278,6 +289,10 @@ bool WorldSpecials::bodyStep(PlayerSimulation& actor, double dt) {
     auto& special = found->second;
     special.elapsed += dt;
     special.firing = std::max(0.0, special.firing-dt);
+    if(!special.endingCued&&special.duration>0&&hasTransformEndingCue(special.id)
+       &&special.elapsed>=special.duration-2.0) {
+        special.endingCued=true;emitSpecialAudio(world_,"special_ending",actor.state.pos,actor.team());
+    }
     if (special.id == "strike") {
         actor.state.vel.x *= std::exp(-8.0 * dt);
         actor.state.vel.z *= std::exp(-8.0 * dt);
@@ -329,6 +344,7 @@ bool WorldSpecials::bodyStep(PlayerSimulation& actor, double dt) {
             special.boostCooldown = def.number("boostGap");
             special.boostTime = 0.35;
             actor.state.vel.y = def.number("boost");
+            emitSpecialAudio(world_, "zip_pull", actor.state.pos, actor.team());
         }
         special.jumpWas = actor.input.jump;
         if (special.boostTime <= 0.0) {
@@ -376,6 +392,10 @@ bool WorldSpecials::bodyStep(PlayerSimulation& actor, double dt) {
         }
         if (special.elapsed >= special.duration) {
             const auto origin = special.origin;
+            if (actor.state.alive) {
+                emitSpecialAudio(world_, "jet_end", actor.state.pos, actor.team());
+                emitSpecialAudio(world_, "special_end", actor.state.pos, actor.team());
+            }
             actors_.erase(found);
             if (actor.state.alive && glm::length(actor.state.pos - origin) > 2.5) actor.superJump(origin, true, true);
         }
@@ -754,6 +774,8 @@ bool WorldSpecials::weapon(PlayerSimulation& actor, double dt, bool fire, bool f
                 special.stuck = 0.0;
                 special.zipElapsed=0.0; special.hang=0.0;
                 world_.paint(actor, hit.point + hit.normal * 0.1, 1.0, actor.random(), {}, true);
+                emitSpecialAudio(world_, "zip_latch", hit.point, actor.team());
+                emitSpecialAudio(world_, "zip_pull", actor.state.pos, actor.team());
             }
         }
         return false;
@@ -898,6 +920,10 @@ void WorldSpecials::tickActor(PlayerSimulation& actor, double dt) {
     auto& special = found->second;
     special.elapsed += dt;
     special.firing=std::max(0.0,special.firing-dt);
+    if(!special.endingCued&&special.duration>0&&hasTransformEndingCue(special.id)
+       &&special.elapsed>=special.duration-2.0) {
+        special.endingCued=true;emitSpecialAudio(world_,"special_ending",actor.state.pos,actor.team());
+    }
     if (special.id == "kraken") {
         const auto& def = GetEquipment(EquipmentCategory::Special, "kraken");
         if (!actor.state.grounded && !special.air && actor.state.vel.y > 3.0 && !special.attack)
@@ -955,7 +981,11 @@ void WorldSpecials::tickActor(PlayerSimulation& actor, double dt) {
             }
         }
     } else if(special.id=="crab") {
-        if(special.hitPoints<=0) { actors_.erase(found);return; }
+        if(special.hitPoints<=0) {
+            emitSpecialAudio(world_, "crab_break", actor.state.pos, actor.team());
+            actors_.erase(found);
+            return;
+        }
         if(special.roll) {
             if(actor.state.grounded && horizontalLength(actor.state.vel)>2) {
                 special.trail+=dt;
@@ -966,6 +996,8 @@ void WorldSpecials::tickActor(PlayerSimulation& actor, double dt) {
     if (special.duration > 0.0 && special.elapsed >= special.duration) {
         special.phase = "ended";
         const auto origin=special.origin; const bool jumpBack=special.jumpBack;
+        if(actor.state.alive)emitSpecialAudio(world_,"special_end",actor.state.pos,actor.team());
+        if (special.id == "crab") emitSpecialAudio(world_, "crab_break", actor.state.pos, actor.team());
         if(special.id=="blower") for(auto& object:objects_) if(object.live && object.owner==&actor && object.kind=="bubble" && object.held) {
             const auto& def=GetEquipment(EquipmentCategory::Special,"blower");
             object.held=false;object.vel={std::sin(actor.input.aimYaw)*def.number("drift"),0.25,std::cos(actor.input.aimYaw)*def.number("drift")};
@@ -1103,7 +1135,7 @@ void WorldSpecials::tickWail(WorldObject& object, double dt) {
 
 void WorldSpecials::specialBlast(PlayerSimulation& owner, glm::dvec3 center, double radius, double maxDamage,
                                  double minDamage, double killRadius, std::string_view weaponId) {
-    world_.emitVisual({"explosion",center,{0,1,0},radius,owner.team()});
+    world_.emitVisual({"explosion",center,{0,1,0},radius,owner.team(),0,.08,0,std::string(weaponId)});
     for (auto* victim : world_.actors_) {
         if (!victim || victim->team() == owner.team() || !victim->state.alive) continue;
         const glm::dvec3 target = victim->state.pos + glm::dvec3(0.0, 0.8, 0.0);
@@ -1118,7 +1150,7 @@ void WorldSpecials::specialBlast(PlayerSimulation& owner, glm::dvec3 center, dou
 }
 
 void WorldSpecials::jetpackBlast(WorldObject& object, glm::dvec3 center, PlayerSimulation* direct) {
-    world_.emitVisual({"explosion",center,{0,1,0},object.radius,object.owner->team()});
+    world_.emitVisual({"explosion",center,{0,1,0},object.radius,object.owner->team(),0,.08,0,"jetpack"});
     const auto ground = world_.geometry_.raycast(center + glm::dvec3(0.0, 0.2, 0.0), {0.0, -1.0, 0.0}, 3.5);
     if (ground.hit) world_.paint(*object.owner, ground.point + ground.normal * 0.1,
         object.paintRadius, object.owner->random(), {}, true);
@@ -1138,7 +1170,7 @@ void WorldSpecials::stampImpact(PlayerSimulation& actor, const ActorSpecial& spe
     const glm::dvec3 center = actor.state.pos + forward * reach;
     const auto ground = world_.geometry_.raycast(center + glm::dvec3(0.0, 1.2, 0.0), {0.0, -1.0, 0.0}, 3.0, true);
     const glm::dvec3 at = ground.hit ? ground.point : glm::dvec3(center.x, actor.state.pos.y, center.z);
-    world_.emitVisual({"explosion",at,{0,1,0},radius,actor.team()});
+    world_.emitVisual({"explosion",at,{0,1,0},radius,actor.team(),0,.08,0,"stamp"});
     world_.paint(actor, at + glm::dvec3(0.0, 0.2, 0.0), radius * 0.95, actor.random(), {}, true);
     world_.paint(actor, at + forward * (radius * 0.7) + glm::dvec3(0.0, 0.2, 0.0),
         radius * 0.6, actor.random(), {}, true);
@@ -1156,7 +1188,7 @@ void WorldSpecials::stampImpact(PlayerSimulation& actor, const ActorSpecial& spe
 void WorldSpecials::zipImpact(PlayerSimulation& actor, ActorSpecial& special, PlayerSimulation* direct) {
     const auto& def = GetEquipment(EquipmentCategory::Special, "zipcaster");
     const glm::dvec3 center = actor.state.pos + glm::dvec3(0.0, 0.7, 0.0);
-    world_.emitVisual({"explosion",center,{0,1,0},def.number("impactRadius"),actor.team()});
+    world_.emitVisual({"explosion",center,{0,1,0},def.number("impactRadius"),actor.team(),0,.08,0,"zipcaster"});
     for (auto* victim : world_.actors_) {
         if (!victim || victim->team() == actor.team() || !victim->state.alive) continue;
         const glm::dvec3 target = victim->state.pos + glm::dvec3(0.0, 0.8, 0.0);
@@ -1177,11 +1209,16 @@ void WorldSpecials::zipImpact(PlayerSimulation& actor, ActorSpecial& special, Pl
 void WorldSpecials::tickStrike(WorldObject& object, double dt) {
     if (object.kind == "strikeMissile") {
         object.age += dt;
+        if(!object.audioWhistled&&object.timer>0&&object.age>=object.timer*0.35) {
+            object.audioWhistled=true;
+            const double progress=std::clamp(object.age/object.timer,0.0,1.0);
+            emitSpecialAudio(world_,"strike_whistle",object.pos+(object.target-object.pos)*progress,object.owner->team());
+        }
         if (object.age < object.timer) return;
         const auto& def = GetEquipment(EquipmentCategory::Special, "strike");
         object.kind = "tornado";
         object.pos = object.target;
-        world_.emitVisual({"explosion",object.pos+glm::dvec3(0,0.6,0),{0,1,0},def.number("radius")*0.8,object.owner->team()});
+        world_.emitVisual({"explosion",object.pos+glm::dvec3(0,0.6,0),{0,1,0},def.number("radius")*0.8,object.owner->team(),0,.08,0,"strike"});
         object.age = 0.0;
         object.timer = def.number("duration");
         object.radius = def.number("radius");
@@ -1225,7 +1262,6 @@ void WorldSpecials::explodeBubble(WorldObject& object, PlayerSimulation* shooter
     object.live = false;
     const auto& def = GetEquipment(EquipmentCategory::Special, "blower");
     const double radius = object.radius * def.number("blastMul");
-    world_.emitVisual({"explosion",object.pos,{0,1,0},radius,object.owner->team()});
     auto& owner = shooter && shooter->team() == object.owner->team() ? *shooter : *object.owner;
     const auto center = object.pos;
     for (int i = 0; i < 6; ++i) {
@@ -1280,6 +1316,7 @@ void WorldSpecials::tickBubble(WorldObject& object, double dt) {
         }
         if (object.timer <= 0.0) {
             object.live = false;
+            world_.emitVisual({"bubble_pop",object.pos,{0,1,0},object.radius,object.owner->team(),0,.08,0,"blower"});
             world_.paint(*object.owner, object.pos - glm::dvec3(0.0, object.radius * 0.5, 0.0),
                 object.radius * 0.6, object.owner->random(), {}, true);
         }
@@ -1379,6 +1416,7 @@ void WorldSpecials::tickOrb(WorldObject& object, double dt) {
             object.pos = hit.point + hit.normal * 0.5;
             object.phase = "fuse";
             object.age = 0.0;
+            world_.emitVisual({"special_warning",object.pos,{0,1,0},object.radius,object.owner->team(),0,.08,0,"booyah"});
         } else if (object.age > object.timer || object.pos.y < PlayerTuning().number("waterY", -20.0) - 2.0)
             object.live = false;
         return;
@@ -1477,7 +1515,13 @@ void WorldSpecials::tickWorld(double dt) {
         if (!actor->state.alive || actor->state.shield <= 0.0) {
             actor->state.shield = 0.0;
             shieldSources_.erase(actor);
-        } else actor->state.shield = std::max(0.0, actor->state.shield - dt);
+        } else {
+            actor->state.shield = std::max(0.0, actor->state.shield - dt);
+            if (actor->state.shield <= 0.0) {
+                emitSpecialAudio(world_, "shield_pop", actor->state.pos, actor->team());
+                shieldSources_.erase(actor);
+            }
+        }
     }
 }
 
@@ -1494,15 +1538,27 @@ double WorldSpecials::filterDamage(PlayerSimulation& victim, PlayerSimulation* a
             if(front<-0.45 || attacker->state.pos.y>victim.state.pos.y+2.4) return amount;
         }
         special.hitPoints-=amount*(special.roll?GetEquipment(EquipmentCategory::Special,"crab").number("rollArmor"):1);
+        if (world_.time_ - special.lastHitAudio > 0.08) {
+            special.lastHitAudio = world_.time_;
+            emitSpecialAudio(world_, "crab_hit", victim.state.pos, victim.team());
+        }
         return 0;
     }
     if(active!=actors_.end() && active->second.id=="stamp" && active->second.guard>0 && attacker && attacker!=&victim) {
         const auto delta=attacker->state.pos-victim.state.pos;const double distance=horizontalLength(delta);
         const double dot=(delta.x*std::sin(active->second.hullYaw)+delta.z*std::cos(active->second.hullYaw))/(distance>0?distance:1);
-        if(distance<0.3 || dot>=std::cos(GetEquipment(EquipmentCategory::Special,"stamp").number("deflectArc")*pi/180.0)) return 0;
+        if(distance<0.3 || dot>=std::cos(GetEquipment(EquipmentCategory::Special,"stamp").number("deflectArc")*pi/180.0)) {
+            emitSpecialAudio(world_, "shield_hit", victim.state.pos, victim.team());
+            return 0;
+        }
     }
     const bool kraken = active != actors_.end() && active->second.id == "kraken";
     if (!kraken && victim.state.shield <= 0.0) return amount;
+    const auto shieldHit = shieldHitTimes_.find(&victim);
+    if (!kraken && (shieldHit == shieldHitTimes_.end() || world_.time_ - shieldHit->second > 0.12)) {
+        shieldHitTimes_[&victim] = world_.time_;
+        emitSpecialAudio(world_, "shield_hit", victim.state.pos, victim.team());
+    }
     const auto& def = GetEquipment(EquipmentCategory::Special, kraken ? "kraken" : "bubbler");
     double dx = 0.0, dz = 0.0;
     if (attacker && attacker != &victim) {
@@ -1580,6 +1636,7 @@ void WorldSpecials::splat(PlayerSimulation& actor) {
 
 void WorldSpecials::cleanup(PlayerSimulation& actor) {
     actors_.erase(&actor);
+    shieldHitTimes_.erase(&actor);
     for (auto& object : objects_) if (object.owner == &actor) object.live = false;
     if (!tickingWorld_) {
         objects_.erase(std::remove_if(objects_.begin(), objects_.end(), [](const WorldObject& object) {
@@ -1597,6 +1654,7 @@ void WorldSpecials::cleanup(PlayerSimulation& actor) {
 }
 
 void WorldSpecials::clear() {
+    shieldHitTimes_.clear();
     for (const auto& [actor, _] : actors_) if (actor) actor->state.shield = 0.0;
     for (const auto& [actor, _] : shieldSources_) if (actor) actor->state.shield = 0.0;
     actors_.clear();

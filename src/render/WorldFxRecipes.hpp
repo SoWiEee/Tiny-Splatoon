@@ -24,16 +24,20 @@ struct WorldFxParticle {
 
 struct WorldFxHit { glm::vec3 point{0}, normal{0,1,0}; };
 using WorldFxCollider = std::function<bool(glm::vec3 from, glm::vec3 to, WorldFxHit& hit)>;
+using WorldFxRippleSink = std::function<void(glm::dvec3,double,double,double,double)>;
+using WorldFxSpeckSink = std::function<void(const WorldFxHit&,glm::vec3,float)>;
 
 // Builds the source fx.js pooled recipes using its xorshift-fixture Math.random
 // stream. `rng` is stateful and must be shared across sequential calls.
 std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,
     glm::dvec3 pos, glm::dvec3 normal, glm::dvec3 color, double radius,
-    std::uint32_t& rng, double waterY=-1.6, glm::dvec3 camera={0,10,0});
+    std::uint32_t& rng, double waterY=-1.6, glm::dvec3 camera={0,10,0},
+    const WorldFxRippleSink& ripple={});
 
 // Mirrors fx.js pool update equations and Float32Array write boundaries. The
 // optional collider has the same segment contract as FX.setCollider.
 void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& particles, double dt,
     std::uint32_t& rng, const WorldFxCollider& collider={}, float waterY=-1.6f,
-    bool onSpeck=false, bool paintEffects=true);
+    bool onSpeck=false, bool paintEffects=true,
+    const WorldFxSpeckSink& speck={}, const WorldFxRippleSink& ripple={});
 }

@@ -14,7 +14,7 @@
     <div id="zone-callout" class="zone-callout hidden" aria-live="polite"></div>
   </div>
   <div id="boss" class="boss hidden"><div class="boss-heading"><strong>破艦巨獸</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-hp"></span></div></div>
-  <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><strong>場地地圖</strong><span id="terrain-status"></span></div><div id="minimap-map" class="minimap-map"></div><div id="position-status" class="position-status"><span id="position-team-coverage"></span></div></div>
+  <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><strong>場地地圖</strong><span id="terrain-status"></span></div><div id="minimap-map" class="minimap-map"></div><div id="position-status" class="position-status"><span id="position-team-coverage"></span></div><div id="jump-map-help" class="jump-map-help"></div><div id="jump-map-queue" class="jump-map-queue"></div><div id="jump-map-legend" class="jump-map-legend"></div></div>
   <div id="fps" class="fps">影格 <strong id="fps-value">60</strong></div>
   <div class="player-info"><div class="player-bars"><span>生命 <strong id="hp">100</strong></span><span>墨量 <strong id="ink">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
   <div id="player-status" class="player-status"></div><div id="reticle" class="reticle"></div>

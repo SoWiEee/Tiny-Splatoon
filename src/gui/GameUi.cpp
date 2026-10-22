@@ -106,6 +106,10 @@ struct GameUi::Impl : Rml::EventListener {
     std::function<void(float,float,float)> volumes;
     bool menuVisible=true,interactive=true,practiceGear=false,hudOverlay=false;
     bool activePractice=false;
+    bool jumpMapOpen=false;
+    int jumpMapSelection=-1,jumpMapQueuedKey=-1;
+    std::string jumpMapQueuedLabel;
+    std::vector<UiJumpMapTarget> jumpMapTargets;
     bool syncingControls=false;
     bool mouse[3]{};
     std::array<bool,12> keys{};
@@ -396,6 +400,17 @@ struct GameUi::Impl : Rml::EventListener {
             Mode();return;
         }
         if(type!="click"||element->GetTagName()!="button")return;
+        if(id.rfind("jump-target-",0)==0||id.rfind("jump-map-marker-",0)==0){
+            const auto dash=id.find_last_of('-');
+            if(jumpMapOpen&&dash!=std::string::npos){
+                try{
+                    const int key=std::stoi(id.substr(dash+1));
+                    const auto target=std::find_if(jumpMapTargets.begin(),jumpMapTargets.end(),[&](const auto& item){return item.key==key;});
+                    if(target!=jumpMapTargets.end()&&target->available){jumpMapSelection=key;Play("ui_confirm");}
+                }catch(const std::exception&){}
+            }
+            return;
+        }
         if(id=="title-start"){GoTo(UiScreen::Home);Play("ui_confirm");}
         else if(id.rfind("nav-",0)==0){Tab(id.substr(4));Play("ui_click");}
         else if(id=="home-play"){GoTo(UiScreen::Play);Play("ui_click");}
@@ -450,7 +465,7 @@ struct GameUi::Impl : Rml::EventListener {
             for(int b=0;b<3;++b){const bool held=glfwGetMouseButton(window,b)==GLFW_PRESS;if(held!=mouse[b]){if(held)context->ProcessMouseButtonDown(b,modifiers);else context->ProcessMouseButtonUp(b,modifiers);mouse[b]=held;}}
             const int nativeKeys[]={GLFW_KEY_TAB,GLFW_KEY_ENTER,GLFW_KEY_SPACE,GLFW_KEY_LEFT,GLFW_KEY_RIGHT,GLFW_KEY_UP,GLFW_KEY_DOWN,GLFW_KEY_ESCAPE,GLFW_KEY_BACKSPACE,GLFW_KEY_DELETE,GLFW_KEY_HOME,GLFW_KEY_END};
             const Rml::Input::KeyIdentifier uiKeys[]={Rml::Input::KI_TAB,Rml::Input::KI_RETURN,Rml::Input::KI_SPACE,Rml::Input::KI_LEFT,Rml::Input::KI_RIGHT,Rml::Input::KI_UP,Rml::Input::KI_DOWN,Rml::Input::KI_ESCAPE,Rml::Input::KI_BACK,Rml::Input::KI_DELETE,Rml::Input::KI_HOME,Rml::Input::KI_END};
-            for(std::size_t i=0;i<keys.size();++i){const bool held=glfwGetKey(window,nativeKeys[i])==GLFW_PRESS;if(held!=keys[i]){if(held)context->ProcessKeyDown(uiKeys[i],modifiers);else context->ProcessKeyUp(uiKeys[i],modifiers);keys[i]=held;}}
+            for(std::size_t i=0;i<keys.size();++i){if(jumpMapOpen&&nativeKeys[i]==GLFW_KEY_TAB)continue;const bool held=glfwGetKey(window,nativeKeys[i])==GLFW_PRESS;if(held!=keys[i]){if(held)context->ProcessKeyDown(uiKeys[i],modifiers);else context->ProcessKeyUp(uiKeys[i],modifiers);keys[i]=held;}}
         }
         context->Update();renderer.Begin(width,height);
         if((renderHud&&hud->IsVisible())||(menuVisible&&menu->IsVisible()))context->Render();
@@ -479,11 +494,14 @@ struct GameUi::Impl : Rml::EventListener {
         return result;
     }
     void UpdateMinimap(const StageData& stage,const FacePaint& paint,MatchSimulation& match){
-        if(!player.settings.minimap){Hidden(hud,"minimap",true);return;}Hidden(hud,"minimap",false);
+        if(!player.settings.minimap&&!jumpMapOpen){Hidden(hud,"minimap",true);return;}Hidden(hud,"minimap",false);
+        Find(hud,"minimap")->SetClass("jump-map-open",jumpMapOpen);
         const auto& state=match.local().state;const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
         const double now=glfwGetTime();
         const std::string stageKey=std::string(stage.id)+":"+std::string(stage.mode);
         std::string cache=stageKey+":"+std::to_string(paint.version())+":"+std::to_string(player.settings.palette)+":"+Bool(player.settings.colorblind)+":"+std::to_string(context->GetDimensions().x);
+        cache+=jumpMapOpen?":jump-map-open":":jump-map-closed";
+        for(const auto& target:jumpMapTargets)cache+=":"+std::to_string(target.key)+","+std::to_string(static_cast<int>(std::round(target.x*4)))+","+std::to_string(static_cast<int>(std::round(target.z*4)))+","+Bool(target.available)+","+target.label;
         if(const auto* zones=match.zones()){cache+=":"+zones->objective().id;for(const int id:zones->activeIndices())cache+=":"+std::to_string(zones->zones()[id].owner);}
         for(const auto& actor:match.actors())cache+=":"+std::to_string(static_cast<int>(std::round(actor->state.pos.x*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.z*4)))+","+std::to_string(actor->state.alive);
         if(minimapCache!=cache&&(now>=nextMinimapUpdate||terrainStage!=stageKey)){
@@ -551,6 +569,16 @@ struct GameUi::Impl : Rml::EventListener {
                 const std::string color(actor->team()==0?palette[0]:palette[1]);
                 markup+="<div class=\"map-actor "+std::string(i==0?"map-actor-local ":"")+(actor->team()==0?"map-actor-a":"map-actor-b")+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;background-color:"+color+";\"></div>";
             }
+            std::string targetLegend;
+            for(const auto& target:jumpMapTargets){
+                const double left=std::clamp((target.x-minX)/spanX*100.,3.,97.);
+                const double top=std::clamp((maxZ-target.z)/spanZ*100.,5.,95.);
+                const std::string stateClass=target.available?"available":"unavailable";
+                const std::string disabled=target.available?"":" disabled=\"disabled\"";
+                markup+="<div class=\"map-marker\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;\"><button id=\"jump-map-marker-"+std::to_string(target.key)+"\" class=\"map-target "+stateClass+"\""+disabled+" title=\""+Escape(target.label)+"\">"+std::to_string(target.key%10)+"</button></div>";
+                targetLegend+="<button id=\"jump-target-"+std::to_string(target.key)+"\" class=\"jump-target "+stateClass+"\""+disabled+"><strong>"+std::to_string(target.key%10)+"</strong><span>"+Escape(target.label)+"</span><small>"+(target.available?"可用":"暫不可用")+"</small></button>";
+            }
+            const auto legendKey=std::string("hud/jump-map-legend");if(textCache[legendKey]!=targetLegend){Find(hud,"jump-map-legend")->SetInnerRML(targetLegend);textCache[legendKey]=targetLegend;}
             const auto key=std::string("hud/minimap-map");if(textCache[key]!=markup){Find(hud,"minimap-map")->SetInnerRML(markup);textCache[key]=markup;}minimapCache=cache;nextMinimapUpdate=now+.1;
         }
         const char* ground=state.groundTeam==1?"自隊墨水":state.groundTeam==2?"敵隊墨水":"乾燥地面";
@@ -653,6 +681,7 @@ struct GameUi::Impl : Rml::EventListener {
         if(!results)resultXpMatch=nullptr;
         activePractice=practice;
         interactive=paused||results||practiceGear||hudOverlay;
+        interactive=interactive||jumpMapOpen;
         Hidden(hud,"pause",!paused||results);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
         Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results);
         Text(hud,"pause-title",practice?"練習暫停":"已暫停");Text(hud,"pause-description",practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
@@ -663,6 +692,9 @@ struct GameUi::Impl : Rml::EventListener {
         Text(hud,"hp",Integer(state.hp));Text(hud,"ink",Integer(state.ink));Text(hud,"special-status",state.specialCharge>=cost?"特殊技能就緒  F / Q":Integer(state.specialCharge)+" / "+Integer(cost));
         Find(hud,"special-fill")->SetProperty("width",Integer(std::clamp(state.specialCharge/cost,0.,1.)*100)+"%");Find(hud,"special-meter")->SetClass("ready",state.specialCharge>=cost);
         Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
+        Text(hud,"jump-map-help",state.alive?"按 1–3 選隊友　4 回生點　5–0 選隊伍訊標":"復活規劃：按數字選擇隊友或隊伍訊標，4 清除規劃");
+        Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?"復活彈射："+std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"尚未安排復活彈射");
+        Find(hud,"jump-map-queue")->SetClass("queued",jumpMapQueuedKey>=0);
         Hidden(hud,"boss",!match.boss());Hidden(hud,"team-score",match.boss()!=nullptr||match.zones()!=nullptr);
         if(const auto* boss=match.boss()){
             const auto& state=boss->state();Text(hud,"boss-phase","階段 "+std::to_string(state.phase));Find(hud,"boss-fill")->SetProperty("width",Integer(state.maxHp>0?std::clamp(state.hp/state.maxHp,0.,1.)*100:0)+"%");Text(hud,"boss-hp",Integer(state.hp)+" / "+Integer(state.maxHp));
@@ -695,6 +727,13 @@ void GameUi::SetSaveError(std::string error){impl_->SetSaveError(error);}
 void GameUi::SetReward(MatchRewardResult reward){impl_->reward=reward;}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
 void GameUi::SetVolumeSink(std::function<void(float,float,float)> value){impl_->volumes=std::move(value);if(impl_->volumes)impl_->volumes(static_cast<float>(impl_->player.settings.master),static_cast<float>(impl_->player.settings.music),static_cast<float>(impl_->player.settings.sfx));}
+void GameUi::SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey,std::string queuedLabel){
+    auto& p=*impl_;
+    if(p.jumpMapOpen!=open)p.minimapCache.clear();
+    p.jumpMapOpen=open;p.jumpMapTargets=std::move(targets);p.jumpMapQueuedKey=queuedKey;p.jumpMapQueuedLabel=std::move(queuedLabel);
+    if(!open)p.jumpMapSelection=-1;
+}
+int GameUi::TakeJumpMapSelection(){return std::exchange(impl_->jumpMapSelection,-1);}
 void GameUi::ShowMenu(const std::string& initialStage){
     auto& p=*impl_;p.resultXpMatch=nullptr;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;

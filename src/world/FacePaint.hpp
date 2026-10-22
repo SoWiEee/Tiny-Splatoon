@@ -40,6 +40,11 @@ struct VisualFlood {
     bool easeOut = false;
 };
 
+struct VisualRipple {
+    glm::dvec3 position{0.0};
+    double amplitude=0.006, wavelength=0.14, speed=1.2, life=0.7;
+};
+
 struct AtlasRect {
     int x = -1, y = -1, width = 0, height = 0, pad = 8;
     double ppm = 0.0;
@@ -60,6 +65,8 @@ public:
     std::vector<VisualSplat> takeVisualSplats();
     void requestVisualFlood(VisualFlood flood);
     std::vector<VisualFlood> takeVisualFloods();
+    void requestVisualRipple(VisualRipple ripple);
+    std::vector<VisualRipple> takeVisualRipples();
     bool takeVisualClear();
     int sample(int faceId, double u, double v) const;
     std::array<double, 2> coverage() const;
@@ -90,6 +97,7 @@ private:
     std::vector<std::uint8_t> grid_, dead_, turfCell_;
     std::vector<VisualSplat> visualSplats_;
     std::vector<VisualFlood> visualFloods_;
+    std::vector<VisualRipple> visualRipples_;
     bool visualClear_ = false;
     std::array<int, 2> counts_{0, 0};
     int turfTotal_ = 0, usedHeight_ = 0, version_ = 0;

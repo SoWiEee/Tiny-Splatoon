@@ -98,6 +98,7 @@ void FacePaint::clear() {
     counts_ = {0, 0};
     visualSplats_.clear();
     visualFloods_.clear();
+    visualRipples_.clear();
     visualClear_ = true;
 }
 
@@ -195,6 +196,20 @@ void FacePaint::requestVisualFlood(VisualFlood flood) {
 std::vector<VisualFlood> FacePaint::takeVisualFloods() {
     std::vector<VisualFlood> result;
     result.swap(visualFloods_);
+    return result;
+}
+
+void FacePaint::requestVisualRipple(VisualRipple ripple) {
+    if (!finite(ripple.position) || !std::isfinite(ripple.amplitude) || ripple.amplitude <= 0 ||
+        !std::isfinite(ripple.wavelength) || ripple.wavelength <= 0 ||
+        !std::isfinite(ripple.speed) || ripple.speed <= 0 || !std::isfinite(ripple.life) || ripple.life <= 0)
+        throw std::invalid_argument("invalid visual ripple");
+    if (visualRipples_.size() < 256) visualRipples_.push_back(ripple);
+}
+
+std::vector<VisualRipple> FacePaint::takeVisualRipples() {
+    std::vector<VisualRipple> result;
+    result.swap(visualRipples_);
     return result;
 }
 

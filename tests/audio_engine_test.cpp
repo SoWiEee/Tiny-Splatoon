@@ -2,21 +2,28 @@
 #include "../src/audio/GameAudio.hpp"
 #include "../src/game/MatchSimulation.hpp"
 #include "../src/game/CombatWorld.hpp"
+#include "../src/game/ArsenalData.hpp"
 #include "../src/game/NavGraph.hpp"
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/ReferenceData.hpp"
 #include "../src/world/StageGeometry.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <iostream>
 #include <limits>
+#include <string>
+#include <string_view>
 #include <stdexcept>
 #include <thread>
 #include <tuple>
+#include <utility>
+#include <vector>
 
 namespace {
 void require(bool condition, const char* message) {
@@ -207,11 +214,6 @@ int main(int argc, char** argv) {
         CharacterTrigger throwSub; throwSub.name = "throw";
         director.ActorTrigger(actor, shoot);
         director.ActorTrigger(actor, throwSub);
-        std::vector<WorldVisualEvent> events(5);
-        events[0].kind = "explosion"; events[1].kind = "bulletImpact"; events[2].kind = "slamWave";
-        events[3].kind = "stormStart"; events[4].kind = "burst";
-        match.tick(1.0 / 60.0);
-        director.Update(1.0 / 60.0, match, events, listener, forward);
         require(actor.specialId() == "jetpack", "The integration actor must use the jetpack special");
         actor.state.specialCharge = 500; actor.input.special = true;
         match.tick(1.0 / 60.0); actor.input.special = false;
@@ -337,6 +339,99 @@ int main(int argc, char** argv) {
         require(directorEngine.ActiveVoices() > voicesBeforeFirstBarrel,
             "The first Barrage barrel cue must wait until approximately 950 ms after the first whistle");
         director.EndMatch();
+
+        MatchOptions routeOptions; routeOptions.practice = true;
+        MatchSimulation routeMatch(*stage, geometry, paint, nav, routeOptions);
+        GameAudio routeDirector(directorEngine);
+        routeDirector.BeginMatch(routeMatch);
+        routeDirector.Update(1.0 / 60.0, routeMatch, {}, listener, forward);
+        struct EventRouteCase {
+            WorldVisualEvent event;
+            std::size_t expectedVoices;
+            std::vector<std::string_view> cues;
+            std::string label;
+        };
+        std::vector<EventRouteCase> routes;
+        const auto addRoute = [&](std::string label, const char* kind, const char* source,
+                                  std::size_t expected, std::initializer_list<std::string_view> cues,
+                                  double charge = 0.0, double radius = 2.0) {
+            WorldVisualEvent event;
+            event.kind = kind; event.source = source; event.pos = {2.0, 0.5, 1.0};
+            event.radius = radius; event.charge = charge;
+            routes.push_back({std::move(event), expected, std::vector<std::string_view>(cues), std::move(label)});
+        };
+        for (const char* source : {"mine", "beacon", "sticky", "sprinkler", "shaker"})
+            addRoute(std::string("device_arm/") + source, "device_arm", source, 1, {"bomb_beep"});
+        addRoute("device_arm/scan", "device_arm", "scan", 1, {"special_activate"});
+        addRoute("device_arm/mist", "device_arm", "mist", 1, {"enemy_ink_sizzle"});
+        addRoute("device_arm/curtain", "device_arm", "curtain", 1, {"swim_splash"});
+        addRoute("device_arm/boomerang is silent", "device_arm", "boomerang", 0, {});
+        for (const char* source : {"mine", "sticky", "waddle", "boomerang"})
+            addRoute(std::string("device_warning/") + source, "device_warning", source, 1, {"bomb_beep"}, 0.6);
+        addRoute("special_warning/booyah", "special_warning", "booyah", 1, {"bomb_beep"});
+        addRoute("special_audio/bomb_throw", "special_audio", "bomb_throw", 1, {"bomb_throw"}, 1.0);
+        addRoute("special_audio/bomb_throw burst pitch", "special_audio", "bomb_throw", 1, {"bomb_throw"}, 1.2);
+        for (const char* source : {"sonar_ping", "sonar_mark", "strike_whistle", "zip_latch", "zip_pull",
+                 "shield_hit", "shield_pop", "crab_hit", "crab_break", "booyah_cheer", "jet_end"})
+            addRoute(std::string("special_audio/") + source, "special_audio", source, 1, {source});
+        addRoute("special_audio/jet_boost is not a producer tag", "special_audio", "jet_boost", 0, {});
+        addRoute("device_hit/tracer", "device_hit", "tracer", 1, {"tracer_hit"});
+        addRoute("device_destroy/torpedo", "device_destroy", "torpedo", 2, {"splat_small", "torpedo_pop"});
+        addRoute("device_destroy/waddle flight", "device_destroy", "waddle", 1, {"splat_small"}, 0.0);
+        addRoute("device_destroy/waddle armed", "device_destroy", "waddle", 1, {"splat_small"}, 1.0);
+        addRoute("device_destroy/beacon", "device_destroy", "beacon", 1, {"splat_small"});
+        addRoute("device_destroy/sprinkler", "device_destroy", "sprinkler", 1, {"splat_small"});
+        addRoute("bubble_pop/blower", "bubble_pop", "blower", 1, {"bubble_pop"});
+        for (const char* source : {"bomb", "mine", "sticky", "seeker", "mist", "waddle"})
+            addRoute(std::string("explosion/") + source, "explosion", source, 1, {"bomb_explode"}, 0.0, 3.0);
+        addRoute("explosion/burst", "explosion", "burst", 1, {"blaster_boom"}, 0.0, 3.0);
+        addRoute("explosion/boomerang small", "explosion", "boomerang", 1, {"boomerang_burst"}, 0.0, 3.0);
+        addRoute("explosion/boomerang large", "explosion", "boomerang", 1, {"bomb_explode"}, 1.0, 3.0);
+        addRoute("explosion/booyah", "explosion", "booyah", 1, {"booyah_blast"}, 0.0, 3.0);
+        addRoute("explosion/strike", "explosion", "strike", 1, {"strike_impact"}, 0.0, 3.0);
+        addRoute("explosion/stamp", "explosion", "stamp", 1, {"stamp_slam"}, 0.0, 3.0);
+        addRoute("explosion/kraken", "explosion", "kraken", 1, {"kraken_slam"}, 0.0, 3.0);
+        addRoute("explosion/blower", "explosion", "blower", 1, {"bubble_blast"}, 0.0, 3.0);
+        addRoute("explosion/zipcaster", "explosion", "zipcaster", 1, {"blaster_boom"}, 0.0, 3.0);
+        addRoute("explosion/shaker", "explosion", "shaker", 1, {"bomb_explode"}, 2.0, 3.0);
+        addRoute("explosion/torpedo soft", "explosion", "torpedo", 2, {"bomb_explode", "torpedo_pop"}, 0.0, 3.0);
+        addRoute("explosion/torpedo full", "explosion", "torpedo", 2, {"bomb_explode", "torpedo_pop"}, 1.0, 3.0);
+        addRoute("explosion/crab is silent", "explosion", "crab", 0, {}, 0.0, 3.0);
+        addRoute("explosion/jetpack is silent", "explosion", "jetpack", 0, {}, 0.0, 3.0);
+        addRoute("bulletImpact", "bulletImpact", "", 1, {"ink_hit_wall"});
+        addRoute("slamWave", "slamWave", "", 1, {"special_slam"});
+        addRoute("stormStart", "stormStart", "", 1, {"storm_thunder"});
+        addRoute("world burst", "burst", "", 1, {"splat_big"});
+        addRoute("beam is silent without weapon identity", "beam", "", 0, {});
+
+        const std::array<std::pair<std::string_view, std::string_view>, 5> barrageVariants{{
+            {"barrage", "bomb"}, {"barrage_sticky", "sticky"}, {"barrage_burst", "burst"},
+            {"barrage_seeker", "seeker"}, {"barrage_mist", "mist"}}};
+        for (const auto& [specialId, subId] : barrageVariants) {
+            const auto& special = GetEquipment(EquipmentCategory::Special, specialId);
+            require(special.text("bomb") == subId, "Each Bomb Rush special must select its configured sub device");
+            addRoute(std::string(specialId) + " throw", "special_audio", "bomb_throw", 1, {"bomb_throw"},
+                subId == "burst" ? 1.2 : 1.0);
+        }
+
+        for (const auto& route : routes) {
+            directorEngine.Clear();
+            double gap = 0.0;
+            for (const auto cue : route.cues) {
+                const auto metadata = directorEngine.Metadata(cue);
+                require(metadata.has_value(), "Every tested route cue must resolve from the source catalog");
+                gap = std::max(gap, metadata->sourceMinGapSeconds);
+            }
+            if (gap > 0.0) std::this_thread::sleep_for(std::chrono::duration<double>(gap + 0.03));
+            const auto before = directorEngine.ActiveVoices();
+            routeDirector.Update(1.0 / 60.0, routeMatch, {route.event}, listener, forward);
+            const auto after = directorEngine.ActiveVoices();
+            if (after != before + route.expectedVoices)
+                throw std::runtime_error("Isolated audio route " + route.label + " expected " +
+                    std::to_string(route.expectedVoices) + " voices, observed " +
+                    std::to_string(after >= before ? after - before : 0));
+        }
+        routeDirector.EndMatch();
 
         AudioLoopOptions zoneLoop;zoneLoop.volume=.1;zoneLoop.zoneHum=AudioLoopOptions::ZoneHumParameters{0,0};
         require(audio.StartLoop("zone-test","zone_hum",zoneLoop),"The procedural zone hum source must start on miniaudio");

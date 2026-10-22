@@ -15,10 +15,57 @@ SFX cues and loop beds are source-rendered at 48 kHz, stereo PCM16, seed 1234, w
 | Stage ambience | A `harbor_ambience` wash with occasional positioned gulls; `halyard` also gets gust-timed rigging clinks and distant ferry horns. Its independent audio random stream does not consume match or gameplay randomness. |
 | Actor state edges for death/respawn, squid form, low ink/refill, special ready/activation/end | Source stings and actor-positioned sounds. Moving squid, charging splatling, and active jetpack/crab/storm/Booyah states manage source loop beds. |
 | Main weapons and devices | Bow, blade, mitts, charger, splatling, and canopy actions use their source-specific shot/charge cues where native pose state exposes them. Torpedo, tracer, Waddle, boomerang and shaker devices update positioned loops and transition cues from their native device state; device loops stop on pause, device removal, and match teardown. |
-| Sub throws and canopy state | Torpedo plays the source bomb-and-torpedo throw pair; tracer and boomerang use their own throw cues, while other throwables use `bomb_throw`. Brolly shots, open/close, damage, break, launch and regrow map to canopy cues. |
+| Sub throws and canopy state | The 15 sub IDs and their routed cues and known gaps are listed below. Brolly shots, open/close, damage, break, launch and regrow map to canopy cues. |
 | Match intro/play/final minute/finish/results phases | Ready/go/timer/result stings plus `menu`, `battle`, `battle_final`, `results_win` or `results_lose` music. |
-| World `explosion`, `bulletImpact`, `slamWave`, `stormStart`, and `burst` events | Spatial source explosion, wall impact, special slam, storm and splat cues. `beam` currently has no sound because its visual event has no firing actor ID, so it cannot distinguish charger shots from a Wail. |
+| World device and special events | `device_arm`, `device_warning`, `device_hit`, `device_destroy`, `special_warning`, `bubble_pop`, `special_audio`, and source-tagged `explosion` events route to positioned source cues. Cue mapping is listed below. |
+| World `bulletImpact`, `slamWave`, `stormStart`, and `burst` events | Spatial wall impact, special slam, storm and splat cues. `beam` remains silent because its visual event has no firing actor ID, so it cannot distinguish charger shots from Wail audio. |
 | Boss phase, move telegraph/active/recovery, damage, stun, crablet spawn/death and defeat | Boss telegraphs, spatial impacts and loops, hit/crablet/death cues, a ducked defeat sting, and phase-specific `boss`, `boss_2`, or `boss_3` music. |
+
+## Equipment audio event coverage
+
+The native event router consumes the same cue names as the source bank. This table records event-level coverage, not a claim that native play frequency, browser processing, or subjective mix is identical.
+
+| Sub ID | Source cue flow | Native route and remaining difference |
+| --- | --- | --- |
+| `bomb` | `bomb_throw`, `bomb_explode` | Generic throw and spatial explosion routes. |
+| `sticky` | `bomb_throw`, arm `bomb_beep`, fuse `bomb_beep` every 0.45→0.1 s, `bomb_explode` | `device_arm`, charge-scaled `device_warning`, and source-tagged explosion route the cues. |
+| `burst` | `bomb_throw` at pitch 1.2, `blaster_boom` | Throw and source-tagged explosion use source volume/pitch. |
+| `shaker` | Level-pitched `bomb_throw`, arm `bomb_beep`, `shaker_hop`, multi-hit `bomb_explode` | Throw, arm, hop, and source-tagged explosion are routed. Hand-charge `shaker_clink`/fizz/fizzle cues remain absent because native simulation has no matching hand-charge state. |
+| `seeker` | `bomb_throw`, `bomb_explode` | Generic throw and explosion routes. |
+| `waddle` | `bomb_throw`, land/lock/hop cues, fuse-progress `bomb_beep`, walk loop, `bomb_explode`, flight/armed `splat_small` | Existing state transitions and loops plus `device_arm`, `device_warning`, `device_destroy`, and explosion routes. Warning interval uses the source 0.45→0.1 s curve; destroy charge selects flight-plop versus armed-pop parameters. |
+| `torpedo` | Bomb/torpedo throw pair, `torpedo_whirr`, transform/lock/launch, full or soft `bomb_explode` + `torpedo_pop`, shotdown `splat_small` + `torpedo_pop` | Device states and source-tagged blast/destroy events route both detonation sizes and shotdown cues. |
+| `tracer` | `tracer_zap`, `tracer_hum`, `tracer_bounce`, direct/trail `tracer_hit` | Throw, loop, bounce and first direct-hit cues route. Trail-only hits are not represented by a native actor-contact event. |
+| `boomerang` | `boomerang_throw`, orbit/whirr loops, return, armed-contact and fuse `bomb_beep`, small `boomerang_burst` or large `bomb_explode` | Throw, loops, return, contact/fuse warnings and source-tagged blast route. Warning volume/pitch follows normalized fuse progress. The source's 40 m camera gate is represented by native spatial attenuation rather than the same camera-distance test. |
+| `scan` | `bomb_throw`, cloud-start `special_activate` | Throw and cloud-start `device_arm` route. |
+| `curtain` | `bomb_throw`, landing `swim_splash` | Throw and landing `device_arm` route. |
+| `sprinkler` | `bomb_throw`, stick `bomb_beep` | Throw and stick `device_arm` route. |
+| `mine` | `bomb_throw`, arm/trigger `bomb_beep`, `bomb_explode` | Arm, trigger warning, and spatial explosion route. Source has no generic destroy sound on the modeled mine detonation/replacement path. |
+| `beacon` | `bomb_throw`, arm `bomb_beep`, generic destroy `splat_small` | Arm and source-supported destroy edges route through `device_arm`/`device_destroy`. |
+| `mist` | `bomb_throw`, cloud-start `enemy_ink_sizzle` | Throw and cloud-start `device_arm` route. |
+
+| Special ID | Source cue flow | Native route and remaining difference |
+| --- | --- | --- |
+| `slam` | Player Splashdown `special_slam` at impact | `slamWave` routes the spatial cue at the native player impact. |
+| `storm` | Throw, storm-start thunder, rain loop | Actor throw, `stormStart`, and the active-special loop route. |
+| `barrage` | Bomb Rush throws `bomb_throw`, then Splat Bomb `bomb_explode` | Each newly spawned special bomb routes `bomb_throw`; its device routes the normal Splat Bomb explosion. |
+| `barrage_sticky` | Bomb Rush throws `bomb_throw`, then Cling Charge arm/fuse warnings and `bomb_explode` | Each spawned special device routes `bomb_throw`; the sticky device routes its arm, fuse and explosion cues. |
+| `barrage_burst` | Bomb Rush throws `bomb_throw` at pitch 1.2, then Pop Pellet `blaster_boom` | Each spawned special device routes `bomb_throw` at pitch 1.2; its impact routes `blaster_boom`. |
+| `barrage_seeker` | Bomb Rush throws `bomb_throw`, then Skitter Bomb `bomb_explode` | Each spawned special device routes `bomb_throw`; its seeker device routes its normal explosion. |
+| `barrage_mist` | Bomb Rush throws `bomb_throw`, then Murk Bomb cloud-start `enemy_ink_sizzle` | Each spawned special device routes `bomb_throw`; the mist device routes its cloud-start cue. |
+| `bubbler` | `shield_up`, throttled `shield_hit`, `shield_pop` | Activation, hit, and expiry cues route. Native hit throttling and pitch are approximate. |
+| `sonar` | `sonar_ping`, local `sonar_mark` | Successful activation and local mark cues route; source's player-local audibility rule is retained. |
+| `strike` | `strike_launch`, descent `strike_whistle`, `strike_impact` | Launch, descent-edge, and source-tagged impact cues route; whistle uses the native flight phase edge rather than source camera-range gating. |
+| `zooka` | `zooka_fire` on a fired shot | Active-special shot trigger routes the cue. |
+| `wail` | `wail_charge`, `wail_blast` loop | Charge cue is routed at activation. Native beam visuals remain silent and the source loop phase/stop boundary is not yet delivered as an audio event. |
+| `kraken` | `kraken_on`, jump/boost, `kraken_slam` | Activation, jump trigger, and source-tagged impact route. |
+| `blower` | `bubble_release`, `bubble_pop`, `bubble_blast` | Actor throw, harmless bubble expiry, and source-tagged blast route. |
+| `jetpack` | `jet_loop`, shot `jet_fire`, jump-boost `zip_pull`, `jet_end` | Managed loop, shot trigger, boost event (`special_audio` source `zip_pull`), and timed end route. |
+| `stamp` | `stamp_throw`, `stamp_swing`, `stamp_slam`, shield `shield_hit` | Throw, action triggers, source-tagged impacts, and shield deflections route. |
+| `booyah` | Charge loop, throw, orb `bomb_beep`, `booyah_blast`, `booyah_cheer` | Loop, throw, landed-orb warning, blast, and cheer route. Cheer pitch is steady instead of source-random. |
+| `zipcaster` | `zip_fire`, `zip_latch`, `zip_pull`, impact `blaster_boom` | Launch/action triggers and spatial latch/pull/impact events route. |
+| `crab` | Move/roll loop, gatling/cannon shots, throttled `crab_hit`, `crab_break` | Managed movement loop and shot triggers plus throttled hit and end events route. |
+
+The audio-only event kinds are retained for `GameAudio` and skipped by world-particle recipes. Warning and destruction events carry source ID, position and team; charge is used only where the source sound varies with fuse progress or Waddle's flight/armed phase. Event coverage does not imply exact WebAudio playback equality.
 
 Boss move sounds use the source-authored named socket positions from the same fixed-step animated rig used by combat. These 20 audio/effect sockets are stored separately from the original 10 combat hit shapes; a missing name falls back to the boss body position. Barrel cues retain their exact simulation-provided positions. Except for the continuous Zones hum, source-specific loop `params` are not exposed by native simulation events; managed loops use their source-rendered default timbre with runtime volume, pitch and position updates. ZoneHum is spatialized at its zone center, but its source reverb send (0.12) is not reproduced because the native mixer has no reverb-send path.
 

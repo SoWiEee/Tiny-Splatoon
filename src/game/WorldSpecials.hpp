@@ -62,11 +62,12 @@ private:
         double elapsed = 0.0, duration = 0.0, cooldown = 0.0, autoPlacementTime = -1.0, moveSpeed = -1.0;
         double accel = -1.0, faceYaw = 0.0, hullYaw = 0.0, charge = 0.0, fullTime = 0.0;
         double hitPoints = 0.0, trail = 0.0, boostCooldown = 0.0, boostTime = 0.0, zipElapsed = 0.0, firing = 0.0;
+        double lastHitAudio = -1.0;
         glm::dvec3 moveIn{0.0}, moveOut{0.0};
         bool hasMoveOut = false, flipBack = false, flipFront = false;
         double guard = 0.0, pending = -1.0, flipElapsed = -1.0, hang = 0.0, stuck = 0.0;
         int bubbleCount = 0;
-        bool body = false, casting = false, thrown = false, bubblerShield = false, armor = false;
+        bool body = false, casting = false, thrown = false, bubblerShield = false, armor = false, endingCued = false;
         bool noSquid = false, aimFace = false, inkProof = false, faceMove = false, hasFaceYaw = false;
         bool mapTarget = false, jumpBack = false, attack = false, air = false, roll = false;
         bool subWas = false, fireWas = false, jumpWas = false, needRelease = false, raise = false;
@@ -79,7 +80,7 @@ private:
         double age = 0.0, timer = 0.0, accumulator = 0.0, radius = 0.0, range = 0.0, damagePerSecond = 0.0;
         double charge = 0.0, maxDamage = 0.0, minDamage = 0.0, killRadius = 0.0, paintRadius = 0.0;
         double directDamage = 0.0;
-        bool live = true, held = false;
+        bool live = true, held = false, audioWhistled = false;
         std::vector<PlayerSimulation*> tagged;
     };
 
@@ -108,6 +109,7 @@ private:
     std::unordered_map<PlayerSimulation*, ActorSpecial> actors_;
     std::unordered_map<PlayerSimulation*, PlayerSimulation*> shieldSources_;
     std::unordered_map<PlayerSimulation*, double> cheerTimes_;
+    std::unordered_map<PlayerSimulation*, double> shieldHitTimes_;
     std::vector<WorldObject> objects_;
 };
 } // namespace restoration

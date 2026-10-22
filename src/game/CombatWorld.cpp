@@ -153,6 +153,9 @@ void CombatWorld::deploy(PlayerSimulation& owner,const std::string& id,bool spec
         d.pos=hit.point;d.normal=hit.normal;d.grounded=true;d.state=id;d.timer=-1;d.C=hit.point;d.N=hit.normal;
         if(id=="curtain") { const auto facing=owner.aimDir(); d.N=glm::normalize(glm::dvec3(facing.x,0,facing.z)); }
         if(id=="mine") { d.timer=def.number("armTime");d.fuse=-1;paint(owner,d.pos+glm::dvec3(0,0.2,0),1.1,owner.random(),{},d.special); }
+        if(id=="mine"||id=="beacon") {
+            emitVisual({"device_arm",d.pos,d.normal,d.radius,d.team,0,.08,0,d.kind});
+        }
     } else {
         auto dir=owner.aimDir();
         if(owner.input.hasAimPoint) { const auto to=owner.input.aimPoint-d.pos; if(glm::length(to)>1.0 && glm::dot(to,dir)>=0) dir=glm::normalize(to); }
@@ -216,6 +219,11 @@ void CombatWorld::blockActor(PlayerSimulation& actor) {
 }
 bool CombatWorld::blockShot(glm::dvec3 from,glm::dvec3 to,int team,double damage,PlayerSimulation* owner) {
     if(blockCanopyShot(from,to,team,damage))return true;
+    const auto destroyed=[&](CombatDevice& d,double charge=0.0) {
+        d.live=false;
+        WorldVisualEvent event;event.kind="device_destroy";event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
+        event.team=d.team;event.charge=charge;event.source=d.kind;emitVisual(std::move(event));
+    };
     for(auto& d:devices_) {
         if(!d.live || d.exploding || d.team==team) continue;
         if(d.kind=="curtain" && d.state=="curtain") {
@@ -224,20 +232,20 @@ bool CombatWorld::blockShot(glm::dvec3 from,glm::dvec3 to,int team,double damage
             const auto at=from+(to-from)*(a/(a-b))-d.pos;
             if(std::abs(glm::dot(at,glm::dvec3(-d.N.z,0,d.N.x)))>d.halfW || at.y<0 || at.y>d.R) continue;
             d.hp-=damage*GetEquipment(EquipmentCategory::Sub,"curtain").number("shotMul");
-            if(d.hp<=0) d.live=false;
+            if(d.hp<=0) destroyed(d);
             return true;
         }
         if(d.kind=="torpedo") {
             const auto segment=to-from;const double len2=glm::dot(segment,segment);
             const double t=len2>1e-9?std::clamp(glm::dot(d.pos-from,segment)/len2,0.0,1.0):0.0;
             if(glm::length(d.pos-(from+segment*t))>0.3) continue;
-            d.hp-=damage;if(d.hp<=0)d.live=false;return true;
+            d.hp-=damage;if(d.hp<=0)destroyed(d);return true;
         }
         if(d.kind=="waddle") {
             if(d.state=="fly") continue;
             const auto hit=StageGeometry::segmentCapsuleDist(from,to,d.pos,0.17,0.4);
             if(hit.dist>=0.2) continue;
-            d.hp-=damage;if(d.hp<=0)d.live=false;
+            d.hp-=damage;if(d.hp<=0)destroyed(d,d.state=="fly"?0.0:1.0);
             return true;
         }
         if(!d.shootable) continue;
@@ -245,7 +253,7 @@ bool CombatWorld::blockShot(glm::dvec3 from,glm::dvec3 to,int team,double damage
         const auto hit=StageGeometry::segmentCapsuleDist(from,to,center,0.35,std::max(0.5,d.radius));
         if(hit.dist>=0.38) continue;
         d.hp-=damage;
-        if(d.hp<=0) d.live=false;
+        if(d.hp<=0) destroyed(d);
         return true;
     }
     return owner && specials_.shotHit(from,to,team,damage,owner);
@@ -291,6 +299,11 @@ bool CombatWorld::blockCanopyShot(glm::dvec3 from,glm::dvec3 to,int team,double 
 }
 double CombatWorld::blockRay(glm::dvec3 from,glm::dvec3 dir,double length,int team,double damage,PlayerSimulation* owner) {
     const auto to=from+dir*length;
+    const auto destroyed=[&](CombatDevice& d) {
+        d.live=false;
+        WorldVisualEvent event;event.kind="device_destroy";event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
+        event.team=d.team;event.source=d.kind;emitVisual(std::move(event));
+    };
     double shieldDistance=length;
     blockCanopyShot(from,to,team,damage,nullptr,&shieldDistance);
     double best=shieldDistance; CombatDevice* hit=nullptr;
@@ -322,22 +335,27 @@ double CombatWorld::blockRay(glm::dvec3 from,glm::dvec3 dir,double length,int te
     if(hit) {
         const double applied=hit->kind=="curtain"?damage*GetEquipment(EquipmentCategory::Sub,"curtain").number("shotMul"):damage;
         hit->hp-=applied;
-        if(hit->hp<=0) hit->live=false;
+        if(hit->hp<=0) destroyed(*hit);
     }
     return owner ? std::min(best,specials_.rayHit(from,dir,best,team,damage,owner)) : best;
 }
 void CombatWorld::damageDevices(glm::dvec3 at,double radius,double damage,int team) {
+    const auto destroyed=[&](CombatDevice& d,double charge=0.0) {
+        d.live=false;
+        WorldVisualEvent event;event.kind="device_destroy";event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
+        event.team=d.team;event.charge=charge;event.source=d.kind;emitVisual(std::move(event));
+    };
     for(auto& d:devices_) {
         if(!d.live || d.exploding || d.team==team) continue;
         if(d.kind=="torpedo") {
             if(glm::length(d.pos-at)>radius+0.3) continue;
             if(d.locked && damage>=50) { explodeDevice(d); continue; }
-            d.hp-=damage;if(d.hp<=0)d.live=false;
+            d.hp-=damage;if(d.hp<=0)destroyed(d);
         } else if(d.kind=="waddle") {
             if(d.state=="fly" || glm::length(d.pos-at)>=radius+0.3) continue;
-            d.hp-=damage;if(d.hp<=0)d.live=false;
+            d.hp-=damage;if(d.hp<=0)destroyed(d,d.state=="fly"?0.0:1.0);
         } else if((d.kind=="curtain" || d.kind=="sprinkler" || d.kind=="beacon") && d.shootable && glm::length(d.pos-at)<radius+0.4) {
-            d.hp-=damage;if(d.hp<=0)d.live=false;
+            d.hp-=damage;if(d.hp<=0)destroyed(d);
         }
     }
 }
@@ -432,7 +450,11 @@ void CombatWorld::explodeDevice(CombatDevice& d,PlayerSimulation* direct) {
     d.exploding=true;
     const auto& sub=GetEquipment(EquipmentCategory::Sub,d.kind);
     if(d.kind=="scan" || d.kind=="mist" || d.kind=="curtain" || d.kind=="sprinkler" || d.kind=="beacon") { d.live=false;return; }
-    emitVisual({"explosion",d.pos,{0,1,0},sub.number("radius",2.4),d.team,0,.08,0,d.kind});
+    const bool bigBoomerang=d.kind=="boomerang"&&d.state=="armed";
+    const double blastRadius=bigBoomerang?sub.number("hitRadius"):sub.number("radius",2.4);
+    double blastCharge=d.kind=="torpedo"&&d.locked?1.0:bigBoomerang?1.0:0.0;
+    if(d.kind=="shaker")blastCharge=static_cast<double>(++d.blastCount);
+    emitVisual({"explosion",d.pos,{0,1,0},blastRadius,d.team,blastCharge,.08,0,d.kind});
     if(d.kind=="waddle") {
         const auto center=d.pos+glm::dvec3(0,0.25,0);
         guardActorsWithCanopies(center,sub.number("radius"),d.team);
@@ -487,8 +509,10 @@ void CombatWorld::explodeDevice(CombatDevice& d,PlayerSimulation* direct) {
         specials_.areaHit(center,sub.number("radius"),sub.number("damage"),d.team,d.owner);
         d.live=false;d.exploding=false;return;
     }
-    const double radius=sub.number("radius",2.4),paintRadius=sub.number("paintRadius",radius*0.75);
-    const double maxDamage=sub.number("damageMax",sub.number("damage",180)),minDamage=sub.number("damageMin",maxDamage);
+    const double radius=bigBoomerang?sub.number("hitRadius"):sub.number("radius",2.4);
+    const double paintRadius=bigBoomerang?sub.number("hitPaintRadius"):sub.number("paintRadius",radius*0.75);
+    const double maxDamage=bigBoomerang?sub.number("hitDamageMax"):sub.number("damageMax",sub.number("damage",180));
+    const double minDamage=bigBoomerang?sub.number("hitDamageMin"):sub.number("damageMin",maxDamage);
     const auto normal=d.kind=="sticky"?d.normal:glm::dvec3(0,1,0);
     const auto center=d.pos+normal*0.2;
     guardActorsWithCanopies(center,radius,d.team);
@@ -897,8 +921,14 @@ void CombatWorld::updateDevices(double dt) {
         if(duration>e.state.track || e.state.trackTeam!=team) {e.state.track=duration;e.state.trackTeam=team;}
     };
     auto poison=[](PlayerSimulation& e,double duration) {e.state.poison=std::max(e.state.poison,duration);};
+    auto deviceCue=[&](const char* kind,const CombatDevice& d,double charge=0.0) {
+        WorldVisualEvent event;event.kind=kind;event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
+        event.team=d.team;event.charge=charge;event.source=d.kind;emitVisual(std::move(event));
+    };
     auto stick=[&](CombatDevice& d,const RayHit& hit,const std::string& state,double timer) {
             d.pos=hit.point+hit.normal*0.005;d.normal=hit.normal;d.state=state;d.grounded=true;d.age=0;d.timer=timer;d.hp=GetEquipment(EquipmentCategory::Sub,d.kind).number("hp",1);
+        deviceCue("device_arm",d);
+        if(d.kind=="sticky")d.pulse=0;
         if(d.kind=="curtain") {
             if(glm::length(d.N)<1e-5) { auto n=glm::dvec3(d.vel.x,0,d.vel.z);if(glm::length(n)>1e-5)d.N=glm::normalize(n); }
             d.halfW=GetEquipment(EquipmentCategory::Sub,d.kind).number("width")*0.5;d.R=GetEquipment(EquipmentCategory::Sub,d.kind).number("height");d.blocksActors=true;
@@ -908,6 +938,23 @@ void CombatWorld::updateDevices(double dt) {
             for(auto& old:devices_)if(&old!=&d && old.live && old.owner==d.owner && old.kind=="sprinkler" && old.state=="spray")old.live=false;
             d.pulse=0;d.spin=0;
         }
+    };
+    auto armBoomerang=[&](CombatDevice& d,const EquipmentData& sub,PlayerSimulation& victim) {
+        applyHit(*d.owner,victim,sub.number("tickDamage"),d.kind);
+        d.target=&victim;d.state="armed";d.age=0;d.timer=sub.number("hitFuse");d.pulse=0;
+        d.walkTime=1.0/sub.number("tickRate");d.vel={0,0,0};
+        deviceCue("device_arm",d);
+        deviceCue("device_warning",d,0.0);
+    };
+    auto boomerangContact=[&](CombatDevice& d,const EquipmentData& sub,glm::dvec3 from,glm::dvec3 to) {
+        for(auto* e:actors_) {
+            if(!e||e->team()==d.team||!e->state.alive||e->state.invuln>0)continue;
+            const auto hit=StageGeometry::segmentCapsuleDist(from,to,e->visualPos(),e->hitRadius(),e->hitHeight());
+            if(hit.dist<e->hitRadius()+sub.number("contact")) {
+                d.pos=from+(to-from)*hit.t;armBoomerang(d,sub,*e);return true;
+            }
+        }
+        return false;
     };
     auto updateShaker=[&](CombatDevice& d,const EquipmentData& s) {
         constexpr double contactRadius=0.19;
@@ -941,7 +988,7 @@ void CombatWorld::updateDevices(double dt) {
             if(ground.hit && ground.normal.y>0.6) {d.pos.y+=contactRadius-ground.dist;floor=true;const double vn=glm::dot(d.vel,ground.normal);if(vn<0){d.vel-=ground.normal*vn;const double friction=std::exp(-6*dt);d.vel.x*=friction;d.vel.z*=friction;}}
         }
         d.grounded=floor;
-        if(floor && !d.held) {d.held=true;d.fuse=s.number("fuse");}
+        if(floor && !d.held) {d.held=true;d.fuse=s.number("fuse");deviceCue("device_arm",d);}
         const double horizontal=std::hypot(d.vel.x,d.vel.z);
         if(!floor && horizontal>1.5) {
             d.trail+=horizontal*dt;
@@ -954,7 +1001,7 @@ void CombatWorld::updateDevices(double dt) {
         }
         if(d.held && d.fuse>=0) {d.fuse-=dt;if(d.fuse<=0) {d.fuse=-1;explodeDevice(d);return;}}
         else if(d.held && d.timer>0) {d.timer-=dt;if(d.timer<=0) {d.timer=-1;explodeDevice(d);return;}}
-        if(d.age>6 && !d.held) {d.held=true;d.fuse=s.number("fuse");}
+        if(d.age>6 && !d.held) {d.held=true;d.fuse=s.number("fuse");deviceCue("device_arm",d);}
         if(d.pos.y<-3.4)d.live=false;
     };
     for(int phase=0;phase<2;++phase) for(auto& d:devices_) {
@@ -963,10 +1010,29 @@ void CombatWorld::updateDevices(double dt) {
         if(d.kind=="brolly")continue;
         const auto& s=GetEquipment(EquipmentCategory::Sub,d.kind);
         d.age+=dt;
+        if(d.kind=="boomerang"&&d.state=="armed") {
+            const double progress=std::clamp(d.age/std::max(d.timer,1e-9),0.0,1.0);
+            d.pulse-=dt;
+            if(d.pulse<=0.0) {d.pulse=0.2-0.12*progress;deviceCue("device_warning",d,progress);}
+            d.walkTime-=dt;
+            if(d.walkTime<=0.0) {
+                d.walkTime+=1.0/s.number("tickRate");
+                for(auto* e:actors_) {
+                    if(!e||e->team()==d.team||!e->state.alive)continue;
+                    const auto hit=StageGeometry::segmentCapsuleDist(d.pos,d.pos,e->visualPos(),e->hitRadius(),e->hitHeight());
+                    const auto chest=e->state.pos+glm::dvec3(0,e->state.squid?0.3:0.75,0);
+                    if(hit.dist>s.number("hoverRadius")||!geometry_.los(d.pos,chest))continue;
+                    applyHit(*d.owner,*e,s.number("tickDamage"),d.kind);
+                }
+            }
+            if(d.age>=d.timer)explodeDevice(d);
+            continue;
+        }
         if(d.kind=="shaker" && d.state=="fly") {updateShaker(d,s);continue;}
         if(d.state=="fly") {
             if(d.kind=="scan" || d.kind=="mist") {
                 if(d.age>=d.fuse) {d.state=d.kind=="scan"?"cloud":"mist";d.age=0;d.timer=s.number(d.kind=="scan"?"cloudTime":"mistTime");
+                    deviceCue("device_arm",d);
                     if(d.kind=="mist" && d.target && d.target->state.alive) poison(*d.target,s.number("mistTime"));}
             }
             if(!d.live || d.state!="fly") continue;
@@ -984,11 +1050,12 @@ void CombatWorld::updateDevices(double dt) {
             }
             if(direct) {
                 if(d.kind=="burst") explodeDevice(d,direct);
-                else if(d.kind=="mist") {d.target=direct;d.state="mist";d.age=0;d.timer=s.number("mistTime");poison(*direct,s.number("mistTime"));}
+                else if(d.kind=="mist") {d.target=direct;d.state="mist";d.age=0;d.timer=s.number("mistTime");poison(*direct,s.number("mistTime"));deviceCue("device_arm",d);}
                 else if(d.kind=="torpedo") explodeDevice(d,direct);
                 continue;
             }
             if(d.kind=="torpedo" && blockShot(prev,d.pos,d.team,0)) {explodeDevice(d);continue;}
+            if(d.kind=="boomerang"&&boomerangContact(d,s,prev,d.pos))continue;
             const auto path=d.pos-prev;const double distance=glm::length(path);
             const auto hit=distance>1e-6?geometry_.raycast(prev,path/distance,distance,true):RayHit{};
             if(d.kind=="tracer") {
@@ -1002,6 +1069,7 @@ void CombatWorld::updateDevices(double dt) {
                 if(directHit) {
                     applyHit(*d.owner,*directHit,s.number("directDamage"),d.kind);
                     track(*directHit,d.team,s.number("directMark"));
+                    deviceCue("device_hit",d);
                     d.tagged.push_back(directHit);d.live=false;continue;
                 }
                 if(blockShot(prev,segmentEnd,d.team,s.number("directDamage"))) {d.pos=segmentEnd;d.live=false;continue;}
@@ -1041,12 +1109,12 @@ void CombatWorld::updateDevices(double dt) {
                 if(d.kind=="sticky") {stick(d,hit,"stuck",s.number("fuse"));continue;}
                 if(d.kind=="sprinkler") {stick(d,hit,"spray",-1);continue;}
                 if(d.kind=="burst") {explodeDevice(d);continue;}
-                if(d.kind=="scan") {d.pos+=hit.normal*0.3;d.state="cloud";d.age=0;d.timer=s.number("cloudTime");continue;}
-                if(d.kind=="mist") {d.pos+=hit.normal*0.3;d.state="mist";d.age=0;d.timer=s.number("mistTime");continue;}
+                if(d.kind=="scan") {d.pos+=hit.normal*0.3;d.state="cloud";d.age=0;d.timer=s.number("cloudTime");deviceCue("device_arm",d);continue;}
+                if(d.kind=="mist") {d.pos+=hit.normal*0.3;d.state="mist";d.age=0;d.timer=s.number("mistTime");deviceCue("device_arm",d);continue;}
                 if((d.kind=="seeker" || d.kind=="waddle") && hit.normal.y>0.6) {
                     d.pos=hit.point;d.grounded=true;d.age=0;d.heading=std::atan2(d.vel.x,d.vel.z);d.target=nullptr;d.stuck=0;
                     if(d.kind=="waddle") {
-                        d.state="sense";d.timer=s.number("fuse");d.locked=false;
+                        d.state="sense";d.timer=s.number("fuse");d.locked=false;d.pulse=0;d.pulsePeriod=0.45;
                         d.walkTime=d.travel=d.lostTime=d.progressTime=d.repath=0;d.path.clear();d.pathIndex=0;d.hopping=d.falling=false;
                         d.progressX=d.pos.x;d.progressZ=d.pos.z;
                     } else {
@@ -1054,7 +1122,7 @@ void CombatWorld::updateDevices(double dt) {
                     }
                     continue;
                 }
-        if(d.kind=="curtain" && hit.normal.y>0.6) {stick(d,hit,"curtain",-1);continue;}
+                if(d.kind=="curtain" && hit.normal.y>0.6) {stick(d,hit,"curtain",-1);continue;}
                 if(d.kind=="torpedo") {d.pos=hit.point+hit.normal*0.14;d.N=hit.normal;explodeDevice(d);continue;}
                 if(d.kind=="shaker" && hit.normal.y>0.6) {d.grounded=true;d.pos=hit.point+hit.normal*0.19;d.held=true;if(d.fuse<0)d.fuse=s.number("fuse");}
                 const double vn=glm::dot(d.vel,hit.normal);d.vel=(d.vel-hit.normal*(1.4*vn))*(hit.normal.y>0.6?0.45:0.6);d.pos+=hit.normal*0.12;
@@ -1072,6 +1140,14 @@ void CombatWorld::updateDevices(double dt) {
             }
             if(d.pos.y<-3.4 || (d.timer>0 && d.age>d.timer && d.kind!="boomerang" && d.kind!="bomb" && d.kind!="shaker"))d.live=false;
         } else if(d.state=="stuck") {
+            if(d.kind=="sticky") {
+                d.pulse-=dt;
+                if(d.pulse<=0) {
+                    const double progress=std::clamp(d.age/std::max(d.timer,1e-9),0.0,1.0);
+                    deviceCue("device_warning",d,progress);
+                    d.pulse=0.45+(0.1-0.45)*progress;
+                }
+            }
             if(d.kind=="shaker") {if(d.age>=d.timer)explodeDevice(d);}
             else if(d.age>=d.timer)explodeDevice(d);
         } else if(d.state=="cloud") {
@@ -1101,7 +1177,9 @@ void CombatWorld::updateDevices(double dt) {
         } else if(d.state=="mine") {
             if(d.fuse>=0) {d.fuse-=dt;if(d.fuse<=0)explodeDevice(d);continue;}
             if(d.age<s.number("armTime"))continue;
-            for(auto* e:actors_) if(e && e->team()!=d.team && e->state.alive && glm::length(e->state.pos-d.pos)<s.number("triggerRadius")) {d.fuse=s.number("delay");d.age=0;break;}
+            for(auto* e:actors_) if(e && e->team()!=d.team && e->state.alive && glm::length(e->state.pos-d.pos)<s.number("triggerRadius")) {
+                d.fuse=s.number("delay");deviceCue("device_warning",d);break;
+            }
         } else if(d.state=="beacon") {
             // Beacon lifetime is controlled by hit points and its two source-defined jump uses.
         } else if(d.state=="sense") {
@@ -1110,7 +1188,13 @@ void CombatWorld::updateDevices(double dt) {
             if(sensed) {
                 d.target=sensed;d.locked=true;d.state="wake";d.age=0;
                 d.heading=std::atan2(sensed->state.pos.x-d.pos.x,sensed->state.pos.z-d.pos.z);
-            } else if(d.age>=d.timer) explodeDevice(d);
+            } else {
+                const double progress=std::clamp(d.age/std::max(d.timer,1e-9),0.0,1.0);
+                d.pulsePeriod=0.45+(0.1-0.45)*progress;
+                d.pulse-=dt;
+                if(d.pulse<=0) {deviceCue("device_warning",d,progress);d.pulse=d.pulsePeriod;}
+                if(d.age>=d.timer) explodeDevice(d);
+            }
         } else if(d.state=="wake") {
             if(d.target && d.target->state.alive) {
                 const double wanted=std::atan2(d.target->state.pos.x-d.pos.x,d.target->state.pos.z-d.pos.z);
@@ -1125,6 +1209,10 @@ void CombatWorld::updateDevices(double dt) {
                     if(d.target) {d.lostTime=0;d.repath=0;d.path.clear();d.pathIndex=0;}
                     else if((d.lostTime+=dt)>0.5) {explodeDevice(d);continue;}
                 } else d.lostTime=0;
+                const double close=d.target?std::clamp(1.0-std::hypot(d.target->state.pos.x-d.pos.x,d.target->state.pos.z-d.pos.z)/std::max(0.01,d.senseRadius),0.0,1.0):0.0;
+                d.pulsePeriod=0.55+(0.18-0.55)*close;
+                d.pulse-=dt;
+                if(d.pulse<=0)d.pulse=d.pulsePeriod;
                 d.left=std::max(0.0,std::min(s.number("life")-d.walkTime,(s.number("maxTravel")-d.travel)/d.speed));
 
                 bool reached=false;
@@ -1281,7 +1369,8 @@ void CombatWorld::updateDevices(double dt) {
         } else if(d.state=="return") {
             const auto delta=d.owner->state.pos+glm::dvec3(0,0.75,0)-d.pos;const double distance=glm::length(delta);
             if(distance< s.number("orbitRadius")+0.35){d.state="orbit";d.age=0;d.heading=std::atan2(d.pos.z-d.owner->state.pos.z,d.pos.x-d.owner->state.pos.x);}
-            else {d.vel=glm::normalize(delta)*std::min(s.number("returnSpeed"),4+d.age*34);d.pos+=d.vel*dt;if(d.age>3)explodeDevice(d);}
+            else {const auto previous=d.pos;d.vel=glm::normalize(delta)*std::min(s.number("returnSpeed"),4+d.age*34);d.pos+=d.vel*dt;
+                if(boomerangContact(d,s,previous,d.pos))continue;if(d.age>3)explodeDevice(d);}
         } else if(d.state=="orbit") {
             d.heading+=s.number("orbitSpin")*dt;d.pos=d.owner->state.pos+glm::dvec3(std::cos(d.heading)*s.number("orbitRadius"),0.95,std::sin(d.heading)*s.number("orbitRadius"));
             if(d.age>=2.5)explodeDevice(d);
