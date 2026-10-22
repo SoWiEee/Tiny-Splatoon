@@ -15,6 +15,7 @@ class FacePaint;
 class PlayerSimulation;
 class StageGeometry;
 struct StageData;
+namespace network { struct ZoneAuthorityState; }
 
 using ZonePolygon = std::vector<glm::dvec2>; // world x/z
 
@@ -102,6 +103,10 @@ public:
 
     void update(double dt, const std::vector<std::unique_ptr<PlayerSimulation>>& actors);
     bool timeUp(); // true means finish now; false means overtime has started
+    network::ZoneAuthorityState captureAuthorityState() const;
+    bool applyAuthorityState(const network::ZoneAuthorityState& state);
+    bool adoptAuthorityState(const network::ZoneAuthorityState& state);
+    void setNetworkAuthority(bool authoritative) { networkAuthority_ = authoritative; }
 
     const std::vector<ZoneState>& zones() const { return zones_; }
     const std::vector<ZoneObjective>& objectives() const { return objectives_; }
@@ -154,6 +159,7 @@ private:
     std::array<double, 2> holdT_{};
     double nextSwap_ = 0.0;
     bool final_ = false, overtime_ = false, placeholder_ = false;
+    bool networkAuthority_ = true;
     std::optional<int> winner_;
     std::string reason_;
     std::vector<ZoneEvent> events_;

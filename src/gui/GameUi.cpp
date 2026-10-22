@@ -110,6 +110,11 @@ struct GameUi::Impl : Rml::EventListener {
     int jumpMapSelection=-1,jumpMapQueuedKey=-1;
     std::string jumpMapQueuedLabel;
     std::vector<UiJumpMapTarget> jumpMapTargets;
+    network::RoomView online;
+    std::vector<UiOnlineRequest> onlineRequests;
+    bool onlineServerSettings=false,onlineRoomSettings=false;
+    std::string onlineStagesMode,onlineRosterMarkup;
+    double onlineNoticeUntil=0;
     bool syncingControls=false;
     bool mouse[3]{};
     std::array<bool,12> keys{};
@@ -182,6 +187,13 @@ struct GameUi::Impl : Rml::EventListener {
         if(!control)throw std::runtime_error("Invalid UI form control: "+id);return control;
     }
     void Value(const std::string& id,const std::string& value){ControlSync sync(syncingControls);Control(id)->SetValue(value);}
+    void Disable(const std::string& id,bool disabled){
+        auto* element=Find(menu,id);
+        if(auto* control=dynamic_cast<Rml::ElementFormControl*>(element)){control->SetDisabled(disabled);return;}
+        if(disabled)element->SetAttribute("disabled","disabled");else element->RemoveAttribute("disabled");
+        element->SetPseudoClass("disabled",disabled);
+        if(disabled)element->SetProperty("tab-index","none");else element->RemoveProperty("tab-index");
+    }
     static std::string Bool(bool value){return value?"true":"false";}
     void Play(const std::string& cue){if(sound)sound(cue);}
     void Commit(){
@@ -311,6 +323,74 @@ struct GameUi::Impl : Rml::EventListener {
         Text(menu,"start-label",boss?"開始協力挑戰":zones?"開始區域爭奪":practice?"開始自由練習":"開始塗地對戰");
         Text(menu,"start-note",practice?"自由練習 · 不結算資料":zones?"1 位玩家 · 7 名電腦玩家 · 固定 5 分鐘＋延長賽":"1 位玩家 · 7 名電腦玩家");
     }
+    void OnlineRequest(UiOnlineRequest::Kind kind){
+        if(onlineRequests.size()>=16)return;
+        UiOnlineRequest request;request.kind=kind;request.address=Control("online-address")->GetValue();request.code=Control("online-code")->GetValue();
+        request.settings=online.settings;
+        if(kind==UiOnlineRequest::Kind::Settings){
+            request.settings.mode=Control("online-mode")->GetValue();request.settings.map=Control("online-stage")->GetValue();
+            const auto stageMode=request.settings.mode=="zones"?"zones":"turf";
+            const auto validStage=[&](const StageData& stage){return stage.mode==stageMode&&(request.settings.mode!="boss"||!stage.noBoss);};
+            const bool validMap=std::any_of(ReferenceStages().begin(),ReferenceStages().end(),[&](const StageData& stage){return validStage(stage)&&stage.id==request.settings.map;});
+            if(!validMap)for(const auto& stage:ReferenceStages())if(validStage(stage)){request.settings.map=std::string(stage.id);break;}
+            request.settings.time=Control("online-time")->GetValue();request.settings.difficulty=Control("online-difficulty")->GetValue();
+            request.settings.duration=static_cast<std::uint32_t>(std::stoul(Control("online-duration")->GetValue()));
+            request.settings.palette=static_cast<std::uint32_t>(std::stoul(Control("online-palette")->GetValue()));
+            request.settings.bots=IsChecked(Find(menu,"online-bots"));
+        }
+        request.team=std::stoi(Control("online-team")->GetValue());
+        const auto self=std::find_if(online.members.begin(),online.members.end(),[&](const auto& member){return member.id==online.selfId;});
+        request.ready=self==online.members.end()||!self->ready;request.emote="wave";
+        onlineRequests.push_back(std::move(request));
+    }
+    void OnlineState(const network::RoomView& view){
+        ControlSync sync(syncingControls);online=view;
+        using network::RoomPhase;
+        const bool inRoom=view.phase==RoomPhase::Lobby||view.phase==RoomPhase::Starting||view.phase==RoomPhase::Match;
+        const bool lobby=view.phase==RoomPhase::Lobby,host=view.selfId&&view.selfId==view.hostId,busy=view.phase==RoomPhase::Connecting;
+        Hidden(menu,"online-connect",inRoom);Hidden(menu,"online-room",!inRoom);
+        Hidden(menu,"online-error",view.error.empty());Text(menu,"online-error",view.error);
+        Text(menu,"online-status",glfwGetTime()<onlineNoticeUntil?"房碼已複製，可以分享給朋友。":view.status.empty()?(inRoom?"選好裝備與隊伍，準備一起出發。":"建立房間，或輸入朋友分享的房碼。"):view.status);
+        for(const char* id:{"online-create","online-join","online-local-service"})Disable(id,busy);
+        Disable("online-join",busy||Control("online-code")->GetValue().size()<4);Hidden(menu,"online-cancel",!busy);
+        Text(menu,"online-room-code",view.code);
+        const auto& settings=view.settings;
+        if(onlineStagesMode!=settings.mode){
+            std::string markup;
+            for(const auto& stage:ReferenceStages()){
+                if(stage.mode!=(settings.mode=="zones"?"zones":"turf")||(settings.mode=="boss"&&stage.noBoss))continue;
+                markup+="<option value=\""+Escape(std::string(stage.id))+"\">"+Escape(std::string(StageLabel(stage.id)))+"</option>";
+            }
+            auto* stages=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,"online-stage"));stages->RemoveAll();stages->SetInnerRML(markup);onlineStagesMode=settings.mode;
+        }
+        Value("online-mode",settings.mode);Value("online-stage",settings.map);Value("online-time",settings.time);
+        Value("online-duration",std::to_string(settings.duration));Value("online-difficulty",settings.difficulty);Value("online-palette",std::to_string(settings.palette));SetChecked(Find(menu,"online-bots"),settings.bots);
+        for(const char* id:{"online-mode","online-stage","online-time","online-duration","online-difficulty","online-palette","online-bots"})Control(id)->SetDisabled(!host||!lobby||(std::string(id)=="online-duration"&&settings.mode=="zones"));
+        Hidden(menu,"online-settings-toggle",!host);Hidden(menu,"online-room-settings",!host||!onlineRoomSettings);
+        Hidden(menu,"online-server-settings",!onlineServerSettings);
+        const auto self=std::find_if(view.members.begin(),view.members.end(),[&](const auto& member){return member.id==view.selfId;});
+        const bool ready=self!=view.members.end()&&self->ready;
+        Value("online-team",self==view.members.end()||self->autoTeam?"-1":std::to_string(self->team));
+        Control("online-team")->SetDisabled(!lobby||settings.mode=="boss");Disable("online-ready",!lobby);Disable("online-emote",!lobby);
+        Text(menu,"online-ready",ready?"取消準備":"準備");
+        const bool allReady=!view.members.empty()&&std::all_of(view.members.begin(),view.members.end(),[&](const auto& member){return member.ready||member.id==view.hostId;});
+        const StageData* chosen=nullptr;for(const auto& stage:ReferenceStages())if(stage.id==settings.map&&stage.mode==(settings.mode=="zones"?"zones":"turf")){chosen=&stage;break;}
+        const bool bothTeams=std::any_of(view.members.begin(),view.members.end(),[](const auto& member){return member.team==0;})&&std::any_of(view.members.begin(),view.members.end(),[](const auto& member){return member.team==1;});
+        const bool humansOnly=chosen&&chosen->noBots;
+        const bool enoughPlayers=!humansOnly||(view.members.size()>=2&&bothTeams);
+        Disable("online-start",!host||!lobby||!allReady||!enoughPlayers);Hidden(menu,"online-start",!host);
+        Text(menu,"online-start-note",!lobby?(view.phase==RoomPhase::Starting?"正在準備進入對戰…":"等待房主返回房間。") :!host?"準備完成後，等待房主開始對戰。":!enoughPlayers?"此場地需至少兩位玩家，且雙方各有一人。":!allReady?"等待所有玩家準備。":"所有玩家已準備，可以開始對戰。");
+        const std::string mode=settings.mode=="boss"?"破艦巨獸協力":settings.mode=="zones"?"區域爭奪":"塗地對戰";
+        Text(menu,"online-summary",mode+" · "+std::string(StageLabel(settings.map))+" · "+std::to_string(settings.duration)+" 秒 · "+(settings.bots?"電腦玩家補位":"僅真人玩家"));
+        std::string markup;
+        for(const auto& member:view.members){
+            std::string name=member.name+(member.id==view.selfId?"（你）":"")+(member.id==view.hostId?" · 房主":"");
+            const std::string state=(settings.mode=="boss"?"協力隊":member.team==0?"橘隊":"藍隊")+std::string(" · ")+(member.ready?"已準備":"未準備");
+            const auto kit=EquipmentLabel(EquipmentCategory::Main,member.main);
+            markup+="<div class=\"online-member "+std::string(member.id==view.selfId?"self ":"")+(member.team==0?"team-orange":"team-blue")+"\"><span class=\"online-member-name\">"+Escape(name)+"</span><span class=\"online-member-kit\">"+Escape(std::string(kit))+"</span><span class=\"online-member-state\">"+Escape(member.emote.empty()?state:state+" · 招呼")+"<br/>"+std::to_string(member.ping)+" ms</span></div>";
+        }
+        if(markup!=onlineRosterMarkup){Find(menu,"online-roster")->SetInnerRML(markup);onlineRosterMarkup=std::move(markup);}
+    }
     void CommitSettingFromControl(const std::string& id,const std::string& value,Rml::Element* target){
         auto& s=player.settings;
         auto number=[&](){return std::stod(value);};auto check=[&](){return IsChecked(target);};
@@ -368,6 +448,11 @@ struct GameUi::Impl : Rml::EventListener {
                 return;
             }
             if(type!="change")return;
+            if(id.rfind("online-",0)==0){
+                if(id=="online-team")OnlineRequest(UiOnlineRequest::Kind::Team);
+                else if(id!="online-address"&&id!="online-code")OnlineRequest(UiOnlineRequest::Kind::Settings);
+                return;
+            }
             if(id=="stage")selection.stage=value;
             else if(id=="theme"){selection.theme=value;player.settings.timeOfDay=value;Commit();}
             else if(id=="difficulty"){selection.difficulty=value;player.settings.difficulty=value;Commit();}
@@ -400,6 +485,20 @@ struct GameUi::Impl : Rml::EventListener {
             Mode();return;
         }
         if(type!="click"||element->GetTagName()!="button")return;
+        if(id.rfind("online-",0)==0){
+            if(element->HasAttribute("disabled"))return;
+            if(id=="online-server-toggle"){onlineServerSettings=!onlineServerSettings;Hidden(menu,"online-server-settings",!onlineServerSettings);}
+            else if(id=="online-settings-toggle"){onlineRoomSettings=!onlineRoomSettings;Hidden(menu,"online-room-settings",!onlineRoomSettings);}
+            else if(id=="online-copy"){glfwSetClipboardString(window,online.code.c_str());onlineNoticeUntil=glfwGetTime()+2;Text(menu,"online-status","房碼已複製，可以分享給朋友。");}
+            else if(id=="online-create")OnlineRequest(UiOnlineRequest::Kind::Create);
+            else if(id=="online-join")OnlineRequest(UiOnlineRequest::Kind::Join);
+            else if(id=="online-leave"||id=="online-cancel")OnlineRequest(UiOnlineRequest::Kind::Leave);
+            else if(id=="online-ready")OnlineRequest(UiOnlineRequest::Kind::Ready);
+            else if(id=="online-start")OnlineRequest(UiOnlineRequest::Kind::Start);
+            else if(id=="online-emote")OnlineRequest(UiOnlineRequest::Kind::Emote);
+            else if(id=="online-local-service")OnlineRequest(UiOnlineRequest::Kind::LocalService);
+            Play("ui_click");return;
+        }
         if(id.rfind("jump-target-",0)==0||id.rfind("jump-map-marker-",0)==0){
             const auto dash=id.find_last_of('-');
             if(jumpMapOpen&&dash!=std::string::npos){
@@ -563,11 +662,11 @@ struct GameUi::Impl : Rml::EventListener {
                 }
             }
             for(std::size_t i=0;i<match.actors().size();++i){
-                const auto& actor=match.actors()[i];if(!actor->state.alive)continue;
+                const auto& actor=match.actors()[i];if(!match.roster()[i].active||!actor->state.alive)continue;
                 const double left=std::clamp((actor->state.pos.x-minX)/spanX*100.,0.,100.);
                 const double top=std::clamp((maxZ-actor->state.pos.z)/spanZ*100.,0.,100.);
                 const std::string color(actor->team()==0?palette[0]:palette[1]);
-                markup+="<div class=\"map-actor "+std::string(i==0?"map-actor-local ":"")+(actor->team()==0?"map-actor-a":"map-actor-b")+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;background-color:"+color+";\"></div>";
+                markup+="<div class=\"map-actor "+std::string(actor->isLocal()?"map-actor-local ":"")+(actor->team()==0?"map-actor-a":"map-actor-b")+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;background-color:"+color+";\"></div>";
             }
             std::string targetLegend;
             for(const auto& target:jumpMapTargets){
@@ -672,19 +771,21 @@ struct GameUi::Impl : Rml::EventListener {
         else xp+="　Lv."+std::to_string(player.level)+"　"+std::to_string(player.xp)+" / "+std::to_string(XpForLevel(player.level));
         Text(hud,"result-xp-label",xp);Find(hud,"result-xp-fill")->SetProperty("width",Integer(xpProgress*100)+"%");
         std::string rows="<tr><th>玩家</th><th>"+std::string(result.zones?"區域塗地":"塗地")+"</th>";if(result.zones)rows+="<th>區域內塗地</th>";rows+="<th>倒下</th>";if(match.boss())rows+="<th>破艦巨獸傷害</th><th>弱點命中</th><th>小螃蟹擊破</th>";rows+="</tr>";
-        for(std::size_t i=0;i<match.actors().size();++i){const auto& actor=*match.actors()[i];rows+="<tr><td>"+Escape(match.roster()[i].name)+"</td><td>"+Integer(actor.turfPainted())+"</td>";if(result.zones)rows+="<td>"+Integer(actor.zoneTurf())+"</td>";rows+="<td>"+std::to_string(actor.deaths())+"</td>";
+        for(std::size_t i=0;i<match.actors().size();++i){if(!match.roster()[i].active)continue;const auto& actor=*match.actors()[i];rows+="<tr><td>"+Escape(match.roster()[i].name)+"</td><td>"+Integer(actor.turfPainted())+"</td>";if(result.zones)rows+="<td>"+Integer(actor.zoneTurf())+"</td>";rows+="<td>"+std::to_string(actor.deaths())+"</td>";
             if(const auto* boss=match.boss())rows+="<td>"+Integer(boss->squadDamage()[i])+"</td><td>"+std::to_string(boss->squadWeakHits()[i])+"</td><td>"+std::to_string(boss->squadSplats()[i])+"</td>";rows+="</tr>";}
         const auto key="hud/results-table";if(textCache[key]!=rows){Find(hud,"results-table")->SetInnerRML(rows);textCache[key]=rows;}
     }
     void RenderHudData(const StageData& stage,const FacePaint& paint,MatchSimulation& match,bool paused,bool nativeApp,bool practice){
         const bool results=match.phase()==MatchPhase::Results;
+        const bool onlineMatch=online.phase==network::RoomPhase::Match||online.phase==network::RoomPhase::Starting;
         if(!results)resultXpMatch=nullptr;
         activePractice=practice;
         interactive=paused||results||practiceGear||hudOverlay;
         interactive=interactive||jumpMapOpen;
         Hidden(hud,"pause",!paused||results);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
         Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results);
-        Text(hud,"pause-title",practice?"練習暫停":"已暫停");Text(hud,"pause-description",practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
+        Text(hud,"pause-title",onlineMatch?"對戰選單":practice?"練習暫停":"已暫停");Text(hud,"pause-description",onlineMatch?"線上對戰會持續進行。關閉選單即可繼續操作。":practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
+        Text(hud,"pause-hint",onlineMatch?"Esc 選單":"Esc 暫停");Text(hud,"results-menu",onlineMatch?"返回房間":"返回選單");Hidden(hud,"results-rematch",onlineMatch);
         const auto stageLabel=StageLabel(stage.id);Text(hud,"stage-name",stageLabel.empty()?std::string(stage.name):std::string(stageLabel));
         const int seconds=static_cast<int>(std::ceil(std::max(0.,match.remaining())));char clock[16];std::snprintf(clock,sizeof(clock),"%02d:%02d",seconds/60,seconds%60);Text(hud,"clock",clock);
         const auto coverage=paint.coverage();Text(hud,"score-a",Percent(coverage[0]));Text(hud,"score-b",Percent(coverage[1]));
@@ -743,6 +844,9 @@ void GameUi::ShowMenu(const std::string& initialStage){
 }
 void GameUi::ShowTitle(const std::string& initialStage){ShowMenu(initialStage);auto& p=*impl_;p.GoTo(UiScreen::Title);p.Find(p.menu,"title-start")->Focus();}
 void GameUi::ShowPracticeGear(){impl_->OpenPracticeGear();}
+void GameUi::ShowOnline(){auto& p=*impl_;p.menu->Show();p.hud->Hide();p.menuVisible=true;p.practiceGear=false;p.hudOverlay=false;p.GoTo(UiScreen::Online);}
+void GameUi::SetOnlineState(const network::RoomView& view){impl_->OnlineState(view);}
+std::vector<UiOnlineRequest> GameUi::TakeOnlineRequests(){return std::exchange(impl_->onlineRequests,{});}
 UiAction GameUi::RenderMenu(int width,int height){return impl_->Render(width,height,false);}
 void GameUi::ShowPracticeStage(const std::string& initialStage){ShowMenu(initialStage);auto& p=*impl_;p.selection.mode="practice";p.selection.practice=true;p.Mode();p.GoTo(UiScreen::Play);}
 UiAction GameUi::RenderHud(const StageData& stage,const FacePaint& paint,MatchSimulation& match,int width,int height,bool paused,bool nativeApp,bool practice){

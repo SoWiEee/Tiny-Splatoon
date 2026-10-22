@@ -107,10 +107,10 @@ bool WorldSpecials::activate(PlayerSimulation& actor, std::string_view id) {
         special.phase = "cast";
         for (auto* enemy : world_.actors_) {
             if (!enemy || enemy->team() == actor.team()) continue;
-            enemy->state.reveal = def.number("duration", 8.0);
-            enemy->state.revealTeam = actor.team();
-            enemy->state.track = def.number("duration", 8.0);
-            enemy->state.trackTeam = actor.team();
+            NetworkActorEffect effect;
+            effect.reveal=effect.track=def.number("duration",8.0);
+            effect.effectTeam=actor.team();
+            world_.applyActorEffect(actor,*enemy,effect);
         }
     } else if (id == "wail") {
         special.noSquid = true;
@@ -1254,8 +1254,9 @@ void WorldSpecials::tickStrike(WorldObject& object, double dt) {
             || victim->state.pos.y > object.pos.y + 7.0) continue;
         world_.applyHit(*object.owner, *victim, object.damagePerSecond * dt * fade, "strike");
         if (distance > 0.3) {
-            victim->state.vel.x += dx / distance * def.number("pull") * dt;
-            victim->state.vel.z += dz / distance * def.number("pull") * dt;
+            NetworkActorEffect effect;
+            effect.velocityImpulse={dx/distance*def.number("pull")*dt,0.0,dz/distance*def.number("pull")*dt};
+            world_.applyActorEffect(*object.owner,*victim,effect);
         }
     }
     if (object.age >= object.timer) object.live = false;
@@ -1313,10 +1314,21 @@ void WorldSpecials::tickBubble(WorldObject& object, double dt) {
             const double distance = std::hypot(dx, dz);
             if (distance >= r || distance <= 1e-3) continue;
             dx /= distance; dz /= distance;
-            enemy->state.pos.x = object.pos.x + dx * r;
-            enemy->state.pos.z = object.pos.z + dz * r;
-            const double vn = enemy->state.vel.x * dx + enemy->state.vel.z * dz;
-            if (vn < 0.0) { enemy->state.vel.x -= dx * vn; enemy->state.vel.z -= dz * vn; }
+            const glm::dvec3 oldPos=enemy->state.pos,oldVel=enemy->state.vel;
+            glm::dvec3 newPos=oldPos;
+            newPos.x=object.pos.x+dx*r;
+            newPos.z=object.pos.z+dz*r;
+            glm::dvec3 newVel=oldVel;
+            const double vn=newVel.x*dx+newVel.z*dz;
+            if(vn<0.0) {newVel.x-=dx*vn;newVel.z-=dz*vn;}
+            if(world_.networkLocalPeer_ && enemy->networkOwner()!=world_.networkLocalPeer_) {
+                NetworkActorEffect effect;
+                effect.velocityImpulse=(newPos-oldPos)/std::max(dt,1e-3)+(newVel-oldVel);
+                world_.applyActorEffect(*object.owner,*enemy,effect);
+            } else {
+                enemy->state.pos=newPos;
+                enemy->state.vel=newVel;
+            }
         }
         if (object.timer <= 0.0) {
             object.live = false;
@@ -1509,13 +1521,18 @@ void WorldSpecials::tickWorld(double dt) {
         for (auto* ally : world_.actors_) {
             if (!ally || ally == owner || ally->team() != owner->team() || !ally->state.alive || ally->state.shield > 0.0) continue;
             if (glm::length(ally->state.pos - owner->state.pos) < bubbler.number("shareRange")) {
-                ally->state.shield = owner->state.shield;
-                shieldSources_[ally] = const_cast<PlayerSimulation*>(owner);
+                NetworkActorEffect effect;
+                effect.shield=owner->state.shield;
+                effect.effectTeam=owner->team();
+                world_.applyActorEffect(*const_cast<PlayerSimulation*>(owner),*ally,effect);
+                if(!world_.networkLocalPeer_ || ally->networkOwner()==world_.networkLocalPeer_)
+                    shieldSources_[ally]=const_cast<PlayerSimulation*>(owner);
             }
         }
     }
     for (auto* actor : world_.actors_) {
         if (!actor) continue;
+        if(world_.networkLocalPeer_ && actor->networkOwner()!=world_.networkLocalPeer_) continue;
         if (!actor->state.alive || actor->state.shield <= 0.0) {
             actor->state.shield = 0.0;
             shieldSources_.erase(actor);
@@ -1628,7 +1645,7 @@ std::vector<WorldObjectView> WorldSpecials::visualObjects() const {
         if (!object.live || !object.owner) continue;
         result.push_back({object.kind,object.phase,object.owner->team(),object.pos,object.previous,
                           object.target,object.mouth,object.vel,object.direction,object.age,
-                          object.timer,object.radius,object.range,object.charge,object.held,object.id});
+                          object.timer,object.radius,object.range,object.charge,object.held,object.id,object.owner->networkNid()});
     }
     return result;
 }
@@ -1655,7 +1672,8 @@ void WorldSpecials::cleanup(PlayerSimulation& actor) {
     for (auto& device : world_.devices_) if (device.owner == &actor && device.special) device.live = false;
     for (auto it = shieldSources_.begin(); it != shieldSources_.end();) {
         if (it->first == &actor || it->second == &actor) {
-            if (it->first) it->first->state.shield = 0.0;
+            if (it->first && (!world_.networkLocalPeer_ || it->first->networkOwner()==world_.networkLocalPeer_))
+                it->first->state.shield = 0.0;
             it = shieldSources_.erase(it);
         } else ++it;
     }
@@ -1663,8 +1681,10 @@ void WorldSpecials::cleanup(PlayerSimulation& actor) {
 
 void WorldSpecials::clear() {
     shieldHitTimes_.clear();
-    for (const auto& [actor, _] : actors_) if (actor) actor->state.shield = 0.0;
-    for (const auto& [actor, _] : shieldSources_) if (actor) actor->state.shield = 0.0;
+    for (const auto& [actor, _] : actors_)
+        if (actor && (!world_.networkLocalPeer_ || actor->networkOwner()==world_.networkLocalPeer_)) actor->state.shield = 0.0;
+    for (const auto& [actor, _] : shieldSources_)
+        if (actor && (!world_.networkLocalPeer_ || actor->networkOwner()==world_.networkLocalPeer_)) actor->state.shield = 0.0;
     actors_.clear();
     shieldSources_.clear();
     if (tickingWorld_) {

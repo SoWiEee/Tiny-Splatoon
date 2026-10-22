@@ -15,11 +15,13 @@
 
 namespace restoration::network {
 namespace {
-constexpr std::size_t MaxQueuedEvents = 256;
+constexpr std::size_t MaxQueuedEvents = 512;
+constexpr std::size_t MaxQueuedMessages = 240;
 constexpr std::size_t MaxQueuedBytes = 1024 * 1024;
 constexpr std::size_t ReservedControlBytes = 64 * 1024;
 constexpr std::size_t MaxPendingBytes = 256 * 1024;
-constexpr std::size_t MaxConnections = 8;
+constexpr std::size_t DefaultMaxConnections = 8;
+constexpr std::size_t MaxSupportedConnections = 128;
 constexpr int MaxMessagesPerPoll = 64;
 constexpr int MessageBatchSize = 16;
 
@@ -39,6 +41,7 @@ struct GnsEndpoint::Impl {
     HSteamNetConnection clientConnection = k_HSteamNetConnection_Invalid;
     std::uint16_t port = 0;
     bool listening = false;
+    std::size_t maxConnections = DefaultMaxConnections;
     std::unordered_set<HSteamNetConnection> connections;
     std::deque<GnsEvent> events;
     std::size_t queuedBytes = 0;
@@ -91,7 +94,7 @@ void GnsEndpoint::QueueControl(GnsEvent event) {
 bool GnsEndpoint::QueueMessage(GnsEvent event) {
     const auto bytes = event.data.size() + event.detail.size();
     constexpr auto messageByteBudget = MaxQueuedBytes - ReservedControlBytes;
-    if (impl_->events.size() >= MaxQueuedEvents - 2 * MaxConnections ||
+    if (impl_->events.size() >= MaxQueuedMessages ||
         impl_->queuedBytes > messageByteBudget || bytes > messageByteBudget - impl_->queuedBytes) return false;
     impl_->queuedBytes += bytes;
     impl_->events.push_back(std::move(event));
@@ -121,7 +124,7 @@ void GnsEndpoint::Reject(HSteamNetConnection connection, std::string detail) {
     QueueControl({GnsEvent::Type::Error, connection, {}, std::move(detail)});
 }
 
-bool GnsEndpoint::Send(HSteamNetConnection connection, const void* data, std::size_t size) {
+bool GnsEndpoint::Send(HSteamNetConnection connection, const void* data, std::size_t size, bool reliable) {
     auto* runtime = impl_->runtime;
     if (!runtime) return false;
     runtime->CheckThread();
@@ -147,12 +150,16 @@ bool GnsEndpoint::Send(HSteamNetConnection connection, const void* data, std::si
         static_cast<std::size_t>(std::max(0, status.m_cbPendingUnreliable)) +
         static_cast<std::size_t>(std::max(0, status.m_cbSentUnackedReliable));
     if (pending > MaxPendingBytes || size > MaxPendingBytes - pending) {
+        if (!reliable) return true;
         QueueControl({GnsEvent::Type::Error, connection, {}, "outgoing pending byte limit exceeded"});
         return false;
     }
 
+    const int sendFlags = reliable ? k_nSteamNetworkingSend_ReliableNoNagle : k_nSteamNetworkingSend_UnreliableNoDelay;
     const auto result = runtime->impl_->sockets->SendMessageToConnection(
-        connection, data, static_cast<uint32>(size), k_nSteamNetworkingSend_ReliableNoNagle, nullptr);
+        connection, data, static_cast<uint32>(size), sendFlags, nullptr);
+    // NoDelay snapshots may be discarded by GNS while the route is busy.
+    if (!reliable && result == k_EResultIgnored) return true;
     if (result != k_EResultOK) {
         QueueControl({GnsEvent::Type::Error, connection, {}, "GameNetworkingSockets rejected the send"});
         return false;
@@ -191,8 +198,8 @@ void GnsEndpoint::HandleIncoming(HSteamNetConnection connection) {
         if (runtime) runtime->impl_->sockets->CloseConnection(connection, 0, "endpoint is not listening", false);
         return;
     }
-    if (impl_->connections.size() >= MaxConnections) {
-        QueueControl({GnsEvent::Type::Error, connection, {}, "server connection limit of 8 reached"});
+    if (impl_->connections.size() >= impl_->maxConnections) {
+        QueueControl({GnsEvent::Type::Error, connection, {}, "server connection limit of " + std::to_string(impl_->maxConnections) + " reached"});
         runtime->impl_->sockets->CloseConnection(connection, 0, "server connection limit reached", false);
         return;
     }
@@ -342,10 +349,13 @@ void GnsRuntime::Shutdown() {
     impl_->initialized = false;
 }
 
-std::unique_ptr<GnsEndpoint> GnsRuntime::Listen(const SteamNetworkingIPAddr& address) {
+std::unique_ptr<GnsEndpoint> GnsRuntime::Listen(const SteamNetworkingIPAddr& address, std::size_t maxConnections) {
     CheckThread();
     if (!address.m_port) throw std::invalid_argument("listen address requires a nonzero port");
+    if (maxConnections < 1 || maxConnections > MaxSupportedConnections)
+        throw std::invalid_argument("listen connection limit must be in [1, 128]");
     auto endpoint = std::unique_ptr<GnsEndpoint>(new GnsEndpoint(*this));
+    endpoint->impl_->maxConnections = maxConnections;
     endpoint->impl_->listening = true;
     endpoint->impl_->pollGroup = impl_->sockets->CreatePollGroup();
     if (endpoint->impl_->pollGroup == k_HSteamNetPollGroup_Invalid)

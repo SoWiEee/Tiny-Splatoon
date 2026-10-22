@@ -27,6 +27,24 @@ button.quiet:hover { background-color: #edf0ed; }
 .content { flex-grow: 1; padding-left: 58dp; border-left: 1dp #d9e0d8; overflow-y: auto; }
 .panel { max-width: 750dp; }
 .intro { color: #5b6862; font-size: 18dp; line-height: 1.65; margin-bottom: 34dp; }
+.online-actions { display: flex; margin: 12dp 0; }
+.online-actions button { margin-right: 10dp; }
+.online-heading { display: flex; align-items: center; margin-bottom: 12dp; }
+.online-heading > div { flex-grow: 1; }
+.room-code { display: block; font-size: 34dp; letter-spacing: 3dp; color: #194e40; }
+.room-code-input { letter-spacing: 3dp; }
+.online-roster { max-height: 280dp; overflow-y: auto; margin: 0 0 20dp; }
+#online-summary { margin-bottom: 16dp; }
+#online-start-note { margin-bottom: 12dp; }
+.online-member { display: flex; align-items: center; padding: 10dp 0; border-bottom: 1dp #d9e0d8; }
+.online-member-name { width: 44%; font-size: 19dp; }
+.online-member-kit { width: 30%; color: #596761; font-size: 16dp; }
+.online-member-state { width: 26%; text-align: right; font-size: 16dp; }
+.online-member.self .online-member-name { font-weight: 700; }
+.online-member.team-orange .online-member-state { color: #9b4518; }
+.online-member.team-blue .online-member-state { color: #245ca3; }
+#online-room-settings, #online-server-settings { margin: 14dp 0 24dp; }
+#online-status { margin-bottom: 20dp; }
 .mode-row { display: flex; margin-bottom: 16dp; }
 .mode { width: 185dp; margin-right: 12dp; background-color: #ffffff; border-color: #d8e0d8; }
 .mode.selected { background-color: #e3ece1; border-color: #438266; color: #194e40; }

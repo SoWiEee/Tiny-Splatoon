@@ -37,6 +37,8 @@ public:
              const FacePaint& paint, const NavGraph& nav, std::uint32_t seed = 1,
              RandomSource random = {});
     void update(double dt, const std::vector<BotSimulation*>& bots);
+    // Drop pointer-keyed and timed planning decisions when bots are rebound after host migration.
+    void resetAfterAuthorityChange();
 
     ZoneBotAssignment assignment(const BotSimulation& bot) const;
     ZoneWaveState waveState(int team) const;

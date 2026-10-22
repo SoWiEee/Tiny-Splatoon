@@ -1,28 +1,40 @@
 # 原生多人連線契約
 
-依 2026-10-22 的使用者決策，傳輸直接使用已安裝的 GameNetworkingSockets 1.4.1（vcpkg revision 1）。此決策取代參考版的 WebSocket wire protocol；房碼、房間與遊戲規則仍對齊 [spec.md NET-01–12](../spec.md#14-線上房間與同步)。
+依 2026-10-22 的使用者決策，傳輸使用 GameNetworkingSockets 1.4.1（vcpkg revision 1），取代參考版 WebSocket wire protocol。房碼、成員、玩家權責與規則對齊 [spec.md NET-01–12](../spec.md#14-線上房間與同步)。來源及基準維持唯讀。
 
-## 第一階段範圍
+## 服務與房間
 
-- `src/network/GnsTransport.*` 管理 GNS 初始化、IP listener／connection、可靠訊息、事件與資源生命週期；應用層在主迴圈非阻塞輪詢。
-- 單一 runtime 可服務同一程序中的 server 與多個 client。連線及訊息佇列有容量限制，超出限制會回報失敗，不以無限累積掩蓋過載。
-- `native_network_transport_2/3/8` 使用真實 loopback sockets 驗證訊息與斷線；這不是跨網或完整遊戲驗收。執行 `ctest --test-dir build -C Release --output-on-failure -R '^native_network_transport_'`。
+- `GnsTransport` 負責 GNS 生命週期、IP 連線、可靠／不可靠訊息與非阻塞輪詢。SDK 保留預設加密設定；單封包最多 64 KiB，收送佇列有明確上限。
+- `Tiny-Splatoon-Server` 是獨立房間服務，負責五字元房碼、最多八人、穩定成員 ID、最早加入者換主、隊伍與準備、公開裝備／外觀、房間設定、loading barrier 及封包轉送。服務與玩家房主分開，房主程序離開不會一併關閉服務。
+- 服務最多 32 房／128 條連線，每人每秒最多 90 則訊息；玩家在比賽斷訊 20 秒、在大廳斷訊 150 秒會移除。每兩秒 heartbeat 會保住仍連線的大廳玩家，房間在最後一人離開後清理。開始載入後等待真人完成，最遲 12 秒放行。禁用 Bot 的場地不補 AI；Boss 全員同隊。
+- 公開 profile 只包含名稱、裝備與外觀，不傳送 XP、保存路徑或私人設定。字串、UTF-8、ID、隊伍、裝備、數值與集合長度在解碼邊界驗證；可靠資料過載會顯示錯誤／斷線。
 
-目前底層傳輸獨立建置為 `game_network`；正式選單尚未連接，不能據此宣稱線上遊玩可用。沒有新增臨時假房間或把 IP 位址當成房碼。
+## 選單與執行
 
-## 本機驗收（2026-10-22）
+選單「線上遊玩」提供建立／加入、取消連線、錯誤提示、複製房碼、八人名單、換隊、準備、招呼及房主設定。保留簡約 RmlUi 介面、繁中與 Noto Sans TC／Inter。
 
-MSVC x64 Release 建置及 `native_network_transport_2/3/8` **3/3 通過**（3.50 秒）。測試使用真實 UDP/IP loopback sockets，確認 client 身分對應與可靠回覆、64 KiB 完整訊息、送出及收到超長封包拒絕、240-message 事件佇列滿載後關閉來源連線、第九條連線拒絕、遠端斷線通知、待處理回呼期間銷毀端點／重新連線，以及兩次 Init／Shutdown 生命週期。SDK 保留預設加密設定。
+同機測試可在「伺服器設定」啟動本機服務，再使用預設 `127.0.0.1:27020`。該服務沒有玩家時會在 180 秒後結束。區網或自管服務需明確指定可連線 IP：
 
-GNS 1.4.1 的 listener 要求非零 port，測試在 localhost 的 30000–39999 範圍最多嘗試 32 次 bind，並由 SDK 查詢實際位址；不使用僅測試記憶體傳輸的 socket pair。收訊每次輪詢最多 64 則，單則最多 64 KiB，事件總量最多 256／1 MiB，傳送 pending＋未確認可靠資料限制為 256 KiB。紀錄位於 `build/acceptance-gns-transport.log`。
+```powershell
+.\build\Tiny-Splatoon-Server.exe --bind 192.168.1.10 --port 27020
+```
 
-以上僅驗證同機傳輸；未驗證跨程序／跨網、封包遺失／抖動、公開服務負載或遊戲同步，沒有達成 NET-01–12 的完整驗收。
+將範例 IP 換成服務電腦的實際位址；每位玩家使用相同位址與房碼。GUI 的「啟動本機服務」僅允許 loopback 位址，區網服務請用上述 CLI 啟動。打開對戰選單時比賽持續運行。
 
-## 後續接入順序
+## 比賽權責
 
-1. 原生房間服務：五字元房碼、最多八人、穩定名單、隊伍／準備／換裝／設定、錯誤與最早加入成員換主；加入房間前驗證訊息格式與公開玩家欄位，保留來源速率與 idle 限制。
-2. 選單與房間入口，再接入來源 3D hub／lobby；比賽開始須等同步實作可用。
-3. 本機玩家與 host 的權責、20 Hz 狀態／事件、插值、墨水重播、命中、三模式與 Boss；remote 呈現不重算傷害或墨水。
-4. 斷線／換主／Bot 接手、結果回同房，以及延遲／抖動／跨網矩陣。
+- 玩家模擬自己的角色；房主負責 AI、比賽時計、Zones、Boss 與結算。遠端角色只更新呈現，不重算投射物傷害或墨水。
+- actor／投射物／裝置／特殊狀態以 20 Hz 快照呈現；可靠遊戲事件批次傳送。插值保留來源的 sender timeline、速度 Hermite、85–300 ms 緩衝及最多 180 ms 外推。
+- 射擊者判定命中，受擊者 owner 套用一次；裝置命中送回 owner，Boss 命中交由房主。種子墨水逐筆重播；遠端盾牌仍阻擋本機攻擊。match epoch、sender、owner 與序號隔離舊局及重複事件。
+- 標記／揭露、毒霧、護盾與速度衝量交給受影響角色的 owner 套用；訊標可作遠端隊友的彈射目標，落地扣次數與裝置受擊交回持有者。裝置 ID 包含 peer namespace，避免不同玩家的裝置重號。彈射狀態、角色事件及結果統計亦同步。
+- 普通場地的離線角色保持 actor／network ID，交給房主建立新 AI，清除手持武器／特殊動作；Cargo 移除角色而不補 Bot。此為來源 `netmatch._adopt` 的行為，不搬移整份 AI 私有記憶。
+- 新房主承接畫面上的 Boss 狀態／目前招式／小螃蟹，依來源 adopt 建立新 brain；Zones 承接計數、罰分、延長、目標時計及 flood 游標。
+- 結果由房主統一；房主約 12 秒後自動返回同房，也可提前返回。訪客不能結束其他人的比賽；房間清除準備狀態後可再開一局，XP 以房碼／epoch／seed／玩家 ID 防止重複結算。
 
-GNS direct-IP 不會自動提供房碼查找、公開 relay、Steam SDR、NAT 穿透或帳號認證。開發測試不部署公開服務、不改防火牆；正式跨網部署需另外實作及驗收。
+## 驗收與界線
+
+測試入口：`native_network_transport_2/3/8`、`native_network_room_2/3/8`、`native_network_authority`、`native_network_match`、`native_network_sync`、`native_network_service_process`，以及原生 UI 互動測試。實際執行結果與證據記於 [2026-10-22 驗收](acceptance-2026-10-22.md)。
+
+單次 owner 快照保留最多 24 個投射物、12 個裝置、12 個特殊物件及每個 Tracer 最近 64 個尾跡點，以維持 64 KiB 封包界線；超出呈現預算不影響可靠的墨水與命中事件。最壞裝置數與長局仍需壓力驗收。可靠事件超出容量會明確停止同步，過期的不可靠 NoDelay 快照則允許捨棄並等待下一份狀態。
+
+原生房間使用現有簡約選單，來源 NET-04 的可游泳 3D hub／lobby、倒數彈射演出仍待移植。GNS direct-IP 不會自動提供公開房碼查找服務、Steam SDR、NAT 穿透或帳號認證；同機通過不能代表跨網、惡劣網路或公開負載驗收。尚未完成全部 NET-01–12，亦未達成來源退役門檻。

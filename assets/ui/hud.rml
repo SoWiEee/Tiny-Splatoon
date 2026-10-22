@@ -1,7 +1,7 @@
 <rml>
 <head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /></head>
 <body id="hud" class="hud">
-  <div class="hud-top"><span id="stage-name" class="stage-name"></span><div id="clock" class="clock">03:00</div><span class="pause-hint">Esc 暫停</span></div>
+  <div class="hud-top"><span id="stage-name" class="stage-name"></span><div id="clock" class="clock">03:00</div><span id="pause-hint" class="pause-hint">Esc 暫停</span></div>
   <div id="team-score" class="team-score"><span id="score-a" class="team-a">0.0%</span><span class="score-divider">／</span><span id="score-b" class="team-b">0.0%</span></div>
   <div id="zones-hud" class="zones-hud hidden">
     <div class="zones-counts">

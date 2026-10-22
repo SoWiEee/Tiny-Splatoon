@@ -1,4 +1,5 @@
 #include "ZoneControl.hpp"
+#include "../network/AuthorityState.hpp"
 
 #include "ArsenalData.hpp"
 #include "FacePaint.hpp"
@@ -135,6 +136,80 @@ ZoneControl::ZoneControl(const StageData& stage, const StageGeometry& geometry, 
     activeIndices_ = objectives_[0].zones;
     final_ = duration_ <= kFinal;
     schedule();
+}
+
+network::ZoneAuthorityState ZoneControl::captureAuthorityState()const{
+    network::ZoneAuthorityState snapshot;
+    snapshot.duration=duration_;snapshot.clock=clock_;snapshot.sampleT=sampleT_;
+    snapshot.neutralT=neutralT_;snapshot.overtimeT=overtimeT_;
+    snapshot.activeObjective=activeObjective_;snapshot.owner=owner_;snapshot.lastOwner=lastOwner_;
+    snapshot.overtimeLosing=overtimeLosing_;snapshot.count=count_;snapshot.penalty=penalty_;
+    snapshot.start=start_;snapshot.tieEnd=tieEnd_;snapshot.hold=holdT_;snapshot.nextSwap=nextSwap_;
+    snapshot.final=final_;snapshot.overtime=overtime_;snapshot.winner=winner_;snapshot.reason=reason_;
+    snapshot.penaltyLog=penaltyLog_;
+    snapshot.zones.reserve(zones_.size());
+    for(const auto& zone:zones_){
+        network::ZoneAuthorityEntry entry;
+        entry.id=zone.id;entry.owner=zone.owner;entry.share=zone.share;entry.hold=zone.hold;
+        entry.warnAt=zone.warnAt;entry.warnArmed=zone.warnArmed;entry.flood=zone.flood;
+        snapshot.zones.push_back(std::move(entry));
+    }
+    snapshot.floods.reserve(floods_.size());
+    for(const auto& flood:floods_)
+        snapshot.floods.push_back({flood.zone,flood.team,flood.next,flood.elapsed,flood.duration,flood.reach,flood.easeOut});
+    return snapshot;
+}
+
+bool ZoneControl::applyAuthorityState(const network::ZoneAuthorityState& snapshot){
+    try{(void)network::EncodeZonesAuthorityState(snapshot);}catch(const std::exception&){return false;}
+    if(snapshot.zones.size()!=zones_.size()||std::abs(snapshot.duration-duration_)>1e-6||
+       snapshot.activeObjective<0||snapshot.activeObjective>=static_cast<int>(objectives_.size()))return false;
+    try{
+        auto nextActive=objectives_[static_cast<std::size_t>(snapshot.activeObjective)].zones;
+        auto nextPenaltyLog=snapshot.penaltyLog;
+        auto nextReason=snapshot.reason;
+        std::vector<FloodRun> nextFloods;
+        nextFloods.reserve(snapshot.floods.size());
+        for(const auto& source:snapshot.floods){
+            if(source.zone<0||source.zone>=static_cast<int>(zones_.size()))return false;
+            const auto& zone=zones_[static_cast<std::size_t>(source.zone)];
+            if(source.next>zone.region.cells.size()||zone.region.cellCenters.size()!=zone.region.cells.size())return false;
+            FloodRun flood;
+            flood.zone=source.zone;flood.team=source.team;flood.next=source.next;
+            flood.elapsed=source.elapsed;flood.duration=source.duration;flood.reach=source.reach;flood.easeOut=source.easeOut;
+            std::vector<std::pair<double,int>> ordered;
+            ordered.reserve(zone.region.cells.size());
+            for(std::size_t i=0;i<zone.region.cells.size();++i){
+                const auto& point=zone.region.cellCenters[i];
+                ordered.emplace_back(std::hypot(point.x-zone.center.x,point.z-zone.center.z),zone.region.cells[i]);
+            }
+            std::stable_sort(ordered.begin(),ordered.end(),[](const auto& a,const auto& b){return a.first<b.first;});
+            flood.distance.reserve(ordered.size());flood.cells.reserve(ordered.size());
+            for(const auto& [distance,cell]:ordered){flood.distance.push_back(distance);flood.cells.push_back(cell);}
+            nextFloods.push_back(std::move(flood));
+        }
+
+        for(std::size_t i=0;i<zones_.size();++i){
+            const auto& source=snapshot.zones[i];
+            auto& zone=zones_[i];
+            zone.owner=source.owner;zone.share=source.share;zone.hold=source.hold;
+            zone.warnAt=source.warnAt;zone.warnArmed=source.warnArmed;zone.flood=source.flood;
+        }
+        clock_=snapshot.clock;sampleT_=snapshot.sampleT;neutralT_=snapshot.neutralT;overtimeT_=snapshot.overtimeT;
+        activeObjective_=snapshot.activeObjective;activeIndices_.swap(nextActive);owner_=snapshot.owner;
+        lastOwner_=snapshot.lastOwner;overtimeLosing_=snapshot.overtimeLosing;count_=snapshot.count;
+        penalty_=snapshot.penalty;start_=snapshot.start;tieEnd_=snapshot.tieEnd;holdT_=snapshot.hold;
+        nextSwap_=snapshot.nextSwap;final_=snapshot.final;overtime_=snapshot.overtime;
+        winner_=snapshot.winner;reason_.swap(nextReason);penaltyLog_.swap(nextPenaltyLog);
+        floods_.swap(nextFloods);events_.clear();networkAuthority_=false;
+        return true;
+    }catch(const std::exception&){return false;}
+}
+
+bool ZoneControl::adoptAuthorityState(const network::ZoneAuthorityState& snapshot){
+    if(!applyAuthorityState(snapshot))return false;
+    networkAuthority_=true;
+    return true;
 }
 
 void ZoneControl::emit(ZoneEvent event) {
@@ -372,6 +447,7 @@ void ZoneControl::end(int winner, std::string reason) {
 
 void ZoneControl::update(double dt, const std::vector<std::unique_ptr<PlayerSimulation>>& actors) {
     if (!std::isfinite(dt) || dt <= 0.0 || dt > 0.1) throw std::invalid_argument("invalid Zones step");
+    if (!networkAuthority_) return;
     if (winner_) return;
     clock_ += dt;
     advanceFloods(dt);
@@ -400,6 +476,8 @@ void ZoneControl::update(double dt, const std::vector<std::unique_ptr<PlayerSimu
 }
 
 bool ZoneControl::timeUp() {
+    if (winner_) return true;
+    if (!networkAuthority_) return false;
     const int losing = losingCount(count_);
     const bool grace = owner_ == -1 && lastOwner_ == losing && neutralT_ < kOvertimeGrace;
     if (losing >= 0 && (owner_ == losing || grace)) {

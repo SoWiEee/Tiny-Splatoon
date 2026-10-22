@@ -70,7 +70,12 @@ int main(int argc, char** argv) {
 
         std::vector<std::unique_ptr<GnsEndpoint>> clients;
         clients.reserve(clientCount);
-        for (std::size_t i = 0; i < clientCount; ++i) clients.push_back(runtime.Connect(serverAddress));
+        for (std::size_t i = 0; i < clientCount; ++i) {
+            clients.push_back(runtime.Connect(serverAddress));
+            const std::uint8_t earlySnapshot=0xfe;
+            require(clients.back()->Send(clients.back()->connection(),&earlySnapshot,1,false),
+                "discarding a pre-connect NoDelay snapshot must not fail the session");
+        }
 
         std::vector<bool> connected(clientCount), sent(clientCount), replied(clientCount);
         std::unordered_map<HSteamNetConnection, std::size_t> serverPeers;

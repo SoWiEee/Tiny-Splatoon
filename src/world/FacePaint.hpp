@@ -4,7 +4,10 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <utility>
 #include <vector>
 
 namespace restoration {
@@ -45,6 +48,15 @@ struct VisualRipple {
     double amplitude=0.006, wavelength=0.14, speed=1.2, life=0.7;
 };
 
+struct PaintJournalEvent {
+    glm::dvec3 center{0.0}, stretch{0.0};
+    double radius=0.0,seed=0.0,stretchAmt=1.0;
+    int team=0;
+    std::uint32_t actorNid=0;
+    SplatKind kind=SplatKind::Shot;
+    bool hasStretch=false,cosmetic=false;
+};
+
 struct AtlasRect {
     int x = -1, y = -1, width = 0, height = 0, pad = 8;
     double ppm = 0.0;
@@ -62,6 +74,11 @@ public:
 
     double splat(const glm::dvec3& center, double radius, int team, double seed, const SplatOptions& options = {});
     bool setCells(const std::vector<int>& cells, int team); // team 0/1, or -1 for bare floor; updates turf counts/version
+    void setNetworkActor(std::uint32_t nid) { networkActor_=nid; }
+    std::uint32_t networkActor() const { return networkActor_; }
+    void setPaintJournalSink(std::function<void(const PaintJournalEvent&)> sink) { paintJournalSink_=std::move(sink); }
+    void setCellsJournalSink(std::function<void(const std::vector<int>&,int)> sink) { cellsJournalSink_=std::move(sink); }
+    void setNetworkApplying(bool value) { networkApplying_=value; }
     std::vector<VisualSplat> takeVisualSplats();
     void requestVisualFlood(VisualFlood flood);
     std::vector<VisualFlood> takeVisualFloods();
@@ -102,6 +119,10 @@ private:
     std::array<int, 2> counts_{0, 0};
     int turfTotal_ = 0, usedHeight_ = 0, version_ = 0;
     double turfArea_ = 0.0, ppm_ = 0.0;
+    std::uint32_t networkActor_=0;
+    bool networkApplying_=false;
+    std::function<void(const PaintJournalEvent&)> paintJournalSink_;
+    std::function<void(const std::vector<int>&,int)> cellsJournalSink_;
 };
 
 double blobWobble(double angle, double seed);

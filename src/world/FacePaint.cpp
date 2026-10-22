@@ -119,6 +119,7 @@ bool FacePaint::setCells(const std::vector<int>& cells, int team) {
         changed = true;
     }
     if (changed) ++version_;
+    if (changed && cellsJournalSink_ && !networkApplying_) cellsJournalSink_(cells, team);
     return changed;
 }
 
@@ -132,6 +133,7 @@ double FacePaint::splat(const glm::dvec3& center, double radius, int team, doubl
         throw std::invalid_argument("roller splat requires stretch direction");
     const int kindIndex = static_cast<int>(options.kind);
     if (kindIndex < 0 || kindIndex >= 8) throw std::invalid_argument("invalid paint kind");
+    if (paintJournalSink_ && !networkApplying_) paintJournalSink_({center,options.stretch,radius,seed,options.stretchAmt,team,networkActor_,options.kind,options.hasStretch,options.cosmetic});
     auto visualKind = options.kind;
     if (options.cosmetic && visualKind == SplatKind::Shot) visualKind = SplatKind::Speck;
     visualSplats_.push_back({center, options.stretch, radius, seed, options.stretchAmt, team,

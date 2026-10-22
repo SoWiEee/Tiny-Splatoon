@@ -66,3 +66,12 @@
 - 獨立 Web Audio fixtures 已重新唯讀渲染檢查；原生 raw IR 容差 1e-7、wet 容差 3e-6，不允許位移。乾／濕分流、零 send、非有限輸入、重置、重複清理、256／480-frame quantum 與不規則讀取通過。480-frame graph 渲染 73,023 frames 花 0.0347 秒；這是離線 convolution 校準，不能代表完整遊戲 FPS 或音訊裝置的最壞 callback 延遲。
 - MSVC Release 全目標建置通過；受影響玩法／來源資產回歸 **17/17**（44.61 秒）、GPU／原生入口 **3/3**（15.07 秒）、WeaponRunner **1/1**（2.75 秒）、音訊引擎 **1/1**（28.29 秒）、原生混響 **1/1**（2.40 秒）及來源混響 fixture 唯讀檢查通過。整合時修正節點重複 uninit 與測試把模擬時間當音效播放時間的問題；沒有放寬比對容差。
 - 紀錄：`build/acceptance-audio-finish-regression.log`、`build/acceptance-audio-finish-render-entry.log`、`build/acceptance-audio-finish-engine.log`；混響 fixture 來源 hash 與匯出指令見[fixture 契約](../tests/fixtures/audio-reverb-source.md)。未重跑完整測試集或整庫音樂重新合成；參考來源及基準未修改。
+
+## 多人整合（2026-10-22／23）
+
+- 原生 GameNetworkingSockets 房間服務、五碼房碼、八人房間、隊伍／準備／房主設定、載入同步與同房再戰已接入正式入口。房主離線後由仍在線的成員接手；一般模式接管離線角色為 AI，Cargo 移除對應有效槽位。
+- 真實 GNS 整合涵蓋移動、墨水格、命中去重、狀態／推力、訊標、超級跳躍、投射物呈現、Zones 計數／罰則、Boss 狀態與換主。八角色持續射擊、35 ms 延遲、15% 重排／複製、過期 epoch 與偽造 owner 拒絕均有測試；這些是本機故障注入，並非跨網際網路驗收。
+- MSVC Release 全目標建置通過。房間三／八人及獨立伺服器程序檢查通過；最後心跳 fixture 原先使用非法房碼，改用合法字元後二人房與 160 秒虛擬心跳／150 秒靜默逾時通過（4.44 秒）。紀錄：`build/acceptance-network-room-final.log`、`build/acceptance-network-heartbeat-final.log`。
+- 受影響玩法第一批 28/30 通過；兩項失敗指出離線裝置 getter 改回傳複本而破壞既有穩定參照。修正共用 getter 後，控制器／裝置、二／三／八人傳輸與完整 GNS 同步補驗 6/6 通過（20.09 秒）。GPU／UI／音訊與正式入口 8/8 通過（64.76 秒）；房間 UI／authority 另 2/2 通過。紀錄：`build/acceptance-network-gameplay.log`、`build/acceptance-network-supplement.log`、`build/acceptance-network-gpu-audio.log`、`build/acceptance-network-ui-authority.log`。
+- 已檢視 1280×720 與 1920×1080 房間截圖，八人清單可捲動且準備／開始按鈕可見。Inter 的字體風格提示依既定字體選擇保留。參考來源與 `reference-baseline.sha256` 未修改。
+- 保留範圍：公開伺服器／NAT 穿透、實機跨網路與長時間負載尚未驗收；來源 3D 大廳互動尚未全量遷移。同步呈現每位擁有者有 24 投射物／12 裝置／12 特殊物件與每裝置 64 個尾跡點上限；可靠墨水與命中不使用此呈現預算。未宣稱完整測試集或 NET 全項通過。

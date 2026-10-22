@@ -72,6 +72,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
           Copy-Item "build-release/Tiny-Splatoon.exe" $packageRoot
+          Copy-Item "build-release/Tiny-Splatoon-Server.exe" $packageRoot
           Copy-Item "build-release/assets" $packageRoot -Recurse
 
           if (Test-Path $dllSource) {

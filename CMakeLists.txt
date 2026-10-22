@@ -38,7 +38,7 @@ endif()
 
 add_executable(Tiny-Splatoon main.cpp)
 
-add_library(game_network STATIC src/network/GnsTransport.cpp)
+add_library(game_network STATIC src/network/GnsTransport.cpp src/network/RoomServer.cpp src/network/RoomSession.cpp src/network/MatchSync.cpp)
 target_link_libraries(game_network PUBLIC GameNetworkingSockets::GameNetworkingSockets)
 target_include_directories(game_network PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/network")
 
@@ -66,8 +66,13 @@ add_library(restoration_core STATIC
     src/game/ZoneData.cpp
     src/game/ZonePlan.cpp
     src/game/WorldSpecials.cpp
+    src/network/AuthorityState.cpp
 )
 target_link_libraries(restoration_core PUBLIC glm::glm)
+target_link_libraries(game_network PUBLIC restoration_core)
+add_executable(Tiny-Splatoon-Server src/network/RoomServerMain.cpp)
+target_link_libraries(Tiny-Splatoon-Server PRIVATE game_network)
+add_dependencies(Tiny-Splatoon Tiny-Splatoon-Server)
 if(MSVC)
     target_compile_options(restoration_core PRIVATE /utf-8)
 endif()
@@ -79,12 +84,12 @@ find_package(Threads REQUIRED)
 target_link_libraries(game_audio PUBLIC restoration_core Threads::Threads ${CMAKE_DL_LIBS})
 add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp)
 target_link_libraries(projectile_visuals PUBLIC restoration_core)
-target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp
+target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/OnlinePlay.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp
     src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp src/render/ZoneRenderer.cpp)
-target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals)
+target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals game_network)
 
 target_link_libraries(Tiny-Splatoon PRIVATE
     glad::glad
@@ -111,6 +116,25 @@ if(BUILD_TESTING)
         add_test(NAME native_network_transport_${NETWORK_CLIENTS} COMMAND network_transport_test ${NETWORK_CLIENTS})
         set_tests_properties(native_network_transport_${NETWORK_CLIENTS} PROPERTIES TIMEOUT 60)
     endforeach()
+    add_executable(network_room_test tests/network_room_test.cpp)
+    target_link_libraries(network_room_test PRIVATE game_network)
+    foreach(NETWORK_CLIENTS 2 3 8)
+        add_test(NAME native_network_room_${NETWORK_CLIENTS} COMMAND network_room_test ${NETWORK_CLIENTS})
+        set_tests_properties(native_network_room_${NETWORK_CLIENTS} PROPERTIES TIMEOUT 90)
+    endforeach()
+    add_executable(network_match_test tests/network_match_test.cpp)
+    target_link_libraries(network_match_test PRIVATE game_network)
+    add_test(NAME native_network_match COMMAND network_match_test)
+    set_tests_properties(native_network_match PROPERTIES TIMEOUT 180)
+    add_executable(network_sync_test tests/network_sync_test.cpp)
+    target_link_libraries(network_sync_test PRIVATE game_network)
+    add_test(NAME native_network_sync COMMAND network_sync_test)
+    set_tests_properties(native_network_sync PROPERTIES TIMEOUT 90)
+    add_executable(network_authority_test tests/network_authority_test.cpp)
+    target_link_libraries(network_authority_test PRIVATE restoration_core)
+    add_test(NAME native_network_authority COMMAND network_authority_test)
+    add_executable(online_play_test tests/online_play_test.cpp src/app/OnlinePlay.cpp)
+    target_link_libraries(online_play_test PRIVATE game_network)
     add_executable(zone_match_test tests/zone_match_test.cpp)
     target_link_libraries(zone_match_test PRIVATE restoration_core)
     add_test(NAME native_zone_matches COMMAND zone_match_test)
@@ -325,6 +349,9 @@ if(BUILD_TESTING)
 
     find_program(REFERENCE_NODE_EXECUTABLE node)
     if(REFERENCE_NODE_EXECUTABLE)
+        add_test(NAME native_network_service_process
+            COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/network_service_process.test.mjs "$<TARGET_FILE:Tiny-Splatoon-Server>" "$<TARGET_FILE:online_play_test>" "$<TARGET_FILE:network_room_test>")
+        set_tests_properties(native_network_service_process PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" TIMEOUT 100)
         add_test(NAME reference_custom_music_import COMMAND "${REFERENCE_NODE_EXECUTABLE}" --test tests/import_music.test.mjs)
         set_tests_properties(reference_custom_music_import PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         add_test(NAME reference_boss_pose

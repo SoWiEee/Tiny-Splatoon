@@ -8,6 +8,7 @@
 ![OpenGL 4.5](https://img.shields.io/badge/OpenGL-4.5-5586A4?style=flat-square&logo=opengl&logoColor=white)
 ![RmlUi](https://img.shields.io/badge/UI-RmlUi-246B58?style=flat-square)
 ![miniaudio](https://img.shields.io/badge/Audio-miniaudio-7B4DAB?style=flat-square)
+![GameNetworkingSockets](https://img.shields.io/badge/Network-GameNetworkingSockets-385A75?style=flat-square)
 ![CMake](https://img.shields.io/badge/Build-CMake-064F8C?style=flat-square&logo=cmake&logoColor=white)
 [![Windows Build](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml/badge.svg)](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml)
 
@@ -33,7 +34,7 @@
 ![區域爭奪遊戲畫面](docs/images/zones.png)
 *Zones 計數、控制區與小地圖。*
 
-完整還原仍在進行；線上多人尚未開放。已完成範圍與差異請見[還原進度](docs/restoration-progress.md)及[待辦清單](docs/next-round-backlog.md)。
+完整還原仍在進行；原生多人目前以指定服務位址及房碼連線。已完成範圍與差異請見[還原進度](docs/restoration-progress.md)及[待辦清單](docs/next-round-backlog.md)。
 
 ## 🛠️ Build & Run
 
@@ -49,6 +50,14 @@ cmake --build build --parallel 4
 ```
 
 [開發與驗證指引](docs/development.md) · [套件相依](vcpkg.json) · [玩家保存與設定](docs/save-player-flow.md)
+
+多人遊玩：進入「線上遊玩」，在「伺服器設定」啟動本機服務，再建立房間。其他玩家使用相同服務位址及房碼加入；同機測試預設為 `127.0.0.1:27020`。區網需另外啟動服務並綁定可連線的區網 IP：
+
+```powershell
+.\build\Tiny-Splatoon-Server.exe --bind 192.168.1.10 --port 27020
+```
+
+請將範例 IP 換成服務電腦的實際位址。房間服務獨立於房主程序，房主離線後可由下一位玩家接手；跨網部署及 NAT 穿透尚未提供。詳見[多人連線契約](docs/network-source-contract.md)。
 
 ## ⌨️ Controls
 
@@ -79,6 +88,7 @@ ctest --test-dir build -C Release --output-on-failure
 | `src/app/` | 視窗、輸入與遊戲流程 |
 | `src/game/`、`src/world/` | 模式、角色、武器、AI、地形與墨水 |
 | `src/render/`、`src/gui/`、`src/audio/` | OpenGL、RmlUi 與 miniaudio |
+| `src/network/` | GNS 傳輸、房間服務及遊戲同步 |
 | `assets/` | 已匯出的原生資產、UI、字體與音訊 |
 | `tests/`、`tools/` | 回歸、來源匯出與效能工具 |
 | `docs/` | 契約、還原進度與驗收證據 |

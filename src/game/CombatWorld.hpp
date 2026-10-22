@@ -4,6 +4,8 @@
 #include "FacePaint.hpp"
 #include "WorldSpecials.hpp"
 #include <cstdint>
+#include <functional>
+#include <limits>
 #include <string>
 #include <vector>
 #include <utility>
@@ -39,6 +41,8 @@ struct ShooterProjectile {
     std::string state;
     std::vector<PlayerSimulation*> tagged;
     ProjectileLook look;
+    bool networkRemote=false;
+    std::uint32_t networkOwner=0;
 };
 
 struct CombatDevice {
@@ -72,6 +76,8 @@ struct CombatDevice {
     int blastCount = 0;
     bool special = false;
     std::vector<PlayerSimulation*> tagged;
+    bool networkRemote=false;
+    std::uint32_t networkOwner=0;
 };
 struct CombatThreat {
     std::uint64_t id = 0;
@@ -108,6 +114,17 @@ struct WorldVisualEvent {
     std::uint64_t id = 0;
     bool sourceLocal = false;
     bool sourceVictimLocal = false;
+    std::uint32_t victimNid = std::numeric_limits<std::uint32_t>::max();
+};
+
+// Small owner-routed gameplay effects applied to an actor by another actor or world object.
+struct NetworkActorEffect {
+    double poison = 0.0;
+    double track = 0.0;
+    double reveal = 0.0;
+    double shield = 0.0;
+    int effectTeam = -1;
+    glm::dvec3 velocityImpulse{0.0};
 };
 
 // Match owns actors; this owns attacks and applies hit/paint/credit exactly once.
@@ -117,12 +134,28 @@ public:
     void addActor(PlayerSimulation& actor);
     void setNavigation(const NavGraph& nav) { nav_ = &nav; }
     void setBoss(BossSimulation* boss) { boss_ = boss; }
+    void setNetworkLocalPeer(std::uint32_t peer) { networkLocalPeer_ = peer; }
+    void setNetworkHitForwarder(std::function<bool(PlayerSimulation&,PlayerSimulation&,double,const std::string&)> forwarder) { networkHitForwarder_=std::move(forwarder); }
+    void setNetworkDeviceHitForwarder(std::function<void(std::uint32_t,std::uint64_t,double,int)> forwarder) { networkDeviceHitForwarder_=std::move(forwarder); }
+    void setNetworkActorEffectForwarder(std::function<void(PlayerSimulation&,PlayerSimulation&,const NetworkActorEffect&)> forwarder) { networkActorEffectForwarder_=std::move(forwarder); }
+    bool applyActorEffect(PlayerSimulation& source,PlayerSimulation& target,const NetworkActorEffect& effect);
+    bool applyNetworkActorEffect(PlayerSimulation& source,PlayerSimulation& target,const NetworkActorEffect& effect);
+    void setNetworkBeaconUseForwarder(std::function<void(PlayerSimulation&,std::uint32_t,std::uint64_t)> forwarder) { networkBeaconUseForwarder_=std::move(forwarder); }
+    bool applyNetworkBeaconUse(PlayerSimulation& actor,std::uint32_t beaconOwnerNid,std::uint64_t id);
+    bool applyNetworkDeviceHit(std::uint32_t owner,std::uint64_t id,double damage,int attackerTeam);
+    void setNetworkVisualForwarder(std::function<void(const WorldVisualEvent&)> forwarder) { networkVisualForwarder_=std::move(forwarder); }
+    void setNetworkApplying(bool value) { networkApplying_=value; }
+    void updateRemoteWorld(std::uint32_t owner,std::vector<ShooterProjectile> projectiles,std::vector<CombatDevice> devices,std::vector<WorldObjectView> objects);
+    void queueRemoteVisual(WorldVisualEvent event);
     void removeActor(PlayerSimulation& actor);
     void cleanup(PlayerSimulation& actor);
     void clear();
     void tick(double dt);
     void launch(ShooterProjectile projectile);
-    std::uint64_t allocateId() { return ++serial_; }
+    std::uint64_t allocateId() {
+        ++serial_;
+        return networkLocalPeer_ ? (static_cast<std::uint64_t>(networkLocalPeer_) << 32) | (serial_ & 0xffffffffULL) : serial_;
+    }
     void launchCanopy(PlayerSimulation& owner, double hp, glm::dvec3 direction, double heldHeight);
     bool canDeploy(const PlayerSimulation& owner, const std::string& id) const;
     void deploy(PlayerSimulation& owner, const std::string& id, bool special = false, double charge = 0.0);
@@ -140,16 +173,16 @@ public:
                PlayerSimulation* direct = nullptr, bool special = false, bool bossDirect = false);
     void beam(PlayerSimulation& owner, glm::dvec3 from, glm::dvec3 dir, double length,
               double radius, double damage, double paintRadius, bool pierce, const std::string& weaponId);
-    const std::vector<ShooterProjectile>& projectiles() const { return projectiles_; }
-    const std::vector<CombatDevice>& devices() const { return devices_; }
+    const std::vector<ShooterProjectile>& projectiles() const;
+    const std::vector<CombatDevice>& devices() const;
     const std::vector<PlayerSimulation*>& actors() const { return actors_; }
     std::vector<CombatThreat> threats() const;
     std::vector<CombatShield> shields() const;
     std::size_t attackCount(const PlayerSimulation& actor) const;
-    std::uint64_t newVolley() { return ++serial_; }
+    std::uint64_t newVolley() { return allocateId(); }
     const StageGeometry& geometry() const { return geometry_; }
     double time() const { return time_; }
-    std::vector<WorldObjectView> visualObjects() const { return specials_.visualObjects(); }
+    std::vector<WorldObjectView> visualObjects() const;
     std::vector<WorldVisualEvent> takeVisualEvents();
     void emitVisual(WorldVisualEvent event);
 private:
@@ -184,8 +217,19 @@ private:
     struct VolleyBossHit { std::uint64_t volley; int target; };
     std::vector<VolleyBossHit> volleyBossHits_;
     std::uint64_t serial_ = 0;
+    std::uint32_t networkLocalPeer_ = 0;
     double time_ = 0.0;
     bool ticking_ = false;
     std::vector<WorldVisualEvent> visualEvents_;
+    std::function<bool(PlayerSimulation&,PlayerSimulation&,double,const std::string&)> networkHitForwarder_;
+    std::function<void(std::uint32_t,std::uint64_t,double,int)> networkDeviceHitForwarder_;
+    std::function<void(PlayerSimulation&,PlayerSimulation&,const NetworkActorEffect&)> networkActorEffectForwarder_;
+    std::function<void(PlayerSimulation&,std::uint32_t,std::uint64_t)> networkBeaconUseForwarder_;
+    std::function<void(const WorldVisualEvent&)> networkVisualForwarder_;
+    bool networkApplying_=false;
+    struct RemoteWorld { std::uint32_t owner=0;std::vector<ShooterProjectile> projectiles;std::vector<CombatDevice> devices;std::vector<WorldObjectView> objects; };
+    std::vector<RemoteWorld> remoteWorlds_;
+    mutable std::vector<ShooterProjectile> projectileView_;
+    mutable std::vector<CombatDevice> deviceView_;
 };
 } // namespace restoration

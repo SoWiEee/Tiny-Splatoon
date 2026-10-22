@@ -46,9 +46,36 @@
             <div class="start-row"><button id="start" class="primary"><span id="start-label">開始塗地對戰</span></button><span id="start-note" class="muted">1 位玩家 · 7 名電腦玩家</span></div>
           </div>
           <div id="panel-online" class="panel hidden">
-            <h1>線上遊玩</h1><p class="intro">目前尚未接入連線服務。線上房間與同步會在後續網路階段開放。</p>
-            <div class="notice"><strong>連線功能尚未開放</strong><span>現在可以直接進入離線塗地或自由練習。</span></div>
-            <button id="online-play" class="primary">前往離線遊玩</button>
+            <h1>私人房間</h1><p id="online-status" class="intro" role="status" aria-live="polite">建立房間，或輸入朋友分享的房碼。</p>
+            <div id="online-error" class="save-error hidden" role="status" aria-live="polite"></div>
+            <div id="online-connect">
+              <div class="field"><label for="online-code">房間代碼</label><input id="online-code" class="text-input room-code-input" type="text" maxlength="8" value="" /></div>
+              <div class="online-actions"><button id="online-create" class="primary">建立房間</button><button id="online-join" class="secondary">加入房間</button><button id="online-cancel" class="quiet hidden">取消連線</button></div>
+              <button id="online-server-toggle" class="quiet">伺服器設定</button>
+              <div id="online-server-settings" class="hidden">
+                <div class="field"><label for="online-address">伺服器位址</label><input id="online-address" class="text-input" type="text" maxlength="64" value="127.0.0.1:27020" /></div>
+                <button id="online-local-service" class="secondary">啟動本機服務</button>
+                <p class="description">同一個房間的玩家需連到相同的房間服務。</p>
+              </div>
+            </div>
+            <div id="online-room" class="hidden">
+              <div class="online-heading"><div><span class="muted">房碼</span><strong id="online-room-code" class="room-code"></strong></div><button id="online-copy" class="quiet">複製房碼</button><button id="online-leave" class="quiet">離開房間</button></div>
+              <p id="online-summary" class="description"></p>
+              <div id="online-roster" class="online-roster"></div>
+              <div class="field"><label for="online-team">我的隊伍</label><select id="online-team"><option value="-1">自動分隊</option><option value="0">橘隊</option><option value="1">藍隊</option></select></div>
+              <div class="online-actions"><button id="online-ready" class="primary">準備</button><button id="online-start" class="secondary">開始對戰</button><button id="online-emote" class="quiet">打招呼</button></div>
+              <p id="online-start-note" class="description"></p>
+              <button id="online-settings-toggle" class="quiet">房間設定</button>
+              <div id="online-room-settings" class="hidden">
+                <div class="field"><label for="online-mode">模式</label><select id="online-mode"><option value="turf">塗地對戰</option><option value="zones">區域爭奪</option><option value="boss">破艦巨獸協力</option></select></div>
+                <div class="field"><label for="online-stage">場地</label><select id="online-stage"></select></div>
+                <div class="field"><label for="online-time">時段</label><select id="online-time"><option value="day">白天</option><option value="dusk">黃昏</option></select></div>
+                <div class="field"><label for="online-duration">對戰時間</label><select id="online-duration"><option value="60">1 分鐘</option><option value="90">1.5 分鐘</option><option value="180">3 分鐘</option><option value="240">4 分鐘</option><option value="300">5 分鐘</option><option value="600">10 分鐘</option></select></div>
+                <div class="field"><label for="online-difficulty">電腦玩家難度</label><select id="online-difficulty"><option value="easy">輕鬆</option><option value="normal">標準</option><option value="hard">挑戰</option></select></div>
+                <div class="setting-check"><input id="online-bots" type="checkbox" checked="checked" /><label for="online-bots">以電腦玩家補滿空位</label></div>
+                <div class="field"><label for="online-palette">隊伍色盤</label><select id="online-palette"><option value="0">橘紅・鈷藍</option><option value="1">泡泡糖・薄荷</option><option value="2">檸檬・葡萄</option><option value="3">水藍・櫻桃</option><option value="4">萊姆・洋紅</option></select></div>
+              </div>
+            </div>
           </div>
           <div id="panel-loadout" class="panel hidden">
             <h1>裝備</h1><p class="intro">主要武器會套用建議搭配；次要武器與特殊武器仍可分別調整。</p>

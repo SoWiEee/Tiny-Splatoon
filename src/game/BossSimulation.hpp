@@ -3,15 +3,18 @@
 #include "BossNav.hpp"
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace restoration {
 class FacePaint;
 class PlayerSimulation;
+namespace network { struct BossAuthorityState; }
 
 enum class BossMoveId { Slam, Barrage, Sweep, Charge, Crablets, Frenzy };
 enum class BossMovePhase { None, Telegraph, Active, Recovery };
@@ -33,7 +36,7 @@ struct BossCrablet {
     int id=0,target=-1;
     glm::dvec3 pos{0};
     double yaw=0,hp=30,age=0,retarget=0,speed=0;
-    bool dead=false;
+    bool dead=false,burst=false;
 };
 struct BossHitShape {
     std::string socket;
@@ -61,9 +64,11 @@ struct BossState {
     bool visible=false,dead=false,invulnerable=false,stunned=false;
 };
 
-// Offline HULLBREAKER owns the source move timeline and victim-side geometry.
+// HULLBREAKER owns the source move timeline and victim-side geometry.
 class BossSimulation {
 public:
+    using HitForwarder = std::function<void(PlayerSimulation&, double, const BossSegmentHit&, const std::string&)>;
+    using SplashForwarder = std::function<void(PlayerSimulation&, glm::dvec3, double, double, double, const std::string&)>;
     BossSimulation(const StageData& stage,const StageGeometry& geometry,FacePaint& paint,
         const std::vector<PlayerSimulation*>& squad,const std::string& difficulty,std::uint32_t seed=1);
     void reset();
@@ -90,6 +95,16 @@ public:
     std::optional<BossSegmentHit> segmentHit(glm::dvec3 from,glm::dvec3 to,double pad=0) const;
     double hit(PlayerSimulation& attacker,double damage,const BossSegmentHit& hit,const std::string& weapon);
     double splash(PlayerSimulation& attacker,glm::dvec3 center,double radius,double maxDamage,double minDamage,const std::string& weapon);
+    network::BossAuthorityState captureAuthorityState() const;
+    bool applyAuthorityState(const network::BossAuthorityState& state);
+    bool adoptAuthorityState(const network::BossAuthorityState& state);
+    void setNetworkAuthority(bool authoritative) {
+        if (networkAuthority_ && !authoritative) followerHazardClock_ = state_.clock;
+        networkAuthority_ = authoritative;
+    }
+    void setNetworkLocalPeer(std::uint32_t peer) { networkLocalPeer_ = peer; }
+    void setHitForwarder(HitForwarder forwarder) { hitForwarder_ = std::move(forwarder); }
+    void setSplashForwarder(SplashForwarder forwarder) { splashForwarder_ = std::move(forwarder); }
     BossThreat threat(double x,double y,double z,double horizon=1.2) const;
     void forceMove(BossMoveId id); // deterministic source move audits
     static double chargeDistance(const BossMove& move,double time);
@@ -109,7 +124,9 @@ private:
     void updateCrablets(double dt);
     void spawnCrablets(int count);
     void popCrablet(BossCrablet& crab,bool killed);
-    void advanceHazards(double from,double to,double dt,bool live);
+    void advanceHazards(double from,double to,double dt,bool live,bool paint);
+    void damageCrabBurst(const BossCrablet& crab);
+    bool ownsVictim(const PlayerSimulation& actor) const;
     void hurtSquad(const BossMove& move,double from,double to,double dt);
     void paintHazards(const BossMove& move,double from,double to);
     double reachAt(const BossMove& move,double x,double z,double radius) const;
@@ -133,6 +150,12 @@ private:
     std::array<BossHitShape,10> hitShapes_{};
     std::vector<BossPoseSocket> poseSockets_;
     bool externalHitShapes_=false,spawnedCrabs_=false,finished_=false;
+    bool networkAuthority_=true;
+    bool hasAuthoritySnapshot_=false;
+    HitForwarder hitForwarder_;
+    SplashForwarder splashForwarder_;
+    std::uint32_t networkLocalPeer_=0;
+    double followerHazardClock_=-1.0;
     int pendingPhase_=0,crabSeq_=1;
     double damageMultiplier_=1,cool_=2.4,retarget_=0,goalTime_=0,stuckTime_=0,
         speed_=0,crabletCooldown_=0,frenzyCooldown_=0;
@@ -144,6 +167,8 @@ private:
     std::array<double,8> attention_{},damageBy_{},totalDamageBy_{};
     std::array<int,8> weakHitsBy_{},splatsBy_{};
     std::vector<std::string> oneShotHits_;
+    std::vector<std::string> localVictimHitGuards_;
+    std::vector<int> localCrabBurstGuards_;
     BossPoseHitPulse poseHitPulse_;
 };
 } // namespace restoration

@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <cstdint>
 #include <optional>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -32,6 +33,7 @@ struct WorldObjectView {
     double age = 0.0, timer = 0.0, radius = 0.0, range = 0.0, charge = 0.0;
     bool held = false;
     std::uint64_t id = 0;
+    std::uint32_t ownerNid=0;
 };
 
 class WorldSpecials {

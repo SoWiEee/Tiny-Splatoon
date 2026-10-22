@@ -6,6 +6,8 @@
 #include "CharacterPose.hpp"
 
 #include <cstdint>
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <optional>
 #include <utility>
@@ -75,11 +77,21 @@ public:
     void setCanRespawn(bool value) { canRespawn_ = value; }
     bool canRespawn() const { return canRespawn_; }
     void setRandomSource(std::function<double()> source) { randomSource_ = std::move(source); }
+    std::function<double()> randomSource() const { return randomSource_; }
     void setBotControlled(bool value) { botControlled_ = value; }
     bool botControlled() const { return botControlled_; }
     void setLocal(bool value) { local_ = value; }
     bool isLocal() const { return local_; }
+    void setNetworkIdentity(std::uint32_t nid,std::uint32_t owner) { networkNid_=nid;networkOwner_=owner; }
+    std::uint32_t networkNid() const { return networkNid_; }
+    std::uint32_t networkOwner() const { return networkOwner_; }
+    void prepareNetworkAdoption();
+    void setNetworkGhostPose(CombatPose combat,SpecialPose special) { networkCombatPose_=std::move(combat);networkSpecialPose_=std::move(special); }
+    bool damageFromNetwork(double amount,PlayerSimulation* attacker,const std::string& source) { return damageFromCombat(amount,attacker,source); }
+    void updatePresentation(double dt) { if(poseFrameSink_)poseFrameSink_(dt); }
     void setPoseTriggerSink(std::function<void(const CharacterTrigger&)> sink) { poseTriggerSink_ = std::move(sink); }
+    void setNetworkPoseTriggerSink(std::function<void(const CharacterTrigger&)> sink) { networkPoseTriggerSink_ = std::move(sink); }
+    void applyNetworkPoseTrigger(const CharacterTrigger& event) { if(poseTriggerSink_)poseTriggerSink_(event); }
     void setPoseFrameSink(std::function<void(double)> sink) { poseFrameSink_ = std::move(sink); }
     void setDamageSink(std::function<void(double,const glm::dvec3*)> sink) { damageSink_ = std::move(sink); }
     void setSplatSink(std::function<void(bool)> sink) { splatSink_ = std::move(sink); }
@@ -89,6 +101,7 @@ public:
     bool superJumpToBeacon(std::uint64_t beaconId);
     glm::dvec3 jumpAnchor() const;
     const std::optional<SuperJumpState>& superJumpState() const { return superJump_; }
+    void setNetworkSuperJump(std::optional<SuperJumpState> state) { superJump_ = std::move(state); }
     void tick(double dt);
     bool damage(double amount);
     glm::dvec3 visualPos() const;
@@ -100,6 +113,11 @@ public:
     int deaths() const { return deaths_; }
     int splats() const { return splats_; }
     int shotsFired() const { return shotsFired_; }
+    void applyNetworkStats(double turf,double zone,int deaths,int splats,int shots) {
+        if(std::isfinite(turf)&&turf>=0.0)turfPainted_=turf;
+        if(std::isfinite(zone)&&zone>=0.0)zoneTurf_=zone;
+        deaths_=std::max(0,deaths);splats_=std::max(0,splats);shotsFired_=std::max(0,shots);
+    }
     glm::dvec3 muzzle(int side=0) const { return runner_.muzzle(side); }
     void setMuzzleSource(std::function<glm::dvec3(int)> source) { muzzleSource_=std::move(source); }
 
@@ -120,7 +138,7 @@ private:
     void splat(bool water=false);
     bool damageFromCombat(double amount, PlayerSimulation* attacker, const std::string& source);
     void finishFrame(double dt);
-    void triggerPose(CharacterTrigger event) { if (poseTriggerSink_) poseTriggerSink_(event); }
+    void triggerPose(CharacterTrigger event) { if (poseTriggerSink_) poseTriggerSink_(event); if(networkPoseTriggerSink_)networkPoseTriggerSink_(event); }
     void updateSuperJump(double dt);
     double random();
     glm::dvec3 aimDir() const;
@@ -151,8 +169,12 @@ private:
     std::uint32_t seed_ = 1;
     std::function<double()> randomSource_;
     bool botControlled_ = false, local_ = false;
+    std::uint32_t networkNid_=0,networkOwner_=0;
+    std::optional<CombatPose> networkCombatPose_;
+    std::optional<SpecialPose> networkSpecialPose_;
     std::optional<SuperJumpState> superJump_;
     std::function<void(const CharacterTrigger&)> poseTriggerSink_;
+    std::function<void(const CharacterTrigger&)> networkPoseTriggerSink_;
     std::function<void(double)> poseFrameSink_;
     std::function<void(double,const glm::dvec3*)> damageSink_;
     std::function<void(bool)> splatSink_;

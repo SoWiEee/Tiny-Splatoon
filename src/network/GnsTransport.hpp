@@ -1,6 +1,7 @@
 #pragma once
 
 #include <steam/steamnetworkingsockets.h>
+#include <steam/isteamnetworkingutils.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -31,7 +32,7 @@ public:
 
     std::uint16_t port() const;
     HSteamNetConnection connection() const;
-    bool Send(HSteamNetConnection connection, const void* data, std::size_t size);
+    bool Send(HSteamNetConnection connection, const void* data, std::size_t size, bool reliable = true);
     bool Disconnect(HSteamNetConnection connection);
     std::vector<GnsEvent> TakeEvents();
 
@@ -61,7 +62,7 @@ public:
 
     void Init();
     void Shutdown();
-    std::unique_ptr<GnsEndpoint> Listen(const SteamNetworkingIPAddr& address);
+    std::unique_ptr<GnsEndpoint> Listen(const SteamNetworkingIPAddr& address, std::size_t maxConnections = 8);
     std::unique_ptr<GnsEndpoint> Connect(const SteamNetworkingIPAddr& address);
     void Poll();
 

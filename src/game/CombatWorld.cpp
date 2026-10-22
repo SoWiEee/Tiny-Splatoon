@@ -30,7 +30,56 @@ CombatWorld::CombatWorld(const StageData& stage,const StageGeometry& geometry,Fa
     :stage_(stage),geometry_(geometry),paint_(paint),specials_(*this) {}
 void CombatWorld::emitVisual(WorldVisualEvent event) {
     if (visualEvents_.size() == 512) visualEvents_.erase(visualEvents_.begin());
+    if(networkVisualForwarder_&&!networkApplying_)networkVisualForwarder_(event);
     visualEvents_.push_back(std::move(event));
+}
+void CombatWorld::queueRemoteVisual(WorldVisualEvent event) {
+    if(visualEvents_.size()==512)visualEvents_.erase(visualEvents_.begin());
+    visualEvents_.push_back(std::move(event));
+}
+bool CombatWorld::applyNetworkDeviceHit(std::uint32_t ownerNid,std::uint64_t id,double damage,int attackerTeam){
+    if(ownerNid>7||damage<=0||!std::isfinite(damage)||attackerTeam<0||attackerTeam>1)return false;
+    if(id==0){
+        const auto found=std::find_if(actors_.begin(),actors_.end(),[&](const auto* actor){return actor&&actor->networkNid()==ownerNid&&actor->networkOwner()==networkLocalPeer_;});
+        if(found==actors_.end()||(*found)->mainId()!="brolly"||(*found)->team()==attackerTeam)return false;
+        auto& canopy=(*found)->runner_.canopy_;if(!canopy.id||canopy.state!=CanopyState::Ready)return false;
+        canopy.hp=std::max(0.0,canopy.hp-damage);canopy.lastHit=time_;
+        canopy.flash=std::min(1.0,canopy.flash+0.3+damage/140.0);canopy.shake=std::min(1.0,canopy.shake+0.25+damage/120.0);
+        if(canopy.hp<=0){canopy.state=CanopyState::Broken;canopy.regrowTime=GetEquipment(EquipmentCategory::Main,"brolly").number("regrowTime");canopy.regrowK=0;canopy.open=0;canopy.openTime=0;canopy.grow=0;canopy.lockRelease=true;canopy.previousShield=false;}
+        return true;
+    }
+    const auto found=std::find_if(devices_.begin(),devices_.end(),[&](const auto& device){return device.id==id&&device.owner&&device.owner->networkNid()==ownerNid&&device.owner->networkOwner()==networkLocalPeer_;});
+    if(found==devices_.end()||!found->live||found->exploding||found->team==attackerTeam)return false;
+    found->hp-=damage;
+    if(found->hp<=0){
+        if(found->kind=="torpedo"&&found->locked&&damage>=50)explodeDevice(*found);
+        else{found->live=false;WorldVisualEvent event;event.kind="device_destroy";event.pos=found->pos;event.normal=found->normal;event.radius=found->radius;event.team=found->team;event.source=found->kind;emitVisual(std::move(event));}
+    }
+    return true;
+}
+void CombatWorld::updateRemoteWorld(std::uint32_t owner,std::vector<ShooterProjectile> projectiles,std::vector<CombatDevice> devices,std::vector<WorldObjectView> objects) {
+    auto found=std::find_if(remoteWorlds_.begin(),remoteWorlds_.end(),[&](const auto& world){return world.owner==owner;});
+    if(found==remoteWorlds_.end()){remoteWorlds_.push_back({owner,std::move(projectiles),std::move(devices),std::move(objects)});found=std::prev(remoteWorlds_.end());}
+    else {found->projectiles=std::move(projectiles);found->devices=std::move(devices);found->objects=std::move(objects);}
+    for(auto& item:found->projectiles){item.networkRemote=true;item.networkOwner=owner;}
+    for(auto& item:found->devices){item.networkRemote=true;item.networkOwner=owner;}
+}
+const std::vector<ShooterProjectile>& CombatWorld::projectiles() const {
+    if(remoteWorlds_.empty())return projectiles_;
+    projectileView_=projectiles_;
+    for(const auto& remote:remoteWorlds_)projectileView_.insert(projectileView_.end(),remote.projectiles.begin(),remote.projectiles.end());
+    return projectileView_;
+}
+const std::vector<CombatDevice>& CombatWorld::devices() const {
+    if(remoteWorlds_.empty())return devices_;
+    deviceView_=devices_;
+    for(const auto& remote:remoteWorlds_)deviceView_.insert(deviceView_.end(),remote.devices.begin(),remote.devices.end());
+    return deviceView_;
+}
+std::vector<WorldObjectView> CombatWorld::visualObjects() const {
+    auto result=specials_.visualObjects();
+    for(const auto& remote:remoteWorlds_)result.insert(result.end(),remote.objects.begin(),remote.objects.end());
+    return result;
 }
 std::vector<WorldVisualEvent> CombatWorld::takeVisualEvents() {
     std::vector<WorldVisualEvent> out;
@@ -78,6 +127,7 @@ void CombatWorld::clear() {
     specials_.clear();
     visualEvents_.clear();
     volleyBossHits_.clear();
+    remoteWorlds_.clear();
     pendingProjectiles_.clear();
     if (ticking_) {
         for (auto& p : projectiles_) p.owner = nullptr;
@@ -262,7 +312,7 @@ bool CombatWorld::blockCanopyShot(glm::dvec3 from,glm::dvec3 to,int team,double 
     for(const auto& s:shields()) {
         if(!s.live || s.team==team)continue;
         glm::dvec3 prevC=s.C,prevN=s.N;
-        if(s.held && s.owner) {
+        if(s.held && s.owner && (!networkLocalPeer_||s.owner->networkOwner()==networkLocalPeer_)) {
             const auto& k=s.owner->runner_.canopy_;
             if(k.previousShield){prevC=k.previousCenter;prevN=k.previousNormal;}
         } else {
@@ -285,13 +335,18 @@ bool CombatWorld::blockCanopyShot(glm::dvec3 from,glm::dvec3 to,int team,double 
             }
             else if(projectile->kind=="slosh")applied*=0.5;
         }
-        if(s.held && s.owner) {
+        if(s.held && s.owner && networkLocalPeer_&&s.owner->networkOwner()!=networkLocalPeer_) {
+            if(networkDeviceHitForwarder_&&!networkApplying_&&projectile&&projectile->owner&&projectile->owner->networkOwner()==networkLocalPeer_)
+                networkDeviceHitForwarder_(s.owner->networkNid(),0,applied,team);
+        } else if(s.held && s.owner) {
             auto& k=s.owner->runner_.canopy_;k.hp=std::max(0.0,k.hp-applied);k.lastHit=time_;
             k.flash=std::min(1.0,k.flash+0.3+applied/140.0);k.shake=std::min(1.0,k.shake+0.25+applied/120.0);
             if(k.hp<=0) {k.state=CanopyState::Broken;k.regrowTime=GetEquipment(EquipmentCategory::Main,"brolly").number("regrowTime");k.regrowK=0;k.open=0;k.openTime=0;k.grow=0;k.lockRelease=true;k.previousShield=false;}
         } else {
             auto it=std::find_if(devices_.begin(),devices_.end(),[&](const auto& d){return d.id==s.id;});
             if(it!=devices_.end()) {it->hp-=applied;if(it->hp<=0)it->live=false;}
+            else if(networkDeviceHitForwarder_&&!networkApplying_&&s.owner&&networkLocalPeer_&&s.owner->networkOwner()!=networkLocalPeer_&&projectile&&projectile->owner&&projectile->owner->networkOwner()==networkLocalPeer_)
+                networkDeviceHitForwarder_(s.owner->networkNid(),s.id,applied,team);
         }
         return true;
     }
@@ -358,6 +413,15 @@ void CombatWorld::damageDevices(glm::dvec3 at,double radius,double damage,int te
             d.hp-=damage;if(d.hp<=0)destroyed(d);
         }
     }
+    if(networkDeviceHitForwarder_&&!networkApplying_&&networkLocalPeer_){
+        for(const auto& remote:remoteWorlds_)for(const auto& d:remote.devices){
+            if(!d.live||d.exploding||d.team==team)continue;
+            const bool vulnerable=d.kind=="torpedo"||d.kind=="waddle"||
+                ((d.kind=="curtain"||d.kind=="sprinkler"||d.kind=="beacon")&&d.shootable);
+            if(!vulnerable||(d.kind=="waddle"&&d.state=="fly")||glm::length(d.pos-at)>=radius+0.4)continue;
+            if(d.owner&&d.owner->networkOwner()!=networkLocalPeer_)networkDeviceHitForwarder_(d.owner->networkNid(),d.id,damage,team);
+        }
+    }
 }
 void CombatWorld::guardActorsWithCanopies(glm::dvec3 at,double radius,int team) {
     const auto active=shields();
@@ -407,21 +471,84 @@ void CombatWorld::damageCanopies(glm::dvec3 at,double radius,int team) {
     }
 }
 bool CombatWorld::beaconAnchor(int team,std::uint64_t id,glm::dvec3& destination) const {
-    const auto it=std::find_if(devices_.begin(),devices_.end(),[&](const auto& d){return d.live && d.kind=="beacon" && d.team==team && (id==0 || d.id==id) && d.uses>0;});
-    if(it==devices_.end()) return false;
+    const auto& allDevices=devices();
+    const auto it=std::find_if(allDevices.begin(),allDevices.end(),[&](const auto& d){return d.live && d.kind=="beacon" && d.team==team && (id==0 || d.id==id) && d.uses>0;});
+    if(it==allDevices.end()) return false;
     destination=it->pos;return true;
 }
 bool CombatWorld::consumeBeacon(PlayerSimulation& actor,std::uint64_t id) {
-    auto it=std::find_if(devices_.begin(),devices_.end(),[&](const auto& d){return d.live && d.kind=="beacon" && d.team==actor.team() && d.id==id && d.uses>0;});
-    if(it==devices_.end()) return false;
-    if(--it->uses<=0 || actor.subId()=="beacon") it->live=false;
+    const auto& allDevices=devices();
+    const auto it=std::find_if(allDevices.begin(),allDevices.end(),[&](const auto& d){return d.live && d.kind=="beacon" && d.team==actor.team() && d.id==id && d.uses>0;});
+    if(it==allDevices.end()) return false;
+    if(it->networkRemote) {
+        if(!networkBeaconUseForwarder_ || !it->owner) return false;
+        networkBeaconUseForwarder_(actor,it->owner->networkNid(),id);
+        return true;
+    }
+    auto local=std::find_if(devices_.begin(),devices_.end(),[&](const auto& d){return d.id==id && d.live && d.kind=="beacon" && d.team==actor.team() && d.uses>0;});
+    if(local==devices_.end()) return false;
+    if(--local->uses<=0 || actor.subId()=="beacon") local->live=false;
+    return true;
+}
+bool CombatWorld::applyNetworkBeaconUse(PlayerSimulation& actor,std::uint32_t beaconOwnerNid,std::uint64_t id) {
+    if(!networkLocalPeer_ || !actor.state.alive
+       || std::find(actors_.begin(),actors_.end(),&actor)==actors_.end()) return false;
+    auto beacon=std::find_if(devices_.begin(),devices_.end(),[&](const auto& d) {
+        return d.live && d.kind=="beacon" && d.uses>0 && d.id==id && d.owner
+            && d.owner->networkNid()==beaconOwnerNid && d.owner->networkOwner()==networkLocalPeer_
+            && d.team==actor.team();
+    });
+    if(beacon==devices_.end()) return false;
+    if(--beacon->uses<=0 || actor.subId()=="beacon") beacon->live=false;
+    return true;
+}
+
+namespace {
+void applyActorEffectState(PlayerSimulation& target,const NetworkActorEffect& effect) {
+    if(effect.poison>0.0) target.state.poison=std::max(target.state.poison,effect.poison);
+    if(effect.track>0.0 && (effect.track>target.state.track || target.state.trackTeam!=effect.effectTeam)) {
+        target.state.track=effect.track;
+        target.state.trackTeam=effect.effectTeam;
+    }
+    if(effect.reveal>0.0 && (effect.reveal>target.state.reveal || target.state.revealTeam!=effect.effectTeam)) {
+        target.state.reveal=effect.reveal;
+        target.state.revealTeam=effect.effectTeam;
+    }
+    if(effect.shield>0.0) target.state.shield=std::max(target.state.shield,effect.shield);
+    target.state.vel+=effect.velocityImpulse;
+}
+}
+
+bool CombatWorld::applyActorEffect(PlayerSimulation& source,PlayerSimulation& target,const NetworkActorEffect& effect) {
+    if(networkLocalPeer_ && source.networkOwner()!=networkLocalPeer_) return false;
+    if(networkLocalPeer_ && target.networkOwner()!=networkLocalPeer_) {
+        if(!networkActorEffectForwarder_) return false;
+        networkActorEffectForwarder_(source,target,effect);
+        return true;
+    }
+    applyActorEffectState(target,effect);
+    return true;
+}
+
+bool CombatWorld::applyNetworkActorEffect(PlayerSimulation& source,PlayerSimulation& target,const NetworkActorEffect& effect) {
+    if(!networkLocalPeer_ || target.networkOwner()!=networkLocalPeer_
+       || std::find(actors_.begin(),actors_.end(),&source)==actors_.end()
+       || std::find(actors_.begin(),actors_.end(),&target)==actors_.end()) return false;
+    applyActorEffectState(target,effect);
     return true;
 }
 bool CombatWorld::applyHit(PlayerSimulation& attacker,PlayerSimulation& victim,double damage,const std::string& source) {
     if(attacker.team()==victim.team() || !victim.state.alive) return false;
+    if(networkHitForwarder_&&!networkApplying_&&networkLocalPeer_&&attacker.networkOwner()==networkLocalPeer_&&victim.networkOwner()!=networkLocalPeer_)
+        return networkHitForwarder_(attacker,victim,damage,source);
     return victim.damageFromCombat(damage,&attacker,source);
 }
 double CombatWorld::paint(PlayerSimulation& owner,glm::dvec3 at,double radius,double seed,const SplatOptions& options,bool special) {
+    struct ActorContext {
+        FacePaint& paint;std::uint32_t previous;
+        ~ActorContext(){paint.setNetworkActor(previous);}
+    } context{paint_,paint_.networkActor()};
+    paint_.setNetworkActor(owner.networkNid());
     const double area=paint_.splat(at,radius,owner.team(),seed,options);
     owner.turfPainted_+=area;
     if(!special && !owner.combatPose().special) owner.state.specialCharge=std::min(owner.weapon().number("specialCost",190),owner.state.specialCharge+area*GetEquipment(EquipmentCategory::Special,owner.specialId()).number("chargeRate",0.8));
@@ -503,7 +630,8 @@ void CombatWorld::explodeDevice(CombatDevice& d,PlayerSimulation* direct) {
             const auto target=e->state.pos+glm::dvec3(0,0.7,0);
             if(glm::length(target-center)>sub.number("radius") || !geometry_.los(center,target)) continue;
             applyHit(*d.owner,*e,sub.number("damage"),d.kind);
-            e->state.track=std::max(e->state.track,sub.number("trackTime"));e->state.trackTeam=d.team;
+            NetworkActorEffect effect;effect.track=sub.number("trackTime");effect.effectTeam=d.team;
+            applyActorEffect(*d.owner,*e,effect);
         }
         damageDevices(center,sub.number("radius"),30,d.team);
         specials_.areaHit(center,sub.number("radius"),sub.number("damage"),d.team,d.owner);
@@ -917,10 +1045,14 @@ void CombatWorld::updateDevices(double dt) {
         }
         return best;
     };
-    auto track=[&](PlayerSimulation& e,int team,double duration) {
-        if(duration>e.state.track || e.state.trackTeam!=team) {e.state.track=duration;e.state.trackTeam=team;}
+    auto track=[&](PlayerSimulation& source,PlayerSimulation& e,int team,double duration) {
+        NetworkActorEffect effect;effect.track=duration;effect.effectTeam=team;
+        applyActorEffect(source,e,effect);
     };
-    auto poison=[](PlayerSimulation& e,double duration) {e.state.poison=std::max(e.state.poison,duration);};
+    auto poison=[&](PlayerSimulation& source,PlayerSimulation& e,double duration) {
+        NetworkActorEffect effect;effect.poison=duration;
+        applyActorEffect(source,e,effect);
+    };
     auto deviceCue=[&](const char* kind,const CombatDevice& d,double charge=0.0) {
         WorldVisualEvent event;event.kind=kind;event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
         event.team=d.team;event.charge=charge;event.source=d.kind;emitVisual(std::move(event));
@@ -1033,7 +1165,7 @@ void CombatWorld::updateDevices(double dt) {
             if(d.kind=="scan" || d.kind=="mist") {
                 if(d.age>=d.fuse) {d.state=d.kind=="scan"?"cloud":"mist";d.age=0;d.timer=s.number(d.kind=="scan"?"cloudTime":"mistTime");
                     deviceCue("device_arm",d);
-                    if(d.kind=="mist" && d.target && d.target->state.alive) poison(*d.target,s.number("mistTime"));}
+                    if(d.kind=="mist" && d.target && d.target->state.alive) poison(*d.owner,*d.target,s.number("mistTime"));}
             }
             if(!d.live || d.state!="fly") continue;
             const auto prev=d.pos;const double speed=glm::length(d.vel);
@@ -1050,7 +1182,7 @@ void CombatWorld::updateDevices(double dt) {
             }
             if(direct) {
                 if(d.kind=="burst") explodeDevice(d,direct);
-                else if(d.kind=="mist") {d.target=direct;d.state="mist";d.age=0;d.timer=s.number("mistTime");poison(*direct,s.number("mistTime"));deviceCue("device_arm",d);}
+                else if(d.kind=="mist") {d.target=direct;d.state="mist";d.age=0;d.timer=s.number("mistTime");poison(*d.owner,*direct,s.number("mistTime"));deviceCue("device_arm",d);}
                 else if(d.kind=="torpedo") explodeDevice(d,direct);
                 continue;
             }
@@ -1068,9 +1200,10 @@ void CombatWorld::updateDevices(double dt) {
                 }
                 if(directHit) {
                     applyHit(*d.owner,*directHit,s.number("directDamage"),d.kind);
-                    track(*directHit,d.team,s.number("directMark"));
+                    track(*d.owner,*directHit,d.team,s.number("directMark"));
                     WorldVisualEvent event;event.kind="device_hit";event.pos=directHit->isLocal()?glm::dvec3(0.0):d.pos;
                     event.team=d.team;event.source="tracer";event.sourceLocal=d.owner->isLocal();event.sourceVictimLocal=directHit->isLocal();
+                    event.victimNid=directHit->networkNid();
                     emitVisual(std::move(event));
                     d.tagged.push_back(directHit);d.live=false;continue;
                 }
@@ -1094,9 +1227,10 @@ void CombatWorld::updateDevices(double dt) {
                         }
                     }
                     if(touched) {
-                        applyHit(*d.owner,*e,s.number("trailDamage"),d.kind);track(*e,d.team,s.number("trailMark"));d.tagged.push_back(e);
+                        applyHit(*d.owner,*e,s.number("trailDamage"),d.kind);track(*d.owner,*e,d.team,s.number("trailMark"));d.tagged.push_back(e);
                         WorldVisualEvent event;event.kind="device_hit";event.pos=e->isLocal()?glm::dvec3(0.0):trailHitPosition;
                         event.team=d.team;event.source="tracer_trail";event.sourceLocal=d.owner->isLocal();event.sourceVictimLocal=e->isLocal();
+                        event.victimNid=e->networkNid();
                         emitVisual(std::move(event));
                     }
                 }
@@ -1162,11 +1296,11 @@ void CombatWorld::updateDevices(double dt) {
             else if(d.age>=d.timer)explodeDevice(d);
         } else if(d.state=="cloud") {
             const double radius=s.number("radius")*std::clamp(d.age/0.25,0.0,1.0);
-            for(auto* e:actors_) if(e && e->team()!=d.team && e->state.alive && std::find(d.tagged.begin(),d.tagged.end(),e)==d.tagged.end() && glm::length(e->state.pos+glm::dvec3(0,0.7,0)-d.pos)<radius) {d.tagged.push_back(e);track(*e,d.team,s.number("trackTime"));}
+            for(auto* e:actors_) if(e && e->team()!=d.team && e->state.alive && std::find(d.tagged.begin(),d.tagged.end(),e)==d.tagged.end() && glm::length(e->state.pos+glm::dvec3(0,0.7,0)-d.pos)<radius) {d.tagged.push_back(e);track(*d.owner,*e,d.team,s.number("trackTime"));}
             if(d.age>=d.timer)d.live=false;
         } else if(d.state=="mist") {
             const double radius=s.number("radius")*std::clamp(d.age/0.4,0.0,1.0);
-            for(auto* e:actors_) if(e && e->team()!=d.team && e->state.alive && glm::length(e->state.pos+glm::dvec3(0,0.6,0)-d.pos)<radius)poison(*e,0.6);
+            for(auto* e:actors_) if(e && e->team()!=d.team && e->state.alive && glm::length(e->state.pos+glm::dvec3(0,0.6,0)-d.pos)<radius)poison(*d.owner,*e,0.6);
             if(d.age>=d.timer)d.live=false;
         } else if(d.state=="curtain") {
             d.hp-=s.number("decay")*dt;if(d.hp<=0)d.live=false;
@@ -1417,6 +1551,13 @@ std::vector<CombatShield> CombatWorld::shields() const {
     std::vector<CombatShield> result;
     for(auto* actor:actors_) {
         if(!actor || actor->mainId()!="brolly")continue;
+        if(networkLocalPeer_&&actor->networkOwner()!=networkLocalPeer_){
+            const auto pose=actor->combatPose();
+            if(!actor->state.alive||actor->state.squid||pose.canopyState!="ready"||pose.canopyOpen<0.55||pose.canopyGrow<0.9)continue;
+            CombatShield shield;shield.team=actor->team();shield.owner=actor;shield.held=true;shield.live=true;shield.blocksActors=false;
+            shield.id=0;shield.N=heldBrollyNormal(*actor);shield.C=heldBrollyCenter(*actor,shield.N);shield.R=0.8;shield.hp=pose.canopyHp;shield.hpMax=pose.canopyHpMax;
+            result.push_back(std::move(shield));continue;
+        }
         const auto& k=actor->runner_.canopy_;
         if(!k.id || k.state!=CanopyState::Ready || k.open<0.55 || k.grow<0.9 || !actor->state.alive || actor->state.squid)continue;
         CombatShield s;s.id=k.id;s.team=actor->team();s.owner=actor;s.held=true;s.live=true;s.blocksActors=false;
@@ -1427,6 +1568,10 @@ std::vector<CombatShield> CombatWorld::shields() const {
         CombatShield s;s.id=d.id;s.team=d.team;s.owner=d.owner;s.held=false;s.live=true;s.blocksActors=true;s.C=d.C;s.N=d.N;s.R=d.R;
         s.pos=d.pos;s.halfW=d.halfW;s.planeOff=d.planeOff;s.speed=d.speed;s.hp=d.hp;s.hpMax=d.hpMax;s.left=d.left;
         result.push_back(std::move(s));
+    }
+    for(const auto& remote:remoteWorlds_)for(const auto& d:remote.devices)if(d.kind=="brolly"&&d.live&&d.owner){
+        CombatShield s;s.id=d.id;s.team=d.team;s.owner=d.owner;s.held=false;s.live=true;s.blocksActors=true;s.C=d.C;s.N=d.N;s.R=d.R;
+        s.pos=d.pos;s.halfW=d.halfW;s.planeOff=d.planeOff;s.speed=d.speed;s.hp=d.hp;s.hpMax=d.hpMax;s.left=d.left;result.push_back(std::move(s));
     }
     return result;
 }

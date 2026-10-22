@@ -2,6 +2,7 @@
 
 #include "../game/PlayerProfile.hpp"
 #include "../render/GraphicsSettings.hpp"
+#include "../network/RoomTypes.hpp"
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -33,6 +34,14 @@ struct UiJumpMapTarget {
     std::string label;
     bool available=false;
 };
+struct UiOnlineRequest {
+    enum class Kind { Create, Join, Leave, Ready, Team, Settings, Start, Emote, LocalService };
+    Kind kind=Kind::Create;
+    std::string address,code,emote;
+    network::RoomSettings settings;
+    int team=-1;
+    bool ready=false;
+};
 
 // The player interface shares the game's context; documents own presentation only.
 class GameUi {
@@ -59,6 +68,9 @@ public:
     void SetVolumeSink(std::function<void(float,float,float)> sink);
     void SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel={});
     int TakeJumpMapSelection();
+    void ShowOnline();
+    void SetOnlineState(const network::RoomView& view);
+    std::vector<UiOnlineRequest> TakeOnlineRequests();
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

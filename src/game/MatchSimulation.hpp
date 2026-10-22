@@ -5,6 +5,7 @@
 #include "CharacterRenderData.hpp"
 #include "ZoneControl.hpp"
 #include "ZonePlan.hpp"
+#include "../network/RoomTypes.hpp"
 #include <array>
 #include <functional>
 #include <memory>
@@ -13,14 +14,20 @@
 namespace restoration {
 struct MatchOptions {
     bool practice=false,autopilot=false;
+    bool network=false;
     std::string mode="turf";
     int duration=0;
     std::uint32_t seed=1;
     std::string main="shooter",sub,special,difficulty="normal";
     std::string playerName="You";
     CharacterStyle style;
+    network::MemberId localPeer=0,authorityPeer=0;
+    std::vector<network::RosterEntry> networkRoster;
 };
-struct MatchRosterEntry { std::string name; CharacterStyle style; int team=0,slot=0; bool local=false; };
+struct MatchRosterEntry {
+    std::string name; CharacterStyle style; int team=0,slot=0; bool local=false;
+    std::uint32_t nid=0; network::MemberId owner=0; bool bot=false,active=true;
+};
 enum class MatchPhase { Intro, Playing, Finish, Judge, Results };
 struct BossResult { bool win=false; double time=0,hp=0,maxHp=0; int phase=1; };
 struct ZoneResult {
@@ -47,9 +54,19 @@ public:
     void tick(double dt);
     void startPlaying();
     void finishJudging();
+    void applyNetworkState(MatchPhase phase,double remaining,std::optional<MatchResult> result);
+    void setNetworkAuthorityPeer(network::MemberId peer);
+    void setNetworkAuthorityPeer(network::MemberId peer,const std::vector<network::RosterEntry>& roster);
+    void applyNetworkRoster(const std::vector<network::RosterEntry>& roster);
+    bool networked() const { return options_.network; }
+    bool networkAuthority() const { return !options_.network||options_.localPeer==options_.authorityPeer; }
+    network::MemberId localPeer() const { return options_.localPeer; }
+    network::MemberId authorityPeer() const { return options_.authorityPeer; }
+    void setNetworkActorActive(std::uint32_t nid,bool active);
+    void updateNetworkBossPresentation();
     // CPU-only animated sockets stay synchronized with fixed simulation ticks.
     void setBossPoseSink(std::function<void(BossSimulation&)> sink);
-    PlayerSimulation& local() { return *actors_.front(); }
+    PlayerSimulation& local();
     const std::vector<std::unique_ptr<PlayerSimulation>>& actors() const { return actors_; }
     const std::vector<std::unique_ptr<BotSimulation>>& bots() const { return bots_; }
     const std::vector<MatchRosterEntry>& roster() const { return roster_; }

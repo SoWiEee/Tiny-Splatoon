@@ -64,6 +64,45 @@ int main(int argc,char** argv){
         auto* name=dynamic_cast<Rml::ElementFormControl*>(element("profile-name"));Check(name!=nullptr,"Profile name must be editable");
         name->SetValue("Mint Ice");name->DispatchEvent("change",{});
         Check(ui.profile().name=="Mint Ice"&&profileWrites==1,"Editing the profile name must persist through the profile sink");
+        {
+            network::RoomView room;ui.SetOnlineState(room);ui.ShowOnline();render();
+            Check(element("online-connect")->IsVisible()&&!element("online-room")->IsVisible(),"Offline room UI must offer create and join");
+            element("online-create")->Click();auto requests=ui.TakeOnlineRequests();
+            Check(requests.size()==1&&requests[0].kind==UiOnlineRequest::Kind::Create&&requests[0].address=="127.0.0.1:27020","Create must preserve the selected room-service address");
+            room.phase=network::RoomPhase::Connecting;room.status="正在連線…";ui.SetOnlineState(room);render();
+            Check(element("online-create")->HasAttribute("disabled")&&element("online-join")->HasAttribute("disabled"),"Connecting must disable duplicate create/join requests");
+            Check(element("online-cancel")->IsVisible(),"Connecting must always offer cancellation");
+            element("online-cancel")->Click();requests=ui.TakeOnlineRequests();Check(requests.size()==1&&requests[0].kind==UiOnlineRequest::Kind::Leave,"Cancel must release the pending session");
+            room.phase=network::RoomPhase::Error;room.error="找不到房間，請確認房碼。";ui.SetOnlineState(room);render();
+            Check(element("online-error")->IsVisible(),"A room error must be visible with a recovery message");
+            room.phase=network::RoomPhase::Lobby;room.error.clear();room.code="BCE23";room.selfId=1;room.hostId=1;
+            for(unsigned id=1;id<=8;++id){network::Member member;member.id=id;member.name="玩家 "+std::to_string(id);member.team=id%2;member.main="shooter";member.ping=12+id;room.members.push_back(member);}
+            ui.SetOnlineState(room);render();
+            Check(element("online-roster")->GetNumChildren()==8&&element("online-start")->HasAttribute("disabled"),"An eight-player lobby must show every member and wait for ready");
+            for(auto& member:room.members)member.ready=true;
+            room.members[0].ready=false;ui.SetOnlineState(room);render();
+            Check(!element("online-start")->HasAttribute("disabled"),"Host start must accept its own implicit readiness");
+            room.members[0].ready=true;
+            ui.SetOnlineState(room);render();
+            Check(!element("online-start")->HasAttribute("disabled"),"A fully ready lobby must allow its host to start");
+            element("online-ready")->Click();requests=ui.TakeOnlineRequests();
+            Check(requests.size()==1&&requests[0].kind==UiOnlineRequest::Kind::Ready&&!requests[0].ready,"Ready must support cancelling the current ready state");
+            element("online-copy")->Click();Check(std::string(glfwGetClipboardString(window))==room.code,"Copy must share the current five-character code");
+            for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
+                glViewport(0,0,size[0],size[1]);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderMenu(size[0],size[1]);
+                Capture(std::filesystem::path(argv[2])/("online-room-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+                const auto available=element("online-room")->GetClientWidth();
+                Check(available>250&&element("online-roster")->GetClientWidth()<=available+1,"Room roster must fit the available menu width");
+                Check(element("online-ready")->GetAbsoluteOffset().y+element("online-ready")->GetOffsetHeight()<size[1],"Ready must stay in the viewport with eight members");
+            }
+            room.hostId=2;ui.SetOnlineState(room);render();
+            Check(!element("online-start")->IsVisible()&&!element("online-settings-toggle")->IsVisible(),"Host migration must update room controls without leaving the room");
+            room.members[0].name="<button id='spoof'>";ui.SetOnlineState(room);render();
+            Check(menu->GetElementById("spoof")==nullptr,"Member names must render as escaped text");
+            element("online-leave")->Click();requests=ui.TakeOnlineRequests();
+            Check(requests.size()==1&&requests[0].kind==UiOnlineRequest::Kind::Leave,"Leave must reach the session owner");
+            ui.SetOnlineState({});ui.ShowMenu("tidewater");render();
+        }
         element("nav-locker")->Click();render();
         auto* hair=dynamic_cast<Rml::ElementFormControl*>(element("style-hair"));Check(hair!=nullptr,"Locker must expose source hair choices");
         const int writesBeforeHair=profileWrites;
@@ -402,8 +441,11 @@ int main(int argc,char** argv){
         Check(xpLabel->GetInnerRML().find("+0")!=Rml::String::npos,"Results should begin the XP reveal at zero");
         const double xpMidTime=glfwGetTime()+.2;glfwSetTime(xpMidTime);hudRender(false);
         Check(xpLabel->GetInnerRML().find("+640")==Rml::String::npos&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"XP should count up with one tick while the award is in flight");
-        const auto xpMidReveal=xpLabel->GetInnerRML();ui.SetReward(reward);glfwSetTime(xpMidTime);hudRender(false);
-        Check(xpLabel->GetInnerRML()==xpMidReveal&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"Repeated reward assignments must not restart the XP reveal or duplicate a tick");
+        const auto shownXp=[&]{const auto text=xpLabel->GetInnerRML();return std::stoi(text.substr(text.find('+')+1));};
+        const int xpMidReveal=shownXp();const double firstRenderDrift=glfwGetTime()-xpMidTime;
+        ui.SetReward(reward);glfwSetTime(xpMidTime);hudRender(false);
+        const double clockDrift=std::max(firstRenderDrift,glfwGetTime()-xpMidTime);
+        Check(std::abs(shownXp()-xpMidReveal)<=std::ceil(clockDrift*reward.gained*3/1.7)+1&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"Repeated reward assignments must not restart the XP reveal or duplicate a tick");
         glfwSetTime(glfwGetTime()+2.0);hudRender(false);
         Check(xpLabel->GetInnerRML().find("+640")!=Rml::String::npos,"Results must finish by displaying the saved XP reward");
         Capture(std::filesystem::path(argv[2])/"results.png",1600,900);

@@ -48,6 +48,18 @@ void PlayerSimulation::setLoadout(std::string main, std::string sub, std::string
     runner_.reset();
 }
 
+void PlayerSimulation::prepareNetworkAdoption() {
+    const PlayerState preservedState = state;
+    world_->cleanup(*this);
+    runner_.reset();
+    networkCombatPose_.reset();
+    networkSpecialPose_.reset();
+    superJump_.reset();
+    input = {};
+    input.aimYaw = preservedState.yaw;
+    state = preservedState;
+}
+
 void PlayerSimulation::spawnAt(glm::dvec3 pos, double yaw) {
     superJump_.reset();
     state = {};
@@ -75,6 +87,7 @@ void PlayerSimulation::spawnAt(glm::dvec3 pos, double yaw) {
 }
 
 CombatPose PlayerSimulation::combatPose() const {
+    if(networkCombatPose_)return *networkCombatPose_;
     auto pose = runner_.pose();
     const auto special = world_->specials_.pose(*this);
     pose.special = special.active;
@@ -84,7 +97,7 @@ CombatPose PlayerSimulation::combatPose() const {
     return pose;
 }
 
-SpecialPose PlayerSimulation::specialPose() const { return world_->specials_.pose(*this); }
+SpecialPose PlayerSimulation::specialPose() const { return networkSpecialPose_?*networkSpecialPose_:world_->specials_.pose(*this); }
 double PlayerSimulation::hitRadius() const { const auto special=specialPose();return special.hitRadius>0?special.hitRadius:0.38; }
 double PlayerSimulation::hitHeight() const { const auto special=specialPose();return special.hitHeight>0?special.hitHeight:(state.squid?0.55:1.45); }
 

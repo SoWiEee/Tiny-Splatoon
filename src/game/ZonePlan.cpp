@@ -153,6 +153,17 @@ ZonePlan::ZonePlan(const ZoneControl& zones, const StageData& stage, const Stage
     }
 }
 
+void ZonePlan::resetAfterAuthorityChange(){
+    assignments_.clear();botState_.clear();
+    focus_.fill(-1);nextSpecial_.fill(0.0);waves_={};
+    time_=0.0;scanTimer_=0.0;roleTimer_=-1.0;activeSignature_=0;activeSetSignature_=0;initialized_=false;
+    for(auto& info:info_){
+        for(auto& values:info.need)std::fill(values.begin(),values.end(),0.0f);
+        for(auto& values:info.ink)std::fill(values.begin(),values.end(),0);
+        info.needSum={0.0,0.0};
+    }
+}
+
 double ZonePlan::random() {
     if (randomSource_) return std::clamp(randomSource_(), 0.0, std::nextafter(1.0, 0.0));
     seed_ += 0x6d2b79f5u;

@@ -15,7 +15,7 @@
 | 保存、設定與完整單人介面 | 原生 profile／設定原子保存、裝備／外觀／XP、首頁／置物櫃／3D 預覽／操作說明／製作名單／結果頒獎台已接入；觸控與震動後端、實體手把手感仍未驗收 | SAVE-01–05、FLOW-01–05／09–10 | 首次啟動、重開還原、舊資料遷移、寫入失敗及每個入口往返 |
 | HUD／UI 排版與字級 | 繁中名稱及 Inter／Noto Sans TC 已接入；來源版面比例與字級仍待調整 | HUD-01–08、FLOW-01–10；[翻譯表](ui-translations.md) | 1280×720 與 1920×1080 的 HUD、選單、暫停和結果畫面來源對照及可讀性 |
 | Zone 模式與正式進度 | 離線七圖已接入 Zone 規則／逆轉／延長、AI／HUD／場地標記／音效與 XP；仍需完整人工視覺／聽感及跨 GPU 驗收，線上 follower 同步屬網路待辦 | MODE-Z01–07、AI-04、AUDIO-03、SAVE-04 | 三難度對戰、領地切換、逆轉／延長、結算只執行一次 |
-| 線上連線 | GameNetworkingSockets 原生 IP 傳輸及 2／3／8 client 本機檢查已接入；房碼／房間／ready、同步、延遲緩衝、換主、斷線 Bot 接手及回原房尚未移植 | NET-01–12 | 2／3／8 clients、三模式、延遲／抖動／斷線／換主及跨網測試 |
+| 線上連線 | GNS 房間服務／房碼／RmlUi 房間、同步、延遲緩衝、換主、斷線 Bot 接手與回同房已接入；來源 3D hub／lobby、跨機／跨網與公開服務負載待完成 | NET-01–12；[多人契約](network-source-contract.md) | 來源 lobby 演出、跨網三模式、長局／最壞持續裝置與延遲矩陣 |
 | 音訊的剩餘來源差異 | 選配歌曲與多項事件、Zone／XP 事件已接入，但 `xp_tick` 節奏與 20 個 Boss 動態 sockets 已接入；XP 音高／音量、Boss impact／腳步／階段時序、細分碰撞、主觀定位、HRTF 與完整壓縮器仍有差異；Shaker／Tracer／Wail 事件及 ZoneHum convolution 已補驗 | AUDIO-01–04；[音訊契約](audio-source-contract.md) | 裝備與 Boss 的主觀聽感／定位、XP 節奏、loop 參數變化與切場清理 |
 | 全量驗收 | 元件 oracle 通過不代表全場景 100%；Boss hazard／live crablet 演出仍需完整視覺矩陣，音訊仍需主觀聽感比對；QA-12 最壞視效負載與品質矩陣未完成 | QA、規格第 15 節 | 固定 reference captures、長局重入／清場、各品質與 GPU 完成時間量測 |
 
@@ -31,7 +31,7 @@
 
 1. **原生測試獨立**：把 LOD 來源期望值固定成有來源 hash 的 fixture；World FX 的原生 fixture 比對與可選來源 hash 驗證分開。目前 `reference_character_lod` 與 `reference_worldfx_oracle` 在 CMake 的來源存在條件之外註冊，卻直接讀取來源檔，不能以刪除或停用測試代替移植。
 2. **剩餘視聽與完整單人驗收**：完成上述道具／潛水、HUD／UI、音訊候選，並做 Boss hazard／live crablet、跨 GPU 與最壞負載矩陣。
-3. **原生多人連線**：以 GameNetworkingSockets 完成房間、同步、斷線／換主／Bot 接手與三模式跨網矩陣。僅保留套件依賴不算完成。
+3. **原生多人連線**：GNS 房間、同步、斷線／換主／Bot 接手與本機三模式已接入；完成來源 3D hub／lobby 及三模式跨機／跨網矩陣。僅本機測試通過不算全量完成。
 4. **最終獨立驗收及來源退役**：在沒有 `splat-ref/` 的乾淨 checkout 建置、執行全部原生回歸與完整玩家流程，檢查各畫質及最壞負載。來源專用匯出器／瀏覽器比對工具可在退役時封存或移除，但需先保留固定 fixtures、資產、來源 hash、授權及必要的比對證據；不能讓缺少來源資料夾默默變成「完整還原通過」。
 
 完成上述來源比對前，保留鎖定的參考版；退役後專案內不再要求這個目錄。此核對未刪除或改動 `splat-ref/`。

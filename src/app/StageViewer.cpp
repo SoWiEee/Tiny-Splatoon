@@ -28,6 +28,8 @@
 #include "AudioEngine.hpp"
 #include "GameAudio.hpp"
 #include "FollowCamera.hpp"
+#include "OnlinePlay.hpp"
+#include "../network/MatchSync.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -53,6 +55,7 @@
 namespace restoration {
 namespace {
 struct Options {
+    std::filesystem::path executable;
     std::string stage = "tidewater", mode = "turf", matchCapture,uiCapture;
     std::string benchmarkReport,graphicsQuality;
     std::string main="shooter",sub,special,difficulty="normal";
@@ -87,6 +90,7 @@ struct WindowMode {
 
 Options ParseOptions(int argc, char** argv) {
     Options result;
+    result.executable=std::filesystem::absolute(argv[0]);
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -210,7 +214,7 @@ CameraTarget CameraActor(const PlayerSimulation& player) {
 enum class MatchExit { Close, StageSelect, Rematch, PracticeStage };
 
 MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& stage,
-                    const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio,bool nativeApp=false,ProfileStore* store=nullptr,PlayerShowcase* showcase=nullptr) {
+                    const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio,bool nativeApp=false,ProfileStore* store=nullptr,PlayerShowcase* showcase=nullptr,OnlinePlay* online=nullptr) {
     audio.Clear();
     const auto graphics=options.graphicsQuality.empty()?ui.graphicsSettings():ForPreset(options.graphicsQuality=="low"?GraphicsPreset::Low:options.graphicsQuality=="high"?GraphicsPreset::High:GraphicsPreset::Medium);
     StageGeometry geometry(stage);
@@ -225,10 +229,13 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     setup.duration=options.duration;
     setup.main=options.main;setup.sub=options.sub;setup.special=options.special;setup.difficulty=options.difficulty;
     if(nativeApp){setup.playerName=ui.profile().name;setup.style=ui.profile().style;}
+    if(online)setup=network::MatchSync::BuildOptions(*online->session(),ui.profile());
     if(nativeApp){camera.horizontalFovDegrees=ui.profile().settings.fov;camera.shake=ui.profile().settings.reducedMotion?0:ui.profile().settings.cameraShake;}
     MatchSimulation match(stage,geometry,paint,nav,setup);
-    if(match.actors().size()!=(options.practice?1:8)) throw std::runtime_error("Incorrect offline actor roster");
-    if(match.bots().size()!=(options.practice?0:7)) throw std::runtime_error("Incorrect offline bot roster");
+    if(!online&&match.actors().size()!=(options.practice?1:8)) throw std::runtime_error("Incorrect offline actor roster");
+    if(!online&&match.bots().size()!=(options.practice?0:7)) throw std::runtime_error("Incorrect offline bot roster");
+    std::unique_ptr<network::MatchSync> networkMatch;
+    if(online)networkMatch=std::make_unique<network::MatchSync>(*online->session(),match,paint);
     if(options.mode!="boss"&&!nativeApp)match.startPlaying();
     gameAudio.BeginMatch(match);
     camera.yaw=match.local().state.yaw;
@@ -244,7 +251,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     RenderPipeline pipeline;
     pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects&&(!nativeApp||ui.profile().settings.bloom));
     CharacterArt art(characterAssets,true,true);
-    const std::string matchId=std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    const std::string matchId=online?"online-"+online->view().code+"-"+std::to_string(online->view().matchEpoch)+"-"+std::to_string(online->view().seed)+"-"+std::to_string(online->view().selfId):std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
     WorldEffects worldEffects(art.data());
     worldEffects.SetPaintSurface(&paint);
     DeviceRenderer deviceRenderer(characterAssets.parent_path()/"devices");
@@ -286,6 +293,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     MatchExit matchExit=MatchExit::Close;
     bool pauseSubWasHeld=false,pauseSpecialWasHeld=false,subResumeSync=false,specialResumeBlock=false;
     double judgeElapsed=0.0;
+    double returnToRoomAt=std::numeric_limits<double>::infinity();
     double mouseX=0.0,mouseY=0.0;
     double pendingMouseX=0,pendingMouseY=0;
     PlayerController controller;
@@ -306,7 +314,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             glfwGetKey(window,GLFW_KEY_E)==GLFW_PRESS || (hasPad&&pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER]);
         pauseSpecialWasHeld=input.special || glfwGetKey(window,GLFW_KEY_F)==GLFW_PRESS ||
             glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS || (hasPad&&(pad.buttons[GLFW_GAMEPAD_BUTTON_Y]||pad.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_THUMB]));
-        paused=true;match.paused=true;accumulator=0.0;captureMouse(false);gameAudio.Pause();
+        paused=true;match.paused=!online;accumulator=0.0;captureMouse(false);if(!online)gameAudio.Pause();
     };
     auto resumeMatch=[&] {
         paused=false;match.paused=false;accumulator=0.0;
@@ -322,7 +330,8 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         auto& input=local.input;
         controller.ValidateSuperJumpQueue(match);
         input={};
-        if(benchmark) {
+        if(online&&paused){input.aimYaw=camera.yaw;input.aimPitch=camera.pitch;}
+        else if(benchmark) {
             const double phase=(static_cast<double>(simulationStep)+options.benchmarkSeed*31.0)/90.0;
             const glm::dvec3 waypoint=target+glm::dvec3(std::sin(phase)*span*0.12,0.0,
                 std::cos(phase*0.73)*span*0.12);
@@ -393,7 +402,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             input.specialConfirm=mapTarget&&left&&!fireBlocked&&!leftWas;
             leftWas=left;
         }
-        match.tick(dt);
+        if(networkMatch)networkMatch->Tick(dt);else match.tick(dt);
         if(match.phase()!=previousPhase){
             switch(match.phase()){
             case MatchPhase::Intro:screenController.MatchState("intro");break;
@@ -424,11 +433,12 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             previousCountdown=count;
         }
         if(!benchmark) {
-            if(match.phase()==MatchPhase::Judge) {
+            if(match.phase()==MatchPhase::Judge&&(!online||online->view().selfId==online->view().hostId)) {
                 judgeElapsed+=dt;
                 if(judgeElapsed>=2.6) match.finishJudging();
             } else judgeElapsed=0.0;
             if(match.phase()==MatchPhase::Results&&!resultReported) {
+                if(online)returnToRoomAt=glfwGetTime()+12.0;
                 if(const auto& result=match.result())
                     std::cout<<"MATCH_RESULT winner="<<(result->winner==0?"orange":"blue")
                              <<" orange="<<result->coverage[0]*100.0<<" blue="<<result->coverage[1]*100.0<<'\n';
@@ -440,7 +450,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                     reward.won=match.result()->boss?match.result()->boss->win:match.result()->winner==match.local().team();
                     reward.turf=match.local().turfPainted();reward.splats=match.local().splats();
                     if(match.result()->zones){reward.zoneTurf=match.local().zoneTurfPainted();reward.knockout=match.result()->zones->reason=="knockout";}
-                    if(match.boss()){reward.bossDamage=match.boss()->squadDamage()[0];reward.splats+=match.boss()->squadSplats()[0];}
+                    if(match.boss()){
+                        const auto localIndex=static_cast<std::size_t>(std::find_if(match.actors().begin(),match.actors().end(),[&](const auto& actor){return actor.get()==&match.local();})-match.actors().begin());
+                        reward.bossDamage=match.boss()->squadDamage()[localIndex];reward.splats+=match.boss()->squadSplats()[localIndex];
+                    }
                     const auto earned=ApplyMatchReward(profile,reward);
                     ui.SetProfile(profile);ui.SetReward(earned);
                     try{store->save(profile);ui.SetSaveError({});}
@@ -564,15 +577,23 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     if(!benchmark&&!options.frames) captureMouse(true);
     glEnable(GL_DEPTH_TEST);
     double lodPrevious=glfwGetTime();
+    if(online)online->session()->MarkLoaded();
     while(!glfwWindowShouldClose(window)) {
         if(capture) capture->beginFrame();
         glfwPollEvents();
+        if(online){
+            const double now=glfwGetTime();online->Update(now);networkMatch->Update(now,std::clamp(now-previous,0.0,0.1));ui.SetOnlineState(online->view());
+            if(!networkMatch->failure().empty())throw std::runtime_error(networkMatch->failure());
+            if(match.phase()==MatchPhase::Results&&now>=returnToRoomAt&&online->view().selfId==online->view().hostId){online->session()->ReturnToLobby();returnToRoomAt=std::numeric_limits<double>::infinity();}
+            const auto phase=online->view().phase;
+            if(phase!=network::RoomPhase::Starting&&phase!=network::RoomPhase::Match){matchExit=MatchExit::StageSelect;break;}
+        }
         int width=0,height=0;
         glfwGetFramebufferSize(window,&width,&height);
         if(width<=0||height<=0) {if(capture)throw std::runtime_error("Benchmark framebuffer is unavailable");glfwWaitEventsTimeout(0.05);continue;}
         if(capture && (width!=1920 || height!=1080)) throw std::runtime_error("Benchmark framebuffer must be exactly 1920x1080; got "+std::to_string(width)+"x"+std::to_string(height));
         const double now=glfwGetTime();
-        const double visualDt=paused?0.0:(capture||options.frames)?dt:std::clamp(now-previous,0.0,0.1);
+        const double visualDt=paused&&!online?0.0:(capture||options.frames)?dt:std::clamp(now-previous,0.0,0.1);
         audio.Update();
         if(!benchmark&&!options.frames) {
             hasPad=false;
@@ -611,7 +632,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             }
         }
         if(capture||options.frames) tick();
-        else if(!paused) {
+        else if(!paused||online) {
             accumulator+=std::clamp(now-previous,0.0,0.1);
             while(accumulator+1e-12>=dt) {tick();accumulator-=dt;}
         }
@@ -629,7 +650,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             view=glm::lookAt(glm::vec3(renderEye),glm::vec3(renderEye+renderForward),glm::vec3(0,1,0));
         }
         const auto vp=projection*view;
-        const double lodStep=benchmark?dt:paused?0.0:std::clamp(now-lodPrevious,0.0,0.1);
+        const double lodStep=benchmark?dt:paused&&!online?0.0:std::clamp(now-lodPrevious,0.0,0.1);
         lodPrevious=now;
         environment.Update(lodStep);
         std::vector<CharacterLodFrame> lodFrames(characters.size());
@@ -639,7 +660,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                 projection[1][1],height),character.scene.isLocal,lodStep);
         }
         std::vector<DeviceActorPose> deviceActors;deviceActors.reserve(characters.size());
-        for(std::size_t i=0;i<characters.size();i++){const auto& character=*characters[i];const auto special=match.actors()[i]->specialPose();deviceActors.push_back({match.actors()[i].get(),&character.pose->frame(),&character.style,special.active&&special.kind=="jetpack"?art.attachment(character.pose->frame(),character.style,"tank/group"):glm::dmat4(1)});}
+        for(std::size_t i=0;i<characters.size();i++){if(!match.roster()[i].active)continue;const auto& character=*characters[i];const auto special=match.actors()[i]->specialPose();deviceActors.push_back({match.actors()[i].get(),&character.pose->frame(),&character.style,special.active&&special.kind=="jetpack"?art.attachment(character.pose->frame(),character.style,"tank/group"):glm::dmat4(1)});}
         int shadowDraws=0;
         if(graphics.shadows){
         directionalShadow.Begin(stage.bounds,glm::dvec3(lighting.sunDirection),graphics.shadowMapSize);
@@ -649,6 +670,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         const CharacterShadowState shadowCaster{true,0,directionalShadow.matrix(),0.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
         for(std::size_t i=0;i<characters.size();++i){
+            if(!match.roster()[i].active)continue;
             const auto& actor=*match.actors()[i];auto& character=*characters[i];const auto& pose=character.pose->frame();const auto& lod=lodFrames[i];
             const auto special=actor.specialPose();const bool hideTank=special.active&&special.kind=="jetpack";
             if(lod.transitioning){
@@ -706,6 +728,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         CharacterShadowState receiver{false,graphics.shadows?directionalShadow.texture():0,directionalShadow.matrix(),1.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
         for(std::size_t i=0;i<characters.size();++i) {
+            if(!match.roster()[i].active)continue;
             const auto& actor=*match.actors()[i];
             auto& character=*characters[i];
             const auto& pose=character.pose->frame();
@@ -737,10 +760,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         if(!capture||options.benchmarkPlayer) {
             if(showcase&&match.phase()==MatchPhase::Results&&match.result()){
                 std::vector<std::size_t> order;
-                for(std::size_t i=0;i<match.actors().size();++i)if(match.actors()[i]->team()==match.local().team())order.push_back(i);
+                for(std::size_t i=0;i<match.actors().size();++i)if(match.roster()[i].active&&match.actors()[i]->team()==match.local().team())order.push_back(i);
                 if(match.boss())std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){return match.boss()->squadDamage()[a]>match.boss()->squadDamage()[b];});
                 std::vector<PlayerShowcase::PodiumPlayer> podium;
-                for(const auto i:order){if(podium.size()==4)break;const auto& a=*match.actors()[i];podium.push_back({match.roster()[i].name,i==0?ui.profile().style:match.roster()[i].style,a.mainId(),a.subId()});}
+                for(const auto i:order){if(podium.size()==4)break;const auto& a=*match.actors()[i];podium.push_back({match.roster()[i].name,a.isLocal()?ui.profile().style:match.roster()[i].style,a.mainId(),a.subId()});}
                 const bool won=match.result()->boss?match.result()->boss->win:match.result()->winner==match.local().team();
                 const auto p=ui.preview();
                 if(p.type==UiPreviewType::Podium&&p.width>0&&p.height>0)
@@ -767,8 +790,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                 }
                 resumeMatch();
             }
-            else if(hudAction==UiAction::StageSelect)matchExit=MatchExit::StageSelect;
-            else if(hudAction==UiAction::Rematch)matchExit=MatchExit::Rematch;
+            else if(hudAction==UiAction::StageSelect||hudAction==UiAction::Rematch){
+                if(online){if(match.phase()==MatchPhase::Results){if(online->view().selfId==online->view().hostId)online->session()->ReturnToLobby();}else online->Leave();matchExit=MatchExit::StageSelect;}
+                else matchExit=hudAction==UiAction::Rematch?MatchExit::Rematch:MatchExit::StageSelect;
+            }
             else if(hudAction==UiAction::PracticeStage)matchExit=MatchExit::PracticeStage;
             else if(hudAction==UiAction::PracticeReset){paint.clear();worldEffects.Clear();screenController.Reset();}
             else if(hudAction==UiAction::PracticeFill){auto& s=match.local().state;s.hp=100;s.ink=100;s.specialCharge=match.local().weapon().number("specialCost",190);}
@@ -801,6 +826,8 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
                 const std::filesystem::path& characterAssets,GameUi& ui,AudioEngine& audio,GameAudio& gameAudio) {
     ProfileStore store;
     WindowMode windowMode;
+    OnlinePlay online(options.executable);
+    std::string handledMatch;
     try{ui.SetProfile(store.load());}
     catch(const std::exception& error){ui.SetProfile({});ui.SetSaveError(error.what());}
     audio.SetVolumes(float(ui.profile().settings.master),float(ui.profile().settings.music),float(ui.profile().settings.sfx));
@@ -810,6 +837,7 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
         windowMode.apply(window,profile.settings.fullscreen);
         try{store.save(profile);ui.SetSaveError({});}
         catch(const std::exception& error){ui.SetSaveError(error.what());}
+        online.ProfileChanged(profile);
     });
     const StageData* selected=&initial;
     ui.ShowTitle(std::string(initial.id));
@@ -826,6 +854,7 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
         SetInkPalette(ProfilePaletteColors(ui.profile().settings.palette,ui.profile().settings.colorblind));
         glfwPollEvents();
         audio.Update();
+        online.Update(frameStart);ui.SetOnlineState(online.view());
         int width=0,height=0;
         glfwGetFramebufferSize(window,&width,&height);
         if(width<=0||height<=0) {glfwWaitEventsTimeout(0.05);continue;}
@@ -837,6 +866,7 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
             showcase.drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,
                 {int(preview.x*width),int((1-preview.y-preview.height)*height),int(preview.width*width),int(preview.height*height)},frameStart,ui.profile().settings.reducedMotion);
         const auto action=ui.RenderMenu(width,height);
+        for(const auto& request:ui.TakeOnlineRequests())online.Handle(request,ui.profile());
         const auto& selection=ui.setup();
         for(const auto& candidate:ReferenceStages())if(candidate.mode==(selection.mode=="zones"?"zones":"turf")&&!candidate.onlineOnly&&candidate.id==selection.stage)selected=&candidate;
         if(action==UiAction::Close) {glfwSetWindowShouldClose(window,1);break;}
@@ -846,7 +876,26 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
             break;
         }
         glfwSwapBuffers(window);
+        const auto roomMatch=online.view().code+"-"+std::to_string(online.view().matchEpoch)+"-"+std::to_string(online.view().seed);
+        if(online.session()&&(online.view().phase==network::RoomPhase::Starting||online.view().phase==network::RoomPhase::Match)&&roomMatch!=handledMatch){
+            const auto& room=online.view();handledMatch=roomMatch;
+            const StageData* onlineStage=nullptr;
+            for(const auto& candidate:ReferenceStages())if(candidate.id==room.settings.map&&candidate.mode==(room.settings.mode=="zones"?"zones":"turf")){onlineStage=&candidate;break;}
+            if(!onlineStage)online.Fail("找不到房間選擇的場地，請重新加入房間。");
+            else{
+                Options game=options;game.match=true;game.native=false;game.practice=false;game.stage=room.settings.map;game.mode=room.settings.mode;game.duration=static_cast<int>(room.settings.duration);game.difficulty=room.settings.difficulty;
+                StageData gameStage=*onlineStage;gameStage.theme=room.settings.time=="dusk"?"sunset":"day";
+                SetInkPalette(ProfilePaletteColors(static_cast<int>(room.settings.palette),ui.profile().settings.colorblind));gameAudio.Menu(false);
+                try{
+                    const auto exit=MatchLoop(window,game,gameStage,characterAssets,ui,audio,gameAudio,true,&store,&showcase,&online);
+                    if(exit==MatchExit::Close)break;
+                }catch(const std::exception& error){online.Fail("無法進入線上對戰："+std::string(error.what()));}
+                gameAudio.Menu(true);
+            }
+            ui.ShowMenu(std::string(selected->id));ui.ShowOnline();ui.SetOnlineState(online.view());frame=0;
+        }
         if(action==UiAction::Start||action==UiAction::Practice) {
+            online.Leave();ui.SetOnlineState(online.view());
             Options game=options;
             game.stage=std::string(selected->id);
             game.practice=action==UiAction::Practice||selection.mode=="practice";

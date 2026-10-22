@@ -1,4 +1,5 @@
 #include "BossSimulation.hpp"
+#include "../network/AuthorityState.hpp"
 #include "ArsenalData.hpp"
 #include "FacePaint.hpp"
 #include "PlayerSimulation.hpp"
@@ -43,7 +44,7 @@ BossSimulation::BossSimulation(const StageData& stage,const StageGeometry& geome
     const std::vector<PlayerSimulation*>& squad,const std::string& difficulty,std::uint32_t seed)
     :stage_(stage),geometry_(geometry),paint_(paint),squad_(squad),nav_(stage,geometry),difficulty_(difficulty),
       seed_(seed),initialSeed_(seed){
-    if(stage.mode!="turf"||stage.onlineOnly||squad.empty())throw std::invalid_argument("Boss requires a legal offline Turf stage and squad");
+    if(stage.mode!="turf"||squad.empty())throw std::invalid_argument("Boss requires a Turf stage and squad");
     damageMultiplier_=difficulty=="easy"?.7:difficulty=="hard"?1.2:1;
     reset();
 }
@@ -54,6 +55,7 @@ double BossSimulation::random(){
 double BossSimulation::pace()const{return difficulty_=="easy"?1.25:difficulty_=="hard"?.85:1;}
 void BossSimulation::reset(){
     seed_=initialSeed_;state_={};move_.reset();moves_.clear();crabs_.clear();oneShotHits_.clear();poseSockets_.clear();
+    localVictimHitGuards_.clear();localCrabBurstGuards_.clear();hasAuthoritySnapshot_=false;followerHazardClock_=-1.0;
     poseHitPulse_={};
     forcedMove_.reset();lastMove_.reset();attention_.fill(0);damageBy_.fill(0);totalDamageBy_.fill(0);weakHitsBy_.fill(0);splatsBy_.fill(0);
     externalHitShapes_=false;spawnedCrabs_=false;finished_=false;pendingPhase_=0;crabSeq_=1;
@@ -76,7 +78,84 @@ void BossSimulation::reset(){
     for(int k=0;k<24&&!nav_.turnOk(x,z,state_.yaw);++k)state_.yaw+=(k%2?1:-1)*k*.13;
     updateDefaultHitShapes();
 }
-void BossSimulation::finish(){finished_=true;move_.reset();moves_.clear();state_.stunned=false;for(auto& crab:crabs_)crab.dead=true;}
+void BossSimulation::finish(){finished_=true;move_.reset();moves_.clear();oneShotHits_.clear();state_.stunned=false;for(auto& crab:crabs_)crab.dead=true;}
+network::BossAuthorityState BossSimulation::captureAuthorityState()const{
+    network::BossAuthorityState snapshot;
+    snapshot.state=state_;snapshot.move=move_;snapshot.moves=moves_;snapshot.crablets=crabs_;
+    snapshot.hitShapes=hitShapes_;snapshot.poseSockets=poseSockets_;snapshot.externalHitShapes=externalHitShapes_;
+    snapshot.damage=totalDamageBy_;snapshot.weakHits=weakHitsBy_;snapshot.splats=splatsBy_;
+    snapshot.hitGuards=oneShotHits_;snapshot.finished=finished_;
+    return snapshot;
+}
+bool BossSimulation::applyAuthorityState(const network::BossAuthorityState& snapshot){
+    try{(void)network::EncodeBossAuthorityState(snapshot);}catch(const std::exception&){return false;}
+    if(snapshot.state.target>=static_cast<int>(squad_.size()))return false;
+    for(const auto& crab:snapshot.crablets)if(crab.target>=static_cast<int>(squad_.size()))return false;
+    try{
+        const bool firstSnapshot=!hasAuthoritySnapshot_;
+        const bool followerSnapshot=!networkAuthority_&&!firstSnapshot;
+        auto nextMove=snapshot.move;
+        auto nextMoves=snapshot.moves;
+        auto nextCrabs=snapshot.crablets;
+        auto nextShapes=snapshot.hitShapes;
+        auto nextSockets=snapshot.poseSockets;
+        auto nextHitGuards=snapshot.hitGuards;
+        auto nextBurstGuards=localCrabBurstGuards_;
+        std::vector<BossCrablet> newBursts;
+        if(followerSnapshot){
+            for(const auto& crab:snapshot.crablets){
+                if(!crab.burst||std::find(nextBurstGuards.begin(),nextBurstGuards.end(),crab.id)!=nextBurstGuards.end())continue;
+                const auto old=std::find_if(crabs_.begin(),crabs_.end(),[&](const auto& current){return current.id==crab.id;});
+                if(old!=crabs_.end()&&old->burst)continue;
+                nextBurstGuards.push_back(crab.id);
+                newBursts.push_back(crab);
+            }
+        }
+        state_=snapshot.state;move_.swap(nextMove);moves_.swap(nextMoves);crabs_.swap(nextCrabs);
+        hitShapes_.swap(nextShapes);poseSockets_.swap(nextSockets);oneShotHits_.swap(nextHitGuards);
+        localCrabBurstGuards_.swap(nextBurstGuards);
+        externalHitShapes_=snapshot.externalHitShapes;totalDamageBy_=snapshot.damage;
+        weakHitsBy_=snapshot.weakHits;splatsBy_=snapshot.splats;finished_=snapshot.finished;
+        poseHitPulse_={};networkAuthority_=false;hasAuthoritySnapshot_=true;
+        if(firstSnapshot)followerHazardClock_=snapshot.state.clock;
+        for(const auto& crab:newBursts)damageCrabBurst(crab);
+        return true;
+    }catch(const std::exception&){return false;}
+}
+bool BossSimulation::adoptAuthorityState(const network::BossAuthorityState& snapshot){
+    if(!applyAuthorityState(snapshot))return false;
+    for(const auto& key:localVictimHitGuards_)
+        if(std::find(oneShotHits_.begin(),oneShotHits_.end(),key)==oneShotHits_.end())oneShotHits_.push_back(key);
+    localVictimHitGuards_.clear();
+    networkAuthority_=true;pendingPhase_=0;forcedMove_.reset();
+    lastMove_.reset();
+    double latestMove=-1.0,latestCrablet=-1.0,latestFrenzy=-1.0,latestEnd=0.0;
+    std::uint32_t adoptedSeed=static_cast<std::uint32_t>(state_.clock*1000.0)^static_cast<std::uint32_t>(state_.hp);
+    for(const auto& move:moves_){
+        adoptedSeed^=move.seed+0x9e3779b9u+(adoptedSeed<<6)+(adoptedSeed>>2);
+        if(move.t0>=latestMove){latestMove=move.t0;latestEnd=move.t0+move.end();lastMove_=move.id;}
+        if(move.id==BossMoveId::Crablets)latestCrablet=std::max(latestCrablet,move.t0);
+        if(move.id==BossMoveId::Frenzy)latestFrenzy=std::max(latestFrenzy,move.t0);
+    }
+    if(move_)lastMove_=move_->id;
+    if(!adoptedSeed)adoptedSeed=1;
+    seed_=adoptedSeed;
+    const auto remaining=[&](double started,double cooldown){return started<0?0.0:std::max(0.0,cooldown-(state_.clock-started));};
+    crabletCooldown_=remaining(latestCrablet,14.0*pace());
+    frenzyCooldown_=remaining(latestFrenzy,11.0*pace());
+    cool_=move_?0.0:latestMove<0?2.4:std::max(0.0,(coolTime[state_.phase]+coolRandom[state_.phase]*.5)*pace()-std::max(0.0,state_.clock-latestEnd));
+    retarget_=goalTime_=stuckTime_=0.0;
+    speed_=std::hypot(state_.vel.x,state_.vel.z);hasGoal_=false;path_.clear();pathIndex_=0;
+    attention_.fill(0.0);damageBy_.fill(0.0);poseHitPulse_={};
+    totalDamageBy_=snapshot.damage;weakHitsBy_=snapshot.weakHits;splatsBy_=snapshot.splats;
+    crabSeq_=1;for(const auto& crab:crabs_)crabSeq_=std::max(crabSeq_,crab.id+1);
+    spawnedCrabs_=move_&&move_->id==BossMoveId::Crablets&&state_.clock-move_->t0>=move_->tele;
+    const double fraction=state_.hp/state_.maxHp;
+    const int phase=fraction<=.33?3:fraction<=.66?2:1;
+    pendingPhase_=phase>state_.phase?phase:0;
+    goal_={state_.pos.x,state_.pos.z};
+    return true;
+}
 void BossSimulation::forceMove(BossMoveId id){forcedMove_=id;cool_=0;}
 PlayerSimulation* BossSimulation::targetActor()const{
     return state_.target>=0&&state_.target<static_cast<int>(squad_.size())&&squad_[state_.target]->state.alive?squad_[state_.target]:nullptr;
@@ -307,6 +386,15 @@ void BossSimulation::runMove(double dt){
 }
 void BossSimulation::tick(double dt,bool playing){
     if(!std::isfinite(dt)||dt<=0||dt>.1)throw std::invalid_argument("Invalid boss step");
+    if(!networkAuthority_){
+        if(followerHazardClock_<0.0)followerHazardClock_=state_.clock;
+        const double from=followerHazardClock_;
+        const double to=std::max(from,std::min(state_.clock,from+dt));
+        const bool live=playing&&!state_.dead&&!finished_&&state_.visible;
+        advanceHazards(from,to,std::max(0.0,to-from),live,false);
+        followerHazardClock_=std::max(from,to);
+        return;
+    }
     const double previous=state_.clock,px=state_.pos.x,pz=state_.pos.z,pyaw=state_.yaw;
     state_.clock+=dt;
     crabletCooldown_-=dt;frenzyCooldown_-=dt;
@@ -336,8 +424,8 @@ void BossSimulation::tick(double dt,bool playing){
     state_.stunned=move_&&move_->stun&&move_->phase(state_.clock)==BossMovePhase::Recovery;
     state_.pos.y+=(nav_.floorAt(state_.pos.x,state_.pos.z)-state_.pos.y)*std::min(1.0,dt*5);
     state_.vel={(state_.pos.x-px)/dt,0,(state_.pos.z-pz)/dt};state_.turn=angleDiff(pyaw,state_.yaw)/dt;
-    if(playing&&!state_.dead&&!finished_&&state_.visible)advanceHazards(previous,state_.clock,dt,true);
-    else advanceHazards(previous,state_.clock,dt,false);
+    if(playing&&!state_.dead&&!finished_&&state_.visible)advanceHazards(previous,state_.clock,dt,true,true);
+    else advanceHazards(previous,state_.clock,dt,false,false);
     if(!externalHitShapes_)updateDefaultHitShapes();
 }
 void BossSimulation::spawnCrablets(int count){
@@ -355,15 +443,21 @@ void BossSimulation::spawnCrablets(int count){
 }
 void BossSimulation::popCrablet(BossCrablet& crab,bool killed){
     if(crab.dead)return;
-    crab.dead=true;
+    crab.dead=true;crab.burst=!killed;
     if(!killed){
-        for(auto* actor:squad_){
-            const auto& p=actor->state.pos;
-            if(!actor->state.alive||nav_.inPad(p.x,p.z,.6))continue;
-            if(std::hypot(p.x-crab.pos.x,p.z-crab.pos.z)<2.1&&std::abs(p.y-crab.pos.y)<1.6)
-                damage(*actor,40*damageMultiplier_);
-        }
+        damageCrabBurst(crab);
         paintAt(crab.pos.x,crab.pos.y,crab.pos.z,1.8);
+    }
+}
+bool BossSimulation::ownsVictim(const PlayerSimulation& actor)const{
+    return actor.networkOwner()==networkLocalPeer_;
+}
+void BossSimulation::damageCrabBurst(const BossCrablet& crab){
+    for(auto* actor:squad_){
+        const auto& p=actor->state.pos;
+        if(!ownsVictim(*actor)||!actor->state.alive||nav_.inPad(p.x,p.z,.6))continue;
+        if(std::hypot(p.x-crab.pos.x,p.z-crab.pos.z)<2.1&&std::abs(p.y-crab.pos.y)<1.6)
+            damage(*actor,40*damageMultiplier_);
     }
 }
 void BossSimulation::updateCrablets(double dt){
@@ -425,13 +519,14 @@ double BossSimulation::beamLength(const BossMove& move,double angle)const{
 void BossSimulation::hurtSquad(const BossMove& m,double from,double to,double dt){
     const double u0=from-m.t0,u1=to-m.t0;
     if(u1<0||u1>m.end()+4)return;
+    auto& hitGuards=networkAuthority_?oneShotHits_:localVictimHitGuards_;
     for(int actorId=0;actorId<static_cast<int>(squad_.size());++actorId){
         auto& a=*squad_[actorId];const auto& p=a.state.pos;
-        if(!a.state.alive||nav_.inPad(p.x,p.z,.6))continue;
+        if(!ownsVictim(a)||!a.state.alive||nav_.inPad(p.x,p.z,.6))continue;
         const auto once=[&](const char* kind,int index,double amount){
             const std::string key=std::to_string(m.t0)+"|"+kind+"|"+std::to_string(index)+"|"+std::to_string(actorId);
-            if(std::find(oneShotHits_.begin(),oneShotHits_.end(),key)!=oneShotHits_.end())return;
-            oneShotHits_.push_back(key);damage(a,amount*damageMultiplier_);
+            if(std::find(hitGuards.begin(),hitGuards.end(),key)!=hitGuards.end())return;
+            hitGuards.push_back(key);damage(a,amount*damageMultiplier_);
         };
         switch(m.id){
         case BossMoveId::Slam:{
@@ -467,7 +562,7 @@ void BossSimulation::hurtSquad(const BossMove& m,double from,double to,double dt
                 const double cx=bx+std::sin(m.yaw)*offset,cz=bz+std::cos(m.yaw)*offset;
                 if(std::hypot(p.x-cx,p.z-cz)<radius+.35&&p.y<m.point.y+3.5){
                     const std::string key=std::to_string(m.t0)+"|ram|0|"+std::to_string(actorId);
-                    if(std::find(oneShotHits_.begin(),oneShotHits_.end(),key)==oneShotHits_.end()){
+                    if(std::find(hitGuards.begin(),hitGuards.end(),key)==hitGuards.end()){
                         const double side=(p.x-bx)*std::cos(m.yaw)-(p.z-bz)*std::sin(m.yaw)>=0?1:-1;
                         a.state.vel.x+=std::cos(m.yaw)*side*9+std::sin(m.yaw)*5;
                         a.state.vel.z+=-std::sin(m.yaw)*side*9+std::cos(m.yaw)*5;
@@ -539,15 +634,25 @@ void BossSimulation::paintHazards(const BossMove& m,double from,double to){
     default:break;
     }
 }
-void BossSimulation::advanceHazards(double from,double to,double dt,bool live){
-    if(!live)return;
-    for(const auto& m:moves_){
-        const double u=to-m.t0;
-        const double extra=m.id==BossMoveId::Slam?(19-2.4)/9.5+(m.rings.empty()?0:m.rings.back()):0;
-        if(u<0||u>=m.end()+extra+.2)continue;
-        hurtSquad(m,from,to,dt);paintHazards(m,from,to);
+void BossSimulation::advanceHazards(double from,double to,double dt,bool live,bool paint){
+    if(live){
+        for(const auto& m:moves_){
+            const double u=to-m.t0;
+            const double extra=m.id==BossMoveId::Slam?(19-2.4)/9.5+(m.rings.empty()?0:m.rings.back()):0;
+            if(u<0||u>=m.end()+extra+.2)continue;
+            hurtSquad(m,from,to,dt);
+            if(paint)paintHazards(m,from,to);
+        }
     }
-    moves_.erase(std::remove_if(moves_.begin(),moves_.end(),[to](const auto& m){return to-m.t0>m.end()+4;}),moves_.end());
+    for(auto it=moves_.begin();it!=moves_.end();){
+        if(to-it->t0<=it->end()+4){++it;continue;}
+        const auto prefix=std::to_string(it->t0)+"|";
+        const auto removeMoveGuards=[&](auto& guards){guards.erase(std::remove_if(guards.begin(),guards.end(),[&](const auto& key){
+            return key.compare(0,prefix.size(),prefix)==0;
+        }),guards.end());};
+        removeMoveGuards(oneShotHits_);removeMoveGuards(localVictimHitGuards_);
+        it=moves_.erase(it);
+    }
 }
 void BossSimulation::updateDefaultHitShapes(){
     // Socket layout is updated by the presentation's animated rig when available.
@@ -612,6 +717,7 @@ double BossSimulation::applyDamage(PlayerSimulation& attacker,double amount,bool
 }
 double BossSimulation::hit(PlayerSimulation& attacker,double amount,const BossSegmentHit& hit,const std::string& weapon){
     if(amount<=0||state_.dead||finished_)return 0;
+    if(!networkAuthority_){if(hitForwarder_)hitForwarder_(attacker,amount,hit,weapon);return 0;}
     if(hit.crablet>=0){
         auto& crab=crabs_.at(hit.crablet);if(crab.dead)return 0;
         const double landed=std::min(amount,crab.hp);crab.hp-=landed;
@@ -626,6 +732,7 @@ double BossSimulation::hit(PlayerSimulation& attacker,double amount,const BossSe
 }
 double BossSimulation::splash(PlayerSimulation& attacker,glm::dvec3 center,double radius,double maxDamage,double minDamage,const std::string& weapon){
     if(finished_)return 0;
+    if(!networkAuthority_){if(splashForwarder_)splashForwarder_(attacker,center,radius,maxDamage,minDamage,weapon);return 0;}
     double total=0;
     for(int i=0;i<static_cast<int>(crabs_.size());++i){
         const auto& crab=crabs_[i];

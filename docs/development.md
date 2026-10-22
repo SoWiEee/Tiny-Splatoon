@@ -15,6 +15,12 @@ cmake --build build --parallel 4
 
 Optimus 入口會請求 NVIDIA GPU；啟動紀錄的 `GPU` 行顯示實際 renderer，Windows／驅動偏好可能覆寫。低／中／高畫質可在選單設定；完整效能矩陣尚未驗收。
 
+多人服務與房碼流程見[多人連線契約](network-source-contract.md)。建置遊戲目標也會建置同目錄的 `Tiny-Splatoon-Server.exe`；服務獨立於玩家程序，需使用相同服務位址才能查找房碼。單獨驗證網路流程：
+
+```powershell
+ctest --test-dir build -C Release --output-on-failure -R '^native_network_'
+```
+
 ## 原生擷取與效能
 
 ```powershell
