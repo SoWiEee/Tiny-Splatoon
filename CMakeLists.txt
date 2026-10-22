@@ -30,12 +30,17 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(RmlUi CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(GameNetworkingSockets CONFIG REQUIRED)
 find_path(MINIAUDIO_INCLUDE_DIR miniaudio.h)
 if(NOT MINIAUDIO_INCLUDE_DIR)
     message(FATAL_ERROR "miniaudio headers were not found")
 endif()
 
 add_executable(Tiny-Splatoon main.cpp)
+
+add_library(game_network STATIC src/network/GnsTransport.cpp)
+target_link_libraries(game_network PUBLIC GameNetworkingSockets::GameNetworkingSockets)
+target_include_directories(game_network PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/network")
 
 add_library(restoration_core STATIC
     src/world/ReferenceData.cpp
@@ -100,6 +105,12 @@ set_property(TARGET Tiny-Splatoon APPEND PROPERTY LINK_DEPENDS ${TINY_RUNTIME_AS
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(network_transport_test tests/network_transport_test.cpp)
+    target_link_libraries(network_transport_test PRIVATE game_network)
+    foreach(NETWORK_CLIENTS 2 3 8)
+        add_test(NAME native_network_transport_${NETWORK_CLIENTS} COMMAND network_transport_test ${NETWORK_CLIENTS})
+        set_tests_properties(native_network_transport_${NETWORK_CLIENTS} PROPERTIES TIMEOUT 60)
+    endforeach()
     add_executable(zone_match_test tests/zone_match_test.cpp)
     target_link_libraries(zone_match_test PRIVATE restoration_core)
     add_test(NAME native_zone_matches COMMAND zone_match_test)

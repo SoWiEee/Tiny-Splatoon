@@ -53,7 +53,7 @@
 | pointer lock | GLFW 游標捕捉／raw mouse motion，選單與失焦行為等效 |
 | localStorage | 本機持久化，保留資料欄位、預設及遷移語意 |
 | WebAudio | 原生合成或由同參數生成音訊，保留聲音與空間混音 |
-| WebSocket relay | 支援房間契約的原生傳輸；協定互通或替代方案需明示與測試 |
+| WebSocket relay | GameNetworkingSockets 原生傳輸及房間服務；保留房碼與行為契約，替代決策及驗收見第 14 節 |
 | Gamepad／touch | 標準手把／震動及 Windows 觸控裝置等效操作 |
 | 全螢幕／Electron shell | 原生視窗／全螢幕、DPI 與 resize |
 
@@ -399,6 +399,10 @@ ID、順序、名稱、預設 kit、數值、動畫／音效／UI／網路均屬
 ## 14. 線上房間與同步
 
 來源：`splat-ref/src/net/{session,transport,netmatch}.js`、`server/src/index.js`、`docs/NET.md`。已移除的舊GameNetworkingSockets host:port不能等同本節完成；正式傳輸選擇須保留房碼與行為契約。
+
+2026-10-22 使用者決策：原生多人傳輸直接採用 **GameNetworkingSockets**，取代瀏覽器 WebSocket 傳輸及其線上協定互通要求。沿用下列房碼、房間、玩家權責與遊戲行為契約；GNS 本身不提供房間查找、成員管理或換主，這些由原生應用層實作。開發先驗證原生 IP client/server 的可靠訊息與斷線，再接房間／GUI 及比賽同步；只有底層連通不得勾選 NET-01–12 完成。開源 GNS 的 direct-IP 連線不代表已提供 Steam SDR、NAT 穿透、認證或公開 relay 服務。跨網部署與互通仍須獨立驗收。
+
+房間與控制訊息使用可靠傳送；後續 20 Hz 狀態同步可用非可靠傳送，依既有事件去重和插值規則處理。傳輸及應用層都必須有封包大小、排隊總量、連線／房間容量與封包內容邊界檢查，不能讓主執行緒阻塞等待網路。
 
 | ID | 強制需求 |
 |---|---|
