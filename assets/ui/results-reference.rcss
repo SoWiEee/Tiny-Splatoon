@@ -111,3 +111,5 @@
 #hud .result-name { flex: 1; width: 100dp; min-width: 0; max-width: none; color: #ffffff; }
 
 #hud.results-active > .boss, #hud.results-active > .battle-hud-layer { display: none; }
+
+#hud .result-actions button { display: flex; align-items: center; justify-content: center; text-align: center; }

@@ -192,7 +192,7 @@ void GameAudio::BeginMatch(MatchSimulation& match) {
     hornTimer_ = 28.0 + 10.0 * AudioRandom(audioRandomState_);
     previousRemaining_ = match.remaining();
     engine_.Play("ready");
-    engine_.PlayMusic("menu", 0.4);
+    engine_.PlayMusic(match.boss()?MusicTrack(match.boss()->state().phase):"battle", 0.4);
     if (match.boss()) Play("boss_title");
 }
 

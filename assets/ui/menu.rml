@@ -85,7 +85,7 @@
             <div id="loadout-detail" class="loadout-detail" aria-live="polite">
               <div class="weapon-detail">
                 <div class="weapon-detail-heading"><h2 id="weapon-name"></h2><span id="weapon-equipped" class="equipped-badge">✓ 已裝備</span></div>
-                <p id="weapon-blurb" class="weapon-blurb"></p>
+                <p id="weapon-blurb" class="weapon-blurb"></p><p id="main-ink-cost"></p>
                 <div class="weapon-stats"><div class="stats-heading">能力</div>
                   <div class="stat-row"><span>射程</span><div class="stat-track"><div id="stat-range"></div></div><b id="stat-range-value"></b></div>
                   <div class="stat-row"><span>傷害</span><div class="stat-track"><div id="stat-damage"></div></div><b id="stat-damage-value"></b></div>

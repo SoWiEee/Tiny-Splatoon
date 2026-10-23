@@ -235,6 +235,16 @@ int main(int argc, char** argv) {
         StageGeometry geometry(*stage);
         FacePaint paint(*stage, geometry);
         NavGraph nav(*stage, geometry);
+        {
+            FacePaint introPaint(*stage,geometry);MatchOptions introOptions;introOptions.duration=180;
+            MatchSimulation intro(*stage,geometry,introPaint,nav,introOptions);AudioEngine introEngine(assets);
+            require(introEngine.Initialize(),"Intro music test needs the native audio engine");GameAudio introAudio(introEngine);
+            introAudio.Menu(true);introAudio.BeginMatch(intro);
+            std::filesystem::path source;bool looping=false;std::uint64_t begin=0,end=0,serial=0;double duration=0;
+            bool ready=false;for(int i=0;i<50&&!ready;++i){introEngine.Update();ready=AudioEngineMusicTestState(introEngine,source,looping,begin,end,serial,duration);if(!ready)std::this_thread::sleep_for(std::chrono::milliseconds(10));}
+            require(ready&&source.filename()=="Splattack.mp3","Entering a match must play battle BGM during Intro without restarting menu music");
+            introAudio.EndMatch();introEngine.Clear();
+        }
         MatchOptions matchOptions; matchOptions.practice = true; matchOptions.special = "jetpack";
         MatchSimulation match(*stage, geometry, paint, nav, matchOptions);
         AudioEngine directorEngine(assets);

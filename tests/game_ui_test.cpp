@@ -176,10 +176,12 @@ int main(int argc,char** argv){
         zoneStage->SetValue("lockgate");zoneStage->DispatchEvent("change",{});
         Check(ui.setup().mode=="zones"&&ui.setup().stage=="lockgate","Zone Control must keep the selected internal map ID for the stage variant");
         element("mode-turf")->Click();render();Check(ui.setup().mode=="turf"&&ui.profile().settings.lastMode=="turf","Returning to Turf must restore its saved mode preference");
+        element("start-label")->Click();Check(render()==UiAction::Start,"Clicking the Start button label must enter the match just like its background");
         element("nav-loadout")->Click();render();
         Check(element("weapon-cards")->GetNumChildren()==static_cast<int>(MainEquipment().size()),"Loadout cards must expose every current main weapon");
         for(const auto& weapon:MainEquipment()){
             const auto id="weapon-card-"+std::string(weapon.id);element(id.c_str())->Click();render();
+            Check(!element("main-ink-cost")->GetInnerRML().empty(),"Every weapon card must expose its actual ink cost model");
             Check(ui.profile().weapon==weapon.id&&element(id.c_str())->GetAttribute<Rml::String>("aria-pressed","")=="true","Weapon cards must equip and expose selection through the real profile");
         }
         element("weapon-card-shooter")->Click();render();
@@ -758,6 +760,7 @@ int main(int argc,char** argv){
                 background(dims.first,dims.second);ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);
                 showcase.drawPodium(squad,sceneMatch.result()->winner==sceneMatch.local().team(),{int(preview.x*dims.first),int((1-preview.y-preview.height)*dims.second),int(preview.width*dims.first),int(preview.height*dims.second)},glfwGetTime(),true);
                 ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                for(const char* id:{"results-rematch","results-menu"}){auto* button=hud->GetElementById(id);auto* label=button->GetFirstChild();Check(label!=nullptr,"Results actions need visible labels");const auto b=button->GetAbsoluteOffset(Rml::BoxArea::Border),t=label->GetAbsoluteOffset(Rml::BoxArea::Border);Check(std::abs((t.y+label->GetOffsetHeight()*.5)-(b.y+button->GetOffsetHeight()*.5))<5,"Results action labels must be vertically centered");}
                 Capture(std::filesystem::path(argv[2])/("source-native-results-full-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
             }
             FacePaint bossScenePaint(*stage,geometry);MatchOptions bossOptions;bossOptions.mode="boss";

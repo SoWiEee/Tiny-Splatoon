@@ -334,6 +334,14 @@ struct GameUi::Impl : Rml::EventListener {
     void UpdateLoadoutStats(){
         try{
             const auto& main=GetEquipment(EquipmentCategory::Main,player.weapon.empty()?selection.main:player.weapon);
+            std::string mainInkCost;
+            if(main.kind=="roller")mainInkCost="甩墨 "+Number(main.number("flickInk"),2)+"% · 滾動每公尺 "+Number(main.number("rollInkPerMeter"),2)+"%";
+            else if(main.kind=="brush")mainInkCost="每次揮筆 "+Number(main.number("swipeInk"),2)+"%";
+            else if(main.kind=="blade")mainInkCost="輕斬 "+Number(main.number("tapInk"),2)+"% · 重斬 "+Number(main.number("heavyInk"),2)+"%";
+            else if(main.kind=="mitts")mainInkCost="每拳 "+Number(main.number("inkPerPunch"),2)+"%";
+            else if(main.number("inkFull",0)>0)mainInkCost="滿蓄力 "+Number(main.number("inkFull"),2)+"%（依蓄力比例）";
+            else mainInkCost="每發 "+Number(main.number("inkPerShot"),2)+"%";
+            Text(menu,"main-ink-cost","耗墨："+mainInkCost);
             const auto& mains=MainEquipment();
             const auto selected=std::find_if(mains.begin(),mains.end(),[&](const auto& item){return item.id==main.id;});
             const std::size_t selectedIndex=selected==mains.end()?0:static_cast<std::size_t>(selected-mains.begin());
@@ -515,7 +523,9 @@ struct GameUi::Impl : Rml::EventListener {
             Find(menu,"menu-back")->Click();event.StopPropagation();return;
         }
         auto* target=event.GetTargetElement();if(!target)return;
-        auto* element=target;while(element&&!element->GetId().size())element=element->GetParentNode();if(!element)return;
+        auto* element=target;
+        if(event.GetType()=="click")for(auto* ancestor=target;ancestor;ancestor=ancestor->GetParentNode())if(ancestor->GetTagName()=="button"){element=ancestor;break;}
+        while(element&&!element->GetId().size())element=element->GetParentNode();if(!element)return;
         const std::string id=element->GetId();const auto type=event.GetType();
         if(type=="keydown"&&id.rfind("settings-tab-",0)==0){
             const int key=event.GetParameter<int>("key_identifier",0);

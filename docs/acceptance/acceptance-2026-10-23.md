@@ -65,3 +65,11 @@
 - 正式 `Tiny-Splatoon.exe --native --frames 3` 及 `--reference-match tidewater --reference-mode boss --frames 600` 完成啟動／擷取；GTX 1650 Max-Q、OpenGL 4.5、591.74。純色標題畫面 1600×900，實際 Boss 戰 1920×1055；檢視確認左上無空黑框、小地圖圓角裁切、同色八人及 Boss 階段條。UI 合成另以準確 1280×720／1920×1080 檢查，含 native Tab、minimap、裝備、設定及完整結果。
 
 仍未驗收／未完成：圖釘重疊避讓與引線、來源游標／視差及完整 3D 登場；Boss title card／連擊數字等完整通知美術、結果印章動態／彩紙物理、來源 PBR 逐像素對照；投射物陰影與預測槍口數值 oracle；音訊精確腳步／impact、主觀定位／HRTF／壓縮器；跨 GPU／品質／最壞負載及跨網矩陣。以上保留在 backlog，不以本輪 UI／元件通過宣稱全遊戲 100%。鎖定的 `splat-ref/` 與來源 hash 基準不修改。
+
+
+## v0.8.5 第一批修正（2026-10-24）
+
+- 真實 click target 回歸重現開始按鈕內層 `start-label` 被誤當動作 ID；事件改解析到外層 button。點文字與點背景均可發出 Start。
+- Intro 不再呼叫 menu 音樂；BeginMatch 直接播放 battle／Boss 當階段 BGM，Playing 保留開始號角。測試在 Intro 檢查實際解碼檔案為 Splattack，修正前失敗、修正後通過。
+- 結算按鈕使用獨立文字 span 與 flex 置中；720p／1080p 比對 border box 與文字中心。裝備頁補各武器來源耗墨模型與數字；未修改已正確的來源玩法值。
+- 初始四項回歸 UI／音訊失敗，Arsenal 與 992 組 WeaponRunner 來源狀態通過（`v085-red-tests.log`）。修正後音訊通過 31.84 秒、UI 通過 11.29 秒（`v085-fixes-tests.log`、`v085-fixes-final-ui.log`）；Release 目標建置通過。僅執行受影響檢查。

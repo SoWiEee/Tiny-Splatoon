@@ -72,7 +72,7 @@
       <div id="results-table" class="results-table"></div>
       <div class="result-footer">
         <div id="result-xp" class="result-xp"><div class="result-level">等級 <strong id="result-level-value">1</strong></div><div class="result-xp-main"><div class="result-xp-row"><strong id="result-xp-label">+0 XP</strong><span id="result-xp-next"></span></div><div class="result-xp-track" aria-hidden="true"><div id="result-xp-fill"></div></div><div id="result-xp-breakdown" class="result-xp-breakdown"></div></div></div>
-        <div class="result-actions"><button id="results-rematch" class="primary">↻　再戰一場</button><button id="results-menu">〈　返回選單</button><button id="results-close">離開遊戲</button></div>
+        <div class="result-actions"><button id="results-rematch" class="primary"><span>↻　再戰一場</span></button><button id="results-menu"><span>〈　返回選單</span></button><button id="results-close">離開遊戲</button></div>
       </div>
     </div>
     <button id="result-skip" class="result-skip" aria-label="略過結果動畫"></button>
