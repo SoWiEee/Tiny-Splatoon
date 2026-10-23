@@ -11,6 +11,7 @@ struct GraphicsSettings {
     bool shadows=true;
     bool reflections=false;
     bool postEffects=true;
+    bool antialiasing=true;
 };
 
 inline GraphicsSettings ForPreset(GraphicsPreset preset) {
@@ -18,7 +19,7 @@ inline GraphicsSettings ForPreset(GraphicsPreset preset) {
     settings.preset=preset;
     switch(preset){
     case GraphicsPreset::Low:
-        settings.renderScale=.65f;settings.shadowMapSize=0;settings.shadows=false;settings.reflections=false;settings.postEffects=false;
+        settings.renderScale=.65f;settings.shadowMapSize=0;settings.shadows=false;settings.reflections=false;settings.postEffects=false;settings.antialiasing=false;
         break;
     case GraphicsPreset::Medium:
         settings.renderScale=.85f;settings.shadowMapSize=1024;settings.shadows=true;settings.reflections=false;settings.postEffects=true;

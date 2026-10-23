@@ -70,6 +70,12 @@ void PlayerController::Update(double dt, const ControllerInput& input, const Pla
     if (!(std::isfinite(dt) && dt > 0.0)) return;
 
     auto& actor = match.local();
+    if (match.phase() == MatchPhase::Intro) {
+        assist_ = {}; edgeTime_ = padLookX_ = padLookY_ = 0.0;
+        actor.input.move = glm::dvec3(0.0);
+        actor.input.aimYaw = camera.yaw; actor.input.aimPitch = camera.pitch;
+        return;
+    }
     const double sensitivity = clamp(finiteOr(settings.sensitivity, 1.0), 0.2, 3.0);
     const double padSensitivity = clamp(finiteOr(settings.padSensitivity, 1.0), 0.2, 3.0);
     const double aimAssistSetting = clamp(finiteOr(settings.aimAssist, 1.0), 0.0, 1.0);

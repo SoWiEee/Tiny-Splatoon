@@ -85,7 +85,14 @@ int main() {
         require(win.boss()->state().visible, "Boss must become targetable after its reveal interval");
         BossSegmentHit lethalWeakHit;
         lethalWeakHit.weak = true;
+        lethalWeakHit.point = {4.5, 2.25, 1.75};
         win.boss()->hit(win.local(), 1000000.0, lethalWeakHit, "shooter");
+        const auto& bossHits = win.boss()->hudHitEvents();
+        require(bossHits.size() == 1 && bossHits[0].serial == 1 && bossHits[0].attackerSlot == 0 &&
+                bossHits[0].weak && bossHits[0].damage == win.boss()->state().maxHp &&
+                bossHits[0].point.x == lethalWeakHit.point.x && bossHits[0].point.y == lethalWeakHit.point.y &&
+                bossHits[0].point.z == lethalWeakHit.point.z,
+            "Boss HUD events must report the landed weakpoint hit and its world impact point");
         win.tick(1.0 / 60.0);
         require(win.phase() == MatchPhase::Finish && win.boss()->state().dead,
             "A lethal weakpoint hit must enter the victory finish phase");

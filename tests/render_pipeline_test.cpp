@@ -34,6 +34,21 @@ int main(){
             return int(pixel[0]);
         };
         const int gray=render(.18f,0,false,false,neutral,{});
+        const char* edgeVertex="#version 450 core\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0,1);}";
+        const char* edgeFragment="#version 450 core\nout vec4 color;void main(){float c=gl_FragCoord.x+gl_FragCoord.y<64.0?1.0:0.0;color=vec4(c,c,c,1);}";
+        CharacterShader edgeShader(edgeVertex,edgeFragment);GLuint edgeVao=0;glGenVertexArrays(1,&edgeVao);
+        ScreenEffects noScreenEffects;noScreenEffects.enabled=false;
+        std::array<unsigned char,64*64*4> withoutAa{},withAa{};
+        auto renderEdge=[&](bool antialiasing,std::array<unsigned char,64*64*4>& pixels){
+            pipeline.Configure(0,false,false,antialiasing);pipeline.Begin(64,64,projection,glm::mat4(1),.1f,100);
+            glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);edgeShader.use();glBindVertexArray(edgeVao);glDrawArrays(GL_TRIANGLES,0,3);
+            const int draws=pipeline.End(neutral,noScreenEffects);glReadPixels(0,0,64,64,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+            if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Antialiasing generated an OpenGL error");return draws;
+        };
+        const int withoutAaDraws=renderEdge(false,withoutAa),withAaDraws=renderEdge(true,withAa);glDeleteVertexArrays(1,&edgeVao);
+        int changedEdgePixels=0;
+        for(std::size_t i=0;i<withoutAa.size();i+=4)if(std::abs(int(withoutAa[i])-int(withAa[i]))>3)++changedEdgePixels;
+        if(withAaDraws!=withoutAaDraws+1||changedEdgePixels==0)throw std::runtime_error("FXAA did not smooth the diagonal edge when enabled");
         pipeline.Configure(0,false,false);pipeline.Begin(32,32,projection,glm::mat4(1),.1f,100);
         glClearColor(.18f,.18f,.18f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);pipeline.End(neutral,{},64,64);
         GLint scaledViewport[4]{};glGetIntegerv(GL_VIEWPORT,scaledViewport);

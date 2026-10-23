@@ -12,6 +12,7 @@ class MatchSimulation;
 class PlayerSimulation;
 struct CharacterTrigger;
 struct WorldVisualEvent;
+struct BossPoseAudioEvent;
 
 class GameAudio {
 public:
@@ -25,6 +26,11 @@ public:
     void BeginMatch(MatchSimulation& match);
     void EndMatch();
     void Pause();
+    void EnableBossAnimationAudio(bool enabled) {
+        bossAnimationAudioEnabled_ = enabled;
+        if (enabled) bossIntroSlamAt_ = bossSlamAt_ = -1;
+    }
+    void BossAnimationEvent(const BossPoseAudioEvent& event);
 
 private:
     struct ActorLoop {
@@ -66,6 +72,7 @@ private:
     std::array<int,8> bossWeakHits_{};
     std::array<const PlayerSimulation*,8> bossDamageActors_{};
     double previousRemaining_ = 0, bossSunkIn_ = 0, bossHitAt_=-99, bossCritAt_=-99;
+    double lastBossFootAt_=-1e9;
     double bossIntroSlamAt_=-1,bossIntroRoarAt_=-1,bossSlamAt_=-1,bossChargeRoarAt_=-1,bossCrabletSecondAt_=-1;
     double bossPhaseRoarAt_=-1,bossDizzyAt_=-1;
     AudioPosition bossIntroSlamPos_{},bossIntroRoarPos_{},bossSlamPos_{},bossChargeRoarPos_{},bossCrabletPos_{},bossBarragePos_{},bossPhaseRoarPos_{},bossDizzyPos_{};
@@ -76,6 +83,7 @@ private:
     int bossPhase_ = 0, matchPhase_ = -1;
     bool harborLoop_ = false, pausedAudio_ = false, resumeLoops_ = false;
     bool hasListenerPosition_ = false, bossDead_ = false, playing_ = false,bossIntroSeen_=false,bossStunSeen_=false,bossDamageSeen_=false;
+    bool bossAnimationAudioEnabled_=false;
     std::size_t zoneEventCursor_=0;
     std::unordered_map<int,double> zoneHums_;
     std::array<int,2> zoneTicks_{{100,100}};

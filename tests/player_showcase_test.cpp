@@ -46,9 +46,38 @@ std::size_t differences(const std::vector<unsigned char>& a,const std::vector<un
         if(std::abs(int(a[i])-int(b[i]))+std::abs(int(a[i+1])-int(b[i+1]))+std::abs(int(a[i+2])-int(b[i+2]))>24)++count;
     return count;
 }
+
+void testPodiumMotion() {
+    using restoration::PlayerShowcase;
+    constexpr double tolerance=1e-8;
+    const auto starting=PlayerShowcase::podiumMotion(0.0,0,true);
+    require(std::abs(starting.drumOffset+2.4)<tolerance,"Podium drum did not start below the stage");
+    require(starting.visible&&starting.airborne&&!starting.landed,"First winner did not enter in the air");
+    require(std::abs(starting.playerOffset-3.08016)<tolerance,"Winner entrance height did not match the source drop");
+
+    require(PlayerShowcase::podiumMotion(.2,0,true).squash>1.0,"Falling winner must stretch before landing");
+    const auto risen=PlayerShowcase::podiumMotion(.72,0,true);
+    require(std::abs(risen.drumOffset)<tolerance,"Podium drum did not finish rising on source timing");
+    const auto staggered=PlayerShowcase::podiumMotion(.46,1,true);
+    require(staggered.airborne&&staggered.playerOffset>0.0,"Later winner did not keep the staggered drop");
+
+    const auto landed=PlayerShowcase::podiumMotion(.46,0,true);
+    require(landed.landed&&!landed.airborne&&std::abs(landed.playerOffset)<tolerance,"Winner did not land at the source stagger");
+    const auto wobble=PlayerShowcase::podiumMotion(.51,0,true);
+    require(wobble.squash<1.0,"Landing did not produce a squash response");
+
+    const auto defeat=PlayerShowcase::podiumMotion(.5,2,false);
+    require(defeat.visible&&!defeat.airborne&&!defeat.landed&&std::abs(defeat.playerOffset)<tolerance,
+            "Defeat lineup should remain grounded");
+    const auto reduced=PlayerShowcase::podiumMotion(0.0,3,true,true);
+    require(reduced.visible&&reduced.landed&&!reduced.airborne&&std::abs(reduced.drumOffset)<tolerance&&
+            std::abs(reduced.playerOffset)<tolerance,"Reduced motion should keep a static result pose");
+}
 }
 
 int main(int argc,char** argv) {
+    try {testPodiumMotion();}
+    catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
     if(!glfwInit())return 1;
     glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);
     glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);

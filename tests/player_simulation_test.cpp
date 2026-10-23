@@ -133,6 +133,26 @@ int main() {
     player.input.move = {0, 0, 1};
     for (int i = 0; i < 25; ++i) player.tick(dt);
     check(player.state.submerged && player.state.vel.z > 8.0, "own ink enables swim acceleration");
+
+    // Source actor.js records input press times, lets the most recent Swim/Fire
+    // press win, and carries the fire buffer across the kid emerge delay.
+    player.spawnAt({0, 0, 0}, 0);
+    player.input.squid = true;
+    player.tick(dt);
+    check(player.state.squid && player.state.submerged,"Swim press did not enter submerged state on own ink");
+    player.input.fire = true;
+    player.tick(dt);
+    check(!player.state.squid && !player.state.submerged,"Later Fire press did not win over held Swim");
+    for (int i = 0; i < 12; ++i) player.tick(dt);
+    check(player.shotsFired() > 0,"Fire press during emergence was not buffered into a shot");
+
+    player.spawnAt({0, 0, 0}, 0);
+    player.input.fire = true;
+    player.tick(dt);
+    player.input.squid = true;
+    player.tick(dt);
+    check(player.state.squid && player.state.submerged,"Later Swim press did not win while Fire stayed held");
+
     player.spawnAt({0, 0, 0}, 0);
     player.input.jump = true;
     player.tick(dt);

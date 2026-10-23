@@ -45,8 +45,6 @@
   font-size: 10dp;
   font-weight: 900;
 }
-#hud #terrain-status,
-#hud #position-status { display: none; }
 #hud .map-surface {
   position: relative;
   width: 100%;
@@ -217,7 +215,6 @@
   box-shadow: none;
 }
 #hud .jump-map-open .minimap-heading,
-#hud .jump-map-open #position-status { display: none; }
 #hud .jump-map-open .map-surface {
   position: absolute;
   z-index: 1;
@@ -278,7 +275,6 @@
   font-weight: 700;
 }
 #hud .jump-map-open .jump-map-legend { display: none; }
-#hud #terrain-status, #hud #position-team-coverage { display: none; }
 
 /* Native renderer has no shadow-filter layers; use the existing solid borders. */
 #hud .minimap, #hud .map-target, #hud .map-pin-ground, #hud .map-actor-ally, #hud .map-actor-local, #hud .map-self-arrow em, #hud .map-base-icon em u { box-shadow: none; }
@@ -290,3 +286,13 @@
 #hud img.map-self-arrow { left: 0; top: 0; width: 100%; height: 100%; }
 #hud .jump-map-open .map-actor-local { width: 54dp; height: 60dp; margin-left: -27dp; margin-top: -30dp; background-color: #15121c; border: 4dp #ffffff; border-radius: 30dp; }
 #hud .jump-map-open img.map-self-arrow { left: 5dp; top: 3dp; width: 36dp; height: 45dp; }
+
+#hud .map-pin-link { position: absolute; left: 0; top: -2dp; height: 4dp; border: 1dp #15121c; background-color: #ffffff; transform-origin: 0% 50%; z-index: 0; }
+#hud .map-target:hover, #hud .map-target:focus { border-color: #ffae47; }
+#hud .map-cursor { position: absolute; width: 26dp; height: 26dp; margin-left: -13dp; margin-top: -13dp; border: 2dp #ffffff; border-radius: 15dp; background-color: #15121c55; pointer-events: none; z-index: 20; }
+#hud .map-cursor i { position: absolute; left: 9dp; top: 9dp; width: 4dp; height: 4dp; border-radius: 3dp; background-color: #ffffff; }
+
+#hud .map-target.cursor-snap { border-color: #ffae47; }
+#hud .map-cursor.snapped { border-color: #ffae47; width: 34dp; height: 34dp; margin-left: -17dp; margin-top: -17dp; }
+#hud .map-jump-arc { position: absolute; height: 3dp; border: 1dp #15121c; transform-origin: 0% 50%; pointer-events: none; z-index: 2; }
+#hud .map-landing-ring { position: absolute; width: 24dp; height: 14dp; margin-left: -12dp; margin-top: -7dp; border: 2dp #ffffff; border-radius: 12dp; pointer-events: none; z-index: 2; }

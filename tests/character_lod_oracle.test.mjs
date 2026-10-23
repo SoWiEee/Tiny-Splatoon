@@ -1,32 +1,36 @@
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-import { LOD_QUALITY, FADE_S, pickTier } from '../splat-ref/src/game/character-lod.js';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
+const root=resolve(import.meta.dirname,'..');
 const executable=process.argv[2];
-const qualities=['low','medium','high','ultra'];
+const fixture=JSON.parse(await readFile(resolve(root,'tests/fixtures/character_lod_fixtures.json'),'utf8'));
+assert.equal(fixture.version,1,'Unsupported Character LOD fixture version');
+assert.equal(fixture.source.path,'splat-ref/src/game/character-lod.js','fixture source attribution');
+assert.equal(fixture.source.sha256,'47e1f70ed071cdf1d442ebad6b460b0f4a3140f518b69e2e80ab672915ec1dc2','immutable Character LOD source hash');
+assert.deepEqual(fixture.qualities.map(row=>row.name),['low','medium','high','ultra'],
+  'Character LOD fixture must cover every quality tier');
+assert.equal(fixture.updateCount,2288,'Character LOD fixture must cover all 2,288 source updates');
+assert.equal(fixture.scenarios.length,8,'Character LOD fixture must cover local and remote actors at every quality');
+
+// Source regeneration and baseline verification live in the optional exporter check.
+
 const input=[];
 const expected=[];
-for (let q=0;q<qualities.length;q++) for(const local of [false,true]) {
+const labels=[];
+for(const scenario of fixture.scenarios) {
+  const q=fixture.qualities.findIndex(quality=>quality.name===scenario.quality);
+  assert.notEqual(q,-1,`Unknown quality in fixture scenario ${scenario.name}`);
   input.push('-1 0 0 0');
-  let tier=-1,to=-1,fade=0;
-  const Q=LOD_QUALITY[qualities[q]];
-  const hero=local?Q.heroLocal:Q.hero;
-  for(const px of [30,54,78,90,120,150,200,300,430,520,200,60,30]) {
-    for(let frame=0;frame<22;frame++) {
-      const dt=1/60;
-      if(to>=0) {
-        fade=Math.min(1,fade+dt/FADE_S);
-        if(fade>=1){tier=to;to=-1;fade=0;}
-      } else {
-        const wanted=pickTier(px,tier,Q,hero);
-        if(tier<0)tier=wanted;
-        else if(wanted!==tier){to=wanted;fade=0;}
-      }
-      input.push(`${q} ${local?1:0} ${px} ${dt}`);
-      expected.push([tier,to>=0?to:tier,fade,to>=0]);
-    }
+  for(let step=0;step<scenario.updates.length;step++) {
+    const [pixels,dt,tier,target,fade,transition]=scenario.updates[step];
+    input.push(`${q} ${Number(scenario.local)} ${pixels} ${dt}`);
+    expected.push([tier,target,fade,transition]);
+    labels.push(`${scenario.name}/${step}`);
   }
 }
+assert.equal(expected.length,fixture.updateCount,'Character LOD fixture update count did not match its rows');
 const result=spawnSync(executable,[],{input:input.join('\n')+'\n',encoding:'utf8'});
 assert.equal(result.status,0,result.stderr);
 const actual=result.stdout.trim().split(/\r?\n/);
@@ -34,9 +38,9 @@ assert.equal(actual.length,expected.length);
 for(let i=0;i<actual.length;i++) {
   const row=actual[i].trim().split(/\s+/).map(Number);
   const want=expected[i];
-  assert.equal(row[0],want[0],`tier at ${i}`);
-  assert.equal(row[1],want[1],`target at ${i}`);
-  assert.ok(Math.abs(row[2]-want[2])<1e-5,`fade at ${i}`);
-  assert.equal(row[3],Number(want[3]),`transition at ${i}`);
+  assert.equal(row[0],want[0],`tier at ${labels[i]}`);
+  assert.equal(row[1],want[1],`target at ${labels[i]}`);
+  assert.ok(Math.abs(row[2]-want[2])<1e-5,`fade at ${labels[i]}`);
+  assert.equal(row[3],want[3],`transition at ${labels[i]}`);
 }
-console.log(`Character LOD source oracle: ${actual.length} state updates across all quality tiers`);
+console.log(`Character LOD fixture oracle: ${actual.length} recorded source updates across all quality tiers`);

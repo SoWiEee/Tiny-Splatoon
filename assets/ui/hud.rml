@@ -1,29 +1,24 @@
 <rml>
-<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /><link type="text/rcss" href="results-reference.rcss" /><link type="text/rcss" href="map-reference.rcss" /></head>
+<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /><link type="text/rcss" href="results-reference.rcss" /><link type="text/rcss" href="map-reference.rcss" /><link type="text/rcss" href="boss-feedback.rcss" /></head>
 <body id="hud" class="hud">
   <div class="hud-top"><span id="stage-name" class="stage-name"></span><span id="pause-hint" class="pause-hint">Esc 暫停</span></div>
   <div id="battle-top" class="battle-top">
     <div class="squad squad-own"><div id="squad-a-count" class="squad-count"></div><div id="squad-a" class="squad-slots"></div></div>
+    <div id="zone-score-a" class="zone-team zone-team-a" role="group" aria-label="我方計數"><strong id="zone-count-a">100</strong><span id="zone-penalty-a" class="zone-penalty hidden" aria-label="罰則">+0</span></div>
     <div id="clock" class="clock">03:00</div>
+    <div id="zone-score-b" class="zone-team zone-team-b" role="group" aria-label="對方計數"><strong id="zone-count-b">100</strong><span id="zone-penalty-b" class="zone-penalty hidden" aria-label="罰則">+0</span></div>
     <div class="squad squad-enemy"><div id="squad-b-count" class="squad-count"></div><div id="squad-b" class="squad-slots"></div></div>
-  </div>
-  <div id="team-score" class="team-score"><span id="score-a" class="team-a">0.0%</span><span class="score-divider">／</span><span id="score-b" class="team-b">0.0%</span></div>
-  <div id="zones-hud" class="zones-hud hidden">
-    <div class="zones-counts">
-      <div class="zone-team zone-team-a"><span id="zone-team-a-name">我方</span><strong id="zone-count-a">100</strong><small>計數</small><span class="zone-penalty">罰則 <strong id="zone-penalty-a">0</strong></span></div>
-      <div class="zones-divider">／</div>
-      <div class="zone-team zone-team-b"><span id="zone-team-b-name">對方</span><strong id="zone-count-b">100</strong><small>計數</small><span class="zone-penalty">罰則 <strong id="zone-penalty-b">0</strong></span></div>
+    <div id="zones-hud" class="zones-hud hidden" aria-label="區域戰況">
+      <div id="zones-active" class="zones-active"><div class="zone-chip"><div class="zone-areas"></div><strong id="zone-objective">中央區</strong></div></div>
+      <div id="zone-phase-hint" class="zone-phase-hint hidden"><strong id="zone-phase">即將輪替</strong><span id="zone-phase-detail"></span></div>
+      <div id="zone-callout" class="zone-callout hidden" aria-live="polite"></div>
     </div>
-    <div class="zone-meta-row"><div class="zone-meta-group"><strong id="zone-objective">中央區</strong><span id="zone-owner">尚未控制</span></div><div class="zone-meta-group zone-phase-group"><strong id="zone-phase">區域輪替</strong><span id="zone-phase-detail"></span></div></div>
-    <div id="zones-active" class="zones-active"></div>
-    <div id="zone-callout" class="zone-callout hidden" aria-live="polite"></div>
   </div>
   <div id="boss" class="boss hidden"><img id="boss-emblem" class="boss-emblem" src="markers/boss.png"/><div class="boss-main"><div class="boss-heading"><strong>破艦巨獸</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div><i class="boss-notch notch-two"></i><i class="boss-notch notch-three"></i></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-state"></span></div></div><strong id="boss-hp" class="boss-percent"></strong></div>
-  <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><span class="minimap-key">TAB</span><strong>地圖</strong><span id="terrain-status"></span></div><div class="map-surface"><img id="minimap-render" src="native-map"/><div id="minimap-map" class="minimap-map"></div></div><div id="position-status" class="position-status"><span id="position-team-coverage"></span></div><div id="jump-map-help" class="jump-map-help"></div><div id="jump-map-queue" class="jump-map-queue"></div><div id="jump-map-legend" class="jump-map-legend"></div></div>
+  <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><span class="minimap-key">TAB</span><strong>地圖</strong></div><div class="map-surface"><img id="minimap-render" src="native-map"/><div id="minimap-map" class="minimap-map"></div></div><div id="jump-map-help" class="jump-map-help"></div><div id="jump-map-queue" class="jump-map-queue"></div><div id="jump-map-legend" class="jump-map-legend"></div></div>
   <div id="fps" class="fps">影格 <strong id="fps-value">60</strong></div>
   <div id="ally-markers" class="ally-markers"></div>
   <div id="death-markers" class="death-markers"></div>
-  <div class="player-info"><div class="player-bars"><span>生命 <strong id="hp">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
   <div id="ink-gauge" class="ink-gauge" role="meter" aria-label="剩餘墨量" aria-valuemin="0" aria-valuemax="100"><ink-tank id="ink-tank"></ink-tank><span id="ink" class="hidden">100</span><span id="ink-low" class="ink-low hidden">墨量不足</span></div>
   <div id="player-status" class="player-status"></div><weapon-reticle id="reticle" class="reticle"></weapon-reticle>
   <div id="battle-hud-layer" class="battle-hud-layer">
@@ -35,6 +30,12 @@
     <div id="battle-callout" class="battle-callout hidden" aria-live="polite"></div>
     <div id="death-card" class="death-card hidden"><img id="death-weapon" class="death-weapon" src="weapons/squid.png"/><div class="death-description"><strong id="death-by">遭到擊倒</strong><span id="death-cause"></span><small id="respawn-hint"></small></div><div class="death-respawn"><hud-ring id="death-ring"></hud-ring><strong id="respawn-seconds">5</strong><span>復活倒數</span></div></div>
     <div id="intro-lineup" class="intro-lineup hidden"></div><div id="battle-banner" class="battle-banner hidden"></div><div id="final-countdown" class="final-countdown hidden"></div>
+  </div>
+  <div id="boss-feedback-layer" class="boss-feedback-layer hidden">
+    <div id="boss-feedback-numbers" class="boss-feedback-numbers"></div>
+    <div id="boss-feedback-move" class="boss-feedback-move hidden"><i id="boss-feedback-edge-arrow" class="boss-feedback-edge-arrow">▶</i><span class="boss-feedback-move-pill"><i class="boss-feedback-warning">!</i><strong id="boss-feedback-move-label"></strong><i id="boss-feedback-move-direction" class="boss-feedback-move-direction">➤</i></span></div>
+    <div id="boss-feedback-title" class="boss-feedback-title hidden"><div class="boss-feedback-title-band"><i></i></div><img src="markers/boss.png"/><div class="boss-feedback-title-text"><small>頭目對戰</small><strong>破艦巨獸</strong><span>鏽殼恐怖巨蟹</span></div></div>
+    <div id="boss-feedback-phase" class="boss-feedback-phase hidden" aria-live="polite"><strong id="boss-feedback-phase-title"></strong><span id="boss-feedback-phase-sub"></span></div>
   </div>
   <div id="pause" class="overlay hidden">
     <div class="dialog pause-dialog">
@@ -72,7 +73,7 @@
       <div id="results-table" class="results-table"></div>
       <div class="result-footer">
         <div id="result-xp" class="result-xp"><div class="result-level">等級 <strong id="result-level-value">1</strong></div><div class="result-xp-main"><div class="result-xp-row"><strong id="result-xp-label">+0 XP</strong><span id="result-xp-next"></span></div><div class="result-xp-track" aria-hidden="true"><div id="result-xp-fill"></div></div><div id="result-xp-breakdown" class="result-xp-breakdown"></div></div></div>
-        <div class="result-actions"><button id="results-rematch" class="primary"><span>↻　再戰一場</span></button><button id="results-menu"><span>〈　返回選單</span></button><button id="results-close">離開遊戲</button></div>
+        <div class="result-actions"><button id="results-rematch" class="primary"><span>↻　再戰一場</span></button><button id="results-menu"><span id="results-menu-label">〈　返回選單</span></button><button id="results-close">離開遊戲</button></div>
       </div>
     </div>
     <button id="result-skip" class="result-skip" aria-label="略過結果動畫"></button>

@@ -23,6 +23,7 @@ struct UiPreview {
     float x=0,y=0,width=0,height=0;
     UiScreen screen=UiScreen::Title;
     UiPreviewType type=UiPreviewType::None;
+    bool settled=false;
 };
 struct UiSetup {
     std::string stage="tidewater",mode="turf",main="shooter",sub="bomb",special="burst",difficulty="normal",theme="day";
@@ -68,11 +69,13 @@ public:
     void SetSaveError(std::string error);
     void SetReward(MatchRewardResult reward);
     void SetSoundSink(std::function<void(const std::string&)> sink);
+    void SetDetailedSoundSink(std::function<void(const std::string&,double,double)> sink);
     void SetVolumeSink(std::function<void(float,float,float)> sink);
     void SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel={});
     void SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY=1.78f);
     void SetNativeMap(unsigned int texture,const glm::mat4& viewProjection);
     int TakeJumpMapSelection();
+    void ConfirmJumpMapCursor();
     void ShowOnline();
     void SetOnlineState(const network::RoomView& view);
     std::vector<UiOnlineRequest> TakeOnlineRequests();

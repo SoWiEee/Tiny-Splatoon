@@ -252,7 +252,8 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     renderer.UploadInk(stage,paint);
     StageMapView nativeMap(stage.bounds,match.local().team()==1);
     RenderPipeline pipeline;
-    pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects&&(!nativeApp||ui.profile().settings.bloom));
+    pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects&&(!nativeApp||ui.profile().settings.bloom),graphics.antialiasing);
+    bool antialiasing=graphics.antialiasing;
     CharacterArt art(characterAssets,true,true);
     const std::string matchId=online?"online-"+online->view().code+"-"+std::to_string(online->view().matchEpoch)+"-"+std::to_string(online->view().seed)+"-"+std::to_string(online->view().selfId):std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
     WorldEffects worldEffects(art.data());
@@ -268,6 +269,8 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     std::unique_ptr<BossRenderer> bossRenderer;
     if(match.boss()){
         bossRenderer=std::make_unique<BossRenderer>(characterAssets.parent_path()/"boss",true);
+        bossRenderer->SetAudioEventSink([&](const BossPoseAudioEvent& event){gameAudio.BossAnimationEvent(event);});
+        gameAudio.EnableBossAnimationAudio(true);
         match.setBossPoseSink([&](BossSimulation& boss){bossRenderer->Update(boss);});
     }
     match.local().setDamageSink([&screenController](double amount,const glm::dvec3* attacker){screenController.Damage(amount,attacker);});
@@ -304,6 +307,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     bool hasPad=false,usingPad=false;
     bool jumpMapOpen=false;
     double mapBlend=0.0;
+    glm::dvec2 mapLook(0);bool mapConfirmWas=false;
     std::array<bool,10> jumpTargetWasHeld{};
     auto captureMouse=[&](bool capture) {
         fireBlocked=true;
@@ -410,7 +414,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         if(match.phase()!=previousPhase){
             switch(match.phase()){
             case MatchPhase::Intro:screenController.MatchState("intro");break;
-            case MatchPhase::Playing:screenController.MatchState("playing");break;
+            case MatchPhase::Playing:screenController.MatchState("playing");if(!paused&&!benchmark&&!options.frames)captureMouse(true);break;
             case MatchPhase::Finish:screenController.MatchState("finish");break;
             case MatchPhase::Judge:screenController.MatchState("judge");break;
             case MatchPhase::Results:screenController.MatchState("results");break;
@@ -447,6 +451,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                     std::cout<<"MATCH_RESULT winner="<<(result->winner==0?"orange":"blue")
                              <<" orange="<<result->coverage[0]*100.0<<" blue="<<result->coverage[1]*100.0<<'\n';
                 captureMouse(false);
+                if(showcase)showcase->beginResults(glfwGetTime()+(ui.profile().settings.reducedMotion?0:2.3));
                 resultReported=true;
                 if(nativeApp&&store&&!options.practice&&match.result()){
                     auto profile=ui.profile();
@@ -624,19 +629,20 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                 (glfwGetKey(window,GLFW_KEY_TAB)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_M)==GLFW_PRESS);
             if(mapHeld!=jumpMapOpen){
                 jumpMapOpen=mapHeld;
-                if(jumpMapOpen)captureMouse(false);
+                if(jumpMapOpen){captureMouse(false);glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_HIDDEN);}
                 else if(!paused&&match.phase()==MatchPhase::Playing)captureMouse(true);
             }
-            if(!paused && match.phase()==MatchPhase::Playing) {
-                double x=0.0,y=0.0;
-                glfwGetCursorPos(window,&x,&y);
+            double x=0.0,y=0.0;
+            glfwGetCursorPos(window,&x,&y);
+            if(!paused && !jumpMapOpen && match.phase()==MatchPhase::Playing && previousPhase==MatchPhase::Playing) {
                 const auto settings=nativeApp?ui.profile().settings:PlayerSettings{};
                 pendingMouseX+=x-mouseX;pendingMouseY+=y-mouseY;
                 if(x!=mouseX||y!=mouseY)usingPad=false;
                 camera.horizontalFovDegrees=settings.fov;
                 camera.shake=settings.reducedMotion?0:settings.cameraShake;
-                mouseX=x;mouseY=y;
-            }
+            } else pendingMouseX=pendingMouseY=0;
+            // Keep the cursor baseline current while look is locked; never bank intro motion.
+            mouseX=x;mouseY=y;
         }
         if(capture||options.frames) tick();
         else if(!paused||online) {
@@ -644,6 +650,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             while(accumulator+1e-12>=dt) {tick();accumulator-=dt;}
         }
         previous=now;
+        if(nativeApp&&antialiasing!=ui.graphicsSettings().antialiasing){
+            antialiasing=ui.graphicsSettings().antialiasing;
+            pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects&&ui.profile().settings.bloom,antialiasing);
+        }
         renderer.UploadInk(stage,paint,visualDt);
         const bool mapWanted=jumpMapOpen||(match.phase()==MatchPhase::Results&&!match.boss());
         const double cameraDt=std::clamp(now-lodPrevious,0.0,.1);
@@ -653,7 +663,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         glm::dvec3 renderForward=benchmark&&!options.benchmarkPlayer?glm::normalize(target-overviewEye):camera.pose().forward;
         float verticalFov=benchmark&&!options.benchmarkPlayer?48.0f:static_cast<float>(camera.pose().verticalFovDegrees);
         if(mapBlend>1e-4&&(!benchmark||options.benchmarkPlayer)){
-            const auto fitted=FitStageMapCamera(stage.bounds,static_cast<double>(width)/height,match.local().team()==1);
+            auto fitted=FitStageMapCamera(stage.bounds,static_cast<double>(width)/height,match.local().team()==1);
+            glm::dvec2 look(0);if(jumpMapOpen&&!ui.profile().settings.reducedMotion){double x=0,y=0;int ww=1,wh=1;glfwGetWindowSize(window,&ww,&wh);glfwGetCursorPos(window,&x,&y);look={std::clamp(x/std::max(1,ww)*2-1.,-1.,1.)*.09,std::clamp(y/std::max(1,wh)*2-1.1,-1.,1.)*-.05};}
+            mapLook+=(look-mapLook)*(1-std::exp(-4*cameraDt));const double yaw=mapLook.x+(match.local().team()==1?3.141592653589793:0),pitch=1.1+mapLook.y;
+            fitted.eye=fitted.target+glm::dvec3(-std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch))*fitted.distance;
             const double e=mapBlend<.5?4.0*mapBlend*mapBlend*mapBlend:1.0-std::pow(-2.0*mapBlend+2.0,3.0)*.5;
             const double up=e+.35*e*(1.0-e);
             const glm::dvec3 gameTarget=renderEye+renderForward*12.0;
@@ -797,7 +810,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                 const bool won=match.result()->boss?match.result()->boss->win:match.result()->winner==match.local().team();
                 const auto p=ui.preview();
                 if(p.type==UiPreviewType::Podium&&p.width>0&&p.height>0)
-                    showcase->drawPodium(podium,won,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);
+                    showcase->drawPodium(podium,won,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion||p.settled);
             }
             const bool gearOpen=options.practice&&ui.preview().screen==UiScreen::PracticeGear;
             std::vector<UiJumpMapTarget> jumpTargets;
@@ -806,6 +819,12 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                     jumpTargets.push_back({target.key,target.x,target.z,target.label,target.available,target.y,
                         target.actor?std::string(target.actor->weapon().kind):std::string()});
             }
+            if(jumpMapOpen&&hasPad){
+                double x=0,y=0;glfwGetCursorPos(window,&x,&y);int ww=1,wh=1;glfwGetWindowSize(window,&ww,&wh);
+                const double dx=std::abs(pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_X])>.15?pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]:0,dy=std::abs(pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y])>.15?pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]:0;
+                if(dx||dy)glfwSetCursorPos(window,std::clamp(x+dx*600*cameraDt,0.,double(ww)),std::clamp(y+dy*600*cameraDt,0.,double(wh)));
+                const bool confirm=pad.buttons[GLFW_GAMEPAD_BUTTON_A];if(confirm&&!mapConfirmWas)ui.ConfirmJumpMapCursor();mapConfirmWas=confirm;
+            }else mapConfirmWas=false;
             ui.SetJumpMap(jumpMapOpen,std::move(jumpTargets),controller.QueuedSuperJumpKey(),controller.QueuedSuperJumpLabel());
             ui.SetWorldView(projection*view,renderEye,projection[1][1]);
             ui.SetNativeMap(nativeMap.texture(),glm::mat4(nativeMap.viewProjection()));
@@ -987,7 +1006,7 @@ int RunStageViewer(int argc, char** argv) {
             GameAudio gameAudio(audio);
             if(!audio.Initialize())std::cerr<<"AUDIO unavailable: "<<audio.lastError()<<'\n';
             GameUi ui(window,assetRoot);
-            ui.SetSoundSink([&](const std::string& name){audio.Play(name);});
+            ui.SetDetailedSoundSink([&](const std::string& name,double volume,double pitch){AudioPlayOptions request;request.volume=volume;request.pitch=pitch;audio.Play(name,request);});
             ui.SetVolumeSink([&](float master,float music,float sfx){audio.SetVolumes(master,music,sfx);});
             if(options.native)NativeMenu(window,options,*found,assets,ui,audio,gameAudio);
             else MatchLoop(window,options,*found,assets,ui,audio,gameAudio);

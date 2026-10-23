@@ -56,7 +56,7 @@ double BossSimulation::pace()const{return difficulty_=="easy"?1.25:difficulty_==
 void BossSimulation::reset(){
     seed_=initialSeed_;state_={};move_.reset();moves_.clear();crabs_.clear();oneShotHits_.clear();poseSockets_.clear();
     localVictimHitGuards_.clear();localCrabBurstGuards_.clear();hasAuthoritySnapshot_=false;followerHazardClock_=-1.0;
-    poseHitPulse_={};
+    poseHitPulse_={};hudHitSerial_=0;hudHitEvents_.clear();
     forcedMove_.reset();lastMove_.reset();attention_.fill(0);damageBy_.fill(0);totalDamageBy_.fill(0);weakHitsBy_.fill(0);splatsBy_.fill(0);
     externalHitShapes_=false;spawnedCrabs_=false;finished_=false;pendingPhase_=0;crabSeq_=1;
     cool_=2.4;retarget_=goalTime_=stuckTime_=speed_=crabletCooldown_=frenzyCooldown_=0;
@@ -697,7 +697,7 @@ std::optional<BossSegmentHit> BossSimulation::segmentHit(glm::dvec3 from,glm::dv
     }
     return best;
 }
-double BossSimulation::applyDamage(PlayerSimulation& attacker,double amount,bool weak){
+double BossSimulation::applyDamage(PlayerSimulation& attacker,double amount,bool weak,glm::dvec3 point){
     if(state_.dead||state_.invulnerable||!state_.visible||finished_)return 0;
     poseHitPulse_.flash=std::max(poseHitPulse_.flash,std::clamp(amount/90.0,.25,1.0));
     if(weak)poseHitPulse_.weakFlash=std::max(poseHitPulse_.weakFlash,std::clamp(amount/90.0,.25,1.0));
@@ -706,6 +706,11 @@ double BossSimulation::applyDamage(PlayerSimulation& attacker,double amount,bool
     const int index=static_cast<int>(std::distance(squad_.begin(),std::find(squad_.begin(),squad_.end(),&attacker)));
     if(index>=0&&index<static_cast<int>(damageBy_.size())){
         damageBy_[index]+=landed;totalDamageBy_[index]+=landed;if(weak)++weakHitsBy_[index];
+    }
+    if(landed>0){
+        hudHitEvents_.push_back({++hudHitSerial_,state_.clock,landed,index,point,weak});
+        // shortcut: keeps 128 events, increase if the HUD can skip more than 128 hits before rendering.
+        if(hudHitEvents_.size()>128)hudHitEvents_.erase(hudHitEvents_.begin());
     }
     if(state_.hp<=.001){state_.hp=0;state_.dead=true;state_.killer=index;finish();for(auto& crab:crabs_)crab.dead=true;}
     else{
@@ -728,7 +733,9 @@ double BossSimulation::hit(PlayerSimulation& attacker,double amount,const BossSe
     if(weapon=="roller")multiplier=.3;
     else if(weapon=="slam")multiplier=.6;
     else if(weapon=="bomb"||weapon=="sticky"||weapon=="seeker"||weapon=="burst"||weapon=="shaker"||weapon=="waddle"||weapon=="torpedo")multiplier=.75;
-    return applyDamage(attacker,amount*(hit.weak?2.5:1)*(state_.stunned?1.25:1)*multiplier,hit.weak);
+    auto point=hit.point;
+    if(glm::length(point)<1e-6)point=hit.shape>=0&&hit.shape<static_cast<int>(hitShapes_.size())?hitShapes_[static_cast<std::size_t>(hit.shape)].pos:state_.pos+glm::dvec3(0,3.2,0);
+    return applyDamage(attacker,amount*(hit.weak?2.5:1)*(state_.stunned?1.25:1)*multiplier,hit.weak,point);
 }
 double BossSimulation::splash(PlayerSimulation& attacker,glm::dvec3 center,double radius,double maxDamage,double minDamage,const std::string& weapon){
     if(finished_)return 0;
@@ -751,7 +758,7 @@ double BossSimulation::splash(PlayerSimulation& attacker,glm::dvec3 center,doubl
     const double length=glm::length(nearest->pos-center);
     const glm::dvec3 to=glm::mix(nearest->pos,center,std::min(.9,nearest->radius/std::max(nearest->radius,length)));
     if(!geometry_.los(center+glm::dvec3(0,.3,0),to))return total;
-    BossSegmentHit h;h.shape=static_cast<int>(nearest-hitShapes_.data());
+    BossSegmentHit h;h.shape=static_cast<int>(nearest-hitShapes_.data());h.point=nearest->pos;
     total+=hit(attacker,maxDamage+(minDamage-maxDamage)*std::clamp(distance/radius,0.0,1.0),h,weapon);
     return total;
 }

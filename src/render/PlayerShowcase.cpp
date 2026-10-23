@@ -27,6 +27,11 @@ void validate(PlayerShowcase::Viewport viewport,double time) {
     if(!std::isfinite(time))throw std::invalid_argument("Showcase time must be finite");
 }
 
+double backOut(double value,double strength) {
+    const double t=std::clamp(value,0.0,1.0)-1.0;
+    return 1.0+t*t*((strength+1.0)*t+strength);
+}
+
 class GlState {
 public:
     GlState() {
@@ -42,6 +47,7 @@ public:
         glGetIntegerv(GL_CULL_FACE_MODE,&cullFace_);glGetIntegerv(GL_FRONT_FACE,&frontFace_);
         depth_=glIsEnabled(GL_DEPTH_TEST);scissorEnabled_=glIsEnabled(GL_SCISSOR_TEST);
         blend_=glIsEnabled(GL_BLEND);cull_=glIsEnabled(GL_CULL_FACE);
+        programPointSize_=glIsEnabled(GL_PROGRAM_POINT_SIZE);
         for(std::size_t i=0;i<textures_.size();++i){
             glActiveTexture(GL_TEXTURE0+static_cast<GLenum>(i+6));
             glGetIntegerv(GL_TEXTURE_BINDING_2D,&textures_[i]);
@@ -59,6 +65,7 @@ public:
                             static_cast<GLenum>(blendSrcAlpha_),static_cast<GLenum>(blendDstAlpha_));
         setEnabled(GL_BLEND,blend_);glCullFace(static_cast<GLenum>(cullFace_));
         glFrontFace(static_cast<GLenum>(frontFace_));setEnabled(GL_CULL_FACE,cull_);
+        setEnabled(GL_PROGRAM_POINT_SIZE,programPointSize_);
         for(std::size_t i=0;i<textures_.size();++i){
             glActiveTexture(GL_TEXTURE0+static_cast<GLenum>(i+6));glBindTexture(GL_TEXTURE_2D,static_cast<GLuint>(textures_[i]));
         }
@@ -70,7 +77,7 @@ private:
     GLint drawFramebuffer_=0,readFramebuffer_=0,depthFunc_=GL_LESS,activeTexture_=GL_TEXTURE0,program_=0,vertexArray_=0,arrayBuffer_=0;
     GLint blendSrcRgb_=GL_ONE,blendDstRgb_=GL_ZERO,blendSrcAlpha_=GL_ONE,blendDstAlpha_=GL_ZERO;
     GLint cullFace_=GL_BACK,frontFace_=GL_CCW;
-    GLboolean depthMask_=GL_TRUE,depth_=GL_FALSE,scissorEnabled_=GL_FALSE,blend_=GL_FALSE,cull_=GL_FALSE;
+    GLboolean depthMask_=GL_TRUE,depth_=GL_FALSE,scissorEnabled_=GL_FALSE,blend_=GL_FALSE,cull_=GL_FALSE,programPointSize_=GL_FALSE;
     GLdouble depthClear_=1.0;
     std::array<GLint,4> viewport_{},scissor_{};
     std::array<GLint,2> textures_{};
@@ -88,7 +95,7 @@ struct PlayerShowcase::Actor {
     CharacterStyle style{};
     std::unique_ptr<CharacterPose> pose;
     double lastTime=0.0;
-    bool hasTime=false;
+    bool hasTime=false,landTriggered=false;
 
     void configure(CharacterArt& art,const std::string& newName,const CharacterStyle& newStyle,
                    const std::string& newMain,const std::string& newSub,const std::string& newDance) {
@@ -105,15 +112,16 @@ struct PlayerShowcase::Actor {
         pose->setStyle(newStyle);pose->setColor(InkColors[0]);
         if(dance!=newDance){
             pose->setDance(newDance);
-            if(newDance=="victory")pose->trigger({"land",9.0});
             dance=newDance;
         }
     }
 
-    void advance(double time,bool reducedMotion,glm::dvec3 position,double yaw) {
+    void advance(double time,bool reducedMotion,glm::dvec3 position,double yaw,
+                 double velocityY=0.0,bool grounded=true,bool visible=true) {
         const double dt=hasTime?std::clamp(time-lastTime,0.0,0.1):0.0;
         lastTime=time;hasTime=true;
-        CharacterAnimState state;state.position=position;state.yaw=yaw;
+        CharacterAnimState state;state.position=position;state.yaw=yaw;state.vy=velocityY;
+        state.grounded=grounded;state.visible=visible;
         CharacterSceneInput scene;
         pose->update(reducedMotion?0.0:dt,state,scene);
     }
@@ -126,8 +134,11 @@ struct PlayerShowcase::Stage {
         ~Mesh(){if(vao)glDeleteVertexArrays(1,&vao);if(vbo)glDeleteBuffers(1,&vbo);if(ebo)glDeleteBuffers(1,&ebo);}
         Mesh()=default;Mesh(const Mesh&)=delete;Mesh& operator=(const Mesh&)=delete;
     };
+    struct Particle {float x,y,z,r,g,b,size,shape,alpha;};
     CharacterShader shader;
+    CharacterShader particleShader;
     std::array<Mesh,4> bodies,coats;
+    GLuint particleVao=0,particleVbo=0;
 
     explicit Stage(const std::filesystem::path& path):shader(R"GLSL(#version 450 core
 in vec3 position;in vec3 normal;in float shade;in float glow;
@@ -139,11 +150,29 @@ in vec3 vNormal;in float vShade,vGlow;
 uniform vec3 uBase,uInk;uniform float uCoat;
 layout(location=0) out vec4 fragColor;
 void main(){float key=max(0.0,dot(normalize(vNormal),normalize(vec3(-.4,.85,.35))));float rim=pow(1.0-max(0.0,normalize(vNormal).z),2.0);vec3 base=mix(uBase*vShade,uInk*vShade,uCoat);base*=.65+.45*key;base+=uInk*vGlow*.48+vec3(rim*.12);fragColor=vec4(base,1.0);}
+)GLSL"),particleShader(R"GLSL(#version 450 core
+in vec3 position;in vec3 color;in float size;in float shape;in float alpha;
+uniform mat4 viewMatrix,projectionMatrix;uniform float viewportHeight;
+out vec3 vColor;out float vShape,vAlpha;
+void main(){vec4 camera=viewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*camera;gl_PointSize=size*projectionMatrix[1][1]*viewportHeight/max(.1,-camera.z);vColor=color;vShape=shape;vAlpha=alpha;}
+)GLSL",R"GLSL(#version 450 core
+in vec3 vColor;in float vShape,vAlpha;layout(location=0) out vec4 fragColor;
+void main(){vec2 p=gl_PointCoord-.5;if(vShape>.5){if(abs(p.x)>.27||abs(p.y)>.5)discard;}else if(dot(p,p)>.25)discard;fragColor=vec4(vColor,vAlpha);}
 )GLSL"){
         auto meshes=readGeometry(path);
         for(std::size_t i=0;i<bodies.size();++i){upload(bodies[i],std::move(meshes[i*2]));upload(coats[i],std::move(meshes[i*2+1]));}
+        glGenVertexArrays(1,&particleVao);glBindVertexArray(particleVao);
+        glGenBuffers(1,&particleVbo);glBindBuffer(GL_ARRAY_BUFFER,particleVbo);
+        const auto attribute=[&](const char* name,int size,std::size_t offset){
+            const int location=particleShader.attribute(name);if(location<0)return;
+            glEnableVertexAttribArray(location);glVertexAttribPointer(location,size,GL_FLOAT,GL_FALSE,sizeof(Particle),reinterpret_cast<const void*>(offset));
+        };
+        attribute("position",3,offsetof(Particle,x));attribute("color",3,offsetof(Particle,r));
+        attribute("size",1,offsetof(Particle,size));attribute("shape",1,offsetof(Particle,shape));
+        attribute("alpha",1,offsetof(Particle,alpha));
         glBindVertexArray(0);
     }
+    ~Stage(){if(particleVao)glDeleteVertexArrays(1,&particleVao);if(particleVbo)glDeleteBuffers(1,&particleVbo);}
 
     static std::vector<std::pair<std::vector<Vertex>,std::vector<std::uint32_t>>> readGeometry(const std::filesystem::path& path){
         std::ifstream input(path,std::ios::binary);
@@ -180,18 +209,74 @@ void main(){float key=max(0.0,dot(normalize(vNormal),normalize(vec3(-.4,.85,.35)
         attribute("shade",1,offsetof(Vertex,shade));attribute("glow",1,offsetof(Vertex,glow));
         mesh.count=static_cast<GLsizei>(data.second.size());
     }
-    void draw(std::size_t count,const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye){
+    void draw(std::size_t count,const std::array<double,4>& drumOffsets,
+              const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye){
         static const std::array<glm::dvec3,4> slots={{{0,.72,0},{-1.34,.46,-.14},{1.34,.46,-.14},{2.55,.22,-.36}}};
         shader.use();glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);
         shader.uniform("uBase",{.13,.15,.32});
         shader.uniform("uInk",{SrgbInkColors[0].x,SrgbInkColors[0].y,SrgbInkColors[0].z});
         for(std::size_t i=0;i<count;++i){
-            const auto model=glm::translate(glm::dmat4(1),slots[i]);
+            const auto model=glm::translate(glm::dmat4(1),slots[i]+glm::dvec3(0.0,drumOffsets[i],0.0));
             shader.matrices(model,view,projection,eye);
             shader.uniform("uCoat",0);glBindVertexArray(bodies[i].vao);glDrawElements(GL_TRIANGLES,bodies[i].count,GL_UNSIGNED_INT,nullptr);
             shader.uniform("uCoat",1);glBindVertexArray(coats[i].vao);glDrawElements(GL_TRIANGLES,coats[i].count,GL_UNSIGNED_INT,nullptr);
         }
         glBindVertexArray(0);
+    }
+
+    void drawParticles(std::size_t count,const std::array<glm::dvec3,4>& slots,double elapsed,bool won,
+                       bool reducedMotion,const glm::dmat4& view,const glm::dmat4& projection,int viewportHeight){
+        if(reducedMotion||elapsed<0.15)return;
+        std::array<Particle,180> particles{};std::size_t used=0;
+        const auto add=[&](double x,double y,double z,glm::dvec3 color,double size,double shape,double alpha){
+            if(used>=particles.size()||alpha<=0.0)return;
+            particles[used++]={static_cast<float>(x),static_cast<float>(y),static_cast<float>(z),
+                static_cast<float>(color.x),static_cast<float>(color.y),static_cast<float>(color.z),
+                static_cast<float>(size),static_cast<float>(shape),static_cast<float>(alpha)};
+        };
+        double minX=slots[0].x,maxX=slots[0].x;
+        for(std::size_t i=0;i<count;++i){minX=std::min(minX,slots[i].x);maxX=std::max(maxX,slots[i].x);}
+        const auto paper=std::array<glm::dvec3,5>{{{1.0,.22,.36},{1.0,.72,.16},{.25,.9,.73},{.38,.64,1.0},{.94,.42,.93}}};
+        if(won){
+            for(int i=0;i<76;++i){
+                const double phase=std::fmod(i*.61803398875,1.0),speed=.2+std::fmod(i*.271,1.0)*.22;
+                const double age=std::fmod(elapsed*speed+phase,1.0);
+                const double x=minX-.55+std::fmod(i*.754877666,1.0)*(maxX-minX+1.1)+std::sin(elapsed*2.0+i)*.11;
+                const double z=-1.25+std::fmod(i*.569840291,1.0)*1.75;
+                const auto color=paper[static_cast<std::size_t>(i)%paper.size()];
+                add(x,3.2-age*3.6,z,color,.12+(i%3)*.018,1.0,.92);
+            }
+            for(int burst=0;burst<2;++burst){
+                const double age=elapsed-(burst==0?.98:1.30);
+                if(age<0.0||age>1.15)continue;
+                for(int i=0;i<28;++i){
+                    const double phase=i*.61803398875+burst*.17;
+                    const double angle=phase*6.283185307179586;
+                    const double speed=1.0+std::fmod(i*.417,1.0)*1.7;
+                    const double height=2.2+std::fmod(i*.293,1.0)*1.5;
+                    const double x=(burst==0?minX-.45:maxX+.45)+std::cos(angle)*speed*age;
+                    const double y=1.05+height*age-2.15*age*age;
+                    const double z=-.85+std::sin(angle)*.65*age;
+                    const auto color=paper[static_cast<std::size_t>(i+burst*2)%paper.size()];
+                    add(x,y,z,color,.14+(i%2)*.025,1.0,std::clamp(1.0-age/1.15,0.0,1.0));
+                }
+            }
+        }else{
+            for(int i=0;i<46;++i){
+                const double phase=std::fmod(i*.61803398875,1.0),age=std::fmod(elapsed*.12+phase,1.0);
+                const double x=minX-.4+std::fmod(i*.754877666,1.0)*(maxX-minX+.8);
+                const double z=-1.2+std::fmod(i*.569840291,1.0)*1.5;
+                const glm::dvec3 color=i%2?glm::dvec3(.48,.38,.63):glm::dvec3(.62,.48,.7);
+                add(x,3.0-age*2.5,z,color,.055,0.0,.42);
+            }
+        }
+        if(used==0)return;
+        particleShader.use();particleShader.matrices(glm::dmat4(1.0),view,projection,glm::dvec3(0.0));
+        particleShader.uniform("viewportHeight",static_cast<double>(viewportHeight));
+        glBindVertexArray(particleVao);glBindBuffer(GL_ARRAY_BUFFER,particleVbo);
+        glBufferData(GL_ARRAY_BUFFER,used*sizeof(Particle),particles.data(),GL_STREAM_DRAW);
+        glEnable(GL_DEPTH_TEST);glDepthMask(GL_FALSE);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_PROGRAM_POINT_SIZE);glDrawArrays(GL_POINTS,0,static_cast<GLsizei>(used));glBindVertexArray(0);
     }
 };
 
@@ -225,6 +310,33 @@ void PlayerShowcase::drawPlayer(const PlayerProfile& profile,const std::string& 
     art_.draw(actor.pose->frame(),profile.style,weaponId,subId,"hero",view,projection,eye,showcaseLighting());
 }
 
+void PlayerShowcase::beginResults(double startTime) {
+    if(!std::isfinite(startTime))throw std::invalid_argument("Showcase result start time must be finite");
+    resultStartTime_=startTime;resultsBegun_=true;hasPodiumKey_=false;podiumNames_.clear();
+    for(auto& actor:actors_)if(actor){actor->landTriggered=false;actor->hasTime=false;}
+}
+
+PlayerShowcase::PodiumMotion PlayerShowcase::podiumMotion(double elapsed,std::size_t slot,bool won,bool reducedMotion) {
+    if(!std::isfinite(elapsed)||elapsed<0.0)throw std::invalid_argument("Showcase result elapsed time must be finite and non-negative");
+    if(slot>=4)throw std::out_of_range("Showcase podium slot is outside the source layout");
+    PodiumMotion motion;
+    if(reducedMotion){motion.landed=won;return motion;}
+    const double rise=backOut((elapsed-.04*slot)/.72,1.15);
+    motion.drumOffset=-2.4*(1.0-rise);
+    if(!won)return motion;
+    constexpr std::array<double,4> landAt={.46,.59,.72,.90};
+    const double fallStart=landAt[slot]-.5;
+    if(elapsed<fallStart){motion.visible=false;return motion;}
+    const double progress=std::clamp((elapsed-fallStart)/.5,0.0,1.0);
+    motion.playerOffset=3.1*(1.0-progress*progress);
+    motion.velocityY=-12.4*progress;
+    motion.airborne=progress<1.0;
+    motion.landed=!motion.airborne;
+    const double landAge=std::max(0.0,elapsed-landAt[slot]);
+    motion.squash=motion.airborne?1+.1*std::clamp(-motion.velocityY/12.,0.,1.):1.0-.15*std::exp(-6.0*landAge)*std::sin(14.0*landAge);
+    return motion;
+}
+
 void PlayerShowcase::drawPodium(const std::vector<PodiumPlayer>& roster,bool won,Viewport viewport,
                                 double time,bool reducedMotion) {
     if(roster.empty())return;
@@ -233,7 +345,17 @@ void PlayerShowcase::drawPodium(const std::vector<PodiumPlayer>& roster,bool won
     static const std::array<glm::dvec3,4> positions={{{0.0,0.72,0.0},{-1.34,0.46,-0.14},{1.34,0.46,-0.14},{2.55,0.22,-0.36}}};
     static constexpr std::array<double,4> yaws={0.0,0.2,-0.2,-0.34};
     const std::size_t count=std::min(roster.size(),positions.size());
+    std::vector<std::string> names;names.reserve(count);
+    for(std::size_t i=0;i<count;++i)names.push_back(roster[i].name.empty()?"winner":roster[i].name);
+    const bool setupChanged=hasPodiumKey_&&(podiumWon_!=won||podiumNames_!=names);
+    if(!resultsBegun_||setupChanged){
+        resultStartTime_=time;resultsBegun_=true;
+        for(auto& actor:actors_)if(actor){actor->landTriggered=false;actor->hasTime=false;}
+    }
+    podiumWon_=won;podiumNames_=std::move(names);hasPodiumKey_=true;
+    const double elapsed=reducedMotion?0.0:std::max(0.0,time-resultStartTime_);
     actors_.resize(count);
+    std::array<PodiumMotion,4> motions{};std::array<double,4> drumOffsets{};
     double minX=positions[0].x,maxX=positions[0].x,maxY=positions[0].y+1.62;
     for(std::size_t i=0;i<count;++i){
         if(!actors_[i])actors_[i]=std::make_unique<Actor>();
@@ -241,10 +363,14 @@ void PlayerShowcase::drawPodium(const std::vector<PodiumPlayer>& roster,bool won
         const auto name=player.name.empty()?"winner":player.name;
         const auto main=player.main.empty()?"shooter":player.main;
         const auto sub=player.sub.empty()?"bomb":player.sub;
-        actors_[i]->configure(art_,name,player.style,main,sub,won?"victory":"defeat");
-        actors_[i]->advance(time,reducedMotion,positions[i],yaws[i]);
+        motions[i]=podiumMotion(elapsed,i,won,reducedMotion);drumOffsets[i]=motions[i].drumOffset;
+        auto& actor=*actors_[i];
+        actor.configure(art_,name,player.style,main,sub,won?(motions[i].landed?"victory":""):"defeat");
+        if(won&&motions[i].landed&&!reducedMotion&&!actor.landTriggered){actor.pose->trigger({"land",9.0});actor.landTriggered=true;}
+        actor.advance(time,reducedMotion,positions[i]+glm::dvec3(0.0,motions[i].playerOffset,0.0),yaws[i],
+                      motions[i].velocityY,!motions[i].airborne,motions[i].visible);
         minX=std::min(minX,positions[i].x);maxX=std::max(maxX,positions[i].x);
-        maxY=std::max(maxY,positions[i].y+1.62);
+        maxY=std::max(maxY,positions[i].y+motions[i].playerOffset+1.62);
     }
 
     GlState saved;
@@ -260,13 +386,18 @@ void PlayerShowcase::drawPodium(const std::vector<PodiumPlayer>& roster,bool won
     const auto projection=glm::perspective(glm::radians(fov),aspect,0.05,distance+30.0);
     const auto light=showcaseLighting();
     if(!stage_)stage_=std::make_unique<Stage>(directory_/"showcase-drums.bin");
-    stage_->draw(count,view,projection,eye);
+    stage_->draw(count,drumOffsets,view,projection,eye);
     for(std::size_t i=0;i<count;++i){
+        if(!motions[i].visible)continue;
         const auto& player=roster[i];
-        art_.draw(actors_[i]->pose->frame(),player.style,
+        auto frame=actors_[i]->pose->frame();
+        const double lateralScale=1.0/std::sqrt(std::max(.01,motions[i].squash));
+        frame.root.scale*=glm::dvec3(lateralScale,motions[i].squash,lateralScale);
+        art_.draw(frame,player.style,
                   player.main.empty()?"shooter":player.main,player.sub.empty()?"bomb":player.sub,
                   "hero",view,projection,eye,light);
     }
+    stage_->drawParticles(count,positions,elapsed,won,reducedMotion,view,projection,viewport.height);
 }
 
 } // namespace restoration

@@ -356,7 +356,7 @@ ID、順序、名稱、預設 kit、數值、動畫／音效／UI／網路均屬
 | ID | 強制需求 |
 |---|---|
 | HUD-01 | 隊色／雙方四人存活／復活／special ready、時計、各武器準星／散布／charge、hit marker；Boss改SQUAD／Boss HUD。 |
-| HUD-02 | 墨槽／低墨／sub耗墨預覽、特殊charge/active、HP警示、feed／死亡原因倒數、隊友名牌／離屏箭頭、情境提示／可選FPS。 |
+| HUD-02 | 墨槽／低墨／sub耗墨預覽、特殊charge/active、以畫面效果呈現HP警示（無玩家HP數字）、個人塗地p（局內不顯示雙隊塗地百分比）、feed／死亡原因倒數、隊友名牌／離屏箭頭、情境提示／可選FPS。 |
 | HUD-03 | 小地圖地形／墨、友軍／合法揭露敵人、死亡／爆炸／jump，不能顯示所有潛藏敵人。death mark5 s、最後1.3 s淡出。 |
 | HUD-04 | Tab/M可互動3D map diorama，隊友／基地／beacon pins與有效性，開圖阻正常射擊；strike獨立選點。 |
 | HUD-05 | jump0.75 s蓄力、飛行弧線／落點警告／目標有效性／beacon消耗；死亡可預排隊友／beacon jump，復活執行，失效取消依來源。 |

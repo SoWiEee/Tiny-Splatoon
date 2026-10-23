@@ -8,13 +8,15 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <stdexcept>
+#include <string>
 #include <glm/geometric.hpp>
 
 using namespace restoration;
 
 namespace {
-void check(bool condition,const char* message) {
+void check(bool condition,const std::string& message) {
     if(!condition) throw std::runtime_error(message);
 }
 
@@ -134,6 +136,212 @@ void runPlacementOrder() {
     check(world.takeVisualEvents().empty(),"Rejected mine placement emitted an arm cue");
 }
 
+void runBombFuseDetonation(bool squid) {
+    // Source contract: splat-ref/src/config.js SUBS.bomb fuse/radius/damage curve;
+    // bomb.js arms on floor contact, then its own fuse tick triggers the blast.
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("shooter","bomb","storm");owner.state.pos={0,0,0};owner.state.grounded=true;
+    owner.input.aimYaw=0;owner.input.aimPitch=0;owner.setRandomSource([]{return 0.5;});
+    enemy.state.pos={20,0,20};enemy.state.hp=500;enemy.state.invuln=0;enemy.state.squid=squid;
+    const auto& tuning=GetEquipment(EquipmentCategory::Sub,"bomb");
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,"bomb");
+    check(world.devices().size()==1&&world.devices()[0].kind=="bomb"&&world.devices()[0].fuse<0,
+          "Splat Bomb did not begin in its source airborne/unarmed phase");
+    const auto bombId=world.devices()[0].id;
+    const auto bomb=[&]() -> const CombatDevice* {
+        const auto it=std::find_if(world.devices().begin(),world.devices().end(),[&](const auto& device){return device.id==bombId;});
+        return it==world.devices().end()?nullptr:&*it;
+    };
+
+    int frames=0;
+    while(frames<120) {
+        const auto* current=bomb();
+        if(!current||current->fuse>=0)break;
+        world.tick(dt);++frames;
+    }
+    const auto* armed=bomb();
+    check(armed&&armed->fuse>=0&&armed->fuse<tuning.number("fuse"),
+          "Splat Bomb did not arm and begin counting down on floor contact");
+    if(!armed)return;
+    check(std::abs((tuning.number("fuse")-dt)-armed->fuse)<1e-9,
+          "Splat Bomb floor contact did not consume exactly its current source tick from the fuse");
+
+    std::vector<WorldVisualEvent> detonationEvents;
+    for(int i=0;i<240;++i) {
+        const auto* current=bomb();
+        if(!current)break;
+        // Place the controlled target beyond the source's 0.8 m damage core, so
+        // the final blast verifies its distance falloff as well as hit application.
+        if(current->fuse<=3*dt)enemy.state.pos=current->pos+glm::dvec3(1.6,-0.4,0);
+        world.tick(dt);
+        auto events=world.takeVisualEvents();
+        detonationEvents.insert(detonationEvents.end(),events.begin(),events.end());
+    }
+    check(!bomb(),"Splat Bomb did not detonate and clean up when its source fuse expired");
+    const auto blast=std::find_if(detonationEvents.begin(),detonationEvents.end(),[](const auto& event){return event.kind=="explosion"&&event.source=="bomb";});
+    check(std::count_if(detonationEvents.begin(),detonationEvents.end(),[](const auto& event){return event.kind=="explosion"&&event.source=="bomb";})==1,
+          "Splat Bomb fuse expiration did not emit exactly one source-tagged blast");
+    check(blast!=detonationEvents.end()&&std::abs(blast->radius-tuning.number("radius"))<1e-9,
+          "Splat Bomb blast event radius diverged from its source tuning");
+    if(blast==detonationEvents.end())return;
+    const auto center=blast->pos;
+    const auto target=enemy.state.pos+glm::dvec3(0,0.7,0);
+    const double distance=glm::length(target-center),radius=tuning.number("radius");
+    check(distance<=radius,"Splat Bomb target fixture drifted outside the source blast radius");
+    const double k=1.0-std::clamp((distance-0.8)/(radius-0.8),0.0,1.0);
+    const double expected=tuning.number("damageMin")+(tuning.number("damageMax")-tuning.number("damageMin"))*k*k;
+    const double actual=500.0-enemy.state.hp;
+    if(std::abs(actual-expected)>=1e-8)
+        std::cerr<<"Splat Bomb damage diagnostic: source distance="<<distance<<", expected="<<expected<<", actual="<<actual
+                 <<", blast=("<<blast->pos.x<<","<<blast->pos.y<<","<<blast->pos.z<<"), target=("
+                 <<target.x<<","<<target.y<<","<<target.z<<")\n";
+    check(std::abs(actual-expected)<1e-8,squid
+          ?"Splat Bomb fuse blast did not apply the source quadratic damage curve to a squid target"
+          :"Splat Bomb fuse blast did not apply the source quadratic damage curve to a standing target");
+}
+
+void runDeviceBlastTargetHeight(const std::string& kind,bool squid) {
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(-10,0,-10),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    if(kind=="torpedo")stage.blocks.push_back(controller_fixtures::syntheticBlocks[2]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("shooter",kind,"storm");owner.state.pos={-10,0,-10};owner.state.grounded=true;
+    enemy.state.pos=kind=="torpedo"?glm::dvec3(2.8,0.5,1.0):glm::dvec3(0,0,2);
+    enemy.state.hp=500;enemy.state.invuln=0;enemy.state.squid=squid;
+    if(kind=="torpedo") {enemy.state.submerged=squid;enemy.state.smoothY=0.2;}
+    const auto& tuning=GetEquipment(EquipmentCategory::Sub,kind);
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,kind);
+    check(world.devices().size()==1&&world.devices()[0].kind==kind,"Blast target fixture did not deploy its requested sub");
+    const auto deviceId=world.devices()[0].id;
+    const auto device=[&]() -> const CombatDevice* {
+        const auto it=std::find_if(world.devices().begin(),world.devices().end(),[&](const auto& d){return d.id==deviceId;});
+        return it==world.devices().end()?nullptr:&*it;
+    };
+    auto& active=const_cast<CombatDevice&>(world.devices()[0]);
+    active.pos=kind=="torpedo"?glm::dvec3(0,2,0):glm::dvec3(0,0.8,0);active.vel={0,0,0};active.age=0;
+    if(kind=="sticky") {
+        active.state="stuck";active.normal={0,1,0};active.timer=dt;
+    } else if(kind=="seeker") {
+        active.state="run";active.age=tuning.number("life");active.target=&enemy;active.heading=0;
+    } else if(kind=="torpedo") {
+        // Hit the tall fixture wall before armTime so the torpedo bursts on
+        // contact instead of locking onto the standing target and unfolding.
+        active.state="fly";active.vel={300,0,0};
+    } else if(kind=="boomerang") {
+        active.state="armed";active.timer=dt;active.walkTime=1.0;active.target=&enemy;
+    } else {
+        check(false,"Blast target fixture requested an unsupported sub kind");return;
+    }
+    world.tick(dt);
+    const auto events=world.takeVisualEvents();
+    const auto blast=std::find_if(events.begin(),events.end(),[&](const auto& e){return e.kind=="explosion"&&e.source==kind;});
+    const auto fixtureName=kind+std::string(squid?" squid":" standing");
+    check(!device(),"Blast target fixture ("+fixtureName+") remained after the detonation tick");
+    check(blast!=events.end(),"Blast target fixture ("+fixtureName+") did not emit an explosion on its tick");
+    check(std::count_if(events.begin(),events.end(),[&](const auto& e){return e.kind=="explosion"&&e.source==kind;})==1,
+          "Blast target fixture emitted other than one source-tagged explosion");
+    if(blast==events.end())return;
+
+    double radius=tuning.number("radius"),maxDamage=tuning.number("damageMax"),minDamage=tuning.number("damageMin");
+    if(kind=="boomerang") {
+        radius=tuning.number("hitRadius");maxDamage=tuning.number("hitDamageMax");minDamage=tuning.number("hitDamageMin");
+    }
+    const glm::dvec3 sourceCenter=kind=="seeker"?blast->pos+glm::dvec3(0,0.2,0):blast->pos;
+    double targetHeight=squid?0.3:0.7;
+    if(kind=="sticky"||kind=="seeker")targetHeight=0.7;
+    else if(kind=="torpedo")targetHeight=enemy.state.smoothY+(squid?0.3:0.8);
+    else if(kind=="boomerang")targetHeight=squid?0.3:0.75;
+    const auto target=enemy.state.pos+glm::dvec3(0,targetHeight,0);
+    const double distance=glm::length(target-sourceCenter);
+    check(distance<=radius,"Blast target fixture ("+fixtureName+") drifted outside the source radius");
+    double expected=0.0;
+    if(kind=="torpedo") {
+        const double core=tuning.number("coreRadius");
+        expected=distance<=core?maxDamage:maxDamage+(minDamage-maxDamage)*std::clamp((distance-core)/(radius-core),0.0,1.0);
+    } else {
+        const double k=1.0-std::clamp((distance-0.8)/(radius-0.8),0.0,1.0);
+        expected=minDamage+(maxDamage-minDamage)*k*k;
+    }
+    const double actual=500.0-enemy.state.hp;
+    if(std::abs(actual-expected)>=1e-8)
+        std::cerr<<"Sub blast diagnostic ("<<fixtureName<<"): distance="<<distance<<", expected="<<expected<<", actual="<<actual<<"\n";
+    check(std::abs(actual-expected)<1e-8,"Sub blast target height/center differed from its source hit fixture ("+fixtureName+")");
+}
+
+void runWaddleTickDetonation() {
+    // Source contract: splat-ref/src/config.js SUBS.waddle and bomb.js's
+    // landed sense → wake → walk → trigger-distance explosion state machine.
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("bow","waddle","strike");owner.state.pos={0,0,0};owner.state.grounded=true;
+    owner.input.aimYaw=0;owner.input.aimPitch=0;owner.setRandomSource([]{return 0.5;});
+    enemy.state.pos={20,0,20};enemy.state.hp=500;enemy.state.invuln=0;
+    const auto& tuning=GetEquipment(EquipmentCategory::Sub,"waddle");
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,"waddle");
+    check(world.devices().size()==1&&world.devices()[0].state=="fly",
+          "Waddle Bomb did not begin in its source thrown phase");
+    const auto waddleId=world.devices()[0].id;
+    const auto waddle=[&]() -> const CombatDevice* {
+        const auto it=std::find_if(world.devices().begin(),world.devices().end(),[&](const auto& device){return device.id==waddleId;});
+        return it==world.devices().end()?nullptr:&*it;
+    };
+    int frames=0;
+    while(frames<120) {
+        const auto* current=waddle();
+        if(!current||current->state=="sense")break;
+        world.tick(dt);++frames;
+    }
+    const auto* sensed=waddle();
+    check(sensed&&sensed->state=="sense"&&sensed->grounded,
+          "Waddle Bomb did not reach its grounded sensing phase through simulation ticks");
+    if(!sensed)return;
+
+    const double scanDistance=std::max(tuning.number("triggerDist")+0.5,2.0);
+    check(scanDistance<tuning.number("senseRadius"),"Waddle source tuning leaves no separation between scan and detonation fixture");
+    enemy.state.pos=sensed->pos+glm::dvec3(0,0,scanDistance);
+    for(frames=0;frames<180;++frames) {
+        const auto* current=waddle();
+        if(!current||current->state=="wake")break;
+        world.tick(dt);
+    }
+    const auto* waking=waddle();
+    check(waking&&waking->state=="wake"&&waking->target==&enemy,
+          "Waddle Bomb failed to acquire an in-range enemy during its source sensing ticks");
+    if(!waking)return;
+    for(frames=0;frames<40;++frames) {
+        const auto* current=waddle();
+        if(!current||current->state=="walk")break;
+        world.tick(dt);
+    }
+    const auto* walking=waddle();
+    check(walking&&walking->state=="walk"&&walking->target==&enemy,
+          "Waddle Bomb did not complete its source wake delay and enter the walk phase");
+    if(!walking)return;
+
+    // Match the actor chest to the source proximity trigger without bypassing any
+    // device state: the following world tick must execute the real detonation.
+    enemy.state.pos=walking->pos-glm::dvec3(0,0.45,0);
+    world.tick(dt);
+    const auto events=world.takeVisualEvents();
+    const auto blast=std::find_if(events.begin(),events.end(),[](const auto& event){return event.kind=="explosion"&&event.source=="waddle";});
+    check(!waddle()&&blast!=events.end(),"Waddle Bomb proximity trigger did not detonate through its simulation tick");
+    check(std::count_if(events.begin(),events.end(),[](const auto& event){return event.kind=="explosion"&&event.source=="waddle";})==1,
+          "Waddle Bomb proximity trigger emitted other than one source explosion");
+    check(blast!=events.end()&&std::abs(blast->radius-tuning.number("radius"))<1e-9,
+          "Waddle Bomb blast event radius diverged from its source tuning");
+    check(std::abs(enemy.state.hp-(500.0-tuning.number("damageMax")))<1e-8,
+          "Waddle Bomb proximity blast did not apply source maximum damage at contact range");
+}
+
 void runDeviceWarningLifecycle() {
     StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
     stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
@@ -147,29 +355,42 @@ void runDeviceWarningLifecycle() {
     const auto armEvents=world.takeVisualEvents();
     check(armEvents.size()==1 && armEvents[0].kind=="device_arm"&&armEvents[0].source=="mine",
           "Mine lifecycle did not start with one arm cue");
+    const auto mineId=world.devices()[0].id;
+    const auto mineDevice=[&]() -> const CombatDevice* {
+        const auto it=std::find_if(world.devices().begin(),world.devices().end(),[&](const auto& device){return device.id==mineId;});
+        return it==world.devices().end()?nullptr:&*it;
+    };
     world.tick(mine.number("armTime")+dt);
-    check(world.devices().size()==1 && world.devices()[0].state=="mine"&&world.devices()[0].age>=mine.number("armTime"),
+    const auto* activeMine=mineDevice();
+    check(activeMine&&activeMine->state=="mine"&&activeMine->age>=mine.number("armTime"),
           "Mine did not become active after its source arm delay");
+    if(!activeMine)return;
     check(world.takeVisualEvents().empty(),"Untriggered active mine emitted a warning");
 
-    const double ageBeforeTrigger=world.devices()[0].age;
-    enemy.state.pos=world.devices()[0].pos;
+    const double ageBeforeTrigger=activeMine->age;
+    const double hpBeforeMine=enemy.state.hp;
+    enemy.state.pos=activeMine->pos;
     world.tick(dt);
     const auto warningEvents=world.takeVisualEvents();
     check(warningEvents.size()==1 && warningEvents[0].kind=="device_warning"&&warningEvents[0].source=="mine"
           && warningEvents[0].team==owner.team(),"Triggered mine did not emit one source warning cue");
-    check(world.devices()[0].fuse==mine.number("delay")&&world.devices()[0].age>ageBeforeTrigger,
+    const auto* triggeredMine=mineDevice();
+    check(triggeredMine&&triggeredMine->fuse==mine.number("delay")&&triggeredMine->age>ageBeforeTrigger,
           "Mine warning reset its source lifetime clock or failed to enter its delay state");
 
     std::vector<WorldVisualEvent> detonationEvents;
-    for(int i=0;i<static_cast<int>(std::ceil(mine.number("delay")/dt))+3&&world.devices()[0].live;++i) {
+    for(int i=0;i<static_cast<int>(std::ceil(mine.number("delay")/dt))+3;++i) {
+        if(!mineDevice())break;
         world.tick(dt);
         auto events=world.takeVisualEvents();
         detonationEvents.insert(detonationEvents.end(),events.begin(),events.end());
     }
-    check(!world.devices()[0].live,"Triggered mine did not clean up after its source fuse");
+    check(!mineDevice(),"Triggered mine did not clean up after its source fuse");
     check(std::count_if(detonationEvents.begin(),detonationEvents.end(),[](const auto& event){return event.kind=="explosion"&&event.source=="mine";})==1,
           "Mine detonation did not emit exactly one source explosion cue");
+    check(std::abs(enemy.state.hp-(hpBeforeMine-mine.number("damage")))<1e-8&&
+          enemy.state.track==mine.number("trackTime")&&enemy.state.trackTeam==owner.team(),
+          "Mine tick detonation did not apply its source damage and enemy tracking effect");
 
     PlayerSimulation stickyOwner(stage,geometry,paint,0,&world);
     stickyOwner.setLoadout("shooter","sticky","storm");stickyOwner.state.pos={-5,0,0};stickyOwner.state.grounded=true;
@@ -236,6 +457,151 @@ void runDeviceRayDestroyCue() {
     check(!world.devices().front().live&&events.size()==1&&events[0].kind=="device_destroy"
           &&events[0].source=="torpedo"&&events[0].team==owner.team(),
           "Ray-destroyed torpedo did not emit one source-tagged device destroy event");
+}
+
+void runBrollyMainShot() {
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("brolly");owner.state.pos={0,0,0};owner.state.grounded=true;owner.input.aimYaw=0;owner.input.aimPitch=0;
+    owner.setRandomSource([]{return 0.5;});enemy.state.pos={0,0,4};enemy.state.grounded=true;enemy.state.invuln=0;
+    constexpr double dt=1.0/60.0;
+    for(int i=0;i<24;++i){owner.tick(dt);world.tick(dt);}
+    owner.input.fire=true;owner.tick(dt);
+    const auto pellets=std::count_if(world.projectiles().begin(),world.projectiles().end(),[](const auto& p){return p.weaponId=="brolly"&&p.kind=="shot";});
+    check(GetEquipment(EquipmentCategory::Main,"brolly").number("pellets")==11.0&&owner.shotsFired()==1&&pellets==11,
+          "Brolly main fire did not create one 11-pellet source volley");
+    check(std::abs(owner.state.ink-(100.0-GetEquipment(EquipmentCategory::Main,"brolly").number("inkPerShot")))<1e-8,
+          "Brolly main volley did not spend its source ink cost exactly once");
+    owner.input.fire=false;
+    for(int i=0;i<20&&enemy.state.hp>=100.0;++i)world.tick(dt);
+    check(enemy.state.hp<100.0&&std::any_of(world.hudEvents().begin(),world.hudEvents().end(),[](const auto& e){return e.kind==CombatHudEvent::Kind::Hit&&e.source=="brolly";}),
+          "Brolly source volley never connected with its centered target");
+}
+
+void runScanCloudLifecycle() {
+    // Source contract: splat-ref/src/config.js SUBS.scan (fuse 1.1, radius 4.2, cloudTime 0.9, trackTime 8).
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("shooter","scan","storm");owner.state.pos={0,0,0};owner.input.aimYaw=0;owner.input.aimPitch=0;
+    enemy.state.hp=100;enemy.state.invuln=0;
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,"scan");
+    int frames=0;
+    while(frames<120&&!world.devices().empty()&&world.devices()[0].state!="cloud"){world.tick(dt);++frames;}
+    check(!world.devices().empty()&&world.devices()[0].state=="cloud","Echo Orb did not transition from its throw into a sensing cloud");
+    check(frames>0&&frames<70,"Echo Orb cloud started outside its source fuse/landing window");
+    const auto cloudCenter=world.devices()[0].pos;
+    enemy.state.pos=cloudCenter-glm::dvec3(0,0.7,0);
+    for(int i=0;i<6;++i)world.tick(dt);
+    check(enemy.state.track==8.0&&enemy.state.trackTeam==owner.team()&&enemy.state.hp==100,
+          "Echo Orb cloud did not source-track an enemy without dealing damage");
+    const auto events=world.takeVisualEvents();
+    check(std::count_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_arm"&&e.source=="scan";})==1,
+          "Echo Orb cloud transition did not emit exactly one arm cue");
+    for(int i=0;i<90&& !world.devices().empty();++i)world.tick(dt);
+    check(world.devices().empty(),"Echo Orb cloud survived beyond its source lifetime");
+}
+
+void runMistDirectPoisonLifecycle() {
+    // Source contract: splat-ref/src/config.js SUBS.mist (direct poison 4.5 s; 12 ink/s; no HP damage).
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("shooter","mist","storm");owner.state.pos={0,0,0};owner.input.aimYaw=0;owner.input.aimPitch=0;
+    enemy.state.pos={0,0,2};enemy.state.grounded=true;enemy.state.invuln=0;enemy.state.ink=50;
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,"mist");
+    int frames=0;
+    while(frames<50&&!world.devices().empty()&&world.devices()[0].state!="mist"){world.tick(dt);++frames;}
+    check(!world.devices().empty()&&world.devices()[0].state=="mist","Murk Bomb direct contact did not open its poison cloud");
+    check(enemy.state.poison==4.5&&enemy.state.hp==100,"Murk Bomb direct hit must poison for the full source cloud lifetime without HP damage");
+    enemy.tick(dt);
+    check(std::abs(enemy.state.ink-(50.0-12.0*dt))<1e-8&&enemy.state.hp==100,
+          "Murk Bomb poison did not drain ink at its source rate while preserving HP");
+    enemy.state.pos={8,0,8};
+    const auto events=world.takeVisualEvents();
+    check(std::count_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_arm"&&e.source=="mist";})==1,
+          "Murk Bomb direct contact did not emit exactly one cloud arm cue");
+    for(int i=0;i<280&&!world.devices().empty();++i)world.tick(dt);
+    check(world.devices().empty(),"Murk Bomb cloud did not clean up at its source lifetime");
+}
+
+void runCurtainBlockingLifecycle() {
+    // Source contract: splat-ref/src/config.js SUBS.curtain (3.4 x 2.7, 170 HP, 19 HP/s, half damage per shot).
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world),enemy(stage,geometry,paint,1,&world);
+    owner.setLoadout("shooter","curtain","storm");owner.state.pos={0,0,0};owner.input.aimYaw=0;owner.input.aimPitch=0;
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,"curtain");
+    int frames=0;
+    while(frames<120&&!world.devices().empty()&&world.devices()[0].state!="curtain"){world.tick(dt);++frames;}
+    check(!world.devices().empty()&&world.devices()[0].state=="curtain"&&world.devices()[0].blocksActors,
+          "Drip Curtain throw did not settle into its blocking wall state");
+    auto& curtain=const_cast<CombatDevice&>(world.devices()[0]);
+    const auto& source=GetEquipment(EquipmentCategory::Sub,"curtain");
+    check(std::abs(curtain.halfW-source.number("width")*0.5)<1e-10&&std::abs(curtain.R-source.number("height"))<1e-10,
+          "Drip Curtain collision dimensions differ from source tuning");
+    auto events=world.takeVisualEvents();
+    check(std::count_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_arm"&&e.source=="curtain";})==1,
+          "Drip Curtain landing did not emit one source arm cue");
+    world.tick(dt);
+    check(std::abs(curtain.hp-(170.0-19.0*dt))<1e-8,"Drip Curtain did not fade at its source health decay rate");
+    const auto from=curtain.pos-curtain.N+glm::dvec3(0,1,0),to=curtain.pos+curtain.N+glm::dvec3(0,1,0);
+    check(world.blockShot(from,to,1,50.0),"Enemy shot crossed the Drip Curtain plane");
+    check(std::abs(curtain.hp-(170.0-19.0*dt-25.0))<1e-8,
+          "Drip Curtain shot damage did not use the source half-damage multiplier");
+    enemy.state.pos=curtain.pos;enemy.state.vel={0,0,0};world.blockActor(enemy);
+    check(glm::length(enemy.state.pos-curtain.pos)>0.4,"Enemy actor crossed the Drip Curtain collision plane");
+    check(world.blockShot(from,to,1,300.0)&&!curtain.live,"Drip Curtain did not break when source-scaled shot damage depleted its HP");
+    events=world.takeVisualEvents();
+    check(std::count_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_destroy"&&e.source=="curtain";})==1,
+          "Drip Curtain break did not emit one source-tagged destroy cue");
+}
+
+void runSprinklerPulseAndReplacement() {
+    // Source contract: splat-ref/src/config.js SUBS.sprinkler (six drops every 0.3 s, one active per owner).
+    StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+    stage.blocks.push_back(controller_fixtures::syntheticBlocks[0]);
+    StageGeometry geometry(stage);FacePaint paint(stage,geometry,2048);CombatWorld world(stage,geometry,paint);
+    PlayerSimulation owner(stage,geometry,paint,0,&world);owner.setLoadout("shooter","sprinkler","storm");
+    owner.state.pos={0,0,0};owner.input.aimYaw=0;owner.input.aimPitch=0;owner.setRandomSource([]{return 0.5;});
+    constexpr double dt=1.0/60.0;
+    world.deploy(owner,"sprinkler");
+    int frames=0;
+    while(frames<120&&!world.devices().empty()&&world.devices()[0].state!="spray"){world.tick(dt);++frames;}
+    check(!world.devices().empty()&&world.devices()[0].state=="spray","Twirl Sprinkler did not stick and enter its spraying state");
+    auto events=world.takeVisualEvents();
+    check(std::count_if(events.begin(),events.end(),[](const auto& e){return e.kind=="device_arm"&&e.source=="sprinkler";})==1,
+          "Twirl Sprinkler landing did not emit one arm cue");
+    std::set<std::uint64_t> dropIds;
+    const auto captureDrops=[&]{
+        for(const auto& p:world.projectiles())
+            if(p.owner==&owner&&p.kind=="drop"&&p.weaponId=="sprinkler")dropIds.insert(p.id);
+    };
+    world.tick(dt);captureDrops();
+    check(dropIds.size()==6,"Twirl Sprinkler first source pulse did not emit six owned drop projectiles");
+    for(int i=0;i<16;++i){world.tick(dt);captureDrops();}
+    check(dropIds.size()==6,"Twirl Sprinkler emitted its second pulse before the source interval");
+    for(int i=0;i<10&&dropIds.size()==6;++i){world.tick(dt);captureDrops();}
+    check(dropIds.size()==12,"Twirl Sprinkler failed to emit its second source-timed pulse");
+
+    const auto firstId=world.devices().front().id;
+    world.deploy(owner,"sprinkler");
+    const auto secondSpraying=[&]{return std::find_if(world.devices().begin(),world.devices().end(),[&](const auto& d){return d.live&&d.id!=firstId&&d.kind=="sprinkler"&&d.state=="spray";});};
+    for(int i=0;i<120&&secondSpraying()==world.devices().end();++i)world.tick(dt);
+    check(secondSpraying()!=world.devices().end(),"Replacement Twirl Sprinkler did not land and start spraying");
+    check(std::count_if(world.devices().begin(),world.devices().end(),[](const auto& d){return d.live&&d.kind=="sprinkler";})==1,
+          "A newly landed Twirl Sprinkler did not replace its owner's existing one");
+    world.cleanup(owner);
+    check(std::none_of(world.devices().begin(),world.devices().end(),[](const auto& d){return d.kind=="sprinkler"&&d.live;}),
+          "Owner cleanup left a Twirl Sprinkler alive after its source lifecycle ended");
 }
 
 void runSeekerCommit() {
@@ -464,9 +830,23 @@ int main() {
         runTracerContact(0.68,22.0,3.0,false,true);
         runBrollyShield();
         runPlacementOrder();
+        runBombFuseDetonation(false);
+        runBombFuseDetonation(true);
+        runDeviceBlastTargetHeight("sticky",true);
+        runDeviceBlastTargetHeight("seeker",true);
+        runDeviceBlastTargetHeight("torpedo",false);
+        runDeviceBlastTargetHeight("torpedo",true);
+        runDeviceBlastTargetHeight("boomerang",false);
+        runDeviceBlastTargetHeight("boomerang",true);
+        runWaddleTickDetonation();
         runDeviceWarningLifecycle();
         runBoomerangContactFuse();
         runDeviceRayDestroyCue();
+        runBrollyMainShot();
+        runScanCloudLifecycle();
+        runMistDirectPoisonLifecycle();
+        runCurtainBlockingLifecycle();
+        runSprinklerPulseAndReplacement();
         runSeekerCommit();
         runBowTierOracle(12,0);
         runBowTierOracle(35,1);
@@ -475,7 +855,7 @@ int main() {
         runBowKitSourceTrace();
         runBladeKitSourceTrace();
         runMittsKitSourceTrace();
-        std::cout<<"Source Tracer, Brolly shield, Seeker commitment, Bow/Blade/Mitts source actions, and placed mine fixtures passed\n";
+        std::cout<<"Source Tracer/Brolly combat, Bomb/Waddle/Mine device ticks, sub lifecycle, Seeker commitment, and Bow/Blade/Mitts source actions passed\n";
     } catch(const std::exception& error) {
         std::cerr<<error.what()<<'\n';return 1;
     }

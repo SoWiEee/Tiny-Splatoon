@@ -1,3 +1,4 @@
+#include "../src/gui/MapPinLayout.hpp"
 #include "../src/render/StageMapView.hpp"
 
 #include <array>
@@ -23,6 +24,9 @@ void boundsFit(glm::dvec4 bounds,double aspect,bool flipForBlueTeam=false){
 
 int main(){
     try{
+        const auto spread=restoration::SpreadMapPins({{100,100},{100,100},{110,105}},84);
+        check(spread.size()==3&&glm::length(spread[0]-spread[1])>60,"Coincident map pins must separate deterministically");
+        check(glm::length(restoration::MapArcPoint({0,0},{10,-10},{20,0},0)-glm::dvec2(0))<1e-9&&glm::length(restoration::MapArcPoint({0,0},{10,-10},{20,0},1)-glm::dvec2(20,0))<1e-9,"Map arc endpoints must stay attached to the world anchors");
         const glm::dvec4 arena{-42,42,-64,64};
         // The source full-screen camera keeps the same fit at 720p and 1080p.
         boundsFit(arena,1280.0/720.0);

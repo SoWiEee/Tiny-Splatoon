@@ -207,7 +207,8 @@ std::string Serialize(const PlayerProfile& p){
        <<",\"timeOfDay\":";WriteString(out,s.timeOfDay);out<<",\"reducedMotion\":"<<(s.reducedMotion?"true":"false")<<",\"palette\":"<<s.palette;
     out<<",\"graphics\":{\"preset\":";WriteString(out,s.graphics.preset==GraphicsPreset::Low?"low":s.graphics.preset==GraphicsPreset::High?"high":s.graphics.preset==GraphicsPreset::Custom?"custom":"medium");
     out<<",\"renderScale\":"<<s.graphics.renderScale<<",\"shadowMapSize\":"<<s.graphics.shadowMapSize<<",\"shadows\":"<<(s.graphics.shadows?"true":"false")
-       <<",\"reflections\":"<<(s.graphics.reflections?"true":"false")<<",\"postEffects\":"<<(s.graphics.postEffects?"true":"false")<<"}}";
+       <<",\"reflections\":"<<(s.graphics.reflections?"true":"false")<<",\"postEffects\":"<<(s.graphics.postEffects?"true":"false")
+       <<",\"antialiasing\":"<<(s.graphics.antialiasing?"true":"false")<<"}}";
     out<<",\"lastSettledMatch\":";WriteString(out,p.lastSettledMatch);out<<'}';
     return out.str();
 }
@@ -262,6 +263,7 @@ void LoadSettings(PlayerSettings& s,const JsonValue* value){
         if(shadowSize!=0&&(shadowSize<256||(shadowSize&(shadowSize-1))!=0))shadowSize=1024;
         s.graphics.shadowMapSize=shadowSize;s.graphics.shadows=ReadBool(graphics,"shadows",true);
         s.graphics.reflections=ReadBool(graphics,"reflections",false);s.graphics.postEffects=ReadBool(graphics,"postEffects",true);
+        s.graphics.antialiasing=ReadBool(graphics,"antialiasing",true);
     }
 }
 

@@ -122,6 +122,24 @@ struct BossPose::Animator {
     double flash=0,weakFlash=0,lastFlashT=-9,crack=0,enrage=0,modelTime=0,lvx=0,lvz=0;
     std::map<std::string,std::vector<double>> uniforms;
     std::map<int,double> crabPhi,crabSeed;
+    std::vector<BossPoseAudioEvent> audioEvents;
+
+    void footstep(glm::dvec3 position,double strength,int leg){
+        BossPoseAudioEvent event;event.kind=BossPoseAudioEvent::Kind::Footstep;event.position=position;
+        event.strength=strength;event.time=modelTime;event.leg=leg;audioEvents.push_back(std::move(event));
+    }
+    void impact(std::string socket,double strength){
+        BossPoseAudioEvent event;event.kind=BossPoseAudioEvent::Kind::Impact;event.strength=strength;
+        event.time=modelTime;event.socket=std::move(socket);audioEvents.push_back(std::move(event));
+    }
+    void fx(std::string name,std::string socket){
+        BossPoseAudioEvent event;event.kind=BossPoseAudioEvent::Kind::Fx;event.time=modelTime;
+        event.name=std::move(name);event.socket=std::move(socket);audioEvents.push_back(std::move(event));
+    }
+    void intro(){
+        BossPoseAudioEvent event;event.kind=BossPoseAudioEvent::Kind::Intro;event.time=modelTime;event.position=rootPos+glm::dvec3(0,3,0);
+        audioEvents.push_back(std::move(event));
+    }
 
     void update(BossPose& owner,Rig& rig,const BossPoseInput& input);
     void animateCrablet(Rig& rig,const BossCrablet& crab,double dt,double t,double seed,double& phi);
@@ -184,7 +202,7 @@ void BossPose::Animator::clip(Channels& P,const std::string& name,const std::str
             P[GLOWL]=static_cast<float>(std::max<double>(P[GLOWL],sm(k01(t,.1,down0))*(.85+.15*std::sin(t*20))));add(P,ED,.25*d);
         }else if(ph=="act"){
             static const std::array<std::vector<double>,4> fallback{{{0},{0},{0,.9},{0,.6}}};const auto& R=s.hasParams&&!s.rings.empty()?s.rings:fallback[static_cast<std::size_t>(std::clamp(phaseNow,0.0,3.0))];
-            std::size_t k=0;while(k+1<R.size()&&t>=R[k+1]-.4)++k;for(const auto r:R)if(cross(r))kickShell(1);
+            std::size_t k=0;while(k+1<R.size()&&t>=R[k+1]-.4)++k;for(const auto r:R)if(cross(r)){impact("clawL",1);kickShell(1);}
             const double dt0=t-R[k];double f;
             if(dt0>=0)f=1-.3*sm(k01(dt0,.05,.45));else{const double up=eo(k01(dt0,-.4,-.16))*(1-ei(k01(dt0,-.13,0)));f=.7*(1-up);slamUp(up*.75);}
             slamHit(f);add(P,BP,bump(dt0,0,.35)*.08);add(P,SY,-bump(dt0,0,.18)*.06);
@@ -199,7 +217,7 @@ void BossPose::Animator::clip(Channels& P,const std::string& name,const std::str
             add(P,RX,.1*u);add(P,RY,-.35*u);add(P,RZ,-.9*u);add(P,RP,-.4*u);P[RO]=static_cast<float>(mix(P[RO],.7,u));add(P,LX,-.1*u);add(P,LY,-.35*u);add(P,LZ,.2*u);add(P,LP,-.2*u);add(P,EP,.3*u);add(P,SPLAY,.1*u);
         }else if(ph=="act"){
             const double tele=teleDur>0?teleDur:.85;const bool has=s.hasParams&&!s.barrels.empty();const std::size_t nt=has?s.barrels.size():static_cast<std::size_t>((std::array<int,4>{0,3,4,6})[static_cast<std::size_t>(std::clamp(phaseNow,0.0,3.0))]);
-            std::size_t n=0;double last=-1;for(std::size_t i=0;i<nt;++i){const double ti=has?s.barrels[i][3]-tele:i*.26;if(cross(ti)){}if(t>=ti-.05){n=i+1;last=ti;}}
+            std::size_t n=0;double last=-1;for(std::size_t i=0;i<nt;++i){const double ti=has?s.barrels[i][3]-tele:i*.26;if(cross(ti))fx("hatch",i%2?"hatchB":"hatchA");if(t>=ti-.05){n=i+1;last=ti;}}
             const double endT=has?s.barrels[nt-1][3]-tele:(nt-1)*.26,tl=last<0?0:t-last,pump=bump(tl,0,.24)*(n>0&&t<endT+.3?1:0),hold=1-sm(k01(t,endT+.2,endT+.9));
             add(P,BY,-.22*hold+.18*pump);add(P,SP,-.12*hold-.05*pump);add(P,BP,-.06*hold-.05*pump);add(P,BZ,-.1*hold);add(P,SY,.03*pump);double lidA=0,lidB=0;
             for(std::size_t i=0;i<nt;++i){const double ti=has?s.barrels[i][3]-tele:i*.26,dt0=t-ti;if(dt0<-.02||dt0>.7)continue;const double o=dt0<.05?eo(k01(dt0,-.02,.05)):1-sm(k01(dt0,.1,.55));if(i%2)lidB=std::max(lidB,o);else lidA=std::max(lidA,o);}
@@ -241,8 +259,8 @@ void BossPose::Animator::clip(Channels& P,const std::string& name,const std::str
         }
     }else if(name=="stun"){
         const bool bonk=stunBonk;const double t0=bonk?.34:.12;
-        if(bonk){if(cross(0))kickShell(1.4);const double j=bump(t,0,.42);add(P,BZ,-.75*j);add(P,BP,-.3*j);add(P,BY,.25*j);add(P,ED,.8*j);add(P,MOUTH,.6*j);}
-        const double c=eo(k01(t,t0,t0+.55));if(cross(t0+.5))kickShell(.7);add(P,BY,-1.05*c);add(P,BP,-.28*c);add(P,BZ,-.25*c);add(P,SPLAY,.45*c);maxAssign(P,SLIDE,c<1?1:.2);
+        if(bonk){if(cross(0)){impact("mouth",1.2);fx("bonk","mouth");kickShell(1.4);}const double j=bump(t,0,.42);add(P,BZ,-.75*j);add(P,BP,-.3*j);add(P,BY,.25*j);add(P,ED,.8*j);add(P,MOUTH,.6*j);}
+        const double c=eo(k01(t,t0,t0+.55));if(cross(t0+.5)){impact("belly",.7);kickShell(.7);}add(P,BY,-1.05*c);add(P,BP,-.28*c);add(P,BZ,-.25*c);add(P,SPLAY,.45*c);maxAssign(P,SLIDE,c<1?1:.2);
         add(P,LX,.35*c);add(P,LY,-.2*c);add(P,LZ,-.25*c);add(P,LP,-.3*c);P[LO]=static_cast<float>(mix(P[LO],.45,c));add(P,RX,-.35*c);add(P,RY,-.35*c);add(P,RZ,-.3*c);add(P,RP,-.25*c);P[RO]=static_cast<float>(mix(P[RO],.5,c));
         const double w=k01(t,t0+.3,t0+.9),ss=t*2.6;add(P,BR,std::sin(ss)*.05*w);add(P,BP,std::cos(ss)*.035*w);add(P,HR,std::sin(ss+1)*.08*w);add(P,EY,std::sin(ss*1.3)*.35*w);add(P,EP,std::cos(ss*1.3)*.25*w-.1*c);add(P,ES,.25*c);add(P,ED,.35*c);add(P,MOUTH,.45*c+.1*std::sin(t*3));maxAssign(P,BELLY,c);add(P,BELLYOUT,c);add(P,SIPP,.3*c);
     }else if(name=="recover"){
@@ -252,13 +270,13 @@ void BossPose::Animator::clip(Channels& P,const std::string& name,const std::str
         if(cross(.38*k))kickShell(.8);add(P,BY,-.3*an+.38*up);add(P,BP,.08*an-.36*up);add(P,BZ,-.15*up);add(P,HP,.15*an-.25*up);add(P,LX,.6*up-.3*an);add(P,LY,1.9*up-.3*an);add(P,LZ,-up);add(P,LP,1.2*up);add(P,LYW,.6*up);P[LO]=static_cast<float>(mix(P[LO],1,up));add(P,RX,-.6*up+.3*an);add(P,RY,1.8*up-.3*an);add(P,RZ,-.9*up);add(P,RP,1.2*up);add(P,RYW,-.6*up);P[RO]=static_cast<float>(mix(P[RO],1,up));add(P,MOUTH,up);add(P,MAND,up);add(P,EP,.45*up);add(P,ES,.35*up);const double vib=up*k01(T,.45,.6);add(P,SY,std::sin(t*57)*.02*vib);add(P,SR,std::sin(t*43)*.02*vib);add(P,LR,std::sin(t*31)*.1*vib);add(P,RR,std::sin(t*29)*.1*vib);add(P,SPLAY,.1*up);maxAssign(P,STEAM,bump(T,.4,1.6));maxAssign(P,CANNON,.2*up);
     }else if(name=="intro"){
         const double k=D>0?D/3.4:1,T=t/k;double by;if(T<.5)by=-6.5;else if(T<.86)by=mix(-6.5,.7,eo(k01(T,.5,.86)));else if(T<1.08)by=mix(.7,-.5,ei(k01(T,.86,1.08)));else by=-.5*(1-eo(k01(T,1.08,1.6)));
-        if(cross(1.08*k)){kickShell(1.2);resetFeet=true;}if(cross(2.15*k))kickShell(.6);
+        if(cross(0))intro();if(cross(1.08*k)){impact("body",1.2);kickShell(1.2);resetFeet=true;}if(cross(2.15*k))kickShell(.6);
         add(P,BY,by);const double air=k01(T,.5,.6)*(1-k01(T,1,1.12));add(P,BP,-.45*air+.12*bump(T,1.05,1.5));maxAssign(P,CURL,T<1?1:1-k01(T,1,1.1));P[LO]=static_cast<float>(mix(P[LO],1,air));P[RO]=static_cast<float>(mix(P[RO],1,air));add(P,LY,.8*air);add(P,RY,.8*air);add(P,LX,.4*air);add(P,RX,-.4*air);
         const double sh=bump(T,1.2,2.05),ss=T*30;add(P,BR,std::sin(ss)*.11*sh);add(P,SR,std::sin(ss-.9)*.13*sh);add(P,BYAW,std::sin(ss+.5)*.06*sh);add(P,HY,std::sin(ss+1.3)*.15*sh);add(P,EY,std::sin(ss+2)*.3*sh);add(P,ED,.4*sh);
         const double up=eob(k01(T,2.05,2.35))*(1-sm(k01(T,2.95,3.4)));add(P,BY,.3*up);add(P,BP,-.3*up);add(P,HP,-.2*up);add(P,LX,.6*up);add(P,LY,1.8*up);add(P,LZ,-up);add(P,LP,1.2*up);add(P,LYW,.6*up);P[LO]=static_cast<float>(mix(P[LO],1,up));add(P,RX,-.6*up);add(P,RY,1.7*up);add(P,RZ,-.9*up);add(P,RP,1.2*up);add(P,RYW,-.6*up);P[RO]=static_cast<float>(mix(P[RO],1,up));add(P,MOUTH,up);add(P,MAND,up);add(P,EP,.4*up);add(P,ES,.3*up);add(P,SY,std::sin(t*57)*.02*up);maxAssign(P,SLIDE,T<1.2?1:0);
     }else if(name=="dead"){
         const double st=bump(t,0,.9);add(P,BZ,-.35*st);add(P,BP,-.2*st);add(P,BR,.1*std::sin(t*7)*st);add(P,BY,.1*st);add(P,LY,1.2*st);add(P,LZ,-.6*st);add(P,LP,.8*st);P[LO]=static_cast<float>(mix(P[LO],1,st));add(P,RY,st);add(P,RP,.6*st);P[RO]=static_cast<float>(mix(P[RO],1,st));add(P,MOUTH,st);add(P,ED,.4*st);
-        const double c=eo(k01(t,.75,1.45));if(cross(1.4))kickShell(1.2);if(cross(1.9))kickShell(1.6);add(P,BY,-1.55*c);add(P,BP,.12*c);add(P,BR,.14*c);add(P,BZ,-.2*c);add(P,SPLAY,.6*c);maxAssign(P,SLIDE,t>.7?1:0);add(P,LX,.5*c);add(P,LY,-.55*c);add(P,LP,-.4*c);add(P,LYW,.3*c);P[LO]=static_cast<float>(mix(P[LO],.6,c));add(P,RX,-.5*c);add(P,RY,-.6*c);add(P,RP,-.4*c);add(P,RYW,-.3*c);P[RO]=static_cast<float>(mix(P[RO],.6,c));add(P,ED,.9*c);add(P,ES,.5*c);add(P,EP,-.5*c);add(P,HP,.2*c);add(P,HA,eob(k01(t,1.9,2.1))*1.1);add(P,HB,eob(k01(t,1.95,2.15))*1.05);add(P,HC,eob(k01(t,1.92,2.12))*1.1);maxAssign(P,CURL,.5*k01(t,2.2,4));const double tw=k01(t,2.2,3)*(1-k01(t,4.5,6));add(P,LO,std::max(0.0,std::sin(t*9)-.7)*.8*tw);add(P,CURL,std::max(0.0,std::sin(t*5.3+1)-.8)*.6*tw);maxAssign(P,BELLY,c*(1-k01(t,2,4)));
+        const double c=eo(k01(t,.75,1.45));if(cross(1.4)){impact("body",1.4);kickShell(1.2);}if(cross(1.9))kickShell(1.6);add(P,BY,-1.55*c);add(P,BP,.12*c);add(P,BR,.14*c);add(P,BZ,-.2*c);add(P,SPLAY,.6*c);maxAssign(P,SLIDE,t>.7?1:0);add(P,LX,.5*c);add(P,LY,-.55*c);add(P,LP,-.4*c);add(P,LYW,.3*c);P[LO]=static_cast<float>(mix(P[LO],.6,c));add(P,RX,-.5*c);add(P,RY,-.6*c);add(P,RP,-.4*c);add(P,RYW,-.3*c);P[RO]=static_cast<float>(mix(P[RO],.6,c));add(P,ED,.9*c);add(P,ES,.5*c);add(P,EP,-.5*c);add(P,HP,.2*c);add(P,HA,eob(k01(t,1.9,2.1))*1.1);add(P,HB,eob(k01(t,1.95,2.15))*1.05);add(P,HC,eob(k01(t,1.92,2.12))*1.1);maxAssign(P,CURL,.5*k01(t,2.2,4));const double tw=k01(t,2.2,3)*(1-k01(t,4.5,6));add(P,LO,std::max(0.0,std::sin(t*9)-.7)*.8*tw);add(P,CURL,std::max(0.0,std::sin(t*5.3+1)-.8)*.6*tw);maxAssign(P,BELLY,c*(1-k01(t,2,4)));
     }
 }
 
@@ -282,11 +300,11 @@ void BossPose::Animator::gait(double dt,const BossPoseInput& s){
     for(auto& l:feet){
         const double lp=fract(phi+l.off);const bool inSwing=gaitOn&&lp<duty;
         if(inSwing&&!l.swing&&(moving||l.err>.2)){l.swing=true;l.from=l.foot;}
-        if(l.swing){const double ss=lp/duty;if(!inSwing||ss<l.s-.5){l.swing=false;l.s=0;l.foot=l.to;kickShell(.05+.02*std::min(v,6.0));}
+        if(l.swing){const double ss=lp/duty;if(!inSwing||ss<l.s-.5){l.swing=false;l.s=0;l.foot=l.to;footstep(l.foot,std::min(1.5,.35+v*.1+(gallop?.5:0)),static_cast<int>(&l-feet.data()));kickShell(.05+.02*std::min(v,6.0));}
             else{l.s=ss;l.to=home(l,static_cast<std::size_t>(&l-feet.data()),p,Tst*.5+(1-ss)*duty/f);glm::dvec3 delta=l.to-l.home;const double dl=glm::length(delta),mx=1.25+(gallop?.8:0);if(dl>mx)l.to=l.home+delta*(mx/dl);l.to.y=rootPos.y;const double e=sm(ss);l.foot=l.from*(1-e)+l.to*e;l.foot.y=mix(l.from.y,l.to.y,e)+std::sin(ss*pi)*arc*(1-.3*std::pow(ss,3));}}
         if(!l.swing){glm::dvec3 d=l.foot-l.home;d.y=0;const double len=glm::length(d),mx=2.6;if(len>mx){l.foot.x=l.home.x+d.x*mx/len;l.foot.z=l.home.z+d.z*mx/len;}}
     }
-    const double paw=p[PAW];if(paw>.001){auto& l=feet[0];const double cyc=fract(time*2.3);glm::dvec3 off(0,std::max(0.0,std::sin(cyc*tau))*.35,.55-cyc*1.1);off=rootQ*off;const glm::dvec3 target=l.home+off;l.foot+=(target-l.foot)*paw;}
+    const double paw=p[PAW];if(paw>.001){auto& l=feet[0];const double cyc=fract(time*2.3);glm::dvec3 off(0,std::max(0.0,std::sin(cyc*tau))*.35,.55-cyc*1.1);off=rootQ*off;const glm::dvec3 target=l.home+off;l.foot+=(target-l.foot)*paw;if(cyc<.5&&fract((time-dt)*2.3)>.5)footstep(l.foot,.3,0);}
     (void)s;
 }
 
@@ -418,6 +436,16 @@ void BossPose::Animator::update(BossPose& owner,Rig& rig,const BossPoseInput& s)
     for(std::size_t i=0;i<owner.hitShapes_.size();++i){const auto& sock=owner.assets_[0].sockets[i];if(sock.bone>=rig.currentGlobal.size())throw std::runtime_error("Boss socket references an absent bone");const glm::dvec3 pos=point(multiplyThree(hitRoot,rig.currentGlobal[sock.bone]),glm::dvec3(sock.offset));const bool active=!s.dead&&!below&&(sock.name=="belly"?(s.stunned||phase>=3||p[BELLY]>.5):(sock.name=="crackL"||sock.name=="crackR"?springs[13].x>.5:true));owner.hitShapes_[i]={sock.name,pos,sock.radius,sock.weak,active};}
     owner.poseSockets_.clear();owner.poseSockets_.reserve(owner.assets_[0].poseSockets.size());
     for(const auto& sock:owner.assets_[0].poseSockets){if(sock.bone>=rig.currentGlobal.size())throw std::runtime_error("Boss pose socket references an absent bone");owner.poseSockets_.push_back({sock.name,point(multiplyThree(hitRoot,rig.currentGlobal[sock.bone]),glm::dvec3(sock.offset))});}
+    for(auto& event:audioEvents){
+        if(event.kind==BossPoseAudioEvent::Kind::Impact||event.kind==BossPoseAudioEvent::Kind::Fx){
+            const auto socket=std::find_if(owner.poseSockets_.begin(),owner.poseSockets_.end(),[&](const auto& item){return item.name==event.socket;});
+            event.position=socket==owner.poseSockets_.end()?rootPos+glm::dvec3(0,3,0):socket->pos;
+            if(event.kind==BossPoseAudioEvent::Kind::Impact&&event.socket=="clawL")event.position.y=rootPos.y+.05;
+            else if(event.kind==BossPoseAudioEvent::Kind::Impact&&event.socket=="body")event.position.y=rootPos.y+.2;
+        }
+        if(owner.audioEventSink_)owner.audioEventSink_(event);
+    }
+    audioEvents.clear();
 }
 
 void BossPose::Animator::animateCrablet(Rig& rig,const BossCrablet& crab,double dt,double t,double seed,double& ph){

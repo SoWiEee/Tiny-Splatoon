@@ -73,3 +73,31 @@
 - Intro 不再呼叫 menu 音樂；BeginMatch 直接播放 battle／Boss 當階段 BGM，Playing 保留開始號角。測試在 Intro 檢查實際解碼檔案為 Splattack，修正前失敗、修正後通過。
 - 結算按鈕使用獨立文字 span 與 flex 置中；720p／1080p 比對 border box 與文字中心。裝備頁補各武器來源耗墨模型與數字；未修改已正確的來源玩法值。
 - 初始四項回歸 UI／音訊失敗，Arsenal 與 992 組 WeaponRunner 來源狀態通過（`v085-red-tests.log`）。修正後音訊通過 31.84 秒、UI 通過 11.29 秒（`v085-fixes-tests.log`、`v085-fixes-final-ui.log`）；Release 目標建置通過。僅執行受影響檢查。
+
+
+## v0.8.5 互動演出、音訊與裝備驗收（2026-10-24）
+
+- 地圖加入六輪 pin 避讓、引線、吸附游標／手把確認、滑鼠視差及彈射弧。幾何測試保留真實投影座標並獨立檢查顯示避讓，避免以移動世界座標掩蓋重疊。
+- Boss 的實際傷害 journal 驅動本機連擊／弱點回饋，補繁中登場、階段、招式與離屏提示。畫面檢視抓到 phase 橫幅與一般「開始」重疊，已在 Boss 專屬提示出現時隱藏一般橫幅並加入斷言。遠端計數仍可能合併同一快照多次命中。
+- 頒獎台接來源升起、角色依序落下與落地伸縮、彩紙／敗北墨滴與印章；跳過及低動態效果直接呈現穩定姿勢。首次入場已核對來源為站立出生／2D 名單，不添加虛構飛入。
+- AA 可保存並即時切換：0 samples 使用 FXAA，原生解析度保留 MSAA；關閉兩者停用。原生 shader 位於 `assets/shaders/post/`，未加入來源生成目錄；來源 post export 檢查曾因目錄多出檔案失敗，移出後恢復通過。
+- 音訊接實際 BossPose crossing（intro、鉗擊、六足落地）及 source death guard；XP 改經詳細 UI sink 傳入來源選單 65 ms／0.05／pitch 1。普通 projectile impact 不再多播牆音，充能槍與迴旋鏢改由明確牆面事件產生。
+- 新增 Bomb／Waddle／Mine 真實 tick 引爆、Brolly 11 顆主攻擊、scan／mist／curtain／sprinkler 生命週期與潛水 press ordering／emerge buffered shot。新增 Bomb 測試初跑失敗：先修正裝置刪除後 fixture 越界，再確認 source 從 `b.pos` 計算衰減而 native 偏移 0.2 m；修正後 targeted devices 通過（0.82 秒）。這些檢查與既有 source fixtures 合成 12 main／15 sub／19 special 覆蓋，矩陣見[裝置生命週期盤點](../audits/device-special-lifecycle-audit.md)。
+- 完整套件前的音訊／玩家／裝置初跑 2/3，音訊 28.94 秒、玩家 3.60 秒；裝置失敗及根因如上。保留 `v085-audio-device-targeted.log`、`v085-device-rerun.log`，不刪除失敗紀錄。
+- GTX 1650 Max-Q／OpenGL 4.5／NVIDIA 591.74 正式 Boss 程式啟動與擷取完成（`v085-final-native-boss.log`）；另有 720p／1080p 的 UI、地圖及結果元件畫面檢查。
+
+音訊邊界：來源匯出器已將每個 cue 的 shared reverb、glue compressor 與 limiter 烘焙進 stereo PCM；原生使用 miniaudio spatialization。實驗可從 Edge OfflineAudioContext 擷取 HRTF impulse response，但對現有素材再套 HRTF 會連濕聲一起處理，不能當作正確還原。真正 parity 仍需 dry/wet 分離及 runtime 共用匯流排；本輪未實作，亦未宣稱主觀聽感／全場景逐影格或跨 GPU／跨網已通過。
+
+
+完整 99 項首輪耗時 377.50 秒，97 項通過（`build/logs/v085-full-tests.log`），兩項失敗保留原紀錄：`reference_combat_devices` 的新 blast fixture 未進入預期引爆狀態，以及 `reference_audio_export` 的舊文字契約仍要求 native 路由到 legacy `menu`。同批音訊播放／動畫 crossing、武器來源數值、潛水狀態、Boss、UI、GPU、網路與其他來源匯出檢查均通過。使用者其後追加選單圖示、返回鍵、預備視角鎖定與 README 截圖；最終只補跑失敗項及這些新增變更影響的測試，不將首輪失敗隱藏或宣稱首次全綠。
+
+
+### v0.8.5 最終補驗與來源獨立性
+
+- 首輪失敗均已修正並補驗：裝置 fixture 改用實際碰牆引爆與安全 ID 查找；音訊契約明列現用 bundled music，保留來源資產 inventory 檢查。`v085-device-fixture-tests.log`、`v085-final-confirm-tests.log` 保留結果。地圖吸附改讀 RmlUi 滑鼠事件，避免隱藏 GLFW 視窗無焦點時游標設定無效，`v085-map-pointer-tests.log` 通過。
+- `build/independent-v085/source` 實際不含 splat-ref，也不是 symlink；冷建置 267 步完成。全部 73 項原生測試通過，290.03 秒（`v085-no-source-tests.log`）；最終固定 LOD fixture／來源匯出另通過，fixture-only oracle 不再讀取來源檔案。來源可選匯出檢查仍保留於主目錄。
+- Zones 減少常駐文字：計數位於時鐘兩側；區域圖示、雙色控制條及 80/20 閾值保留，擁有者以顏色及 accessible label 表達。零懲罰不顯示，輪換提示限最後 5 秒，延長賽／事件提示保留。主目錄區域計分、AI、音效、GPU 與 UI 6/6 通過，55.65 秒（`v085-zones-final-tests.log`）；同一補丁複製至無來源副本重建後，UI 1/1 通過，12.10 秒（`v085-zones-independent-tests.log`）。
+- 720p／1080p 合成畫面已檢視，計數／名單／時鐘無重疊。README 更新原生設定選單、塗地及最新 Zones 截圖；實際遊戲擷取由無來源副本在 GTX 1650 Max-Q 執行。選單為原生 UI 合成，戰鬥為完整場景，不把合成背景當成完整遊戲渲染。
+- Impeccable 分別對選單與本次 Zones 範圍進行一次 detector；僅回報使用者指定 Inter 的 overused-font 警告（選單 2、HUD 6），保留指定字體。鎖定的 splat-ref 與 baseline 未修改；未重跑未受本次 UI 變更影響的完整套件。
+
+- 實際 Zones 擷取發現 RmlUi 不接受 `font-variant-numeric`／`border-style`，移除無效宣告並補跑 UI 確認（1/1，11.27 秒，`v085-zones-style-confirm.log`）；採既有 border 寬度／顏色，沒有加入瀏覽器專用 CSS。

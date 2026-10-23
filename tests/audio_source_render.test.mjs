@@ -74,7 +74,8 @@ if (requiredTracks.some((track) => !tracks.has(track)) || tracks.size !== requir
 const director = await readFile(path.join(root, 'src', 'audio', 'GameAudio.cpp'), 'utf8');
 const musicCalls = [...director.matchAll(/PlayMusic\("([a-z0-9_]+)"/g)].map((match) => match[1]);
 for (const track of musicCalls) if (!tracks.has(track)) fail(`GameAudio requests missing music track ${track}`);
-for (const track of ['title', 'menu', 'battle', 'battle_final', 'results_win', 'results_lose', 'boss', 'boss_2', 'boss_3'])
+// menu remains a packaged legacy alias; native match entry intentionally starts battle during Intro.
+for (const track of ['title', 'battle', 'battle_final', 'results_win', 'results_lose', 'boss', 'boss_2', 'boss_3'])
   if (!director.includes(`"${track}"`)) fail(`GameAudio does not route the ${track} music state`);
 if (!director.includes('return phase >= 3 ? "boss_3" : phase == 2 ? "boss_2" : "boss";'))
   fail('Boss music must select its three source intensity phases');
@@ -168,7 +169,7 @@ for (const clip of manifest.clips) {
 
 const musicIndex = (await readFile(path.join(audioRoot, 'music.tsv'), 'utf8')).trimEnd().split(/\r?\n/);
 if (musicIndex.length !== manifest.music.length) fail('music index and manifest track counts differ');
-const expectedMusicFiles = new Set(['manifest.json', 'catalog.tsv', 'music.tsv']);
+const expectedMusicFiles = new Set(['manifest.json', 'catalog.tsv', 'music.tsv', 'bundled-music.tsv']);
 for (let i = 0; i < manifest.music.length; i++) {
   const track = manifest.music[i];
   const [name, frames, loopBegin, loopEnd, bpm] = musicIndex[i].split('\t');
@@ -189,6 +190,29 @@ for (let i = 0; i < manifest.music.length; i++) {
 for (const clip of manifest.clips) {
   expectedMusicFiles.add(clip.file);
   if (clip.loop) expectedMusicFiles.add(clip.loop.file);
+}
+const bundledAliases = new Map([
+  ['title', 'LifeWillChange_Instrumental.mp3'], ['menu', 'LifeWillChange_Instrumental.mp3'],
+  ['battle', 'Splattack.mp3'], ['battle_final', 'Splattack.mp3'], ['boss', 'Splattack.mp3'],
+  ['boss_2', 'Splattack.mp3'], ['boss_3', 'Splattack.mp3'],
+]);
+const bundledRows = (await readFile(path.join(audioRoot, 'bundled-music.tsv'), 'utf8')).trimEnd().split(/\r?\n/);
+const bundledTracks = new Set();
+const bundledFiles = new Set();
+for (const row of bundledRows) {
+  const [track, gain, file, ...extra] = row.split('\t');
+  const gainDb = Number(gain);
+  if (extra.length || !bundledAliases.has(track) || bundledTracks.has(track) || bundledAliases.get(track) !== file ||
+      !gain?.trim() || !Number.isFinite(gainDb) || gainDb < -60 || gainDb > 24)
+    fail(`invalid or unauthorized bundled music mapping: ${row}`);
+  bundledTracks.add(track);
+  bundledFiles.add(file);
+}
+if (bundledTracks.size !== bundledAliases.size) fail('bundled music aliases must cover the approved title, menu, battle, and Boss routes');
+for (const file of bundledFiles) {
+  const bytes = await readFile(path.join(audioRoot, file));
+  if (!bytes.length) fail(`bundled music file is empty: ${file}`);
+  expectedMusicFiles.add(file);
 }
 const actual = new Set((await filesUnder(audioRoot)).filter(file=>file!=='custom-music.tsv'&&!file.startsWith('songs/')));
 if (actual.size !== expectedMusicFiles.size || [...expectedMusicFiles].some((file) => !actual.has(file)))

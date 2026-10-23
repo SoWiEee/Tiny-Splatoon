@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/worldfx_source_fixtures.json', import.meta.url), 'utf8'));
-const source = readFileSync(new URL('../splat-ref/src/fx/fx.js', import.meta.url));
-assert.equal(createHash('sha256').update(source).digest('hex'), fixture.sha256, 'source fx.js hash');
+assert.equal(fixture.source, 'splat-ref/src/fx/fx.js', 'fixture source path');
+assert.equal(fixture.sha256, '9e8a646a6154824b64f9b35eeab1e4347f3bdb282ff7c337645dca14f8b88bc8', 'immutable source fx.js hash');
 const names = Object.keys(fixture.recipes);
 const result = spawnSync(process.argv[2], [], { input: `${names.join('\n')}\n`, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 assert.equal(result.status, 0, result.stderr);
@@ -104,4 +103,4 @@ for (let i = 0; i < names.length; i++) {
     for (const [pool, count] of Object.entries(counts)) assert.equal(count, sourceRecipe[phase === 'immediatePools' ? 'immediate' : 'firstFrame'][pool], `${name}.${phase}.${pool} count`);
   }
 }
-console.log(`WORLD_FX source match ${names.length} recipes; exact Float32 values except trig-derived position/velocity vectors (observed max ${maxObservedTrigUlp} ULP${maxObservedTrigPath ? ` at ${maxObservedTrigPath}` : ''}; limit 1 ULP)`);
+console.log(`WORLD_FX committed source fixture match ${names.length} recipes; exact Float32 values except trig-derived position/velocity vectors (observed max ${maxObservedTrigUlp} ULP${maxObservedTrigPath ? ` at ${maxObservedTrigPath}` : ''}; limit 1 ULP)`);

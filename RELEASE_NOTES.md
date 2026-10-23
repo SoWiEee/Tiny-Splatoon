@@ -1,22 +1,34 @@
-# Tiny Splatoon v0.8.0
+# Tiny Splatoon v0.8.5
 
-## 新增與調整
+## 更新內容
 
-- 原生 GameNetworkingSockets 私人房間：房碼、八人名單、分隊與準備、換主、遊戲同步及返回同房。
-- 更新選單視覺與操作回饋，沿用來源烏賊／武器圖示；設定頁可捲動，返回列固定可見。
-- 戰鬥上方顯示隊伍存活狀態、復活倒數與特殊就緒；準心右側新增動態墨管、副武器耗墨刻線與低墨提示。
-- 選單 BGM 改為 LifeWillChange_Instrumental.mp3，對戰 BGM 改為 Splattack.mp3；依實際音檔長度循環，最後一分鐘及 Boss 換階段沿用同一串流。
-- 十二種主武器專屬準心、實際散布與蓄力狀態；隊友頭頂名牌、武器、特殊就緒與離屏方向。
-- 六類世界粒子改用來源 shader／mesh，補接槍口、尾跡、甩墨、閃避、充能與命中墨花。
-- 補齊普通炸彈與插地箭倒數範圍、Shaker 動畫噴口／充能燈／泡沫、迴旋鏢滴墨、傘破裂及特殊武器粒子事件；波刃停止後短暫消退。
-- README 更新三張原生遊戲截圖，並附 HUD 差異與傷害來源核對文件。
+- 修正點擊開始按鈕文字偶爾無法進場，以及 Intro 重新播放選單音樂；進場直接使用局內 BGM。
+- 結算操作文字置中，裝備頁顯示每種武器的實際耗墨方式與數值。
+- 選單補來源設定分類圖示、深墨底返回鍵與返回箭頭；預備階段鎖定視角，丟棄累積滑鼠／手把轉向輸入。
+- 依參考版移除局內玩家 HP 數字與即時雙隊塗地百分比；保留受傷效果、個人塗地 p、Boss 血條與 Zones 計數。
+- Zones HUD 對齊來源：計數置於時鐘兩側，區域以圖示／色條呈現；隱藏重複擁有者、百分比及零懲罰文字，輪換提示僅於最後 5 秒顯示。
+- 畫面設定加入可保存的反鋸齒開關：中畫質使用 FXAA，原生解析度使用 MSAA；關閉可停用兩者。
+- 原生 3D Tab 地圖加入標記避讓、引線、游標吸附／手把確認、滑鼠視差、彈射預覽／進行中路徑及落點環。
+- 小地圖採圓角長框、來源箭頭與隊友／追蹤敵人標記；修正大型標記殘留與渲染雜框。
+- Boss 加入繁中登場、階段橫幅、招式與離屏方向提示，以及實際命中的連擊傷害／弱點回饋。
+- 結算加入台座升起、角色依序落下與落地伸縮、勝利彩紙／敗北墨滴及印章動態；支援低動態效果設定。
+- World FX／LOD 的原生 oracle 改用已提交、帶固定來源 hash 的 fixture，沒有參考版目錄也能建置與驗收；來源重匯出保留為可選檢查。
+- 保留暖紙色純色選單、十二種繁中武器卡片、四類可捲動設定、來源圖示與 Boss 八人專用結算。
+- Boss 腳步、鉗擊與落地音改接實際動畫事件；修正普通子彈多播撞牆音與結果 XP 音量。
+- 補驗十二種主武器、十五種副武器、十九種特殊技能及潛水切換，補齊傘槍主射擊、炸彈／機器炸彈、掃描／毒霧／墨幕／灑水器生命週期斷言。
 
-- 文件依用途歸檔、測試 fixture 獨立分層，補上導覽並修正來源瀏覽器暫存清理。
+## 安裝
 
-## 安裝與驗收
+完整解壓 Tiny-Splatoon-v0.8.5-windows-x64.zip，執行 Tiny-Splatoon.exe；保留同目錄 DLL 與 assets。需要支援 OpenGL 4.5 的 GPU／驅動。私人房間服務 Tiny-Splatoon-Server.exe 隨包附上。
 
-完整解壓 Tiny-Splatoon-v0.8.0-windows-x64.zip，執行 Tiny-Splatoon.exe；請保留同目錄 DLL 與 assets。需要支援 OpenGL 4.5 的 GPU／驅動；多人房間服務 Tiny-Splatoon-Server.exe 隨包附上。
+玩家資料位於 %LOCALAPPDATA%/Tiny-Splatoon/profile.json。反鋸齒在「設定 → 畫面」，可與低動態效果、畫質及音量一同保存。
 
-玩家資料仍位於 %LOCALAPPDATA%/Tiny-Splatoon/profile.json。畫質與音量可在選單設定。
+## 驗收範圍
 
-驗收範圍與已知差異見 [本輪紀錄](docs/acceptance/acceptance-2026-10-23.md)、[HUD 對照](docs/audits/hud-source-audit.md)、[傷害核對](docs/audits/damage-source-audit.md)及[還原進度](docs/restoration-progress.md)。本機多人驗證不代表跨網／NAT／公開服務已驗收；完整來源 HUD 演出與最壞負載仍待完成。
+不含 splat-ref 的獨立副本完成 Release 全目標建置及 73/73 原生測試（290.03 秒）；最新 Zones 變更另通過主目錄 6/6 回歸與獨立副本 UI 驗證。
+
+本機 Release 建置與受影響的 UI、音訊、武器耗墨、保存、地圖、Boss、頒獎台、反鋸齒 GPU 及網路同步回歸；檢視 720p／1080p 合成畫面並以 GTX 1650 執行原生程式。
+
+現有音檔已含來源混響與壓縮，空間定位使用 miniaudio，仍有 WebAudio HRTF／總匯流排動態處理差異。完整來源逐影格、主觀聽感、實體手把、跨 GPU／最壞視效負載與跨網仍未全量驗收；遠端 Boss 命中數字使用同步計數差值，可能合併同一快照內的多次命中。3D lobby／hub 與來源完全一致的頒獎光照仍未完成。
+
+詳見 [還原進度](docs/restoration-progress.md)、[驗收紀錄](docs/acceptance/acceptance-2026-10-23.md)及 [HUD 差異](docs/audits/hud-source-audit.md)。

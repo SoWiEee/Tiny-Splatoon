@@ -142,7 +142,8 @@
         const bool go=match.phase()==MatchPhase::Playing&&now-battle.phaseAt<.8&&!practice;
         const bool finish=match.phase()==MatchPhase::Finish&&!practice;
         Hidden(hud,"battle-banner",(!intro&&!go&&!finish)||(!intro&&!finish&&(battle.callUntil>now||!state.alive)));Text(hud,"battle-banner",intro?"準備好了嗎？":finish?"對戰結束！":"開始！");
-        Hidden(hud,"intro-lineup",!intro);
+        Hidden(hud,"intro-lineup",!intro||now-battle.phaseAt>=3.5);
+        Find(hud,"intro-lineup")->SetProperty("opacity",Number(player.settings.reducedMotion?1:std::clamp((3.5-(now-battle.phaseAt))/.6,0.,1.)));
         if(intro){std::string lineup;for(int side=0;side<2;++side){lineup+="<div class=\"lineup-team\"><h2>"+std::string(match.boss()?side==0?"協力小隊":"破艦巨獸":side==0?"我方隊伍":"對方隊伍")+"</h2>";
             for(std::size_t i=0;i<match.actors().size();++i){const auto& a=*match.actors()[i];if(!match.roster()[i].active||a.team()!=(side==0?local.team():1-local.team()))continue;lineup+="<div class=\"lineup-player\"><img src=\"weapons/"+std::string(a.weapon().kind)+".png\"/><strong>"+Escape(match.roster()[i].name)+"</strong></div>";}
             lineup+="</div>";}const auto key="hud/intro-lineup";if(textCache[key]!=lineup){Find(hud,"intro-lineup")->SetInnerRML(lineup);textCache[key]=lineup;}}

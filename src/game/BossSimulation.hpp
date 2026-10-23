@@ -56,6 +56,13 @@ struct BossThreat {
     bool cover=false,beam=false,lane=false;
 };
 struct BossPoseHitPulse { double flash=0,weakFlash=0,hurt=0; };
+struct BossHudHitEvent {
+    std::uint64_t serial=0;
+    double time=0,damage=0;
+    int attackerSlot=-1;
+    glm::dvec3 point{0};
+    bool weak=false;
+};
 struct BossState {
     glm::dvec3 pos{0},vel{0};
     double yaw=0,turn=0,clock=0,hp=0,maxHp=0;
@@ -77,6 +84,7 @@ public:
     const BossState& state() const {return state_;}
     std::optional<glm::dvec3> poseAim() const;
     BossPoseHitPulse takePoseHitPulse();
+    const std::vector<BossHudHitEvent>& hudHitEvents() const {return hudHitEvents_;}
     const BossNav& nav() const {return nav_;}
     const std::optional<BossMove>& move() const {return move_;}
     const std::vector<BossMove>& moves() const {return moves_;}
@@ -133,7 +141,7 @@ private:
     double beamLength(const BossMove& move,double angle) const;
     void paintAt(double x,double y,double z,double radius);
     void damage(PlayerSimulation& actor,double amount);
-    double applyDamage(PlayerSimulation& attacker,double amount,bool weak);
+    double applyDamage(PlayerSimulation& attacker,double amount,bool weak,glm::dvec3 point);
     void updateDefaultHitShapes();
     PlayerSimulation* targetActor() const;
     const StageData& stage_;
@@ -166,6 +174,8 @@ private:
     std::size_t pathIndex_=0;
     std::array<double,8> attention_{},damageBy_{},totalDamageBy_{};
     std::array<int,8> weakHitsBy_{},splatsBy_{};
+    std::uint64_t hudHitSerial_=0;
+    std::vector<BossHudHitEvent> hudHitEvents_;
     std::vector<std::string> oneShotHits_;
     std::vector<std::string> localVictimHitGuards_;
     std::vector<int> localCrabBurstGuards_;

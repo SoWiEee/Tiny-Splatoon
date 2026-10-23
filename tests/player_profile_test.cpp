@@ -24,20 +24,21 @@ int main(){
     try{
         std::filesystem::create_directories(root);const auto path=root/"profile.json";ProfileStore store(path);
         auto profile=store.load();Check(profile.name=="Player"&&profile.level==1&&profile.xp==0&&profile.weapon=="shooter","missing profile defaults changed");
-        Check(profile.settings.graphics.preset==GraphicsPreset::Medium&&profile.settings.palette==0,"native settings defaults changed");
+        Check(profile.settings.graphics.preset==GraphicsPreset::Medium&&profile.settings.palette==0&&profile.settings.graphics.antialiasing,"native settings defaults changed");
+        Check(!ForPreset(GraphicsPreset::Low).antialiasing&&ForPreset(GraphicsPreset::Medium).antialiasing&&ForPreset(GraphicsPreset::High).antialiasing,"graphics preset antialiasing defaults changed");
 
         profile.name=u8"甲乙丙丁戊己庚辛壬癸一二三四五六七";profile.weapon="dualies";profile.sub="sticky";profile.special="jetpack";
         profile.style={7,8,9,7,3,2};profile.settings.quality="ultra";profile.settings.invertY=true;profile.settings.fov=91;
         profile.settings.palette=4;profile.settings.reducedMotion=true;profile.settings.graphics.preset=GraphicsPreset::Custom;
         profile.settings.bossLength=300;profile.settings.lastMode="boss";
-        profile.settings.graphics.renderScale=.72f;profile.settings.graphics.shadowMapSize=4096;profile.settings.graphics.reflections=true;
+        profile.settings.graphics.renderScale=.72f;profile.settings.graphics.shadowMapSize=4096;profile.settings.graphics.reflections=true;profile.settings.graphics.antialiasing=false;
         store.save(profile);profile=store.load();
         Check(profile.name==u8"甲乙丙丁戊己庚辛壬癸一二三四五六","UTF-8 profile name was not limited to 16 characters");
         Check(profile.weapon=="twins"&&profile.sub=="sticky"&&profile.special=="jetpack","weapon migration or loadout persistence failed");
         Check(profile.style.hair==7&&profile.style.skin==8&&profile.style.outfit==9&&profile.style.eyes==7&&profile.style.hat==3&&profile.style.brows==2,"character style persistence failed");
         Check(profile.settings.invertY&&profile.settings.fov==91&&profile.settings.palette==4&&profile.settings.reducedMotion,"player settings persistence failed");
         Check(profile.settings.bossLength==300&&profile.settings.lastMode=="boss","Boss preferences did not survive reload");
-        Check(profile.settings.graphics.preset==GraphicsPreset::Custom&&profile.settings.graphics.renderScale==.72f&&profile.settings.graphics.shadowMapSize==4096&&profile.settings.graphics.reflections,"graphics settings persistence failed");
+        Check(profile.settings.graphics.preset==GraphicsPreset::Custom&&profile.settings.graphics.renderScale==.72f&&profile.settings.graphics.shadowMapSize==4096&&profile.settings.graphics.reflections&&!profile.settings.graphics.antialiasing,"graphics settings persistence failed");
         Check(ProfilePaletteColors(1)[0]=="#ff3f9e"&&ProfilePaletteColors(1)[1]=="#18d48c"&&ProfilePaletteColors(1,false,true)[1]=="#2f5bff","Pink/green palette and Boss blue ink must remain distinct");
         Check(ProfilePaletteColors(4)[0]=="#a6f01a"&&ProfilePaletteColors(2,true)[1]=="#2a52ff","source team palette colors changed");
 
@@ -46,6 +47,8 @@ int main(){
         Check(profile.settings.fov==82&&profile.settings.fpsCap==0&&profile.settings.quality=="high","invalid settings did not use defaults");
         Write(path,R"({"name":"Tide","settings":{"invertY":true}})");profile=store.load();
         Check(profile.name=="Tide"&&profile.level==1&&profile.weapon=="shooter"&&profile.settings.invertY&&profile.settings.fov==82,"missing fields did not keep defaults");
+        Write(path,R"({"settings":{"graphics":{"preset":"custom"}}})");profile=store.load();
+        Check(profile.settings.graphics.preset==GraphicsPreset::Custom&&profile.settings.graphics.antialiasing,"legacy custom graphics profile did not keep the antialiasing default");
         Write(path,"not json");profile=store.load();Check(profile.name=="Player"&&profile.level==1,"malformed profile did not use defaults");
 
         PlayerProfile turf;auto reward=ApplyMatchReward(turf,{"match-turf","turf",true,false,100.2,0,0,3});

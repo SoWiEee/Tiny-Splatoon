@@ -1,6 +1,7 @@
 #include "../src/audio/AudioEngine.hpp"
 #include "../src/audio/GameAudio.hpp"
 #include "../src/game/MatchSimulation.hpp"
+#include "../src/game/BossPose.hpp"
 #include "../src/game/CombatWorld.hpp"
 #include "../src/game/ArsenalData.hpp"
 #include "../src/game/NavGraph.hpp"
@@ -52,6 +53,32 @@ int main(int argc, char** argv) {
         for (const char* name : {"shoot_shooter", "shoot_blaster", "shoot_charger", "shoot_dualies", "shoot_splatling",
                 "slosh_throw", "roller_flick", "bow_loose", "blade_swish", "crab_cannon", "boss_cannon_sweep", "xp_tick"})
             require(audio.Metadata(name).has_value(), "Weapon, active-special, Boss, and UI cues must resolve by source name");
+        {
+            BossPose pose(assets.parent_path() / "reference/boss/model.bin");
+            std::vector<BossPoseAudioEvent> poseEvents;
+            pose.SetAudioEventSink([&](const BossPoseAudioEvent& event) { poseEvents.push_back(event); });
+            BossPoseInput poseInput; poseInput.move = "slam"; poseInput.movePhase = "act"; poseInput.moveTime = 0;
+            poseInput.phaseDuration = 1.9; poseInput.hasParams = true; poseInput.rings = {0};
+            pose.Update(poseInput);
+            require(std::any_of(poseEvents.begin(), poseEvents.end(), [](const auto& event) {
+                        return event.kind == BossPoseAudioEvent::Kind::Impact && event.socket == "clawL" &&
+                            std::isfinite(event.position.x) && std::isfinite(event.position.y) && std::isfinite(event.position.z);
+                    }), "Boss pose must emit a positioned claw impact on the exact slam animation crossing");
+            poseEvents.clear();
+            BossPoseInput introInput; introInput.move = "intro"; introInput.moveTime = 0.0;
+            introInput.phaseDuration = 3.4; introInput.dt = 1.0 / 60.0;
+            pose.Update(introInput);
+            require(std::any_of(poseEvents.begin(), poseEvents.end(), [](const auto& event) {
+                        return event.kind == BossPoseAudioEvent::Kind::Intro &&
+                            std::isfinite(event.position.x) && std::isfinite(event.position.y) && std::isfinite(event.position.z);
+                    }), "The Boss pose sink must emit intro audio when the initial animation crosses time zero");
+            poseEvents.clear(); poseInput.move.clear(); poseInput.movePhase.clear(); poseInput.dt = 1.0 / 60.0;
+            for (int frame = 0; frame < 120; ++frame) { poseInput.position.x += 5.0 / 60.0; pose.Update(poseInput); }
+            require(std::any_of(poseEvents.begin(), poseEvents.end(), [](const auto& event) {
+                        return event.kind == BossPoseAudioEvent::Kind::Footstep && event.leg >= 0 && event.leg < 6 &&
+                            std::isfinite(event.position.x) && std::isfinite(event.position.y) && std::isfinite(event.position.z);
+                    }), "Boss pose must emit positioned footsteps from actual six-leg landing crossings");
+        }
         require(audio.Metadata("swim")->loopable && audio.Metadata("climb")->loopable &&
                 audio.Metadata("enemy_ink_sizzle")->loopable && audio.Metadata("harbor_ambience")->loopable &&
                 audio.Metadata("splatling_spin")->loopable && audio.Metadata("boss_dizzy")->loopable &&
@@ -346,6 +373,32 @@ int main(int argc, char** argv) {
         director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
         require(directorEngine.ActiveVoices() > voicesBeforeBossCue && directorEngine.lastError().empty(),
             "GameAudio must route a Boss socket cue through its optional body-position fallback");
+        director.EnableBossAnimationAudio(true);
+        const auto checkBossAnimationCue = [&](BossPoseAudioEvent event, std::string_view cue, const char* message) {
+            const auto metadata = directorEngine.Metadata(cue);
+            require(metadata.has_value(), "Boss animation callback test cue must exist in the source catalog");
+            std::this_thread::sleep_for(std::chrono::duration<double>(metadata->sourceMinGapSeconds + 0.03));
+            const auto before = directorEngine.ActiveVoices();
+            director.BossAnimationEvent(event);
+            require(directorEngine.ActiveVoices() == before + 1, message);
+        };
+        BossPoseAudioEvent footEvent; footEvent.kind = BossPoseAudioEvent::Kind::Footstep;
+        footEvent.position = {1.0, 0.5, 1.0}; footEvent.strength = 0.6; footEvent.leg = 2; footEvent.time = 1.0;
+        checkBossAnimationCue(footEvent, "boss_step", "An animation foot landing must play the positioned Boss step cue");
+        const auto voicesAfterFootstep = directorEngine.ActiveVoices();
+        footEvent.time = 1.05; director.BossAnimationEvent(footEvent);
+        require(directorEngine.ActiveVoices() == voicesAfterFootstep,
+            "Boss footstep events within the source 60 ms throttle must not duplicate");
+        BossPoseAudioEvent impactEvent; impactEvent.kind = BossPoseAudioEvent::Kind::Impact;
+        impactEvent.position = {1.0, 0.5, 1.0}; impactEvent.socket = "clawL"; impactEvent.strength = 1.0;
+        checkBossAnimationCue(impactEvent, "boss_slam", "A claw animation impact must play the positioned Boss slam cue");
+        BossPoseAudioEvent bonkEvent; bonkEvent.kind = BossPoseAudioEvent::Kind::Fx;
+        bonkEvent.position = {1.0, 0.5, 1.0}; bonkEvent.name = "bonk";
+        checkBossAnimationCue(bonkEvent, "boss_crash", "A bonk animation event must play the source crash cue");
+        BossPoseAudioEvent hatchEvent; hatchEvent.kind = BossPoseAudioEvent::Kind::Fx;
+        hatchEvent.position = {1.0, 0.5, 1.0}; hatchEvent.name = "hatch";
+        checkBossAnimationCue(hatchEvent, "crablet_chitter", "A barrage hatch marker must play the source Crablet cue");
+        director.EnableBossAnimationAudio(false);
         const auto advanceBossAudio = [&](double step) {
             boss->tick(step, true);
             director.Update(step, bossMatch, {}, listener, forward);
@@ -532,6 +585,39 @@ int main(int argc, char** argv) {
         GameAudio routeDirector(directorEngine);
         routeDirector.BeginMatch(routeMatch);
         routeDirector.Update(1.0 / 60.0, routeMatch, {}, listener, forward);
+        {
+            auto& actor = routeMatch.local();
+            const auto origin = actor.state.pos + glm::dvec3(0.0, 0.8, 0.0);
+            bool emittedChargerWallCue = false;
+            for (int i = 0; i < 36 && !emittedChargerWallCue; ++i) {
+                const double angle = static_cast<double>(i) * 6.283185307179586 / 36.0;
+                const glm::dvec3 direction(std::sin(angle), 0.0, std::cos(angle));
+                const auto wall = geometry.raycast(origin, direction, 60.0, true);
+                if (!wall.hit) continue;
+                bool actorBlocks = false;
+                for (const auto* target : routeMatch.world().actors()) {
+                    if (!target || target->team() == actor.team() || !target->state.alive) continue;
+                    const auto contact = StageGeometry::segmentCapsuleDist(origin, wall.point,
+                        target->visualPos(), target->hitRadius(), target->hitHeight());
+                    if (contact.dist < target->hitRadius() + 0.14) { actorBlocks = true; break; }
+                }
+                if (actorBlocks) continue;
+                routeMatch.world().beam(actor, origin, direction, 60.0, 0.14, 10.0, 0.5, false, "charger");
+                const auto events = routeMatch.world().takeVisualEvents();
+                emittedChargerWallCue = std::any_of(events.begin(), events.end(), [&](const auto& event) {
+                    return event.kind == "inkWallImpact" && event.source == "charger" && event.sourceLocal &&
+                        event.id == actor.networkNid() && glm::length(event.pos - wall.point) < 1e-6;
+                });
+            }
+            require(emittedChargerWallCue,
+                "A charger beam that ends on stage geometry must emit a positioned local ink wall event");
+        }
+        auto& wallOwner = routeMatch.local();
+        constexpr std::uint32_t wallOwnerNid = 0x57414c4cu;
+        constexpr std::uint32_t wallUnknownNid = 0xfedcba98u;
+        wallOwner.setNetworkIdentity(wallOwnerNid, 0);
+        wallOwner.setLocal(true);
+        wallOwner.state.pos = {listener.x, listener.y, listener.z};
         struct EventRouteCase {
             WorldVisualEvent event;
             std::size_t expectedVoices;
@@ -545,6 +631,8 @@ int main(int argc, char** argv) {
             WorldVisualEvent event;
             event.kind = kind; event.source = source; event.pos = {2.0, 0.5, 1.0};
             event.radius = radius; event.charge = charge;
+            if (event.kind == "inkWallImpact") event.id = wallUnknownNid;
+            if (event.kind == "inkWallImpact" && event.source == "charger") event.id = wallOwnerNid;
             routes.push_back({std::move(event), expected, std::vector<std::string_view>(cues), std::move(label)});
         };
         for (const char* source : {"mine", "beacon", "sticky", "sprinkler", "shaker"})
@@ -598,7 +686,15 @@ int main(int argc, char** argv) {
         addRoute("explosion/torpedo full", "explosion", "torpedo", 2, {"bomb_explode", "torpedo_pop"}, 1.0, 3.0);
         addRoute("explosion/crab is silent", "explosion", "crab", 0, {}, 0.0, 3.0);
         addRoute("explosion/jetpack is silent", "explosion", "jetpack", 0, {}, 0.0, 3.0);
-        addRoute("bulletImpact", "bulletImpact", "", 1, {"ink_hit_wall"});
+        addRoute("generic shot impact has no wall cue", "bulletImpact", "shot", 0, {});
+        addRoute("generic drop impact has no wall cue", "bulletImpact", "drop", 0, {});
+        addRoute("charger wall impact", "inkWallImpact", "charger", 1, {"ink_hit_wall"});
+        addRoute("boomerang wall impact near camera", "inkWallImpact", "boomerang", 1, {"ink_hit_wall"});
+        addRoute("remote wall impact out of range", "inkWallImpact", "boomerang", 0, {"ink_hit_wall"});
+        routes.back().event.pos = {80.0, 0.0, 80.0};
+        addRoute("local wall impact outside camera range", "inkWallImpact", "charger", 1, {"ink_hit_wall"});
+        routes.back().event.sourceLocal = true;
+        routes.back().event.pos = {80.0, 0.0, 80.0};
         addRoute("slamWave", "slamWave", "", 1, {"special_slam"});
         addRoute("stormStart", "stormStart", "", 1, {"storm_thunder"});
         addRoute("world burst", "burst", "", 1, {"splat_big"});
@@ -631,6 +727,41 @@ int main(int argc, char** argv) {
                     std::to_string(route.expectedVoices) + " voices, observed " +
                     std::to_string(after >= before ? after - before : 0));
         }
+        const auto checkWallGate = [&](const char* source, double ownerDistance, double eventDistance,
+                                       bool actorLocal, bool eventLocal, std::uint64_t ownerId,
+                                       std::size_t expectedVoices, const char* message) {
+            wallOwner.setLocal(actorLocal);
+            wallOwner.state.pos = {listener.x + ownerDistance, listener.y, listener.z};
+            WorldVisualEvent event; event.kind = "inkWallImpact"; event.source = source;
+            event.pos = {listener.x + eventDistance, listener.y, listener.z};
+            event.id = ownerId; event.sourceLocal = eventLocal;
+            directorEngine.Clear();
+            const auto metadata = directorEngine.Metadata("ink_hit_wall");
+            require(metadata.has_value(), "Wall gate tests need the registered source wall cue");
+            std::this_thread::sleep_for(std::chrono::duration<double>(metadata->sourceMinGapSeconds + 0.03));
+            routeDirector.Update(1.0 / 60.0, routeMatch, {event}, listener, forward);
+            require(directorEngine.ActiveVoices() == expectedVoices, message);
+        };
+        checkWallGate("charger", 29.999, 100.0, false, false, wallOwnerNid, 1, "A remote charger owner just inside 30 m must be audible");
+        checkWallGate("boomerang", 100.0, 33.999, false, false, wallUnknownNid, 1, "A boomerang wall cue just inside 34 m must be audible");
+        checkWallGate("charger", 30.0, 100.0, false, false, wallOwnerNid, 0,
+            "A matched remote charger owner at 30 m must be culled by the strict source gate");
+        checkWallGate("charger", 30.001, 0.0, false, false, wallOwnerNid, 0,
+            "A matched remote charger owner beyond 30 m must be culled even when the hit point is near");
+        checkWallGate("charger", 100.0, 100.0, true, false, wallOwnerNid, 1,
+            "A local charger owner must pass the source gate regardless of its measured distance");
+        checkWallGate("charger", 100.0, 30.0, false, false, wallUnknownNid, 0,
+            "An unmatched charger owner at 30 m must be culled by the strict fallback gate");
+        checkWallGate("charger", 0.0, 30.001, false, false, wallUnknownNid, 0,
+            "An unmatched remote charger owner must be culled beyond the 30 m hit-point fallback");
+        checkWallGate("charger", 100.0, 100.0, false, true, wallUnknownNid, 1,
+            "An unmatched local charger event must retain the sourceLocal fallback");
+        checkWallGate("boomerang", 100.0, 34.0, false, false, wallUnknownNid, 0,
+            "A boomerang wall cue at 34 m must be culled by the strict source gate");
+        checkWallGate("boomerang", 0.0, 34.001, false, false, wallUnknownNid, 0,
+            "A boomerang wall cue beyond 34 m must be culled");
+        checkWallGate("boomerang", 0.0, 100.0, true, true, wallUnknownNid, 0,
+            "A local boomerang wall cue must not bypass the 34 m event-point gate");
         routeDirector.EndMatch();
 
         MatchOptions wailOptions; wailOptions.practice = true; wailOptions.special = "wail";

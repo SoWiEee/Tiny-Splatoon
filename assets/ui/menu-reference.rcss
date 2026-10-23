@@ -122,9 +122,11 @@
 #menu #panel-settings { display: flex; height: 100%; min-height: 0; flex-direction: column; }
 #menu .settings-panel { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding: 11dp; background-color: #fff9ef; border: 1dp #211d27; border-radius: 12dp; }
 #menu .settings-tabs { display: flex; flex: none; margin-bottom: 10dp; padding: 4dp; background-color: #e7ddca; border: 1dp #b9ab93; border-radius: 12dp; }
-#menu button.settings-tab { flex: 1 1 0; min-width: 0; min-height: 49dp; margin: 0 3dp; padding: 8dp 10dp; color: #665b50; background-color: transparent; border-color: transparent; border-radius: 9dp; font-size: 18dp; text-align: center; }
+#menu button.settings-tab { display: flex; flex: 1 1 0; min-width: 0; min-height: 49dp; align-items: center; justify-content: center; margin: 0 3dp; padding: 8dp 10dp; color: #665b50; background-color: transparent; border-color: transparent; border-radius: 9dp; font-size: 18dp; text-align: center; transition: border-color .12s, color .12s; }
+#menu button.settings-tab img { flex: none; width: 20dp; height: 20dp; margin-right: 8dp; }
+#menu button.settings-tab span { line-height: 1.1; }
 #menu button.settings-tab:hover { color: #211d27; background-color: #e4eaff; }
-#menu button.settings-tab:focus { color: #211d27; border: 2dp #211d27; }
+#menu button.settings-tab:focus { color: #211d27; background-color: #e4eaff; border: 2dp #211d27; }
 #menu button.settings-tab.selected { color: #211629; background-color: #f28a24; border-color: #ffae55; }
 #menu .settings-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 7dp 4dp 0; }
 #menu .settings-group { padding: 11dp 13dp 13dp; margin: 0 0 11dp; background-color: #f8f1e4; border: 1dp #b9ab93; border-radius: 10dp; }
@@ -162,12 +164,18 @@
   #menu .setting-row input[type=range], #menu .setting-row select { flex: 1 1 150dp; width: 150dp; margin-left: 0; }
   #menu button.weapon-card { flex-basis: 92dp; min-width: 92dp; max-width: 112dp; }
   #menu button.settings-tab { font-size: 15dp; padding-left: 5dp; padding-right: 5dp; }
+  #menu button.settings-tab img { width: 18dp; height: 18dp; margin-right: 5dp; }
 }
 
 #menu #panel-settings.hidden, #menu .settings-section.hidden, #menu .panel.hidden { display: none; }
 
 #menu .menu-footer { position: absolute; bottom: 0; left: 28dp; right: 28dp; height: 58dp; min-height: 58dp; padding: 0; box-sizing: border-box; align-items: center; }
 #menu .menu-footer button { font-size: 16dp; padding: 5dp 10dp; height: 36dp; }
+#menu .menu-footer #menu-back { display: flex; align-items: center; justify-content: center; min-width: 100dp; height: 40dp; padding: 0 13dp; color: #fff9e9; background-color: #211d27; border: 1dp #211d27; border-radius: 7dp; transition: background-color .12s, border-color .12s; }
+#menu .menu-footer #menu-back img { flex: none; width: 18dp; height: 18dp; margin-right: 8dp; }
+#menu .menu-footer #menu-back:hover { color: #fff9e9; background-color: #2f5bff; border-color: #2f5bff; }
+#menu .menu-footer #menu-back:focus { color: #fff9e9; background-color: #211d27; border: 2dp #f28a24; }
+#menu .menu-footer #menu-back:active { color: #fff9e9; background-color: #81390d; border-color: #f28a24; }
 #menu .menu-layout { bottom: 62dp; }
 
 #menu .menu-left { background-color: #f4ecdc; }

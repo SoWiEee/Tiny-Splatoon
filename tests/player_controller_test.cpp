@@ -60,6 +60,7 @@ struct Harness {
     MatchSimulation match;
 
     explicit Harness(bool practice) : match(stage, geometry, paint, nav, options(practice)) {
+        match.startPlaying();
         for (auto& actor : match.actors()) actor->state.invuln = 0.0;
     }
 };
@@ -98,6 +99,21 @@ int main() {
     };
 
     constexpr double dt = 1.0 / 60.0;
+    {
+        Harness harness(false); harness.match.restart();
+        FollowCamera camera; camera.yaw=.5; camera.pitch=-.1;
+        PlayerController controller; PlayerSettings settings;
+        ControllerInput input; input.mouseDX=900; input.mouseDY=-400;
+        input.gamepadConnected=input.usingPad=true; input.rightStickX=1; input.rightStickY=-1; input.forward=true;
+        for(int i=0;i<120;++i)controller.Update(dt,input,settings,harness.match,camera,harness.geometry);
+        check(near(camera.yaw,.5)&&near(camera.pitch,-.1),"Intro locks both mouse and stick camera orientation");
+        check(glm::length(harness.match.local().input.move)==0,"Intro does not move the local actor");
+        harness.match.startPlaying(); input={}; input.gamepadConnected=true;
+        controller.Update(dt,input,settings,harness.match,camera,harness.geometry);
+        check(near(camera.yaw,.5)&&near(camera.pitch,-.1),"Playing starts without buffered stick acceleration or look delta");
+        input.mouseDX=10;controller.Update(dt,input,settings,harness.match,camera,harness.geometry);
+        check(near(camera.yaw,.479),"Playing accepts fresh mouse motion after the intro lock");
+    }
     {
         Harness harness(true);
         auto& actor = harness.match.local();

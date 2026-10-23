@@ -16,6 +16,10 @@
         resultDone=player.settings.reducedMotion||resultSkipped||showTime>=7.0;
         Find(hud,"results")->SetClass("results-intro",resultIntro);
         Find(hud,"results")->SetClass("results-full",!resultIntro);
+        const double stamp=player.settings.reducedMotion||resultSkipped?1:std::clamp((showTime-1.35)/.35,0.,1.);
+        Find(hud,"result-boss-stamp")->SetProperty("transform","rotate(-8deg) scale("+Number(1+(1-stamp)*1.2)+")");
+        Find(hud,"result-boss-stamp")->SetProperty("opacity",Number(stamp));
+
         if(!resultIntro&&!resultFocused){
             auto* target=Find(hud,"results-rematch");
             if(!target->IsVisible())target=Find(hud,"results-menu");
@@ -82,7 +86,7 @@
             rows+="<div class=\"result-team-head\"><span class=\"result-team-name\" style=\"color:"+std::string(palette[boss?local.team():team])+";\">● "+(boss?std::string(team?"協力小隊 · 5–8":"協力小隊 · 前四名"):std::string(teamNames[team]))+(boss?(win&&!team?" <strong>★ 擊破</strong>":""):(result.winner==team?" <strong>★ 勝利</strong>":""))+"</span><span class=\"result-col turf\">"+(boss?"傷害":"塗地")+"</span>";
             if(result.zones&&!boss)rows+="<span class=\"result-col zone\">區域</span>";
             if(boss)rows+="<span class=\"result-col small\">弱點</span>";
-            rows+="<span class=\"result-col small\">✦</span><span class=\"result-col small\">☠</span>";
+            rows+="<span class=\"result-col small\">擊倒</span><span class=\"result-col small\">陣亡</span>";
             if(boss)rows+="<span class=\"result-col turf\">塗地</span>";
             rows+="</div>";
             int rowNumber=0;
@@ -134,5 +138,5 @@
             }
         }
         Text(hud,"result-xp-breakdown",breakdown);
-        if(reward.applied&&xpProgress>0&&xpProgress<1.0&&now>=resultXpNextTick){Play("xp_tick");resultXpNextTick=now+.065;}
+        if(reward.applied&&xpProgress>0&&xpProgress<1.0&&now>=resultXpNextTick){Play("xp_tick",.05,1);resultXpNextTick=now+.065;}
     }

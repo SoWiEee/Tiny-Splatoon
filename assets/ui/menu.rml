@@ -124,10 +124,10 @@
             <div id="settings-save-error" class="save-error hidden" role="status" aria-live="polite"></div>
             <div class="settings-panel">
               <div class="settings-tabs" role="tablist" aria-label="設定分類">
-                <button id="settings-tab-controls" class="settings-tab selected" role="tab" aria-selected="true" aria-controls="settings-controls" tabindex="0">操作</button>
-                <button id="settings-tab-video" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-video" tabindex="-1">畫面</button>
-                <button id="settings-tab-audio" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-audio" tabindex="-1">聲音</button>
-                <button id="settings-tab-gameplay" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-gameplay" tabindex="-1">遊戲</button>
+                <button id="settings-tab-controls" class="settings-tab selected" role="tab" aria-selected="true" aria-controls="settings-controls" tabindex="0"><img src="menu-icons/controls.png" alt="" aria-hidden="true" /><span>操作</span></button>
+                <button id="settings-tab-video" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-video" tabindex="-1"><img src="menu-icons/video.png" alt="" aria-hidden="true" /><span>畫面</span></button>
+                <button id="settings-tab-audio" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-audio" tabindex="-1"><img src="menu-icons/audio.png" alt="" aria-hidden="true" /><span>聲音</span></button>
+                <button id="settings-tab-gameplay" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-gameplay" tabindex="-1"><img src="menu-icons/gameplay.png" alt="" aria-hidden="true" /><span>遊戲</span></button>
               </div>
               <div id="settings-scroll" class="settings-scroll" tabindex="0" aria-label="設定選項">
                 <section id="settings-controls" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-controls" aria-hidden="false">
@@ -147,6 +147,7 @@
                   <div class="settings-group"><h2>畫面與效能</h2>
                     <div class="setting-row"><label for="graphics-preset">畫質</label><select id="graphics-preset"><option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="custom">自訂</option></select></div>
                     <div class="setting-row"><label for="fov">視野</label><input id="fov" type="range" min="65" max="100" step="1" /><span id="fov-value"></span></div>
+                    <div class="setting-check"><input id="graphics-aa" type="checkbox" checked="checked" /><label for="graphics-aa">反鋸齒（中畫質 FXAA／原生解析度 MSAA）</label></div>
                     <div class="setting-check"><input id="graphics-shadows" type="checkbox" /><label for="graphics-shadows">陰影</label></div>
                     <div class="setting-check"><input id="graphics-reflections" type="checkbox" /><label for="graphics-reflections">反射</label></div>
                     <div class="setting-check"><input id="graphics-post" type="checkbox" /><label for="graphics-post">後製效果</label></div>
@@ -201,7 +202,7 @@
           </div>
         </div>
       </div>
-      <div id="menu-footer" class="menu-footer"><button id="menu-back" class="quiet">返回</button><span id="menu-footer-hint">Tab 切換焦點　Enter 選擇</span></div>
+      <div id="menu-footer" class="menu-footer"><button id="menu-back" class="quiet"><img src="menu-icons/back.png" alt="" aria-hidden="true" /><span>返回</span></button><span id="menu-footer-hint">Tab 切換焦點　Enter 選擇</span></div>
     </div>
     <div id="preview-surface" class="preview-surface" aria-label="角色預覽"></div>
   </div>

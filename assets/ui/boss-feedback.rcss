@@ -1,0 +1,54 @@
+#hud .boss-feedback-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+#hud .boss-feedback-numbers { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; }
+#hud .boss-feedback-number, #hud .boss-feedback-crit { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+#hud .boss-feedback-number b { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: 31dp; font-weight: 700; line-height: 1; color: #ffffff; font-effect: outline(2dp #15121c); }
+#hud .boss-feedback-number.weak b { color: #fff9ad; }
+#hud .boss-feedback-crit { animation: boss-feedback-pop .8s ease-out forwards; }
+#hud .boss-feedback-crit i { position: absolute; left: -26dp; top: -26dp; width: 52dp; height: 52dp; border: 3dp #fff9ad; border-radius: 26dp; background-color: #ff8a1440; }
+#hud .boss-feedback-crit b { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: 34dp; font-weight: 700; color: #fff9ad; font-effect: outline(2dp #15121c); }
+@keyframes boss-feedback-pop { 0% { opacity: 0; transform: scale(.3); } 18% { opacity: 1; transform: scale(1.15); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-24dp); } }
+
+#hud .boss-feedback-move { position: absolute; left: 50%; top: 20%; width: 0; height: 0; }
+#hud .boss-feedback-move.hidden { display: none; }
+#hud .boss-feedback-move-pill { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 8dp; padding: 5dp 16dp 5dp 7dp; transform: translate(-50%, -50%); white-space: nowrap; border: 3dp #fff9e9; border-radius: 999dp; background-color: #15121cf2; transition: background-color .12s, border-color .12s; }
+#hud .boss-feedback-warning { display: block; width: 31dp; height: 31dp; line-height: 31dp; text-align: center; border-radius: 26dp; background-color: #ff8a14; color: #15121c; font-size: 23dp; font-weight: 700; }
+#hud #boss-feedback-move-label { color: #ffffff; font-size: 24dp; font-weight: 700; font-effect: outline(2dp #15121c); }
+#hud .boss-feedback-move.active .boss-feedback-move-pill { background-color: #8e1632; border-color: #fff9ad; }
+#hud .boss-feedback-move.open .boss-feedback-move-pill { background-color: #fff9ad; border-color: #ffffff; }
+#hud .boss-feedback-move.open #boss-feedback-move-label { color: #15121c; font-effect: outline(2dp #15121c); }
+#hud .boss-feedback-move-direction { display: block; margin-left: 2dp; color: #fff9ad; font-size: 28dp; font-weight: 700; }
+#hud .boss-feedback-move-direction.hidden { display: none; }
+#hud .boss-feedback-edge-arrow { display: none; position: absolute; left: 58dp; top: -11dp; color: #ffb03b; font-size: 26dp; font-effect: outline(2dp #15121c); }
+#hud .boss-feedback-move.edge .boss-feedback-edge-arrow { display: block; }
+
+#hud .boss-feedback-title { position: absolute; left: 0; top: 15%; width: 100%; height: 158dp; display: flex; align-items: center; justify-content: center; animation: boss-feedback-title 2.75s ease-out forwards; }
+#hud .boss-feedback-title.hidden { display: none; }
+#hud .boss-feedback-title-band { position: absolute; left: -4%; right: -4%; top: 24dp; bottom: 20dp; transform: rotate(-3deg) scaleX(0); transform-origin: left center; border: 4dp #15121c; background-color: #ff8a14; animation: boss-feedback-band 2.75s ease-out forwards; }
+#hud .boss-feedback-title-band i { display: block; width: 100%; height: 100%; background-color: #ff8a14; }
+#hud .boss-feedback-title img { position: relative; width: 108dp; height: 108dp; margin-right: 18dp; border: 4dp #15121c; border-radius: 54dp; background-color: #15121c; }
+#hud .boss-feedback-title-text { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4dp; color: #15121c; font-effect: outline(2dp #15121c); }
+#hud .boss-feedback-title-text small { padding: 3dp 8dp; background-color: #15121c; color: #fff9e9; font-size: 14dp; font-weight: 700; letter-spacing: 2dp; font-effect: outline(2dp #15121c); }
+#hud .boss-feedback-title-text strong { color: #ffffff; font-size: 56dp; line-height: 1; letter-spacing: 1dp; font-effect: outline(2dp #15121c); }
+#hud .boss-feedback-title-text span { padding: 4dp 10dp; background-color: #fff9e9; font-size: 15dp; font-weight: 700; letter-spacing: 1dp; }
+@keyframes boss-feedback-title { 0%, 84% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes boss-feedback-band { 0% { transform: rotate(-3deg) scaleX(0); } 12%, 76% { transform: rotate(-3deg) scaleX(1); } 100% { transform: rotate(-3deg) scaleX(0); } }
+
+#hud .boss-feedback-phase { position: absolute; left: 50%; top: 35%; display: flex; flex-direction: column; align-items: center; padding: 12dp 28dp; transform: translate(-50%, -50%) rotate(-2deg); border: 5dp #ff8a14; background-color: #15121c; color: #ffffff; animation: boss-feedback-phase 2.9s ease-out forwards; white-space: nowrap; }
+#hud .boss-feedback-phase.hidden { display: none; }
+#hud .boss-feedback-phase strong { font-size: 52dp; line-height: 1; }
+#hud .boss-feedback-phase span { margin-top: 8dp; padding: 5dp 13dp; border-radius: 20dp; background-color: #fff9e9; color: #15121c; font-size: 17dp; font-weight: 700; }
+#hud .boss-feedback-phase.rage { border-color: #ff8a9e; background-color: #981a35; color: #fff9ad; }
+#hud .boss-feedback-phase.rage span { color: #981a35; }
+@keyframes boss-feedback-phase { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(-2deg) scale(1.8); } 14% { opacity: 1; transform: translate(-50%, -50%) rotate(-2deg) scale(.96); } 22%, 82% { transform: translate(-50%, -50%) rotate(-2deg) scale(1); opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) translateY(-30dp) rotate(-2deg); } }
+
+#hud .boss-feedback-layer.reduced-motion .boss-feedback-title,
+#hud .boss-feedback-layer.reduced-motion .boss-feedback-title-band,
+#hud .boss-feedback-layer.reduced-motion .boss-feedback-phase,
+#hud .boss-feedback-layer.reduced-motion .boss-feedback-crit { animation: none; }
+#hud .boss-feedback-layer.reduced-motion .boss-feedback-title,
+#hud .boss-feedback-layer.reduced-motion .boss-feedback-phase { opacity: 1; }
+#hud .boss-feedback-layer.reduced-motion .boss-feedback-title-band { transform: rotate(-3deg) scaleX(1); }
+
+#hud .boss-feedback-move-pill { width: 250dp; height: 52dp; box-sizing: border-box; }
+#hud .boss-feedback-warning { flex: none; }
+#hud #boss-feedback-move-label { flex: 1; text-align: center; font-size: 22dp; }

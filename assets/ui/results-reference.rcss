@@ -1,6 +1,6 @@
-.hud.results-active > .hud-top, .hud.results-active > .battle-top, .hud.results-active > .team-score,
+.hud.results-active > .hud-top, .hud.results-active > .battle-top,
 .hud.results-active > .zones-hud, .hud.results-active > .boss, .hud.results-active > .minimap,
-.hud.results-active > .fps, .hud.results-active > .player-info, .hud.results-active > .ink-gauge,
+.hud.results-active > .fps, .hud.results-active > .ink-gauge,
 .hud.results-active > .player-status, .hud.results-active > .reticle,
 #hud .hud.results-active > .battle-hud-layer { display: none; }
 

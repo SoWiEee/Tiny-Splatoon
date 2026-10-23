@@ -64,16 +64,16 @@ GradeSettings GradeSettings::Theme(const std::string& theme){
     return g;
 }
 struct RenderPipeline::State {
-    std::unique_ptr<CharacterShader> gtao,denoise,highpass,composite,grade,screen,output,mul,sum;
+    std::unique_ptr<CharacterShader> gtao,denoise,highpass,composite,grade,screen,output,fxaa,mul,sum;
     std::array<std::unique_ptr<CharacterShader>,5> blur;
     Target scene,resolved,ao,filtered,ping,pong,bright,bloom;
     std::array<Target,5> horizontal,vertical;
     GLuint vao=0,noise=0,pdNoise=0;
-    int samples=4,width=0,height=0,allocatedSamples=-1;bool useAo=true,useBloom=true,active=false;
+    int samples=4,width=0,height=0,allocatedSamples=-1;bool useAo=true,useBloom=true,useFxaa=false,active=false;
     glm::mat4 projection{1},world{1};float nearPlane=.1f,farPlane=1000;
     explicit State(const std::filesystem::path& path){
         auto load=[&](const char* name){return std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(path/name));};
-        gtao=load("gtao.frag");denoise=load("denoise.frag");highpass=load("highpass.frag");composite=load("bloom-composite.frag");grade=load("grade.frag");screen=load("screen.frag");output=load("output.frag");
+        gtao=load("gtao.frag");denoise=load("denoise.frag");highpass=load("highpass.frag");composite=load("bloom-composite.frag");grade=load("grade.frag");screen=load("screen.frag");output=load("output.frag");fxaa=std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(path.parent_path().parent_path()/"shaders/post/fxaa.frag"));
         mul=std::make_unique<CharacterShader>(fullscreen,multiply);sum=std::make_unique<CharacterShader>(fullscreen,add);
         for(int i=0;i<5;i++){
             blur[i]=load(("blur-"+std::to_string(i)+".frag").c_str());
@@ -101,11 +101,11 @@ struct RenderPipeline::State {
 };
 RenderPipeline::RenderPipeline(std::filesystem::path assets):state_(std::make_unique<State>(assets)){}
 RenderPipeline::~RenderPipeline()=default;
-void RenderPipeline::Configure(int samples,bool ao,bool bloom){
+void RenderPipeline::Configure(int samples,bool ao,bool bloom,bool antialiasing){
     GLint maximum=0;glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES,&maximum);
-    if(samples<0||samples>maximum)throw std::invalid_argument("Unsupported HDR sample count");
+    if(samples<0||(antialiasing&&samples>maximum))throw std::invalid_argument("Unsupported HDR sample count");
     if(state_->active)throw std::logic_error("Cannot reconfigure an active frame");
-    state_->samples=samples;state_->useAo=ao;state_->useBloom=bloom;
+    state_->samples=antialiasing?samples:0;state_->useAo=ao;state_->useBloom=bloom;state_->useFxaa=antialiasing&&samples==0;
 }
 void RenderPipeline::Begin(int w,int h,const glm::mat4& p,const glm::mat4& world,float nearPlane,float farPlane){
     auto& s=*state_;GLint maxSize=0;glGetIntegerv(GL_MAX_TEXTURE_SIZE,&maxSize);
@@ -151,6 +151,9 @@ int RenderPipeline::End(const GradeSettings& g,const ScreenEffects& f,int output
     v2("uRes",{s.width,s.height});e.uniform("uAspect",double(s.width)/s.height);e.uniform("uTime",f.time);e.uniform("uSpeed",f.speed);v3("uSpeedTint",f.speedTint);e.uniform("uStretch",f.stretch);e.uniform("uPunch",f.punch);v2("uPunchPos",f.punchPos);e.uniform("uBlast",f.blast);v2("uBlastPos",f.blastPos);e.uniform("uBlastRing",f.blastRing);v3("uBlastColor",f.blastColor);e.uniform("uChroma",f.chroma);e.uniform("uLensOn",f.lensTexture?1.:0.);v2("uLensTexel",f.lensTexel);v3("uLensColA",f.lensColorA);v3("uLensColB",f.lensColorB);
     v4("uEdgeInk",f.edgeInk);v4("uAura",f.aura);v4("uHeart",f.heart);e.uniform("uHurt",f.hurt);v4("uUrgency",f.urgency);v4("uSwim",f.swim);e.uniform("uFocus",f.focus);v4("uShimmer",f.shimmer);v4("uFlood",f.flood);e.uniform("uFloodDrip",f.floodDrip);e.uniform("uFloodClear",f.floodClear);e.uniform("uHole",f.hole);v3("uHoleRim",f.holeRim);v4("uFlash",f.flash);e.uniform("uDesat",f.desaturation);e.uniform("uSat",f.saturation);v4("uKill",f.kill);v4("uCharge",f.charge);s.draw();draws++;
     current=effected.color;
+    }
+    if(s.useFxaa){
+        auto& antialiased=current==s.ping.color?s.pong:s.ping;s.target(antialiased);s.fxaa->use();bindTexture(*s.fxaa,"tDiffuse",current,0);s.fxaa->uniform("resolution",{double(s.width),double(s.height)});s.draw();draws++;current=antialiased.color;
     }
     glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,outputWidth>0?outputWidth:s.width,outputHeight>0?outputHeight:s.height);s.output->use();bindTexture(*s.output,"tDiffuse",current,0);s.output->uniform("toneMappingExposure",1.);s.draw();draws++;
     glActiveTexture(GL_TEXTURE0);s.active=false;return draws;

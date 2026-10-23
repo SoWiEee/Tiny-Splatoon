@@ -1,4 +1,5 @@
 #include "GameUi.hpp"
+#include "MapPinLayout.hpp"
 #include "InkTankElement.hpp"
 #include "WeaponReticleElement.hpp"
 #include "SpecialGaugeElement.hpp"
@@ -120,10 +121,12 @@ struct GameUi::Impl : Rml::EventListener {
     UiScreen previousScreen=UiScreen::Home;
     std::function<void(const PlayerProfile&)> profileSink;
     std::function<void(const std::string&)> sound;
+    std::function<void(const std::string&,double,double)> detailedSound;
     std::function<void(float,float,float)> volumes;
     bool menuVisible=true,interactive=true,practiceGear=false,hudOverlay=false;
     bool activePractice=false;
     bool jumpMapOpen=false;
+    int mapHoverKey=-1;
     int jumpMapSelection=-1,jumpMapQueuedKey=-1;
     std::string jumpMapQueuedLabel;
     std::vector<UiJumpMapTarget> jumpMapTargets;
@@ -134,6 +137,7 @@ struct GameUi::Impl : Rml::EventListener {
     double onlineNoticeUntil=0;
     bool syncingControls=false;
     bool mouse[3]{};
+    glm::dvec2 pointerPosition{0};
     std::array<bool,12> keys{};
     std::string hovered;
     std::map<std::string,std::string> textCache;
@@ -182,6 +186,7 @@ struct GameUi::Impl : Rml::EventListener {
                 throw std::runtime_error("Unable to load Inter / Noto Sans TC fonts");
             context=Rml::CreateContext("game-ui",{1280,720});
             if(!context)throw std::runtime_error("Unable to create player UI context");
+            context->GetRootElement()->AddEventListener("mousemove",this);
             menu=context->LoadDocument((assets/"ui/menu.rml").string());
             hud=context->LoadDocument((assets/"ui/hud.rml").string());
             if(!menu||!hud)throw std::runtime_error("Unable to load player UI documents");
@@ -230,7 +235,7 @@ struct GameUi::Impl : Rml::EventListener {
         if(disabled)element->SetProperty("tab-index","none");else element->RemoveProperty("tab-index");
     }
     static std::string Bool(bool value){return value?"true":"false";}
-    void Play(const std::string& cue){if(sound)sound(cue);}
+    void Play(const std::string& cue,double volume=1,double pitch=1){if(detailedSound)detailedSound(cue,volume,pitch);else if(sound)sound(cue);}
     void Commit(){
         NormalizeProfile(player);
         SyncProfileControls();
@@ -297,7 +302,7 @@ struct GameUi::Impl : Rml::EventListener {
         ControlSync sync(syncingControls);const auto& graphics=player.settings.graphics;
         const char* preset=graphics.preset==GraphicsPreset::Low?"low":graphics.preset==GraphicsPreset::High?"high":graphics.preset==GraphicsPreset::Custom?"custom":"medium";
         Value("graphics-preset",preset);
-        SetChecked(Find(menu,"graphics-shadows"),graphics.shadows);SetChecked(Find(menu,"graphics-reflections"),graphics.reflections);SetChecked(Find(menu,"graphics-post"),graphics.postEffects);
+        SetChecked(Find(menu,"graphics-shadows"),graphics.shadows);SetChecked(Find(menu,"graphics-reflections"),graphics.reflections);SetChecked(Find(menu,"graphics-post"),graphics.postEffects);SetChecked(Find(menu,"graphics-aa"),graphics.antialiasing);
     }
     void SyncProfileControls(){
         ControlSync sync(syncingControls);const auto& s=player.settings;
@@ -516,6 +521,7 @@ struct GameUi::Impl : Rml::EventListener {
         Commit();Play("ui_click");
     }
     void ProcessEvent(Rml::Event& event)override{
+        if(event.GetType()=="mousemove"){pointerPosition={event.GetParameter<float>("mouse_x",0),event.GetParameter<float>("mouse_y",0)};return;}
         if(event.GetType()=="keydown"&&event.GetParameter<int>("key_identifier",0)==Rml::Input::KI_ESCAPE&&hud->IsVisible()&&Find(hud,"leave-confirm")->IsVisible()){
             Find(hud,"leave-stay")->Click();event.StopPropagation();return;
         }
@@ -537,6 +543,9 @@ struct GameUi::Impl : Rml::EventListener {
         }
         if(type=="mouseover"||type=="focus"){
             if((element->GetTagName()=="button"||element->GetTagName()=="select")&&hovered!=id){hovered=id;Play("ui_hover");}return;
+        }
+        if(type=="click"&&jumpMapOpen&&mapHoverKey>=0&&element->GetTagName()!="button"){
+            jumpMapSelection=mapHoverKey;Play("ui_confirm");return;
         }
         if(type=="input"||type=="change"){
             if(syncingControls)return;
@@ -572,10 +581,10 @@ struct GameUi::Impl : Rml::EventListener {
                 else if(value=="medium")player.settings.graphics=ForPreset(GraphicsPreset::Medium);else player.settings.graphics.preset=GraphicsPreset::Custom;
                 player.settings.quality=value=="low"?"low":value=="medium"?"medium":"high";
                 Commit();Play("ui_click");
-            }else if(id=="graphics-shadows"||id=="graphics-reflections"||id=="graphics-post"){
+            }else if(id=="graphics-shadows"||id=="graphics-reflections"||id=="graphics-post"||id=="graphics-aa"){
                 auto& graphics=player.settings.graphics;const bool enabled=IsChecked(target);
                 if(id=="graphics-shadows"){graphics.shadows=enabled;player.settings.shadows=enabled;if(enabled&&!graphics.shadowMapSize)graphics.shadowMapSize=1024;}
-                else if(id=="graphics-reflections")graphics.reflections=enabled;else graphics.postEffects=enabled;
+                else if(id=="graphics-reflections")graphics.reflections=enabled;else if(id=="graphics-aa")graphics.antialiasing=enabled;else graphics.postEffects=enabled;
                 graphics.preset=GraphicsPreset::Custom;Commit();Play("ui_toggle");
             }else{
                 CommitSettingFromControl(id,value,target);
@@ -665,8 +674,9 @@ struct GameUi::Impl : Rml::EventListener {
         menu->SetClass("practice-gear",practiceGear);
         int ww=0,wh=0;glfwGetWindowSize(window,&ww,&wh);
         context->SetDimensions({width,height});const float scale=std::clamp(std::min(width/1440.f,height/900.f),.72f,1.6f);context->SetDensityIndependentPixelRatio(scale);
-        if(interactive){
+        if(interactive&&glfwGetWindowAttrib(window,GLFW_FOCUSED)){
             double x=0,y=0;glfwGetCursorPos(window,&x,&y);
+            pointerPosition={x*width/std::max(1,ww),y*height/std::max(1,wh)};
             int modifiers=0;if(glfwGetKey(window,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS)modifiers|=Rml::Input::KM_SHIFT;
             if(glfwGetKey(window,GLFW_KEY_LEFT_CONTROL)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_RIGHT_CONTROL)==GLFW_PRESS)modifiers|=Rml::Input::KM_CTRL;
             if(glfwGetKey(window,GLFW_KEY_LEFT_ALT)==GLFW_PRESS||glfwGetKey(window,GLFW_KEY_RIGHT_ALT)==GLFW_PRESS)modifiers|=Rml::Input::KM_ALT;
@@ -691,6 +701,17 @@ struct GameUi::Impl : Rml::EventListener {
                 }
             }
         }
+        if(jumpMapOpen)context->Update(); // Newly rebuilt pins need layout before cursor hit testing.
+        if(jumpMapOpen)if(auto* cursor=hud->GetElementById("map-cursor")){
+            const double x=pointerPosition.x,y=pointerPosition.y;
+            mapHoverKey=-1;double nearest=60*scale;glm::dvec2 snap(x,y);
+            for(const auto& target:jumpMapTargets)if(target.available)if(auto* pin=hud->GetElementById("jump-map-marker-"+std::to_string(target.key))){
+                const auto offset=pin->GetAbsoluteOffset(Rml::BoxArea::Border);const auto size=pin->GetBox().GetSize(Rml::BoxArea::Border);const glm::dvec2 center(offset.x+size.x*.5,offset.y+size.y*.5);const double distance=glm::length(center-glm::dvec2(x,y));
+                pin->SetClass("cursor-snap",false);if(distance<nearest){nearest=distance;mapHoverKey=target.key;snap=center;}
+            }
+            if(mapHoverKey>=0)Find(hud,"jump-map-marker-"+std::to_string(mapHoverKey))->SetClass("cursor-snap",true);
+            cursor->SetClass("snapped",mapHoverKey>=0);cursor->SetProperty("left",Number(snap.x)+"px");cursor->SetProperty("top",Number(snap.y)+"px");
+        }
         context->Update();renderer.Begin(width,height);
         if((renderHud&&hud->IsVisible())||(menuVisible&&menu->IsVisible()))context->Render();
         renderer.End();return std::exchange(action,UiAction::None);
@@ -706,7 +727,7 @@ struct GameUi::Impl : Rml::EventListener {
         }else if(hud&&hud->IsVisible()&&hud->GetElementById("results")->IsVisible()){
             result.screen=UiScreen::Results;
             if(resultIntro){result.type=UiPreviewType::None;return result;}
-            element=hud->GetElementById("results-preview");result.type=UiPreviewType::Podium;
+            element=hud->GetElementById("results-preview");result.type=UiPreviewType::Podium;result.settled=resultSkipped||player.settings.reducedMotion;
         }else if(hud&&hud->IsVisible()&&hud->GetElementById("pause")->IsVisible()){
             result.screen=Find(hud,"leave-confirm")->IsVisible()?UiScreen::LeaveConfirm:UiScreen::Pause;result.type=activePractice?UiPreviewType::Practice:UiPreviewType::None;
             if(result.type==UiPreviewType::None)return result;
@@ -727,8 +748,8 @@ struct GameUi::Impl : Rml::EventListener {
         const double now=glfwGetTime();
         const std::string stageKey=std::string(stage.id)+":"+std::string(stage.mode);
         std::string cache=stageKey+":"+std::to_string(paint.version())+":"+std::to_string(player.settings.palette)+":"+Bool(player.settings.colorblind)+":"+std::to_string(context->GetDimensions().x);
-        cache+=jumpMapOpen?":jump-map-open":":jump-map-closed";
-        cache+=":"+std::to_string(jumpMapQueuedKey);
+        cache+=jumpMapOpen?":jump-map-open:"+std::to_string(static_cast<int>(match.world().time()*10)):std::string(":jump-map-closed");
+        cache+=":"+std::to_string(jumpMapQueuedKey)+":"+std::to_string(mapHoverKey);
         for(const auto& target:jumpMapTargets)cache+=":"+std::to_string(target.key)+","+std::to_string(static_cast<int>(std::round(target.x*4)))+","+std::to_string(static_cast<int>(std::round(target.y*4)))+","+std::to_string(static_cast<int>(std::round(target.z*4)))+","+Bool(target.available)+","+target.label+","+target.weapon;
         if(const auto* zones=match.zones()){cache+=":"+zones->objective().id;for(const int id:zones->activeIndices())cache+=":"+std::to_string(zones->zones()[id].owner);}
         for(const auto& actor:match.actors())cache+=":"+std::to_string(static_cast<int>(std::round(actor->state.pos.x*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.y*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.z*4)))+","+std::to_string(actor->state.alive)+","+std::to_string(actor->state.track>0&&actor->state.trackTeam==match.local().team());
@@ -744,7 +765,7 @@ struct GameUi::Impl : Rml::EventListener {
             left=(x*.5+.5)*100.0;top=(.5-y*.5)*100.0;return true;
         };
         if(minimapCache!=cache&&now>=nextMinimapUpdate){
-            auto* map=Find(hud,"minimap-map");const double mapWidth=map->GetClientWidth(),mapHeight=map->GetClientHeight();
+            auto* map=Find(hud,"minimap-map");const double mapWidth=jumpMapOpen?context->GetDimensions().x:map->GetClientWidth(),mapHeight=jumpMapOpen?context->GetDimensions().y:map->GetClientHeight();
             std::string markup,targetLegend;
             if(const auto* zones=match.zones()){
                 for(const int id:zones->activeIndices()){
@@ -784,6 +805,9 @@ struct GameUi::Impl : Rml::EventListener {
                 const double alpha=std::clamp((mark.born+5.0-deathClock)/1.3,0.0,1.0);
                 markup+="<div class=\"map-death-mark\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;opacity:"+Number(alpha)+";\"><img src=\""+DeathMarkIcon(player,mark.team)+"\"/></div>";
             }
+            std::vector<glm::dvec2> pinAnchors;std::vector<int> pinKeys;
+            if(jumpMapOpen)for(const auto& target:jumpMapTargets){double x=0,y=0;if(project({target.x,target.y,target.z},x,y)){pinAnchors.push_back({x*mapWidth/100,y*mapHeight/100});pinKeys.push_back(target.key);}}
+            const auto pinPositions=SpreadMapPins(pinAnchors,84*context->GetDensityIndependentPixelRatio());
             for(const auto& target:jumpMapTargets){
                 const std::string stateClass=target.available?"available":"unavailable";
                 const std::string disabled=target.available&&jumpMapOpen?"":" disabled=\"disabled\"";
@@ -791,6 +815,11 @@ struct GameUi::Impl : Rml::EventListener {
                 targetLegend+="<button id=\"jump-target-"+std::to_string(target.key)+"\" class=\"jump-target "+stateClass+"\""+disabled+">"+icon+"<strong>"+std::to_string(target.key%10)+"</strong><span>"+Escape(target.label)+"</span><small>"+(target.available?"可用":"暫不可用")+"</small></button>";
                 if(!jumpMapOpen)continue;
                 double left=0,top=0;if(!project({target.x,target.y,target.z},left,top))continue;
+                const double anchorLeft=left,anchorTop=top;
+                const auto pin=std::find(pinKeys.begin(),pinKeys.end(),target.key);
+                if(pin!=pinKeys.end()&&mapWidth>0&&mapHeight>0){const auto point=pinPositions[static_cast<std::size_t>(pin-pinKeys.begin())];left=std::clamp(point.x,48.,mapWidth-48)*100/mapWidth;top=std::clamp(point.y,135.,mapHeight-25)*100/mapHeight;}
+                const double linkX=(anchorLeft-left)*mapWidth/100,linkY=(anchorTop-top)*mapHeight/100;
+                const std::string link=std::hypot(linkX,linkY)>3?"<i class=\"map-pin-link\" style=\"width:"+Number(std::hypot(linkX,linkY))+"px;transform:rotate("+Number(std::atan2(linkY,linkX)*180/3.141592653589793)+"deg);\"></i>":"";
                 std::string displayLabel=target.label;
                 std::string mapIcon=icon;
                 if(target.key==4){displayLabel="BASE";mapIcon="<span class=\"map-base-icon\"><i></i><b></b><em><u></u></em></span>";}
@@ -798,17 +827,32 @@ struct GameUi::Impl : Rml::EventListener {
                 else if(displayLabel.rfind("隊友 ",0)==0)displayLabel.erase(0,std::string("隊友 ").size());
                 const std::string teamColor(palette[static_cast<std::size_t>(match.local().team())]);
                 const std::string style=" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;\"";
-                markup+="<div class=\"map-marker\""+style+"><div class=\"map-pin-stem\"></div><div class=\"map-pin-ground\" style=\"background-color:"+teamColor+";\"></div><button id=\"jump-map-marker-"+std::to_string(target.key)+"\" class=\"map-target "+stateClass+(jumpMapQueuedKey==target.key?" queued":"")+"\" style=\"background-color:"+teamColor+";\""+disabled+" title=\""+Escape(target.label)+"\">"+mapIcon+"<strong>"+std::to_string(target.key%10)+"</strong></button><span class=\"map-target-label\">"+Escape(displayLabel)+"</span></div>";
+                markup+="<div class=\"map-marker\" data-anchor-left=\""+Number(anchorLeft,3)+"\" data-anchor-top=\""+Number(anchorTop,3)+"\""+style+">"+link+"<div class=\"map-pin-stem\"></div><div class=\"map-pin-ground\" style=\"background-color:"+teamColor+";\"></div><button id=\"jump-map-marker-"+std::to_string(target.key)+"\" class=\"map-target "+stateClass+(jumpMapQueuedKey==target.key?" queued":"")+"\" style=\"background-color:"+teamColor+";\""+disabled+" title=\""+Escape(target.label)+"\">"+mapIcon+"<strong>"+std::to_string(target.key%10)+"</strong></button><span class=\"map-target-label\">"+Escape(displayLabel)+"</span></div>";
             }
+            if(jumpMapOpen){
+                const auto arc=[&](glm::dvec3 from,glm::dvec3 to,double start,double end,bool self){
+                    double x0,y0,x1,y1;if(!project(from,x0,y0)||!project(to,x1,y1))return;
+                    const glm::dvec2 a(x0*mapWidth/100,y0*mapHeight/100),b(x1*mapWidth/100,y1*mapHeight/100),control=MapArcControl(a,b);
+                    auto previous=MapArcPoint(a,control,b,start);
+                    for(int i=1;i<=24;++i){const auto next=MapArcPoint(a,control,b,start+(end-start)*i/24);const auto delta=next-previous;
+                        markup+="<i class=\"map-jump-arc\" style=\"left:"+Number(previous.x)+"px;top:"+Number(previous.y)+"px;width:"+Number(glm::length(delta)+1)+"px;background-color:"+std::string(palette[match.local().team()])+";opacity:"+(self?"1":".55")+";transform:rotate("+Number(std::atan2(delta.y,delta.x)*180/3.141592653589793)+"deg);\"></i>";previous=next;}
+                    markup+="<i class=\"map-landing-ring\" style=\"left:"+Number(b.x)+"px;top:"+Number(b.y)+"px;border-color:"+std::string(palette[match.local().team()])+";\"></i>";
+                };
+                const int previewKey=mapHoverKey>=0?mapHoverKey:jumpMapQueuedKey;
+                for(const auto& target:jumpMapTargets)if(target.key==previewKey&&target.available)arc(match.local().state.alive?match.local().state.pos:stage.spawnPads[match.local().team()],{target.x,target.y,target.z},0,1,true);
+                for(const auto& actor:match.actors())if(actor->team()==match.local().team()&&actor->superJumpState()){
+                    const auto& jump=*actor->superJumpState();const double done=jump.flight?std::clamp(jump.elapsed/std::max(.01,jump.duration),0.,1.):0;
+                    const double reach=jump.flight?1:1-std::pow(1-std::clamp(jump.elapsed/.75,0.,1.),3);
+                    arc(jump.flight?jump.from:actor->state.pos,jump.flight?jump.to:jump.target,done,reach,actor->isLocal());
+                }
+            }
+            if(jumpMapOpen)markup+="<div id=\"map-cursor\" class=\"map-cursor\"><i></i></div>";
             const auto legendKey=std::string("hud/jump-map-legend");if(textCache[legendKey]!=targetLegend){Find(hud,"jump-map-legend")->SetInnerRML(targetLegend);textCache[legendKey]=targetLegend;}
             const auto key=std::string("hud/minimap-map");if(textCache[key]!=markup){Find(hud,"minimap-map")->SetInnerRML(markup);textCache[key]=markup;}
             minimapCache=cache;nextMinimapUpdate=now+.1;
         }
         Text(hud,"jump-map-help",jumpMapOpen?"點擊地圖上的隊友，或按 1–0 選擇跳躍目標　·　Tab / M 關閉":"");
         Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"");
-        const char* ground=state.groundTeam==1?"自隊墨水":state.groundTeam==2?"敵隊墨水":"乾燥地面";
-        const auto coverage=paint.coverage();Text(hud,"terrain-status",ground+std::string("　自隊 ")+Percent(coverage[0]));
-        Text(hud,"position-team-coverage","敵隊 "+Percent(coverage[1]));
     }
     void UpdateAllyMarkers(MatchSimulation& match,bool hidden){
         Hidden(hud,"ally-markers",hidden||!haveWorldView);
@@ -941,47 +985,56 @@ struct GameUi::Impl : Rml::EventListener {
     void UpdateZonesHud(MatchSimulation& match){
         const auto* zones=match.zones();
         Hidden(hud,"zones-hud",zones==nullptr);
-        if(!zones){displayedZones=nullptr;zoneEventCursor=0;Hidden(hud,"zone-callout",true);return;}
+        Find(hud,"battle-top")->SetClass("zones-mode",zones!=nullptr);
+        if(!zones){displayedZones=nullptr;zoneEventCursor=0;Hidden(hud,"zone-callout",true);Hidden(hud,"zone-phase-hint",true);return;}
 
         const int localTeam=match.local().team(),enemyTeam=1-localTeam;
         const auto teamName=[&](int team){return team==localTeam?std::string("我方"):team==enemyTeam?std::string("對方"):std::string("無隊伍");};
         const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
         const auto& counts=zones->counts();const auto& penalties=zones->penalty();
-        Text(hud,"zone-team-a-name",teamName(localTeam));Text(hud,"zone-team-b-name",teamName(enemyTeam));
         Text(hud,"zone-count-a",ZoneCount(counts[localTeam]));Text(hud,"zone-count-b",ZoneCount(counts[enemyTeam]));
-        Text(hud,"zone-penalty-a",ZoneCount(penalties[localTeam]));Text(hud,"zone-penalty-b",ZoneCount(penalties[enemyTeam]));
+        Text(hud,"zone-penalty-a","+"+ZoneCount(penalties[localTeam]));Text(hud,"zone-penalty-b","+"+ZoneCount(penalties[enemyTeam]));
+        Hidden(hud,"zone-penalty-a",penalties[localTeam]<=0);Hidden(hud,"zone-penalty-b",penalties[enemyTeam]<=0);
+        Find(hud,"zone-penalty-a")->SetAttribute("aria-label","罰則 +"+ZoneCount(penalties[localTeam]));
+        Find(hud,"zone-penalty-b")->SetAttribute("aria-label","罰則 +"+ZoneCount(penalties[enemyTeam]));
+        Find(hud,"zone-score-a")->SetAttribute("aria-label",teamName(localTeam)+"計數");
+        Find(hud,"zone-score-b")->SetAttribute("aria-label",teamName(enemyTeam)+"計數");
+        Find(hud,"zone-score-a")->SetAttribute("style","border-color:"+std::string(palette[0])+";");
+        Find(hud,"zone-score-b")->SetAttribute("style","border-color:"+std::string(palette[1])+";");
 
         const auto& objective=zones->objective();
         const std::string objectiveLabel=objective.id=="center"?"中央區":objective.home==localTeam?"己方側區":"敵方側區";
-        Text(hud,"zone-objective",objectiveLabel);
-        Text(hud,"zone-owner",zones->owner()<0?"尚未控制":teamName(zones->owner())+"控制中");
         const auto& active=zones->activeIndices();const auto& all=zones->zones();
-        std::string markup;
+        const int objectiveOwner=zones->owner();
+        const std::string objectiveColor=objectiveOwner<0?"#d1c8b7":std::string(palette[objectiveOwner==localTeam?0:1]);
+        std::string markup="<div class=\"zone-chip\" style=\"border-color:"+objectiveColor+";\"><div class=\"zone-areas\">";
         for(const int index:active){
             if(index<0||static_cast<std::size_t>(index)>=all.size())continue;
             const auto& zone=all[static_cast<std::size_t>(index)];
             const std::string label=zone.kind=="center"?"中央區":zone.home==localTeam?"己方側區":"敵方側區";
             const double ownShare=std::clamp(zone.share[localTeam],0.0,1.0),enemyShare=std::clamp(zone.share[enemyTeam],0.0,1.0);
-            const std::string owner=zone.owner<0?"尚未控制":teamName(zone.owner)+"掌控";
-            markup+="<div class=\"zone-card\"><div class=\"zone-card-heading\"><strong>"+label+"</strong><span>"+owner+"</span></div>";
-            markup+="<div class=\"zone-share-track\"><div class=\"zone-share-a\" style=\"width:"+Number(ownShare*100,2)+"%;background-color:"+std::string(palette[0])+";\"></div><div class=\"zone-share-b\" style=\"width:"+Number(enemyShare*100,2)+"%;background-color:"+std::string(palette[1])+";\"></div><i class=\"zone-control-threshold\"></i></div>";
-            markup+="<div class=\"zone-share-labels\"><span>我方 "+ZoneCount(ownShare*100)+"%</span><span>對方 "+ZoneCount(enemyShare*100)+"%</span></div></div>";
+            const std::string owner=zone.owner<0?"尚未控制":teamName(zone.owner)+"控制中";
+            const std::string ownerColor=zone.owner<0?"#d1c8b7":std::string(palette[zone.owner==localTeam?0:1]);
+            const int ownPercent=static_cast<int>(std::lround(ownShare*100)),enemyPercent=static_cast<int>(std::lround(enemyShare*100));
+            const std::string accessible=label+"，"+owner+"；我方 "+std::to_string(ownPercent)+"%，對方 "+std::to_string(enemyPercent)+"%";
+            markup+="<span class=\"zone-area\" role=\"img\" aria-label=\""+accessible+"\"><span class=\"zone-icon\" aria-hidden=\"true\"><b class=\"zone-icon-core\" style=\"background-color:"+ownerColor+";\"></b><i class=\"zone-icon-corner zone-icon-nw\"></i><i class=\"zone-icon-corner zone-icon-ne\"></i><i class=\"zone-icon-corner zone-icon-sw\"></i><i class=\"zone-icon-corner zone-icon-se\"></i></span>";
+            markup+="<span class=\"zone-share-track\" aria-hidden=\"true\"><i class=\"zone-share-a\" style=\"width:"+std::to_string(ownPercent)+"%;background-color:"+std::string(palette[0])+";\"></i><i class=\"zone-share-b\" style=\"width:"+std::to_string(enemyPercent)+"%;background-color:"+std::string(palette[1])+";\"></i><i class=\"zone-control-threshold zone-control-threshold-own\"></i><i class=\"zone-control-threshold zone-control-threshold-enemy\"></i></span></span>";
         }
-        if(markup.empty())markup="<div class=\"zone-card\"><div class=\"zone-card-heading\"><strong>區域資訊</strong><span>等待場地載入</span></div></div>";
+        if(active.empty())markup+="<span class=\"zone-area\" role=\"img\" aria-label=\"等待區域載入\"><span class=\"zone-icon\" aria-hidden=\"true\"><b class=\"zone-icon-core\" style=\"background-color:#d1c8b7;\"></b><i class=\"zone-icon-corner zone-icon-nw\"></i><i class=\"zone-icon-corner zone-icon-ne\"></i><i class=\"zone-icon-corner zone-icon-sw\"></i><i class=\"zone-icon-corner zone-icon-se\"></i></span></span>";
+        markup+="</div><strong id=\"zone-objective\" class=\"zone-objective\">"+objectiveLabel+"</strong></div>";
         const auto key=std::string("hud/zones-active");if(textCache[key]!=markup){Find(hud,"zones-active")->SetInnerRML(markup);textCache[key]=markup;}
 
         const double secondsToSwap=std::max(0.0,zones->nextSwap());
+        bool showPhaseHint=false;
         if(zones->overtime()){
             Text(hud,"zone-phase","延長賽");
             Text(hud,"zone-phase-detail","離開有效區 "+ZoneCount(zones->neutralTime())+" / 10 秒");
-        }else if(zones->final()){
-            Text(hud,"zone-phase","最後 30 秒");Text(hud,"zone-phase-detail","僅中央區計分");
-        }else if(secondsToSwap<=5.0){
-            Text(hud,"zone-phase","即將輪替");Text(hud,"zone-phase-detail","區域於 "+ZoneCount(secondsToSwap)+" 秒後輪替");
-        }else{
-            const int swap=static_cast<int>(std::ceil(secondsToSwap));
-            Text(hud,"zone-phase","區域輪替");Text(hud,"zone-phase-detail","下次輪替 "+std::to_string(swap/60)+":"+(swap%60<10?"0":"")+std::to_string(swap%60));
+            showPhaseHint=true;
+        }else if(!zones->final()&&!zones->ended()&&secondsToSwap>0.0&&secondsToSwap<=5.0){
+            Text(hud,"zone-phase","即將輪替");Text(hud,"zone-phase-detail",ZoneCount(secondsToSwap)+" 秒後輪替");
+            showPhaseHint=true;
         }
+        Hidden(hud,"zone-phase-hint",!showPhaseHint);
 
         if(displayedZones!=zones||zones->events().size()<zoneEventCursor){displayedZones=zones;zoneEventCursor=zones->events().size();zoneCalloutUntil=0;}
         const auto& events=zones->events();const double now=glfwGetTime();
@@ -1060,6 +1113,7 @@ struct GameUi::Impl : Rml::EventListener {
     }
     #include "SourceResults.inc"
     #include "BattleHud.inc"
+    #include "BossHud.inc"
     void RenderHudData(const StageData& stage,const FacePaint& paint,MatchSimulation& match,bool paused,bool nativeApp,bool practice){
         const bool results=match.phase()==MatchPhase::Results;
         const bool onlineMatch=online.phase==network::RoomPhase::Match||online.phase==network::RoomPhase::Starting;
@@ -1071,24 +1125,23 @@ struct GameUi::Impl : Rml::EventListener {
         Hidden(hud,"pause",!paused||results);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
         Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results||!match.local().state.alive||match.local().state.squid||jumpMapOpen||hudOverlay||practiceGear);
         Text(hud,"pause-title",onlineMatch?"對戰選單":practice?"練習暫停":"已暫停");Text(hud,"pause-description",onlineMatch?"線上對戰會持續進行。關閉選單即可繼續操作。":practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
-        Text(hud,"pause-hint",onlineMatch?"Esc 選單":"Esc 暫停");Text(hud,"results-menu",onlineMatch?"返回房間":"返回選單");Hidden(hud,"results-rematch",onlineMatch);
+        Text(hud,"pause-hint",onlineMatch?"Esc 選單":"Esc 暫停");Text(hud,"results-menu-label",onlineMatch?"返回房間":"返回選單");Hidden(hud,"results-rematch",onlineMatch);
         const auto stageLabel=StageLabel(stage.id);Text(hud,"stage-name",stageLabel.empty()?std::string(stage.name):std::string(stageLabel));
         const int seconds=static_cast<int>(std::ceil(std::max(0.,match.remaining())));char clock[16];std::snprintf(clock,sizeof(clock),"%02d:%02d",seconds/60,seconds%60);Text(hud,"clock",clock);
         Find(hud,"clock")->SetClass("last-minute",seconds<=60&&!practice);Find(hud,"clock")->SetClass("final-seconds",seconds<=10&&!practice);
         UpdateSquads(match,practice);
-        const auto coverage=paint.coverage();Text(hud,"score-a",Percent(coverage[0]));Text(hud,"score-b",Percent(coverage[1]));
-        const auto& local=match.local();const auto& state=local.state;const double cost=local.weapon().number("specialCost",190);
-        Text(hud,"hp",Integer(state.hp));Text(hud,"ink",Integer(state.ink));Text(hud,"special-status",state.specialCharge>=cost?"特殊技能就緒  F / Q":Integer(state.specialCharge)+" / "+Integer(cost));
-        Find(hud,"special-fill")->SetProperty("width",Integer(std::clamp(state.specialCharge/cost,0.,1.)*100)+"%");Find(hud,"special-meter")->SetClass("ready",state.specialCharge>=cost);
+        const auto& local=match.local();const auto& state=local.state;
+        Text(hud,"ink",Integer(state.ink));
         UpdateInkGauge(match,paused,results);
         UpdateBattleHud(match,paused,results,practice);
+        UpdateBossFeedback(match,paused,results);
         UpdateAllyMarkers(match,paused||results||jumpMapOpen||hudOverlay||practiceGear);
         UpdateDeathMarks(match,paused,paused||results||jumpMapOpen||hudOverlay||practiceGear);
         Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
         Text(hud,"jump-map-help",state.alive?"按 1–3 選隊友　4 回生點　5–0 選隊伍訊標":"復活規劃：按數字選擇隊友或隊伍訊標，4 清除規劃");
         Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?"復活彈射："+std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"尚未安排復活彈射");
         Find(hud,"jump-map-queue")->SetClass("queued",jumpMapQueuedKey>=0);
-        Hidden(hud,"boss",!match.boss());Hidden(hud,"team-score",match.boss()!=nullptr||match.zones()!=nullptr);
+        Hidden(hud,"boss",!match.boss());
         if(const auto* boss=match.boss()){
             const auto& state=boss->state();
             const double hp=state.maxHp>0?std::clamp(state.hp/state.maxHp,0.,1.)*100:0;
@@ -1103,7 +1156,7 @@ struct GameUi::Impl : Rml::EventListener {
         UpdateMinimap(stage,paint,match);
         const double now=glfwGetTime();if(lastHudTime>0&&now>lastHudTime)hudFps=static_cast<int>(std::round(1./(now-lastHudTime)));lastHudTime=now;
         Hidden(hud,"fps",!player.settings.showFps);if(player.settings.showFps)Text(hud,"fps-value",std::to_string(hudFps));
-        if(results)UpdateResults(match,coverage);
+        if(results)UpdateResults(match,paint.coverage());
     }
 };
 
@@ -1124,6 +1177,7 @@ void GameUi::SetProfile(PlayerProfile profile){
 void GameUi::SetProfileSink(std::function<void(const PlayerProfile&)> sink){impl_->profileSink=std::move(sink);}
 void GameUi::SetSaveError(std::string error){impl_->SetSaveError(error);}
 void GameUi::SetReward(MatchRewardResult reward){impl_->reward=reward;}
+void GameUi::SetDetailedSoundSink(std::function<void(const std::string&,double,double)> value){impl_->detailedSound=std::move(value);}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
 void GameUi::SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY){impl_->projectionY=projectionY;impl_->worldView=viewProjection;impl_->worldEye=eye;impl_->haveWorldView=true;}
 void GameUi::SetNativeMap(unsigned int texture,const glm::mat4& viewProjection){auto& p=*impl_;p.renderer.SetNativeMapTexture(static_cast<GLuint>(texture));p.nativeMapView=viewProjection;p.haveNativeMapView=true;}
@@ -1134,6 +1188,7 @@ void GameUi::SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queue
     p.jumpMapOpen=open;p.jumpMapTargets=std::move(targets);p.jumpMapQueuedKey=queuedKey;p.jumpMapQueuedLabel=std::move(queuedLabel);
     if(!open)p.jumpMapSelection=-1;
 }
+void GameUi::ConfirmJumpMapCursor(){auto& p=*impl_;if(p.jumpMapOpen&&p.mapHoverKey>=0)p.jumpMapSelection=p.mapHoverKey;}
 int GameUi::TakeJumpMapSelection(){return std::exchange(impl_->jumpMapSelection,-1);}
 void GameUi::ShowMenu(const std::string& initialStage){
     auto& p=*impl_;p.resultXpMatch=nullptr;p.resultIntro=false;p.resultSkipped=false;p.resultDone=false;p.resultFocused=false;p.inkMatch=nullptr;p.inkActor=nullptr;p.inkFullIdle=0;p.lastHudTime=0;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;

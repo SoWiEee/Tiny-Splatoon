@@ -140,6 +140,7 @@ struct BossRenderer::State {
 BossRenderer::BossRenderer(std::filesystem::path assets,bool environment):state_(std::make_unique<State>(std::move(assets))){state_->environment=environment;}
 BossRenderer::~BossRenderer()=default;
 void BossRenderer::Update(BossSimulation& boss){state_->pose.Update(boss);}
+void BossRenderer::SetAudioEventSink(std::function<void(const BossPoseAudioEvent&)> sink){state_->pose.SetAudioEventSink(std::move(sink));}
 int BossRenderer::DrawShadow(const BossSimulation& boss,const glm::mat4& lightViewProjection){
     if(!boss.state().visible)return 0;
     state_->ensureGpu();

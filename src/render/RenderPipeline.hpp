@@ -35,7 +35,7 @@ public:
     ~RenderPipeline();
     RenderPipeline(const RenderPipeline&)=delete;
     RenderPipeline& operator=(const RenderPipeline&)=delete;
-    void Configure(int samples,bool ao,bool bloom);
+    void Configure(int samples,bool ao,bool bloom,bool antialiasing=true);
     void Begin(int width,int height,const glm::mat4& projection,const glm::mat4& cameraWorld,float nearPlane,float farPlane);
     int End(const GradeSettings& grade={},const ScreenEffects& effects={},int outputWidth=0,int outputHeight=0);
 private:

@@ -701,7 +701,16 @@ void CombatWorld::explodeDevice(CombatDevice& d,PlayerSimulation* direct) {
     paintDevice(d,paintAt,paintRadius);
     for(auto* e:actors_) {
         if(!e || e->team()==d.team || !e->state.alive) continue;
-        const auto target=e->state.pos+glm::dvec3(0,e->state.squid?0.3:0.7,0);const double dist=e==direct?0.0:glm::length(target-center);
+        double targetHeight=e->state.squid?0.3:0.7;
+        if(d.kind=="bomb" || d.kind=="sticky" || d.kind=="seeker")targetHeight=0.7;
+        else if(d.kind=="torpedo")targetHeight=e->state.smoothY+(e->state.squid?0.3:0.8);
+        else if(d.kind=="boomerang")targetHeight=e->state.squid?0.3:0.75;
+        const auto target=e->state.pos+glm::dvec3(0,targetHeight,0);
+        // Bomb, sticky, torpedo, and boomerang measure actor falloff from the
+        // device position. Seeker's source _blast instead passes pos + 0.2m.
+        const bool sourceUsesDeviceCenter=d.kind=="bomb" || d.kind=="sticky" || d.kind=="torpedo" || d.kind=="boomerang";
+        const auto damageCenter=sourceUsesDeviceCenter?d.pos:center;
+        const double dist=e==direct?0.0:glm::length(target-damageCenter);
         if(dist>radius || !geometry_.los(center+normal*0.1,target)) continue;
         if(d.kind=="torpedo") {
             const double core=sub.number("coreRadius");
@@ -753,8 +762,10 @@ void CombatWorld::beam(PlayerSimulation& owner,glm::dvec3 from,glm::dvec3 dir,do
     const double blocked=blockRay(from,dir,length,owner.team(),damage,&owner);
     const auto hit=geometry_.raycast(from,dir,blocked,true); length=hit.hit?hit.dist:blocked;
     const auto end=from+dir*length;
+    bool struckBoss=false, struckActor=false;
     if(boss_&&owner.team()==0){
         if(const auto bossHit=boss_->segmentHit(from,end,radius)){
+            struckBoss=true;
             boss_->hit(owner,damage,*bossHit,id);
             if(!pierce)length=bossHit->distance;
         }
@@ -763,13 +774,18 @@ void CombatWorld::beam(PlayerSimulation& owner,glm::dvec3 from,glm::dvec3 dir,do
         if (!e) continue;
         if(e->team()==owner.team() || !e->state.alive) continue;
         const auto h=StageGeometry::segmentCapsuleDist(from,end,e->visualPos(),e->hitRadius(),e->hitHeight());
-        if(h.dist<e->hitRadius()+radius) { applyHit(owner,*e,damage,id); if(!pierce) {length*=h.t;break;} }
+        if(h.dist<e->hitRadius()+radius) { struckActor=true;applyHit(owner,*e,damage,id); if(!pierce) {length*=h.t;break;} }
     }
     for(double d=0;d<length;d+=0.55) {
         const auto floor=geometry_.raycast(from+dir*d,{0,-1,0},4,true);
         if(floor.hit) paint(owner,floor.point+floor.normal*0.1,paintRadius,owner.random());
     }
     if(hit.hit) paint(owner,hit.point+hit.normal*0.1,paintRadius,owner.random());
+    if(id=="charger" && hit.hit && !struckBoss && !struckActor) {
+        WorldVisualEvent wall;wall.kind="inkWallImpact";wall.pos=hit.point;wall.normal=hit.normal;
+        wall.radius=radius;wall.team=owner.team();wall.source=id;wall.id=owner.networkNid();wall.sourceLocal=owner.isLocal();
+        emitVisual(std::move(wall));
+    }
     const double charge=std::max(.12,owner.combatPose().charge);
     emitVisual({"beam",from,dir,length,owner.team(),charge,(.035+charge*.05)*2.3,time_*17});
 }
@@ -1308,6 +1324,11 @@ void CombatWorld::updateDevices(double dt) {
                 continue;
             }
             if(hit.hit) {
+                if(d.kind=="boomerang") {
+                    WorldVisualEvent wall;wall.kind="inkWallImpact";wall.pos=hit.point;wall.normal=hit.normal;
+                    wall.radius=d.radius;wall.team=d.team;wall.source=d.kind;wall.id=d.id;
+                    wall.sourceLocal=d.owner->isLocal();emitVisual(std::move(wall));
+                }
                 d.pos=hit.point;
                 if(d.kind=="sticky") {stick(d,hit,"stuck",s.number("fuse"));continue;}
                 if(d.kind=="sprinkler") {stick(d,hit,"spray",-1);continue;}

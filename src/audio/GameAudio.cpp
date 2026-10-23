@@ -1,5 +1,6 @@
 #include "GameAudio.hpp"
 
+#include "BossPose.hpp"
 #include "BossSimulation.hpp"
 #include "ArsenalData.hpp"
 #include "CharacterPose.hpp"
@@ -124,6 +125,45 @@ void GameAudio::Footstep(PlayerSimulation& actor, AudioPosition position, double
     engine_.Play(cue, options);
 }
 
+void GameAudio::BossAnimationEvent(const BossPoseAudioEvent& event) {
+    if (!engine_.ready() || !match_ || !match_->boss() || !bossAnimationAudioEnabled_) return;
+    const auto* boss = match_->boss();
+    AudioPlayOptions options; options.pos = Position(event.position);
+    switch (event.kind) {
+    case BossPoseAudioEvent::Kind::Intro:
+        if (bossAnimationAudioEnabled_ && !bossDead_ &&
+            match_->phase() != MatchPhase::Finish && match_->phase() != MatchPhase::Results) {
+            bossIntroSlamAt_ = boss->state().clock + 0.1;
+            bossIntroSlamPos_ = options.pos.value();
+        }
+        break;
+    case BossPoseAudioEvent::Kind::Footstep:
+        if (bossDead_ || event.time - lastBossFootAt_ < 0.06) return;
+        lastBossFootAt_ = event.time;
+        options.volume = 0.35 + 0.65 * std::clamp(event.strength, 0.0, 1.0);
+        options.pitch = 0.9 + AudioRandom(audioRandomState_) * 0.2;
+        engine_.Play("boss_step", options);
+        break;
+    case BossPoseAudioEvent::Kind::Impact:
+        if (event.socket.find("claw") != std::string::npos) {
+            options.volume = std::clamp(event.strength, 0.2, 1.0);
+            engine_.Play("boss_slam", options);
+        } else if (!bossDead_) {
+            options.volume = 1.0; options.pitch = 0.75;
+            engine_.Play("boss_step", options);
+        }
+        break;
+    case BossPoseAudioEvent::Kind::Fx:
+        if (event.name == "bonk" && !bossDead_) {
+            options.pos = BossPosition(*boss, "shellTop"); options.volume = 0.7;
+            engine_.Play("boss_crash", options);
+        } else if (event.name == "hatch") {
+            engine_.Play("crablet_chitter", options);
+        }
+        break;
+    }
+}
+
 void GameAudio::ActorTrigger(PlayerSimulation& actor, const CharacterTrigger& event) {
     const auto kind = actor.weaponProfile().kind;
     const auto pose = actor.specialPose();
@@ -184,6 +224,7 @@ void GameAudio::BeginMatch(MatchSimulation& match) {
     StopLoops(); StopWorldLoops(); engine_.StopMusic(0.05);
     StopZoneLoops();zoneEventCursor_=0;zoneTicks_={100,100};zoneHumAccumulator_=0;zoneWarnAt_=-99;
     match_ = &match; playing_ = false; bossPhase_ = 0; matchPhase_ = -1; bossDead_ = false;bossStunSeen_=false;
+    bossAnimationAudioEnabled_=false;lastBossFootAt_=-1e9;
     bossDamage_.fill(0);bossWeakHits_.fill(0);bossDamageActors_.fill(nullptr);bossDamageSeen_=false;bossHitAt_=bossCritAt_=-99;
     bossMove_.clear(); crablets_.clear(); bossSunkIn_ = 0; bossIntroSeen_=false; ClearBossPendingAudio();
     actorLoops_.clear(); actorStates_.clear();
@@ -236,6 +277,7 @@ void GameAudio::EndMatch() {
     ClearBossPendingAudio();bossIntroSeen_=false;
     pausedAudio_ = false; resumeLoops_ = false; hasListenerPosition_ = false;
     bossPhase_ = 0; matchPhase_ = -1; bossDead_ = false; bossSunkIn_ = 0;bossStunSeen_=false;
+    bossAnimationAudioEnabled_=false;lastBossFootAt_=-1e9;
     bossDamage_.fill(0);bossWeakHits_.fill(0);bossDamageActors_.fill(nullptr);bossDamageSeen_=false;bossHitAt_=bossCritAt_=-99;
 }
 
@@ -529,7 +571,7 @@ void GameAudio::UpdateBoss(double dt, MatchSimulation& match) {
     }
     if(state.anim==1&&!bossIntroSeen_){
         bossIntroSeen_=true;
-        if(scheduleAudio){bossIntroSlamAt_=state.clock+.1;bossIntroSlamPos_=pos;bossIntroRoarAt_=state.clock+.35;bossIntroRoarPos_=socketPos("mouth");}
+        if(scheduleAudio){if(!bossAnimationAudioEnabled_){bossIntroSlamAt_=state.clock+.1;bossIntroSlamPos_=pos;}bossIntroRoarAt_=state.clock+.35;bossIntroRoarPos_=socketPos("mouth");}
     }
     if(bossIntroSlamAt_>=0&&state.clock>=bossIntroSlamAt_){AudioPlayOptions options;options.pos=bossIntroSlamPos_;options.volume=.55;options.pitch=.8;engine_.Play("boss_slam",options);bossIntroSlamAt_=-1;}
     if(bossIntroRoarAt_>=0&&state.clock>=bossIntroRoarAt_){AudioPlayOptions options;options.pos=bossIntroRoarPos_;engine_.Play("boss_roar",options);bossIntroRoarAt_=-1;}
@@ -603,7 +645,7 @@ void GameAudio::UpdateBoss(double dt, MatchSimulation& match) {
                 }
             } else if (movePhase == BossMovePhase::Active) {
                 if (move->id == BossMoveId::Slam) {
-                    if (!suppressResumedEdges) { bossSlamAt_=state.clock+.12;bossSlamPos_=socketPos("clawL"); }
+                    if (!suppressResumedEdges && !bossAnimationAudioEnabled_) { bossSlamAt_=state.clock+.12;bossSlamPos_=socketPos("clawL"); }
                 }
                 else if (move->id == BossMoveId::Barrage) {
                     if (!suppressResumedEdges) {
@@ -916,7 +958,29 @@ void GameAudio::Update(double dt, MatchSimulation& match, const std::vector<Worl
                 engine_.Play("bomb_explode", options);
             }
         }
-        else if (event.kind == "bulletImpact") { options.volume = 0.35; engine_.Play("ink_hit_wall", options); }
+        else if (event.kind == "inkWallImpact") {
+            bool nearCamera = false;
+            if (event.source == "charger") {
+                const auto owner = std::find_if(match.actors().begin(), match.actors().end(), [&](const auto& actor) {
+                    return actor && actor->networkNid() == event.id;
+                });
+                if (owner != match.actors().end()) {
+                    nearCamera = (*owner)->isLocal() || !hasListenerPosition_ ||
+                        DistanceSquared(Position((*owner)->state.pos), listenerPosition_) < 30.0 * 30.0;
+                } else {
+                    // Owner may be absent from a late visual event; use the hit point as a bounded fallback.
+                    nearCamera = event.sourceLocal || !hasListenerPosition_ ||
+                        DistanceSquared(Position(event.pos), listenerPosition_) < 30.0 * 30.0;
+                }
+            } else if (event.source == "boomerang") {
+                nearCamera = !hasListenerPosition_ ||
+                    DistanceSquared(Position(event.pos), listenerPosition_) < 34.0 * 34.0;
+            }
+            if (nearCamera) { options.volume = 0.6; engine_.Play("ink_hit_wall", options); }
+        }
+        else if (event.kind == "bulletImpact") {
+            // Generic impact does not distinguish a wall from an actor or Boss.
+        }
         else if (event.kind == "beam") {
             // ActorTrigger handles the source weapon/special shot at the firing edge; beam geometry has no owner ID.
             // Keep it spatially silent here to avoid playing a Wail sound for charger beams.

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
@@ -11,6 +12,7 @@ class BossSimulation;
 class StageGeometry;
 class BossModelData;
 struct CharacterLightState;
+struct BossPoseAudioEvent;
 
 // Renders the source-built HULLBREAKER mesh and its telegraphed attack geometry.
 class BossRenderer {
@@ -20,6 +22,7 @@ public:
     BossRenderer(const BossRenderer&)=delete;
     BossRenderer& operator=(const BossRenderer&)=delete;
     void Update(BossSimulation& boss);
+    void SetAudioEventSink(std::function<void(const BossPoseAudioEvent&)> sink);
     int DrawShadow(const BossSimulation& boss,const glm::mat4& lightViewProjection);
     int Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,
              const glm::vec3& camera,const glm::vec3& squadColor,const CharacterLightState* lights=nullptr);
