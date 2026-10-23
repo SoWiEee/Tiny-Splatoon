@@ -85,6 +85,9 @@ public:
     static double VolumeGain(double value);
 
 private:
+    friend bool AudioEngineMusicTestState(const AudioEngine&, std::filesystem::path&, bool&,
+        std::uint64_t&, std::uint64_t&, std::uint64_t&, double&);
+    friend bool AudioEngineMusicTestReadsAcrossEnd(AudioEngine&);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

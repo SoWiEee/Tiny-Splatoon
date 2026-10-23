@@ -24,16 +24,16 @@
 
 - ✅ restoration 程式按職責移到 src/app、src/game、src/world、src/render、src/gui；舊 OpenGL 入口退役，普通啟動進入原生選圖。搬移與清理後各有 Release 建置及當時完整 CTest 回歸。GameNetworkingSockets 保留依賴供未來連線，目前未初始化網路。
 - ✅ 角色 live pose 的 32 個基本與 19 個外觀／形態／LOD 代表場景以原 0.001 門檻通過，含骨骼、skin matrix、126 channels、head／muzzle 與零件 transform；當時 Release CTest 31/31 通過。來源 LOD 的 2,288 次更新、互補 dither 與 GPU 前／中／後影格檢查通過。代表場景不等於所有動畫狀態的窮舉驗收。
-- ✅ HDR／陰影／後製、Screen FX、World FX 與 BossNav 的來源 oracle 及 GPU 元件檢查通過；當時 Release CTest 46/46 通過，後加的近鏡 World FX GPU 項目另行通過。來源與限制見[渲染契約](render-pipeline-source-contract.md)。
+- ✅ HDR／陰影／後製、Screen FX、World FX 與 BossNav 的來源 oracle 及 GPU 元件檢查通過；當時 Release CTest 46/46 通過，後加的近鏡 World FX GPU 項目另行通過。來源與限制見[渲染契約](contracts/render-pipeline-source-contract.md)。
 - ✅ GTX 1650／1920×1080／VSync off 的七圖 Turf 固定負載量測完成，見[效能紀錄](benchmarks/turf-2026-10-20/README.md)；這批負載未涵蓋全部後續環境與最壞視效，不能作為完整 QA-12。
-- 歷史檢查點：Boss 當時只有 rest rig，嚴格姿勢 oracle **0/16**，見[當時失敗報告](boss-pose-checkpoint-report.json)。這不是目前狀態；後續已修正並通過 16/16。
+- 歷史檢查點：Boss 當時只有 rest rig，嚴格姿勢 oracle **0/16**，見[當時失敗報告](acceptance/boss-pose-checkpoint-report.json)。這不是目前狀態；後續已修正並通過 16/16。
 
 ## 第五階段：場景、連續墨水、投射物、音訊與 Boss（2026-10-21）
 
-- ✅ 場景接入來源 bevel、PropKit 幾何、46 層 albedo／normal／ORM 與 Canvas 招牌等貼圖，共 23 個合法地圖／模式 pack、14 個壓縮貼圖 pack；來源重建與尺寸／內容／雜湊檢查通過。詳見[場景契約](stage-visual-source-contract.md)。
+- ✅ 場景接入來源 bevel、PropKit 幾何、46 層 albedo／normal／ORM 與 Canvas 招牌等貼圖，共 23 個合法地圖／模式 pack、14 個壓縮貼圖 pack；來源重建與尺寸／內容／雜湊檢查通過。詳見[場景契約](contracts/stage-visual-source-contract.md)。
 - ✅ 來源 GPU paint shader 的連續墨水外觀接入遊戲，CPU ownership grid 繼續負責玩法與計分；濕度衰減／覆蓋保留及 GPU 可見像素檢查通過。
-- ✅ 墨滴變形／衛星滴、弓箭、拳套、刀波、Charger ribbon 與 live rig 槍口接入；24 組真實 JavaScript _draw fixture 和 GPU 像素檢查通過，詳見[投射物契約](projectile-source-contract.md)。
-- ✅ 來源音訊資料擴為 201 個 cue、31 組 loop、九首 FLAC，接入角色／世界／對局／Boss；原生播放、轉場與清理測試通過。來源重建後的 manifest hash 問題已修正並作資產／索引及比對器檢查，完整渲染指令未在該次修正後重跑；詳見[音訊契約](audio-source-contract.md)。
+- ✅ 墨滴變形／衛星滴、弓箭、拳套、刀波、Charger ribbon 與 live rig 槍口接入；24 組真實 JavaScript _draw fixture 和 GPU 像素檢查通過，詳見[投射物契約](contracts/projectile-source-contract.md)。
+- ✅ 來源音訊資料擴為 201 個 cue、31 組 loop、九首 FLAC，接入角色／世界／對局／Boss；原生播放、轉場與清理測試通過。來源重建後的 manifest hash 問題已修正並作資產／索引及比對器檢查，完整渲染指令未在該次修正後重跑；詳見[音訊契約](contracts/audio-source-contract.md)。
 - ✅ Boss 動態姿勢修正 rig 雙精度匯出及 Float32 讀取後的混合運算，原 0.001 容差 oracle **16/16**、3,925 次更新／280 份完整快照通過；材質與受擊 GPU 項目亦通過。此結果取代第四階段的 0/16 歷史狀態，完整 Boss 視聽相似度仍待獨立驗收。
 - ✅ 此整合點 Release 全目標建置、CTest **61/61** 通過；GTX 1650 完成實際 Turf／Boss 擷取。當時的遠距 overview 效能見[量測紀錄](benchmarks/source-scene-2026-10-20/README.md)，不能代表近鏡最壞負載。
 
@@ -45,7 +45,7 @@
 
 ## 第七階段：環境、裝置、畫質與玩家視角（2026-10-21）
 
-- ✅ 來源環境／動態遠景、29 類雙隊裝置、Tracer 光帶、角色連續下潛／回人形及裝置／蓄力音訊接入；低／中／高畫質與陰影／反射／後製選項接入。來源資產與材質回歸、GPU 截圖及六組玩家視角效能量測見[本輪驗收](acceptance-2026-10-21.md)。
+- ✅ 來源環境／動態遠景、29 類雙隊裝置、Tracer 光帶、角色連續下潛／回人形及裝置／蓄力音訊接入；低／中／高畫質與陰影／反射／後製選項接入。來源資產與材質回歸、GPU 截圖及六組玩家視角效能量測見[本輪驗收](acceptance/acceptance-2026-10-21.md)。
 - 待改善：GTX 1650 的中／高畫質未達 60 FPS；玩家認為目前下潛視效仍不像來源。畫質、主觀視覺及音訊差異留在[下一輪候選](next-round-backlog.md)。
 
 ## 第八階段：離線 Zones 與穩定性（2026-10-21）
@@ -62,10 +62,10 @@
 - ✅ HUD／選單／結果放大文字，Zones 面板更緊湊，小地圖移除開發座標；720p／1080p 互動、字級與版面檢查通過。
 - ✅ 依使用者指示移除舊 ImGui 診斷頁、相依與兩支專用腳本；保留最新原生練習、三模式、擷取及 benchmark 入口，CLI／預設入口回歸通過。
 - ✅ README 改為置中標頭、技術 badges、Old Demo 與六個簡潔章節；三張 GTX 1650／1600×900 真實畫面已擷取並檢視，本地連結檢查通過。
-- ✅ 最終整合補驗 **12/12** 通過（32.16 秒），正式墨面尾流 GPU 補驗另通過（9.00 秒）。來源粒子十個配方的嚴格 oracle 通過，來源 JSON 負零序列化與 C++／JS 運算精度差異已修正；受影響檢查以分批補驗記錄，並未宣稱重跑全部 83 項。細節與剩餘差異見 [2026-10-22 驗收](acceptance-2026-10-22.md)。以上不表示所有道具視效與音訊差異已完成。
+- ✅ 最終整合補驗 **12/12** 通過（32.16 秒），正式墨面尾流 GPU 補驗另通過（9.00 秒）。來源粒子十個配方的嚴格 oracle 通過，來源 JSON 負零序列化與 C++／JS 運算精度差異已修正；受影響檢查以分批補驗記錄，並未宣稱重跑全部 83 項。細節與剩餘差異見 [2026-10-22 驗收](acceptance/acceptance-2026-10-22.md)。以上不表示所有道具視效與音訊差異已完成。
 ## 第十階段：裝置生命週期、步行墨水與彈射地圖（2026-10-22）
 
-- ✅ 逐項核對 15 副武器與 19 特殊技能的來源生成／預警／作用／結束接點；[檢查表](device-special-lifecycle-audit.md) 分開標示程式核對、CPU 行為與模型 GPU 檢查，未將資產存在視為完整視效驗收。
+- ✅ 逐項核對 15 副武器與 19 特殊技能的來源生成／預警／作用／結束接點；[檢查表](audits/device-special-lifecycle-audit.md) 分開標示程式核對、CPU 行為與模型 GPU 檢查，未將資產存在視為完整視效驗收。
 - ✅ 修正黏彈預警進度、地雷觸發後的動畫時鐘、Booyah 引爆光暈與迴旋鏢接觸引爆；補齊安放／預警／直接命中／射線破壞裝置及 Bomb Rush 實際投擲音訊事件。音訊逐事件測試保留來源重播間隔，包含應靜音與雙音效案例。
 - ✅ 步行腳步改接來源乾地／己墨／敵墨配方，移除誤用的爆炸殼；落地小墨點採 cosmetic Speck，不改 ownership／計分版本。正式墨面接入 24 槽 transient ripple；光暈使用加色混合，避免四邊形底色壓暗背景。13 個粒子來源配方嚴格 oracle 與 production ripple GPU 檢查通過。
 - ✅ 按住 Tab／M 開啟彈射地圖，1–3 選隊友、4 選生點、5–0 選隊伍訊標；陣亡後可預選復活彈射，失效目標取消、4 清除預選，訊標落地後扣次數。控制器與 UI 互動檢查涵蓋有效／失效目標及復活排程。
@@ -76,12 +76,12 @@
 
 - ✅ Shaker 手持充能 loop／半滿與全滿 clink／死亡 fizzle、Tracer 尾跡命中與本機受擊定位、Wail 雙喇叭獨立 loop／階段邊界／暫停及清場已接入並通過針對性回歸。
 - ✅ ZoneHum live plaza send／stereo return 和原生音樂 riser wet tail 接入；固定 Web Audio fixtures 比對、乾濕分流、非固定讀取大小與重複清理通過。完整來源壓縮器／HRTF 與主觀聽感仍待對照。
-- ✅ Release 全目標建置、17 項玩法／來源回歸、3 項 GPU／入口、WeaponRunner／音訊引擎／原生混響各 1 項與來源混響唯讀重渲染通過；詳見[驗收紀錄](acceptance-2026-10-22.md)。
+- ✅ Release 全目標建置、17 項玩法／來源回歸、3 項 GPU／入口、WeaponRunner／音訊引擎／原生混響各 1 項與來源混響唯讀重渲染通過；詳見[驗收紀錄](acceptance/acceptance-2026-10-22.md)。
 
 ## 第十二階段：多人傳輸接入（2026-10-22）
 
 - ✅ 依使用者決策，新增 `src/network/`，正式採用 GameNetworkingSockets 原生 IP 傳輸；runtime／端點生命週期、可靠訊息、非阻塞輪詢、容量限制與錯誤／斷線事件已接入。
-- ✅ 真實 loopback 的 2／3／8 client 矩陣 **3/3** 通過（3.50 秒），涵蓋訊息身分／大小邊界、佇列超載、第九條連線拒絕、斷線／重連與重複清理。Release 全目標建置通過，見[連線契約](network-source-contract.md)。
+- ✅ 真實 loopback 的 2／3／8 client 矩陣 **3/3** 通過（3.50 秒），涵蓋訊息身分／大小邊界、佇列超載、第九條連線拒絕、斷線／重連與重複清理。Release 全目標建置通過，見[連線契約](contracts/network-source-contract.md)。
 - 此為傳輸階段的歷史檢查點；房碼、房間及同步接入見下一階段，沒有據此勾選 NET-01–12 或跨網驗收。
 
 ## 第十三階段：原生房間、換主與遊戲同步（2026-10-22）
@@ -90,8 +90,28 @@
 - ✅ 正式 RmlUi 選單接入建立／加入、取消、錯誤、複製房碼、名單與房間控制，保留繁中及 Noto Sans TC／Inter。對戰選單不停止線上比賽，訪客不能結束其他人的比賽。
 - ✅ 玩家自管角色，房主處理 AI／時計／Zones／Boss／結算；20 Hz actor／投射物／裝置呈現、sender timeline／Hermite／有界外推、可靠事件批次、種子墨水及 owner 命中接入。
 - ✅ 普通場離線角色轉交 AI，保留位置與陣亡／復活進度；Cargo 移除角色並隱藏畫面／陰影／名單。換主承接 Boss 當前狀態與招式、Zones 規則時計與 flood 游標，採來源 adopt 行為建立新 brain。
-- ✅ 2／3／8 人房間、實際 GNS 多實例的三模式與換主、跨程序服務、Boss／Zones 狀態及 UI 互動已有通過紀錄；後續補驗與限制詳見[本輪驗收](acceptance-2026-10-22.md)及[多人契約](network-source-contract.md)。
+- ✅ 2／3／8 人房間、實際 GNS 多實例的三模式與換主、跨程序服務、Boss／Zones 狀態及 UI 互動已有通過紀錄；後續補驗與限制詳見[本輪驗收](acceptance/acceptance-2026-10-22.md)及[多人契約](contracts/network-source-contract.md)。
 - 仍待移植／驗收：來源可游泳 3D hub／lobby、倒數彈射演出、跨機／跨網、公開服務部署與最壞網路負載；此階段不代表 NET-01–12 全量完成。
+
+## 第十四階段：選單風格、隊伍名單與設定捲動（2026-10-23）
+
+- ✅ 依使用者新方向取代簡約選單，以暖紙色、深墨描邊與橘／藍操作回饋呈現；沿用來源烏賊、十五種武器圖示及既定繁中字體。
+- ✅ 戰鬥頂列接入實際存活／總人數、武器、本機標記、陣亡叉號、復活秒數與特殊就緒；涵蓋訪客隊伍、離線移除角色、Boss 八人小隊與練習模式。
+- ✅ 設定頁獨立捲動且底部返回列固定可見；720p／1080p 滾輪、最後選項、焦點與回到頁首檢查通過。Release 建置、四項 UI／入口檢查及截圖補驗通過，詳見[本輪驗收](acceptance/acceptance-2026-10-23.md)。
+- 準心墨管、十二種主武器準心與隊友位置標記見第十五階段；完整特殊球、復活環、通知與完整 UI 演出仍待移植，HUD 未全項完成。
+
+## 第十五階段：武器視效、道具動畫與戰鬥 HUD（v0.8.0）
+
+- ✅ 十二種可選主武器準心讀取實際散布、FOV、充能、雙槍與傘狀態；動態墨管接耗墨刻線、低墨、液面晃動與閒置淡出。
+- ✅ 活隊友世界名牌、武器、特殊就緒、遠距淡出及離屏箭頭接入；僅己方追蹤中的敵人可顯示。尖端沿用隊伍色與粗深色外框。
+- ✅ 六類世界粒子改接來源 shader、mesh、instance attributes、混合與深度設定；槍口、甩墨、彈體尾跡、充能／滿蓄、光束命中及雙槍閃避接入。
+- ✅ 普通炸彈採實際來源球形模型，修正模型啟用後倒數範圍被跳過；飛行、反彈、蜂鳴、插地箭倒數與迴旋鏢滴墨接入。
+- ✅ Shaker 手持 grip 晃動、動畫 nozzle、充能燈與泡沫、落地搖晃接入；傘破裂、Tracer 接觸、Torpedo、Storm、Wail、泡泡與 Jetpack 對應粒子事件補接。刀刃波停止後保留來源 0.14 秒消退。
+- ✅ 選單／對戰改用使用者提供的 MP3，依解碼長度循環；最後一分鐘及 Boss 換階段維持同一串流。實際長度分別約 150.65／194.14 秒。
+- ✅ 傷害來源核對與 shooter 三發／出生無敵／陣亡重複命中／復活回歸通過；保留來源傷害，詳見[核對表](audits/damage-source-audit.md)。
+- ✅ 53 個來源特效配方嚴格 oracle、六類粒子 GPU、裝置 phase、音訊／UI 與相關玩法回歸通過；本輪未重跑完整測試集。
+- ✅ 文件依契約／差異／驗收／歷史分層，fixture 集中於 `tests/fixtures/`；整理後全目標建置與 14 項來源回歸通過；清除約 1.6 GiB 舊中間輸出，並修正來源瀏覽器 profile 未自動清除。
+- 驗收證據與已知邊界見[本輪驗收](acceptance/acceptance-2026-10-23.md)、[視效路徑](audits/weapon-device-fx-audit.md)及[HUD 差異](audits/hud-source-audit.md)。元件與來源數值檢查不代表全場景逐影格完全一致。
 
 ## 尚未完成的驗收與工作
 

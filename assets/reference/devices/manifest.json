@@ -1,5 +1,6 @@
 {
   "source": {
+    "weapons.js": "2ec02b036376fdab0fda3556374d92db945b0f0409b311fe2e80b64418b79298",
     "subs.js": "8bb3f7da75a9361235c4ec1603a0987bf4d543db7ede1adf628d837e47719183",
     "specials.js": "da71b549853c53ed70876c7e02ed12d55e18f9046df1d567998562bec22b39cc",
     "special-props.js": "c8fd279ad5869e1738b886abb57046562b8a10dc70c3c15f2ad5ff680a6fbdbd",
@@ -14,7 +15,7 @@
     {
       "kind": "bomb",
       "team": 0,
-      "nodes": 5,
+      "nodes": 3,
       "meshes": 2
     },
     {
@@ -99,6 +100,12 @@
       "kind": "boomerang",
       "team": 0,
       "nodes": 7,
+      "meshes": 3
+    },
+    {
+      "kind": "shakerHandLamps",
+      "team": 0,
+      "nodes": 4,
       "meshes": 3
     },
     {
@@ -188,7 +195,7 @@
     {
       "kind": "bomb",
       "team": 1,
-      "nodes": 5,
+      "nodes": 3,
       "meshes": 2
     },
     {
@@ -273,6 +280,12 @@
       "kind": "boomerang",
       "team": 1,
       "nodes": 7,
+      "meshes": 3
+    },
+    {
+      "kind": "shakerHandLamps",
+      "team": 1,
+      "nodes": 4,
       "meshes": 3
     },
     {
@@ -363,16 +376,22 @@
   "files": {
     "tracer-ribbon.vert": "68842fa7e362e79449c1d69189a91dcdf9a733d444f296b32759577f7dd8d426",
     "tracer-ribbon.frag": "06ec6e005835298e9826d2e4b01bdc37e1800b606effbca4c3d2dd1ff22d2504",
-    "1e16a832c6090358445f3cb2ec7924400a80a82cdddea333d74efa553dded639.mesh": "1e16a832c6090358445f3cb2ec7924400a80a82cdddea333d74efa553dded639",
+    "21a81af6e1a0d4db2332f2f2246345cb7e72eb51a34713752ba8bab6f3653706.mesh": "21a81af6e1a0d4db2332f2f2246345cb7e72eb51a34713752ba8bab6f3653706",
+    "9bc8701a711c65bf835a.vert": "a1f2e36695aadf477991ae89dc24c20d0d2d6e269ff03e15d45c9207edfe2a40",
+    "9bc8701a711c65bf835a.frag": "7737d887d44509b22cfbc080f1b3290bba922580e44f2fb51236a5aff73c5782",
+    "9bc8701a711c65bf835a.uniforms": "0cae833ac3723f9af732e23351337f8063be4223f2dd8ed50ccda2d0b9a2b709",
+    "3865e5ccb8d15bd6bc27eb4f8d36d03dfb5b5ebe5f7cff8d56a61bc1952de5df.mesh": "3865e5ccb8d15bd6bc27eb4f8d36d03dfb5b5ebe5f7cff8d56a61bc1952de5df",
+    "6e2be89d6b7268f21a2c.vert": "b6bddf1ce228ab803566a891cda71aad8da89259907f09c8d59d2c144e75f080",
+    "6e2be89d6b7268f21a2c.frag": "02970bfc40e66a260c278e95004492fefc61d9173ca0297b6c8a45ab37d472c9",
+    "6e2be89d6b7268f21a2c.uniforms": "4600892c7afb693830b7bb7a0a65d70ef5cabe91eb6cb73ed6f165109b21fcd0",
+    "c62a026811a1cdcc2fc573d46245763a89d447af8a8ec5167ffd97ebf99b0a70.mesh": "c62a026811a1cdcc2fc573d46245763a89d447af8a8ec5167ffd97ebf99b0a70",
     "44a0e8a34c92476f5379.vert": "e4b029ace555dc4002dde1030d49277c7a1ae4d9ba264d4ab8e55cc00d25828e",
     "44a0e8a34c92476f5379.frag": "2ee11d408b951d1649cd567b702e8fde354ab85719e63dc8743648c02b1e196b",
     "44a0e8a34c92476f5379.uniforms": "6bdcbe59adeda9d4c6003044fe9137852e62b6c0a451a3476b79952956623938",
-    "dd527fd0bdfaf12bdda465d4f0dbaeb9ff26d845c73e5904e3a9a539598c3d4b.mesh": "dd527fd0bdfaf12bdda465d4f0dbaeb9ff26d845c73e5904e3a9a539598c3d4b",
+    "e7ff7fb6363b79fae2102b0c8cd9becd17cd97f4741297aaebe9e44b0fab1e91.mesh": "e7ff7fb6363b79fae2102b0c8cd9becd17cd97f4741297aaebe9e44b0fab1e91",
     "37bf2a43fdccc5ae34a9.vert": "4721fa1bb23fae556bc74e3bd32c9d72dadf4dbf7083801602b8b7a89daa096a",
     "37bf2a43fdccc5ae34a9.frag": "1111ecbcfdc55e1189f7fb2d7cdde707949ea42d11a53d20edd10b9e390a888a",
     "37bf2a43fdccc5ae34a9.uniforms": "8a164e58d8fa6841d6c9b698b923cfbc0ec37e23301b8e7474b02caa1d005a4f",
-    "c62a026811a1cdcc2fc573d46245763a89d447af8a8ec5167ffd97ebf99b0a70.mesh": "c62a026811a1cdcc2fc573d46245763a89d447af8a8ec5167ffd97ebf99b0a70",
-    "e7ff7fb6363b79fae2102b0c8cd9becd17cd97f4741297aaebe9e44b0fab1e91.mesh": "e7ff7fb6363b79fae2102b0c8cd9becd17cd97f4741297aaebe9e44b0fab1e91",
     "2770343c3ce3bb9aff142d99f7d6b1c04061987ef4a0915d9b8f3b232bca4389.mesh": "2770343c3ce3bb9aff142d99f7d6b1c04061987ef4a0915d9b8f3b232bca4389",
     "4f4b760e81ad33758e1a3d95933581a2ad81e5e13f3889f681a31751e2b34c69.mesh": "4f4b760e81ad33758e1a3d95933581a2ad81e5e13f3889f681a31751e2b34c69",
     "6c06f686a497166ee8cdfa536ac88cf7ef9bd1d6a04b0abc82c0f1fd414f2e70.mesh": "6c06f686a497166ee8cdfa536ac88cf7ef9bd1d6a04b0abc82c0f1fd414f2e70",
@@ -508,6 +527,9 @@
     "58688bb6e5e2a07a9e9e2873361360207500de14e6e2e64a6dd3557014c21348.mesh": "58688bb6e5e2a07a9e9e2873361360207500de14e6e2e64a6dd3557014c21348",
     "f70603c9ec0bed57ba43f21dc56ad2de35d8d4b88ba93e24a4d216f4ead93b2a.mesh": "f70603c9ec0bed57ba43f21dc56ad2de35d8d4b88ba93e24a4d216f4ead93b2a",
     "e20d4131006984d4ffc1139903670bf682a43bc6bc154bfe83fc371eddc4186b.mesh": "e20d4131006984d4ffc1139903670bf682a43bc6bc154bfe83fc371eddc4186b",
+    "8e651a560625c2452c9d.vert": "a1f2e36695aadf477991ae89dc24c20d0d2d6e269ff03e15d45c9207edfe2a40",
+    "8e651a560625c2452c9d.frag": "7737d887d44509b22cfbc080f1b3290bba922580e44f2fb51236a5aff73c5782",
+    "8e651a560625c2452c9d.uniforms": "405c72cbf5a620e61af3e17432a77790896b160958db48560a7159254f57763f",
     "706eb1be4f49cb9f106f.vert": "4721fa1bb23fae556bc74e3bd32c9d72dadf4dbf7083801602b8b7a89daa096a",
     "706eb1be4f49cb9f106f.frag": "1111ecbcfdc55e1189f7fb2d7cdde707949ea42d11a53d20edd10b9e390a888a",
     "706eb1be4f49cb9f106f.uniforms": "34bda31b04b203337f4cb7034b26ae14a0c6c978ad482eac02688b75a672ca2b",
@@ -556,6 +578,6 @@
     "4357345aca7eb50f4e5d.vert": "a6b7c35d0e9419c3c2273cae54a35ab53076ae6fb62bab9197cb95c93ab5fdce",
     "4357345aca7eb50f4e5d.frag": "7478a9ab0127dff33385b4ca66d884401dd42a40b5e0ec6ca911505fe91323a1",
     "4357345aca7eb50f4e5d.uniforms": "4012d0c7c7690a589e91a6fa342c03ec85c9815ed4ddc568e24c7ed6eb3cf785",
-    "models.txt": "d50ef339b0945d9d8e9e246ffa6398bd2fd3c8359cf9baa0a00c580e0adaea20"
+    "models.txt": "d0f6e2f681b822d78f55c0352b54094506a18c0a29acd078d555bf71d78d0a17"
   }
 }

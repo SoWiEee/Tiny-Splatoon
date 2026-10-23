@@ -4,7 +4,7 @@
 #include "../src/world/FacePaint.hpp"
 #include "../src/game/NavGraph.hpp"
 #include "../src/world/StageGeometry.hpp"
-#include "ai_bot_oracle_fixtures.hpp"
+#include "fixtures/ai_bot_oracle_fixtures.hpp"
 
 #include <algorithm>
 #include <array>

@@ -33,7 +33,7 @@ int main() {
         animation.tick(in);
         std::vector<CharacterPartPose> parts;add(parts,"spin");
         animation.apply(parts,"right");
-        // actual Character.update weapon_spinner/frame 1 in character_pose_fixtures.json
+        // actual Character.update weapon_spinner/frame 1 in fixtures/character_pose_fixtures.json
         assert(close(find(parts,"spin").local.rotation.z,0.006890798026040803));
         assert(close(find(parts,"spin").local.rotation.w,0.9999762581694449));
     }

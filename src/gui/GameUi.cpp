@@ -1,4 +1,6 @@
 #include "GameUi.hpp"
+#include "InkTankElement.hpp"
+#include "WeaponReticleElement.hpp"
 #include "RmlRenderer.hpp"
 #include "../game/ArsenalData.hpp"
 #include "../game/MatchSimulation.hpp"
@@ -8,6 +10,7 @@
 #include "../world/FacePaint.hpp"
 #include "../world/ReferenceData.hpp"
 #include <RmlUi/Core.h>
+#include <RmlUi/Core/ElementInstancer.h>
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Core/Elements/ElementFormControlInput.h>
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
@@ -92,6 +95,8 @@ struct GameUi::Impl : Rml::EventListener {
     GLFWwindow* window;
     UiSystem system;
     RmlRenderer renderer;
+    Rml::ElementInstancerGeneric<InkTankElement> inkTankInstancer;
+    Rml::ElementInstancerGeneric<WeaponReticleElement> reticleInstancer;
     Rml::Context* context=nullptr;
     Rml::ElementDocument *menu=nullptr,*hud=nullptr;
     UiSetup selection;
@@ -124,6 +129,13 @@ struct GameUi::Impl : Rml::EventListener {
     GLFWscrollfun previousScroll=nullptr;
     GLFWcharfun previousChar=nullptr;
     double lastHudTime=0;
+    double inkFullIdle=0;
+    const MatchSimulation* inkMatch=nullptr;
+    const PlayerSimulation* inkActor=nullptr;
+    glm::mat4 worldView{1.f};
+    float projectionY=1.78f;
+    glm::dvec3 worldEye{0};
+    bool haveWorldView=false;
     double nextMinimapUpdate=0;
     int hudFps=0;
     std::string minimapCache;
@@ -140,6 +152,8 @@ struct GameUi::Impl : Rml::EventListener {
         Rml::SetSystemInterface(&system);Rml::SetRenderInterface(&renderer);
         if(!Rml::Initialise())throw std::runtime_error("Unable to initialize player UI");
         try{
+            Rml::Factory::RegisterElementInstancer("ink-tank",&inkTankInstancer);
+            Rml::Factory::RegisterElementInstancer("weapon-reticle",&reticleInstancer);
             if(!Rml::LoadFontFace((assets/"fonts/Inter.ttf").string(),false,Rml::Style::FontWeight::Normal)||
                !Rml::LoadFontFace((assets/"fonts/Inter.ttf").string(),false,Rml::Style::FontWeight::Bold)||
                !Rml::LoadFontFace((assets/"fonts/NotoSansTC.ttf").string(),true,Rml::Style::FontWeight::Normal)||
@@ -684,6 +698,95 @@ struct GameUi::Impl : Rml::EventListener {
         const auto coverage=paint.coverage();Text(hud,"terrain-status",ground+std::string("　自隊 ")+Percent(coverage[0]));
         Text(hud,"position-team-coverage","敵隊 "+Percent(coverage[1]));
     }
+    void UpdateAllyMarkers(MatchSimulation& match,bool hidden){
+        Hidden(hud,"ally-markers",hidden||!haveWorldView);
+        if(hidden||!haveWorldView)return;
+        const auto size=context->GetDimensions();if(size.x<=0||size.y<=0)return;
+        const double marginX=std::max(85.,80.*context->GetDensityIndependentPixelRatio()+5.);
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
+        struct Placement {std::string id;double x,y,angle,opacity;};
+        std::vector<Placement> placements;
+        std::string markup;
+        for(std::size_t i=0;i<match.actors().size();++i){
+            const auto& actor=*match.actors()[i];const auto& entry=match.roster()[i];
+            const bool tracked=actor.team()!=match.local().team()&&actor.state.track>0&&actor.state.trackTeam==match.local().team();
+            if(!entry.active||!actor.state.alive||actor.isLocal()||(actor.team()!=match.local().team()&&!tracked))continue;
+            const auto point=actor.visualPos()+glm::dvec3(0,actor.state.squid?1.:1.9,0);
+            const auto clip=worldView*glm::vec4(glm::vec3(point),1);
+            const double denominator=std::abs(clip.w)>1e-6?clip.w:1e-6;
+            double x=clip.x/denominator*.5*size.x,y=-clip.y/denominator*.5*size.y;
+            const bool onScreen=clip.w>0&&clip.z/denominator<=1&&std::abs(x)<size.x*.5-20&&std::abs(y)<size.y*.5-20;
+            if(!onScreen){if(clip.w<=0){x=-x;y=-y;}const double k=std::min((size.x*.5-marginX)/std::max(1e-3,std::abs(x)),(size.y*.5-65)/std::max(1e-3,std::abs(y)));x*=k;y*=k;}
+            const double angle=std::atan2(y,x)*180/3.141592653589793;
+            x=std::clamp(x+size.x*.5,marginX,size.x-marginX);y=std::clamp(y+size.y*.5,65.,size.y-45.);
+            const bool ready=actor.state.specialCharge>=actor.weapon().number("specialCost",190);
+            const double opacity=1-.35*std::clamp((glm::distance(point,worldEye)-14)/20,0.,1.);
+            const auto id="ally-marker-"+std::to_string(i);
+            placements.push_back({id,x*100/size.x,y*100/size.y,onScreen?90:angle,opacity});
+            markup+="<div id=\""+id+"\" class=\"ally-marker"+std::string(onScreen?"":" offscreen")+(ready?" ready":"")+(tracked?" tracked":"")+"\"><div class=\"ally-tag\" style=\"background-color:"+std::string(palette[actor.team()])+";\"><img src=\"weapons/"+std::string(actor.weapon().kind)+".png\"/><span>"+Escape(entry.name)+(ready?" ★":"")+(tracked?" · 已標記":"")+"</span></div><i class=\"ally-direction\"><i class=\"ally-direction-fill\" style=\"border-left-color:"+std::string(palette[actor.team()])+";\"></i></i></div>";
+        }
+        const auto key="hud/ally-markers";if(textCache[key]!=markup){Find(hud,"ally-markers")->SetInnerRML(markup);textCache[key]=markup;}
+        for(const auto& p:placements){auto* tag=Find(hud,p.id);tag->SetProperty("left",Number(p.x)+"%");tag->SetProperty("top",Number(p.y)+"%");tag->SetProperty("opacity",Number(p.opacity));tag->GetLastChild()->SetProperty("transform","rotate("+Number(p.angle)+"deg)");}
+    }
+    void UpdateInkGauge(MatchSimulation& match,bool paused,bool results){
+        auto& actor=match.local();const auto& state=actor.state;
+        auto* gauge=Find(hud,"ink-gauge");
+        auto* tank=dynamic_cast<InkTankElement*>(Find(hud,"ink-tank"));
+        if(!tank)throw std::runtime_error("Ink tank element was not registered");
+        if(inkMatch!=&match||inkActor!=&actor){inkMatch=&match;inkActor=&actor;inkFullIdle=0;tank->Reset();}
+        const double now=glfwGetTime();
+        const double dt=!paused&&!results&&lastHudTime>0?std::clamp(now-lastHudTime,0.0,.1):0;
+        const auto combat=actor.combatPose();const auto special=actor.specialPose();
+        const double subCost=special.active&&special.phase=="barrage"?0:actor.subWeapon().number("inkCost",70);
+        const bool low=state.ink<18;
+        inkFullIdle=state.ink>=99.5&&!low&&!combat.subAim?inkFullIdle+dt:0;
+        gauge->SetClass("idle",inkFullIdle>1.4);
+        gauge->SetClass("low",low);gauge->SetClass("nosub",state.ink<subCost);
+        const auto kind=actor.weapon().kind;
+        gauge->SetClass("roller",kind=="roller"||kind=="brush");gauge->SetClass("charger",kind=="charger");
+        gauge->SetAttribute("aria-valuenow",Integer(std::clamp(state.ink,0.,100.)));
+        Hidden(hud,"ink-gauge",paused||results||!state.alive||jumpMapOpen||hudOverlay||practiceGear);
+        Hidden(hud,"ink-low",!low);
+        const auto hex=ProfilePaletteColors(player.settings.palette,player.settings.colorblind)[actor.team()];
+        const auto rgb=std::stoul(std::string(hex.substr(1)),nullptr,16);
+        InkTankFrame frame;frame.ink=state.ink;frame.subCost=subCost;frame.low=low;frame.aiming=combat.subAim;
+        frame.reducedMotion=player.settings.reducedMotion;frame.yaw=actor.input.aimYaw;frame.vx=state.vel.x;frame.vz=state.vel.z;frame.dt=dt;
+        frame.color=Rml::Colourb((rgb>>16)&255,(rgb>>8)&255,rgb&255,255);tank->Update(frame);
+        auto* reticle=dynamic_cast<WeaponReticleElement*>(Find(hud,"reticle"));
+        if(!reticle)throw std::runtime_error("Weapon reticle element was not registered");
+        WeaponReticleFrame aim;aim.weapon=kind;aim.pose=combat;aim.dt=dt;aim.shotsFired=actor.shotsFired();
+        aim.grounded=state.grounded;aim.clinging=state.climbing;aim.burstDuration=actor.streamDuration();aim.inkColor=frame.color;
+        const double pixels=std::tan(actor.crosshairSpreadDegrees()*3.141592653589793/180)*projectionY*context->GetDimensions().y*.5;
+        aim.spreadPx=std::min(90.,pixels);
+        if(kind=="roller"||kind=="brush")aim.spreadPx=kind=="roller"?28:22;
+        reticle->SetAttribute("data-weapon",std::string(kind));reticle->Update(aim);
+    }
+    void UpdateSquads(MatchSimulation& match,bool practice){
+        Hidden(hud,"squad-a",practice);Hidden(hud,"squad-b",practice);
+        Hidden(hud,"squad-a-count",practice);Hidden(hud,"squad-b-count",practice);
+        Find(hud,"battle-top")->SetClass("boss-squad",match.boss()!=nullptr);
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
+        for(int side=0;side<2;++side){
+            const int team=side==0?match.local().team():1-match.local().team();
+            std::string markup;int alive=0,total=0;
+            for(std::size_t i=0;i<match.actors().size();++i){
+                const auto& actor=*match.actors()[i];const auto& entry=match.roster()[i];
+                if(!entry.active||actor.team()!=(match.boss()?match.local().team():team))continue;
+                ++total;if(actor.state.alive)++alive;
+                if(match.boss()&&((total-1)/4)!=side)continue;
+                const bool ready=actor.state.alive&&actor.state.specialCharge>=actor.weapon().number("specialCost",190);
+                const std::string status=actor.state.alive?(ready?"特殊就緒":"存活"):actor.canRespawn()?"復活 "+Integer(std::ceil(actor.state.respawnTimer))+" 秒":"已退場";
+                const auto label=EquipmentLabel(EquipmentCategory::Main,actor.mainId());
+                markup+="<div id=\"squad-player-"+std::to_string(i)+"\" class=\"squad-player"+std::string(actor.state.alive?"":" dead")+(ready?" ready":"")+(actor.isLocal()?" self":"")+"\" title=\""+Escape(entry.name+" · "+std::string(label)+" · "+status)+"\" style=\"background-color:"+std::string(actor.state.alive?palette[actor.team()]:"#403c4a")+";\">";
+                markup+="<img class=\"squad-weapon\" src=\"weapons/"+std::string(actor.weapon().kind)+".png\" /><i class=\"squad-cross-a\"></i><i class=\"squad-cross-b\"></i>";
+                markup+="<span class=\"squad-state\">"+(actor.state.alive?(ready?std::string("就緒"):std::string()):actor.canRespawn()?Integer(std::ceil(actor.state.respawnTimer)):std::string("退場"))+"</span><span class=\"squad-self\">你</span></div>";
+            }
+            const char* id=side==0?"squad-a":"squad-b";
+            const auto key=std::string("hud/")+id;
+            if(textCache[key]!=markup){Find(hud,id)->SetInnerRML(markup);textCache[key]=markup;}
+            Text(hud,side==0?"squad-a-count":"squad-b-count",std::string(match.boss()?"協力小隊":side==0?"我方":"對方")+"  "+std::to_string(alive)+" / "+std::to_string(total));
+        }
+    }
     void UpdateZonesHud(MatchSimulation& match){
         const auto* zones=match.zones();
         Hidden(hud,"zones-hud",zones==nullptr);
@@ -783,15 +886,19 @@ struct GameUi::Impl : Rml::EventListener {
         interactive=paused||results||practiceGear||hudOverlay;
         interactive=interactive||jumpMapOpen;
         Hidden(hud,"pause",!paused||results);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
-        Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results);
+        Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results||!match.local().state.alive||match.local().state.squid||jumpMapOpen||hudOverlay||practiceGear);
         Text(hud,"pause-title",onlineMatch?"對戰選單":practice?"練習暫停":"已暫停");Text(hud,"pause-description",onlineMatch?"線上對戰會持續進行。關閉選單即可繼續操作。":practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
         Text(hud,"pause-hint",onlineMatch?"Esc 選單":"Esc 暫停");Text(hud,"results-menu",onlineMatch?"返回房間":"返回選單");Hidden(hud,"results-rematch",onlineMatch);
         const auto stageLabel=StageLabel(stage.id);Text(hud,"stage-name",stageLabel.empty()?std::string(stage.name):std::string(stageLabel));
         const int seconds=static_cast<int>(std::ceil(std::max(0.,match.remaining())));char clock[16];std::snprintf(clock,sizeof(clock),"%02d:%02d",seconds/60,seconds%60);Text(hud,"clock",clock);
+        Find(hud,"clock")->SetClass("last-minute",seconds<=60&&!practice);Find(hud,"clock")->SetClass("final-seconds",seconds<=10&&!practice);
+        UpdateSquads(match,practice);
         const auto coverage=paint.coverage();Text(hud,"score-a",Percent(coverage[0]));Text(hud,"score-b",Percent(coverage[1]));
         const auto& local=match.local();const auto& state=local.state;const double cost=local.weapon().number("specialCost",190);
         Text(hud,"hp",Integer(state.hp));Text(hud,"ink",Integer(state.ink));Text(hud,"special-status",state.specialCharge>=cost?"特殊技能就緒  F / Q":Integer(state.specialCharge)+" / "+Integer(cost));
         Find(hud,"special-fill")->SetProperty("width",Integer(std::clamp(state.specialCharge/cost,0.,1.)*100)+"%");Find(hud,"special-meter")->SetClass("ready",state.specialCharge>=cost);
+        UpdateInkGauge(match,paused,results);
+        UpdateAllyMarkers(match,paused||results||jumpMapOpen||hudOverlay||practiceGear);
         Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
         Text(hud,"jump-map-help",state.alive?"按 1–3 選隊友　4 回生點　5–0 選隊伍訊標":"復活規劃：按數字選擇隊友或隊伍訊標，4 清除規劃");
         Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?"復活彈射："+std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"尚未安排復活彈射");
@@ -827,6 +934,7 @@ void GameUi::SetProfileSink(std::function<void(const PlayerProfile&)> sink){impl
 void GameUi::SetSaveError(std::string error){impl_->SetSaveError(error);}
 void GameUi::SetReward(MatchRewardResult reward){impl_->reward=reward;}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
+void GameUi::SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY){impl_->projectionY=projectionY;impl_->worldView=viewProjection;impl_->worldEye=eye;impl_->haveWorldView=true;}
 void GameUi::SetVolumeSink(std::function<void(float,float,float)> value){impl_->volumes=std::move(value);if(impl_->volumes)impl_->volumes(static_cast<float>(impl_->player.settings.master),static_cast<float>(impl_->player.settings.music),static_cast<float>(impl_->player.settings.sfx));}
 void GameUi::SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey,std::string queuedLabel){
     auto& p=*impl_;
@@ -836,7 +944,7 @@ void GameUi::SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queue
 }
 int GameUi::TakeJumpMapSelection(){return std::exchange(impl_->jumpMapSelection,-1);}
 void GameUi::ShowMenu(const std::string& initialStage){
-    auto& p=*impl_;p.resultXpMatch=nullptr;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
+    auto& p=*impl_;p.resultXpMatch=nullptr;p.inkMatch=nullptr;p.inkActor=nullptr;p.inkFullIdle=0;p.lastHudTime=0;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;
     p.selection.duration=p.selection.mode=="zones"?300:p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;
     p.Value("difficulty",p.selection.difficulty);p.Value("theme",p.selection.theme);p.Value("duration",std::to_string(p.selection.duration));
@@ -853,6 +961,8 @@ UiAction GameUi::RenderHud(const StageData& stage,const FacePaint& paint,MatchSi
     auto& p=*impl_;
     if(p.practiceGear||p.hudOverlay){p.menu->Show();p.hud->Show();p.menuVisible=true;}
     else{p.menu->Hide();p.hud->Show();p.menuVisible=false;}
+    p.context->SetDimensions({width,height});
+    p.context->SetDensityIndependentPixelRatio(std::clamp(std::min(width/1440.f,height/900.f),.72f,1.6f));
     p.RenderHudData(stage,paint,match,paused,nativeApp,practice);
     return p.Render(width,height,true);
 }

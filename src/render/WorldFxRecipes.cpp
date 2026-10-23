@@ -44,11 +44,117 @@ void eraseAt(std::vector<WorldFxParticle>& items,std::size_t i,WorldFxShape shap
     items.erase(items.begin()+static_cast<std::ptrdiff_t>(i));
 }
 std::size_t countShape(const std::vector<WorldFxParticle>& items,WorldFxShape shape){return std::count_if(items.begin(),items.end(),[&](const auto& x){return x.shape==shape;});}
+#include "WorldFxWeaponRecipes.inc"
+#include "WorldFxKitRecipes.inc"
+#include "WorldFxSpecialRecipes.inc"
 }
 
-std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3 pos,glm::dvec3 normal,glm::dvec3 color,double radius,std::uint32_t& rng,double waterY,glm::dvec3 camera,const WorldFxRippleSink& ripple){
-    std::vector<WorldFxParticle> out;normal=normalized(normal);const glm::dvec3 up(0,1,0),white(1);
-    if(name=="footstepOwn"||name=="footstepEnemy"||name=="footstepDry"){
+std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3 pos,glm::dvec3 normal,glm::dvec3 color,double radius,std::uint32_t& rng,double waterY,glm::dvec3 camera,const WorldFxRippleSink& ripple,const WorldFxRecipeContext& context,glm::dvec3 direction,double time,double dt){
+    // Weapon recipes receive aim direction separately from a recipe's surface normal.
+    std::vector<WorldFxParticle> out;const glm::dvec3 sourceVector=normal;normal=normalized(normal);const glm::dvec3 up(0,1,0),white(1);
+    if(name=="muzzleBlaster"){
+        const auto dir=normalized(direction);
+        sprite(out,WorldFxShape::Glow,pos+dir*0.1,dir*2.0,color*4.5,0.35,0.7,0.09,1,rng,2.2,0,4,0);
+        ring(out,pos+dir*0.25,dir,mix(color,white,0.3),0.55,0.16,7,0.9,1.2,rng,dir*3.0);
+        for(int i=0;i<9;i++){const auto d=cone(dir,0.4,rng);const double speed=6+rand01(rng)*6,size=0.03+rand01(rng)*0.035,life=0.4+rand01(rng)*0.2;drop(out,pos,d*speed,color,size,life,0.8,1.3,0,rng);}
+        const auto puffColor=mix(color,white,0.45);
+        for(int i=0;i<2;i++)sprite(out,WorldFxShape::Puff,pos+dir*0.3,dir*double(2+i*1.5)+up*0.4,puffColor,0.2,0.7,0.4,0.32,rng,5);
+    }else if(name=="muzzleCharger"){
+        const auto dir=normalized(direction);
+        sprite(out,WorldFxShape::Glow,pos,{0,0,0},mix(color,white,0.4)*3.5,0.7,0.4,0.14,1,rng,0,0,13,0,0);
+        ring(out,pos+dir*0.15,dir,mix(color,white,0.3),0.38,0.14,7,0.9,1,rng,dir*2.0);
+        for(int i=0;i<5;i++){const auto d=cone(dir,0.14,rng);const double speed=10+rand01(rng)*8,size=0.018+rand01(rng)*0.02;drop(out,pos,d*speed,color,size,0.25,0.4,1.8,F_QUIET,rng);}
+    }else if(name=="flickCurtain"){
+        const auto dir=normalized(direction);
+        const double yaw=std::atan2(dir.x,dir.z),spread=radius*pi/180;
+        const int n=std::max(6,static_cast<int>(std::round(30.0)));
+        for(int i=0;i<n;i++){
+            const double t=(double(i)/(n-1))*2-1,a=yaw+t*spread*0.55+(rand01(rng)-0.5)*0.08;
+            const double upAngle=0.35+rand01(rng)*0.35,speed=6+rand01(rng)*5*(1-0.4*std::abs(t)),cu=std::cos(upAngle);
+            const double size=0.03+rand01(rng)*0.04;
+            drop(out,{pos.x+std::sin(a)*0.4,pos.y+(rand01(rng)-0.3)*0.4,pos.z+std::cos(a)*0.4},
+                {std::sin(a)*cu*speed,std::sin(upAngle)*speed,std::cos(a)*cu*speed},color,size,1.4,1,1.2,size>0.055?F_PAINT:0,rng);
+        }
+        const auto puffColor=mix(color,white,0.4);
+        for(int i=0;i<3;i++){const double a=yaw+(i-1)*spread*0.35;sprite(out,WorldFxShape::Puff,
+            {pos.x+std::sin(a)*0.8,pos.y+0.2,pos.z+std::cos(a)*0.8},{std::sin(a)*3,1,std::cos(a)*3},
+            puffColor,0.2,0.7,0.4,0.3,rng,4);}
+    }else if(name=="rollerSpray"){
+        const glm::dvec3 fwd=normal;
+        const glm::dvec3 right(fwd.z,0.0,-fwd.x);
+        const double k=std::clamp(context.factor,0.0,1.0),frameDt=std::clamp(dt,0.0,0.05);
+        const int count=static_cast<int>(std::floor(30*k*frameDt+rand01(rng)));
+        for(int i=0;i<count;i++){
+            const double offset=(rand01(rng)-0.5)*radius,speed=1.6+rand01(rng)*2.2;
+            const double vy=1.4+rand01(rng)*1.8,size=0.025+rand01(rng)*0.03;
+            const int flags=rand01(rng)<0.3?F_PAINT:0;
+            drop(out,pos+right*offset+fwd*0.05+up*0.1,
+                fwd*(speed*k)+right*((offset>0?1.0:offset<0?-1.0:0.0)*0.7)+up*vy,color,size,1.0,1,1,flags,rng);
+        }
+        if(rand01(rng)<8*frameDt*k){const double side=rand01(rng)<0.5?-1.0:1.0;const auto puffColor=mix(color,white,0.4);
+            sprite(out,WorldFxShape::Puff,pos+right*(side*radius*0.5)+up*0.15,
+                right*(side*0.8)+fwd+up*0.5,puffColor,0.1,0.35,0.3,0.28,rng,4);}
+    }else if(name=="dodgeSplash"){
+        const glm::dvec3 at(pos.x,pos.y+0.03,pos.z);
+        const auto axis=normalized(glm::dvec3(-direction.x*0.8,0.9,-direction.z*0.8));
+        for(int i=0;i<14;i++){
+            const auto d=cone(axis,1.05,rng);const double speed=2.4+rand01(rng)*2.8;
+            const double size=0.02+rand01(rng)*0.026;const int flags=rand01(rng)<0.25?F_PAINT:0;
+            drop(out,at+up*0.05,d*speed,color,size,1.0,1,1.4,flags,rng);
+        }
+        shell(out,at,color,0.12,0.5,0.06,0.2,0.95,0,0,0.2,up,1,rng);
+        if(ripple)ripple(at,0.008,0.15,1.6,0.8);else ring(out,at,up,color,1.124,0.56,1,0.45,1,rng);
+    }else if(name=="dodgeSkid"){
+        const auto dir=normalized(glm::dvec3(direction.x,0,direction.z));
+        const double fade=1.0-std::clamp(context.factor,0.0,1.0),frameDt=std::clamp(dt,0.0,0.05);
+        const glm::dvec3 right(dir.z,0,-dir.x);
+        int count=static_cast<int>(std::floor((10+46*fade)*frameDt+rand01(rng)));
+        while(count-->0){
+            const double side=(rand01(rng)-0.5)*2,speed=(3+rand01(rng)*3)*(0.5+0.5*fade);
+            const glm::dvec3 at=pos+dir*0.3+right*side*0.25+up*0.05;
+            const glm::dvec3 velocity=dir*speed+right*side*1.6+up*(0.5+rand01(rng)*1.1);
+            const double size=0.011+rand01(rng)*0.014;
+            drop(out,at,velocity,color,size,0.55,1,1.7,F_QUIET,rng);
+        }
+        count=static_cast<int>(std::floor(22*fade*frameDt+rand01(rng)));
+        while(count-->0){
+            auto d=sphere(rng);d.y=std::abs(d.y)*0.8+0.3;
+            const double speed=1.5+rand01(rng)*2;
+            const glm::dvec3 at(pos.x+d.x*0.25,pos.y+0.35+d.y*0.2,pos.z+d.z*0.25);
+            const glm::dvec3 velocity(d.x*speed+dir.x*2.2,d.y*speed,d.z*speed+dir.z*2.2);
+            const double size=0.015+rand01(rng)*0.018;
+            drop(out,at,velocity,color,size,0.9,1,1.3,0,rng);
+        }
+    }else if(name=="dodgePlant"){
+        const auto axis=normalized(glm::dvec3(direction.x*0.7,1,direction.z*0.7));
+        for(int i=0;i<9;i++){
+            const auto d=cone(axis,0.75,rng);const double speed=1.8+rand01(rng)*2;
+            const double size=0.016+rand01(rng)*0.02;
+            drop(out,pos+up*0.04,d*speed,color,size,0.8,1,1.3,0,rng);
+        }
+        const glm::dvec3 at(pos.x,pos.y+0.01,pos.z);
+        if(ripple)ripple(at,0.0065,0.13,1.3,0.7);else ring(out,at,up,color,0.828,0.49,1,0.45,1,rng);
+    }else if(name=="dryFire"){
+        const glm::dvec3 dust(0.4793201830913402,0.3967552307153359,0.2746773120495699);
+        sprite(out,WorldFxShape::Puff,pos,normalized(direction)*0.8+up*0.3,dust,0.05,0.22,0.35,0.35,rng,5,0.3,4,0.02,1,0,0);
+    }else if(name=="bombTrail"){
+        if(rand01(rng)<0.7){const double vx=sourceVector.x*0.1+(rand01(rng)-0.5)*0.6;const double vy=sourceVector.y*0.1;const double vz=sourceVector.z*0.1+(rand01(rng)-0.5)*0.6;const glm::dvec3 velocity(vx,vy,vz);drop(out,pos,velocity,color,0.02+rand01(rng)*0.02,0.8,1,1.2,0,rng);}
+        if(rand01(rng)<0.35)sprite(out,WorldFxShape::Puff,pos,{0,0.2,0},mix(color,white,0.45),0.06,0.2,0.25,0.22,rng,4);
+    }else if(name=="bounceSplash"){
+        const auto tangent=normalized(glm::cross(std::abs(normal.y)<0.95?glm::dvec3(0,1,0):glm::dvec3(1,0,0),normal)),bitangent=glm::cross(normal,tangent);
+        const double a0=rand01(rng)*tau;
+        for(int i=0;i<6;i++){
+            const double a=a0+(double(i)/6)*tau+(rand01(rng)-0.5)*0.5,c=std::cos(a),s=std::sin(a);
+            const double upAmount=0.7+rand01(rng)*0.9,outward=0.6+rand01(rng)*0.6,speed=2*(0.6+rand01(rng)*0.6),size=0.03*(0.55+rand01(rng)*0.8);
+            drop(out,pos+normal*0.04,((tangent*c+bitangent*s)*outward+normal*upAmount)*speed,color,size,1.2,1,1,0,rng);
+        }
+        const auto point=pos+normal*0.01;
+        if(ripple)ripple(point,0.006,0.12,1.2,0.6);else ring(out,point,normal,color,0.676,0.42,1,0.45,1,rng);
+    }else if(name=="beepPulse"){
+        const double k=std::clamp(context.factor,0.0,1.0);
+        sprite(out,WorldFxShape::Glow,pos,{0,0,0},mix(color,white,0.3)*(3+3*k),0.35,0.8+0.4*k,0.14,1,rng,0,0,2+3*k,0);
+        if(context.hasPoint)ring(out,context.point,normal,color,radius,0.32,7,0.55+0.35*k,1.2,rng);
+    }else if(name=="footstepOwn"||name=="footstepEnemy"||name=="footstepDry"){
         const double speed=radius,dx=normal.x,dz=normal.z;
         if(name=="footstepDry"){
             if(speed<3.2)return out;
@@ -149,15 +255,20 @@ std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3
                 {0,vy,0},bubbleColor,size0,size1,life,0.7,rng,1,0,21,0.03,0);
         }
     }else if(name=="burst"){
-        constexpr int count=12;const double size=0.1;
+        const int count=std::max(1,static_cast<int>(std::round(context.count)));
+        const double size=context.size,speedScale=context.speed,spread=std::max(0.05,context.spread),gravity=context.gravity;
+        const int paint=context.paint?F_PAINT:0;
         const glm::dvec3 at=pos+normal*0.04;
         for(int i=0;i<count;i++){
-            const glm::dvec3 dir=cone(normal,0.9*pi*0.5,rng);const double speed=4*(0.5+rand01(rng)*0.8),sz=size*(0.35+rand01(rng)*0.6);
-            drop(out,at,dir*speed,color,sz,1.6+rand01(rng)*0.6,1,1.3,0,rng);
-            if(rand01(rng)<0.45){const double s2=speed*(0.7+rand01(rng)*0.5);const double jx=(rand01(rng)-0.5)*0.8,jy=(rand01(rng)-0.5)*0.8,jz=(rand01(rng)-0.5)*0.8;const glm::dvec3 v=dir*s2+glm::dvec3(jx,jy,jz);drop(out,at,v,color,sz*0.4,1.2,1,1.3,0,rng);}
+            const glm::dvec3 dir=cone(normal,spread*pi*0.5,rng);const double speed=speedScale*(0.5+rand01(rng)*0.8),sz=size*(0.35+rand01(rng)*0.6);
+            drop(out,at,dir*speed,color,sz,1.6+rand01(rng)*0.6,gravity,1.3,paint,rng);
+            if(rand01(rng)<0.45){const double s2=speed*(0.7+rand01(rng)*0.5);const double jx=(rand01(rng)-0.5)*0.8,jy=(rand01(rng)-0.5)*0.8,jz=(rand01(rng)-0.5)*0.8;const glm::dvec3 v=dir*s2+glm::dvec3(jx,jy,jz);drop(out,at,v,color,sz*0.4,1.2,gravity,1.3,0,rng);}
         }
         const double splash=size*(1.6+0.5*std::sqrt(double(count)));
-        if(count>=4&&glm::dot(pos-camera,pos-camera)<24.0*24.0){const auto atShell=pos+normal*(splash*0.12);shell(out,atShell,color,splash*0.35,splash*1.1,0.07,0.17+splash*0.12,0.95,0,0,0.2,normal,1,rng);}
+        if(count>=4&&context.sheet&&glm::dot(pos-camera,pos-camera)<24.0*24.0){const auto atShell=pos+normal*(splash*0.12);shell(out,atShell,color,splash*0.35,splash*1.1,0.07,0.17+splash*0.12,0.95,0,0,0.2,normal,1,rng);}
+        if(ripple)ripple(pos,0.0035+size*0.03,0.1,1.0,0.5);
+        if(context.ring)ring(out,pos,normal,color,0.22+size*3.2,0.26,0,0.9,1.1,rng);
+        if(context.mist&&count>=6)sprite(out,WorldFxShape::Puff,at,normal*1.2,mix(color,white,0.3),size*2,size*5,0.35,0.3,rng,5);
     }else if(name=="explosion"){
         const double R=radius,Rv=std::min(R,2.4),spd=std::sqrt(R/3.0);
         sprite(out,WorldFxShape::Glow,pos,glm::dvec3(0),color*4.5,Rv*0.4,Rv*0.85,0.12,1,rng,2.2,0,6,0);
@@ -193,6 +304,12 @@ std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3
     }else if(name=="rainSheet"){
         const double dt=1.0/60.0;const int count=int(std::floor(radius*radius*3.2*dt+rand01(rng)));
         const auto rain=mix(color,white,0.35);for(int i=0;i<count;i++){const double a=rand01(rng)*tau,r=std::sqrt(rand01(rng))*radius*0.95;const glm::dvec3 p(pos.x+std::cos(a)*r,pos.y-0.4-rand01(rng)*0.5,pos.z+std::sin(a)*r),v(0.35,-19-rand01(rng)*4,0.12);const double size=0.022+rand01(rng)*0.012;drop(out,p,v,rain,size,1,1,5.5,F_QUIET,rng);}
+    }else if(buildWeaponRecipe(out,name,pos,sourceVector,color,radius,rng,direction,time,dt,camera,ripple)) {
+        return out;
+    }else if(buildKitRecipe(out,name,pos,sourceVector,color,radius,rng,direction,time,dt,camera,ripple,context)) {
+        return out;
+    }else if(buildSpecialRecipe(out,name,pos,sourceVector,color,radius,rng,direction,time,dt,camera,ripple)) {
+        return out;
     }else throw std::invalid_argument("Unknown source World FX recipe");
     return out;
 }

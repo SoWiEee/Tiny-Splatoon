@@ -43,7 +43,7 @@ const output = [
   '}',
   '',
 ].join('\n');
-const path = new URL('../tests/brolly_source_fixtures.hpp', import.meta.url);
+const path = new URL('../tests/fixtures/brolly_source_fixtures.hpp', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(path, 'utf8') !== output) throw new Error('Brolly source fixtures differ from locked source');
 } else writeFileSync(path, output);

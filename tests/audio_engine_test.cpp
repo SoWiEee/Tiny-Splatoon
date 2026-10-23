@@ -7,7 +7,7 @@
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/ReferenceData.hpp"
 #include "../src/world/StageGeometry.hpp"
-#include "sonar_wail_source_fixtures.hpp"
+#include "fixtures/sonar_wail_source_fixtures.hpp"
 
 #include <algorithm>
 #include <array>
@@ -188,6 +188,43 @@ int main(int argc, char** argv) {
         audio.Update();
         require(!audio.PlayMusic("not_a_source_track"), "Unknown music names must not resolve to a fallback track");
         audio.Clear();
+
+        AudioEngine replacementMusic(assets);
+        require(replacementMusic.Initialize(), "Bundled replacement tracks must initialize through miniaudio");
+        std::uint64_t menuSerial = 0, battleSerial = 0;
+        for (const auto& [track, file] : std::array<std::pair<std::string_view, std::string_view>, 7>{{
+                {"title", "LifeWillChange_Instrumental.mp3"}, {"menu", "LifeWillChange_Instrumental.mp3"},
+                {"battle", "Splattack.mp3"}, {"battle_final", "Splattack.mp3"}, {"boss", "Splattack.mp3"},
+                {"boss_2", "Splattack.mp3"}, {"boss_3", "Splattack.mp3"}}}) {
+            require(replacementMusic.PlayMusic(track, 0), "Each bundled replacement alias must be playable");
+            std::filesystem::path source;
+            bool looping = false;
+            std::uint64_t loopBegin = 0, loopEnd = 0, serial = 0;
+            double durationSeconds = 0;
+            bool streamReady = false;
+            for (int attempt = 0; attempt < 50 && !streamReady; ++attempt) {
+                streamReady = AudioEngineMusicTestState(replacementMusic, source, looping, loopBegin, loopEnd, serial, durationSeconds);
+                if (!streamReady) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            require(streamReady,
+                "Bundled music status must expose a decoded stream to the focused audio test");
+            require(source == assets / file, "Each logical music name must use its exact bundled MP3 asset");
+            require(looping && loopBegin == 0 && loopEnd == std::numeric_limits<std::uint64_t>::max(),
+                "Bundled MP3s must loop from the first frame through the decoder's full-file end boundary");
+            const double expectedDuration = file == "Splattack.mp3" ? 194.142 : 150.653;
+            require(std::abs(durationSeconds - expectedDuration) < 0.5,
+                "Bundled MP3 stream length must match its supplied asset without waiting for playback to end");
+            if (file == "LifeWillChange_Instrumental.mp3") {
+                if (!menuSerial) menuSerial = serial;
+                else require(serial == menuSerial, "Title and match-menu aliases must keep one Life Will Change stream");
+            } else {
+                if (!battleSerial) battleSerial = serial;
+                else require(serial == battleSerial, "Battle, final-minute and Boss aliases must keep one Splattack stream");
+            }
+        }
+        require(AudioEngineMusicTestReadsAcrossEnd(replacementMusic),
+            "The bundled Splattack stream must read all requested frames across its actual end loop boundary");
+        replacementMusic.Clear();
 
         const auto& stages = ReferenceStages();
         const auto stage = std::find_if(stages.begin(), stages.end(), [](const StageData& candidate) {

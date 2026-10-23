@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-const fixture=JSON.parse(readFileSync(new URL('./boss_pose_fixtures.json',import.meta.url),'utf8'));
+const fixture=JSON.parse(readFileSync(new URL('./fixtures/boss_pose_fixtures.json',import.meta.url),'utf8'));
 const samples=[];
 const input=fixture.cases.map(c=>{
  const byFrame=new Map(c.records.map(r=>[r.frame,r]));

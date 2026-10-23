@@ -237,8 +237,8 @@ const output = [
   '}', '',
 ].join('\n');
 const outputJson = JSON.stringify({ sources: sourcePaths.map((path, i) => ({ path, sha256: hashes[i] })), rows }, null, 2) + '\n';
-const headerPath = new URL('../tests/world_specials_source_fixtures.hpp', import.meta.url);
-const jsonPath = new URL('../tests/world_specials_source_fixtures.json', import.meta.url);
+const headerPath = new URL('../tests/fixtures/world_specials_source_fixtures.hpp', import.meta.url);
+const jsonPath = new URL('../tests/fixtures/world_specials_source_fixtures.json', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(headerPath, 'utf8') !== output) throw new Error('Special source C++ fixture differs');
   if (readFileSync(jsonPath, 'utf8') !== outputJson) throw new Error('Special source JSON fixture differs');

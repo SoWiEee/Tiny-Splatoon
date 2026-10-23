@@ -1,7 +1,7 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/game/WorldSpecials.hpp"
 #include "../src/game/ArsenalData.hpp"
-#include "sonar_wail_source_fixtures.hpp"
+#include "fixtures/sonar_wail_source_fixtures.hpp"
 
 #include <algorithm>
 #include <cmath>

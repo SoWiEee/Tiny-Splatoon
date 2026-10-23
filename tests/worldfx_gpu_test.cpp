@@ -3,6 +3,8 @@
 #include "../src/game/CombatWorld.hpp"
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/render/WorldEffects.hpp"
+#include "../src/render/WorldFxParticleRenderer.hpp"
+#include "../src/render/DeviceRenderer.hpp"
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/StageGeometry.hpp"
 
@@ -126,6 +128,55 @@ int main() {
               "Wail firing did not place its source speaker prop");
 
         CharacterData characterData;
+        {
+            WorldFxParticleRenderer pools;
+            const glm::vec3 eye(0,3,5);const auto view=glm::lookAt(eye,glm::vec3(0),glm::vec3(0,1,0));
+            const auto projection=glm::perspective(glm::radians(48.f),1.f,.1f,30.f);
+            std::filesystem::create_directories("build/captures/worldfx");
+            for(int i=0;i<6;++i){
+                WorldFxParticle item;item.shape=static_cast<WorldFxShape>(i);item.radius=item.renderRadius=.65f;item.radius1=1;
+                item.life=1;item.age=.2f;item.renderLength=i==5?2.f:1.2f;item.alpha=item.renderAlpha=1;
+                item.color={1,.25415f,.007f};item.normal={0,1,0};item.vel={1,2,0};item.crown=1;item.seed=.37f;
+                glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glViewport(0,0,128,128);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);glPolygonOffset(2,3);
+                check(pools.Draw({item},{},view,projection,eye,nullptr,.4)==1,"Every source particle pool must submit its actual shader and attributes");
+                GLint equation=0;glGetIntegerv(GL_BLEND_EQUATION_RGB,&equation);check(equation==GL_FUNC_REVERSE_SUBTRACT&&glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE),"Source particle draws must restore caller GL state");
+                std::vector<unsigned char> pixels(128*128*4);glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+                int visible=0;for(std::size_t p=0;p<pixels.size();p+=4)if(pixels[p]>20||pixels[p+1]>20||pixels[p+2]>20)++visible;
+                check(visible>5&&glGetError()==GL_NO_ERROR,"A source particle pool must render visible native pixels without GL errors: "+std::to_string(i));
+                stbi_flip_vertically_on_write(1);stbi_write_png(("build/captures/worldfx/pool-"+std::to_string(i)+".png").c_str(),128,128,4,pixels.data(),128*4);
+            }
+            glBlendEquation(GL_FUNC_ADD);glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);glPolygonOffset(0,0);
+            CharacterPose steady(characterData,characterData.rig(0,0,0),"shaker-grip","shooter"),shaking(characterData,characterData.rig(0,0,0),"shaker-grip","shooter");
+            steady.setSub("shaker");shaking.setSub("shaker");CharacterAnimState input;input.subAim=true;CharacterSceneInput scene;
+            for(int frame=0;frame<60;++frame){steady.update(1./60,input,scene);shaking.update(1./60,input,scene);}
+            input.shakerCharging=true;input.shakerCharge=1;
+            const auto shaken=shaking.update(1./60,input,scene);input.shakerCharging=false;const auto held=steady.update(1./60,input,scene);
+            check(shaken.shakerKick>0&&held.shakerKick==0,"Shaker lamps must share the charging grip kick on a level transition");
+            const glm::dvec4 grip(0,.1915,0,1);
+            check(glm::distance(glm::dvec3(shaken.subPropWorld*grip),glm::dvec3(held.subPropWorld*grip))<1e-5,"A charging Shaker must rattle around the held grip without detaching from the hand");
+            check(glm::distance(shaken.subNozzle,held.subNozzle)>1e-5,"Shaker vent FX must follow the animated can's nozzle");
+        }
+        {
+            FacePaint bombPaint(*stage,geometry);CombatWorld bombWorld(*stage,geometry,bombPaint);
+            PlayerSimulation bomber(*stage,geometry,bombPaint,0,&bombWorld);bomber.spawnAt(anchor,0);
+            bombWorld.deploy(bomber,"bomb");
+            auto& bomb=const_cast<std::vector<CombatDevice>&>(bombWorld.devices()).back();
+            bomb.pos=anchor+glm::dvec3(0,.2,0);bomb.vel={0,0,0};
+            const double fuse=GetEquipment(EquipmentCategory::Sub,"bomb").number("fuse");bomb.fuse=fuse*.5;
+            DeviceRenderer sourceModels;WorldEffects danger(characterData);danger.SetDeviceRenderer(&sourceModels);
+            danger.Update(1./60,bombWorld,anchor+glm::dvec3(0,12,0));
+            auto ring=std::find_if(danger.worldItems().begin(),danger.worldItems().end(),[](const auto& p){return p.shape==WorldFxShape::Ring&&p.style==3;});
+            check(ring!=danger.worldItems().end(),"Source device models must not suppress the armed bomb danger ring");
+            check(std::abs(ring->age-.5)<1e-6&&std::abs(ring->radius-GetEquipment(EquipmentCategory::Sub,"bomb").number("radius"))<1e-6,"Bomb warning must use source fuse progress and actual blast radius");
+            glViewport(0,0,128,128);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            danger.Draw(glm::lookAt(glm::vec3(anchor)+glm::vec3(0,12,0),glm::vec3(anchor),glm::vec3(0,0,-1)),glm::ortho(-5.f,5.f,-5.f,5.f,.1f,30.f),glm::vec3(anchor)+glm::vec3(0,12,0));
+            std::vector<unsigned char> pixels(128*128*4);glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+            int visible=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++visible;
+            check(visible>100,"The fuse danger region must produce visible native GPU pixels");
+            bomb.live=false;danger.Update(1./60,bombWorld,anchor);
+            check(danger.worldItems().empty(),"An exploded or removed bomb must not leave a stale danger region");
+        }
         {
             FacePaint walkPaint(*stage,geometry);
             CombatWorld walkWorld(*stage,geometry,walkPaint);

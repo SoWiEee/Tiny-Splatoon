@@ -5,6 +5,7 @@
 #include "WeaponRunner.hpp"
 #include "CharacterPose.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
@@ -67,6 +68,8 @@ public:
     double lastDamage() const { return lastDamage_; }
     WeaponProfile weaponProfile() const { return runner_.profile(); }
     CombatPose combatPose() const;
+    double crosshairSpreadDegrees() const { return runner_.spread(); }
+    double streamDuration() const;
     SpecialPose specialPose() const;
     double hitRadius() const;
     double hitHeight() const;
@@ -119,6 +122,12 @@ public:
         deaths_=std::max(0,deaths);splats_=std::max(0,splats);shotsFired_=std::max(0,shots);
     }
     glm::dvec3 muzzle(int side=0) const { return runner_.muzzle(side); }
+    glm::dvec3 aimDirection() const { return aimDir(); }
+    glm::dmat4 tankWorld() const { return tankSource_?tankSource_():glm::translate(glm::dmat4(1),state.pos+glm::dvec3(0,1.25,0)); }
+    void setTankSource(std::function<glm::dmat4()> source) { tankSource_=std::move(source); }
+    glm::dvec3 subNozzle() const { return subNozzleSource_?subNozzleSource_().first:state.pos+glm::dvec3(0,1.2,0); }
+    glm::dvec3 subNozzleDirection() const { return subNozzleSource_?subNozzleSource_().second:glm::dvec3(0,1,0); }
+    void setSubNozzleSource(std::function<std::pair<glm::dvec3,glm::dvec3>()> source) { subNozzleSource_=std::move(source); }
     void setMuzzleSource(std::function<glm::dvec3(int)> source) { muzzleSource_=std::move(source); }
 
     PlayerState state;
@@ -179,6 +188,8 @@ private:
     std::function<void(double,const glm::dvec3*)> damageSink_;
     std::function<void(bool)> splatSink_;
     std::function<glm::dvec3(int)> muzzleSource_;
+    std::function<glm::dmat4()> tankSource_;
+    std::function<std::pair<glm::dvec3,glm::dvec3>()> subNozzleSource_;
 };
 
 } // namespace restoration

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
-const expected = JSON.parse(await readFile(new URL('./boss_nav_fixtures.json', import.meta.url), 'utf8'));
+const expected = JSON.parse(await readFile(new URL('./fixtures/boss_nav_fixtures.json', import.meta.url), 'utf8'));
 const rows = execFileSync(process.argv[2], [], { encoding: 'utf8', timeout: 600000 }).trim().split(/\r?\n/);
 const near = (got, want, label) => assert.ok(Math.abs(got - want) < 0.00002, `${label}: ${got} != ${want}`);
 let line = 0, checks = 0;

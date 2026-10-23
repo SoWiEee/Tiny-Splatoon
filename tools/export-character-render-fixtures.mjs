@@ -2,7 +2,7 @@ import { readFile,writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 const root=resolve(import.meta.dirname,'..'),check=process.argv.includes('--check');
 if(process.argv.slice(2).some(arg=>arg!=='--check'))throw new Error('Usage: node tools/export-character-render-fixtures.mjs [--check]');
-const source=JSON.parse(await readFile(resolve(root,'tests/character_pose_fixtures.json'),'utf8'));
+const source=JSON.parse(await readFile(resolve(root,'tests/fixtures/character_pose_fixtures.json'),'utf8'));
 const { captureCharacterPose }=await import('./export-character-pose.mjs');
 const THREE=await import('three');
 const { Character }=await import('../splat-ref/src/game/character.js');
@@ -54,8 +54,8 @@ for(const matrix of tankCases){
     }finally{c.dispose();}
 }
 tankOut+='}};\n}\n';
-const tankTarget=resolve(root,'tests/character_tank_fixtures.hpp');
+const tankTarget=resolve(root,'tests/fixtures/character_tank_fixtures.hpp');
 if(check){if(await readFile(tankTarget,'utf8')!==tankOut)throw new Error('Stale source tank uniform fixtures');}else await writeFile(tankTarget,tankOut);
-const target=resolve(root,'tests/character_render_fixtures.hpp');
+const target=resolve(root,'tests/fixtures/character_render_fixtures.hpp');
 if(check){if(await readFile(target,'utf8')!==out)throw new Error('Stale source render fixtures');}else await writeFile(target,out);
 console.log(`${check?'Verified':'Exported'} 12 weapon and 10 preset source snapshots for native renderer tests`);

@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "WorldEffects.hpp"
+#include "WorldFxParticleRenderer.hpp"
 #include "WorldFxTransitions.hpp"
 #include "TeamPalette.hpp"
 #include "DeviceRenderer.hpp"
@@ -25,10 +26,9 @@ namespace restoration {
 namespace {
 constexpr float pi=3.14159265358979323846f;
 constexpr glm::vec3 orange{1.0f,0.5412f,0.0784f},blue{0.1843f,0.3569f,1.0f};
-glm::vec3 ink(int team) { return SrgbInkColors[team==1?1:0]; }
+glm::vec3 ink(int team) { return glm::vec3(InkColors[team==1?1:0]); }
 glm::vec3 unit(glm::vec3 v) { return glm::length(v)>1e-5f?glm::normalize(v):glm::vec3(0,1,0); }
 float clamp01(float v) { return std::clamp(v,0.0f,1.0f); }
-struct Vertex { glm::vec4 posRadius, normalLength, colorAlpha, meta, velocity; };
 GLuint shader(GLenum type,const char* source) {
     const GLuint id=glCreateShader(type);
     glShaderSource(id,1,&source,nullptr);glCompileShader(id);
@@ -36,99 +36,6 @@ GLuint shader(GLenum type,const char* source) {
     if(!ok) { char log[4096]{};glGetShaderInfoLog(id,sizeof(log),nullptr,log);glDeleteShader(id);throw std::runtime_error(std::string("WorldEffects shader: ")+log); }
     return id;
 }
-constexpr const char* vertexSource=R"GLSL(#version 450 core
-layout(location=0) in vec4 posRadius;
-layout(location=1) in vec4 normalLength;
-layout(location=2) in vec4 colorAlpha;
-layout(location=3) in vec4 meta;
-layout(location=4) in vec4 velocity;
-out V {vec3 pos;vec3 normal;vec3 color;vec3 vel;float radius;float length;float alpha;float shape;float age;float style;float seed;} v;
-void main(){v.pos=posRadius.xyz;v.radius=posRadius.w;v.normal=normalLength.xyz;v.length=normalLength.w;
-v.color=colorAlpha.rgb;v.alpha=colorAlpha.a;v.shape=meta.x;v.age=meta.y;v.style=meta.z;v.seed=meta.w;
-v.vel=velocity.xyz;gl_Position=vec4(posRadius.xyz,1.0);}
-)GLSL";
-constexpr const char* geometrySource=R"GLSL(#version 450 core
-layout(points) in;
-layout(triangle_strip,max_vertices=16) out;
-in V {vec3 pos;vec3 normal;vec3 color;vec3 vel;float radius;float length;float alpha;float shape;float age;float style;float seed;} v[];
-out vec2 uv;out vec3 col;out vec3 world;out vec3 nrm;out float alpha;out float shape;out float age;out float style;out float seed;
-uniform mat4 view;uniform mat4 projection;
-void quad(vec3 center,vec3 right,vec3 up){
-  vec2 q[4]=vec2[4](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1));
-  for(int i=0;i<4;i++){uv=q[i];world=center+right*q[i].x+up*q[i].y;
-    gl_Position=projection*view*vec4(world,1);EmitVertex();}
-  EndPrimitive();
-}
-void main(){
-  col=v[0].color;alpha=v[0].alpha;shape=v[0].shape;age=v[0].age;style=v[0].style;seed=v[0].seed;
-  vec3 camR=vec3(view[0][0],view[1][0],view[2][0]);
-  vec3 camU=vec3(view[0][1],view[1][1],view[2][1]);
-  vec3 axis=normalize(v[0].normal);nrm=axis;
-  float r=v[0].radius;
-  if(shape==3.0){vec3 ref=abs(axis.y)<0.95?vec3(0,1,0):vec3(1,0,0);
-    vec3 right=normalize(cross(ref,axis));quad(v[0].pos+axis*0.025,right*r,cross(axis,right)*r);return;}
-  if(shape==5.0||shape==6.0){vec3 right=normalize(cross(axis,camU));if(length(right)<0.001)right=camR;
-    vec3 up=axis*max(v[0].length,0.01)*0.5;
-    quad(v[0].pos+up,right*r,up);quad(v[0].pos+up,normalize(cross(axis,right))*r,up);return;}
-  if(shape==9.0){quad(v[0].pos,camR*r,camU*r*1.8);return;}
-  if(shape==10.0){quad(v[0].pos,camR*r,camU*r*1.25);return;}
-  if(shape==0.0){vec2 projected=(view*vec4(v[0].vel,0)).xy;float stretch=1.0+min(length(projected)*0.09,3.0);
-    vec3 up=length(projected)>0.01?normalize(camR*projected.x+camU*projected.y):camU;
-    quad(v[0].pos,normalize(cross(up,normalize(vec3(view[0][2],view[1][2],view[2][2]))))*r/sqrt(stretch),up*r*stretch);return;}
-  quad(v[0].pos,camR*r,camU*r);
-}
-)GLSL";
-constexpr const char* fragmentSource=R"GLSL(#version 450 core
-in vec2 uv;in vec3 col;in vec3 world;in vec3 nrm;in float alpha;in float shape;in float age;in float style;in float seed;
-out vec4 outColor;uniform float time;
-float hash(vec2 p){vec3 p3=fract(vec3(p.xyx)*0.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
-float noise(vec2 p){vec2 i=floor(p),f=fract(p),u=f*f*(3.0-2.0*f);
-return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
-void main(){float r=length(uv),a=0;vec3 c=col;float t=clamp(age,0,1);
- if(shape==0.0){
-   float tail=clamp(length(uv)*0.2,0,1);float y=uv.y+0.22*tail;
-   a=1.0-smoothstep(0.86,1.0,length(vec2(uv.x,y)));
-   float z=sqrt(max(0.0,1.0-dot(uv,uv)));float rim=pow(1.0-z,2.2);
-   c=col*(0.55+0.65*max(z*0.8+uv.y*0.2,0.0));c+=col*(col+0.25)*pow(max(-uv.x,0),1.5)*0.25;
-   c=mix(c,vec3(0.48,0.66,0.95),rim*0.26);c+=vec3(1.0,0.95,0.82)*pow(max(1.0-length(uv-vec2(-0.28,0.33))*2.6,0),18.0)*1.7;
- }else if(shape==1.0){float n=noise(uv*3.1+seed*19.0+t*1.5);float edge=0.58+(n-0.5)*0.35;
-   a=smoothstep(1.0,edge*0.7,r+(n-0.5)*0.2)*(1.0-t*t);c*=0.76+0.28*uv.y+0.15*n;
- }else if(shape==2.0){
-   float kind=floor(style/10.0+0.001),core=style-kind*10.0;
-   if(kind<0.5){float g=pow(max(1.0-r,0.0),2.2),hot=pow(max(1.0-r*1.8,0.0),3.0);c=col*g+vec3(1.0,0.97,0.92)*hot*core;}
-   else if(kind<1.5){float cr=max(exp(-abs(uv.x)*22.0)*exp(-abs(uv.y)*2.6),exp(-abs(uv.y)*22.0)*exp(-abs(uv.x)*2.6));vec2 d=vec2(uv.x+uv.y,uv.x-uv.y)*0.7071;float dg=max(exp(-abs(d.x)*30.0)*exp(-abs(d.y)*6.0),exp(-abs(d.y)*30.0)*exp(-abs(d.x)*6.0))*0.4;float halo=pow(max(1.0-r,0.0),3.0)*0.45,hot=pow(max(1.0-r*3.2,0.0),2.0);c=col*(cr+dg+halo)+vec3(1.0,0.98,0.95)*hot*core;}
-   else if(kind<2.5){float rim=smoothstep(0.16,0.0,abs(r-0.8))*0.8+smoothstep(0.5,0.95,r)*step(r,0.9)*0.25;float hl=smoothstep(0.24,0.0,length(uv-vec2(-0.3,0.34)));c=col*rim+vec3(1.0)*hl*(0.6+core*0.2);}
-   else{float rim=exp(-pow((r-0.78)*7.0,2.0));c=col*rim+vec3(1.0)*rim*rim*core*0.3;}
-   outColor=vec4(c*alpha,1.0);return;
- }else if(shape==3.0){float ang=atan(uv.y,uv.x),wob=(noise(vec2(cos(ang),sin(ang))*3.0+seed*53.0)-0.5)*0.1;
-   if(style<0.5){float outer=0.93+wob,w=mix(0.34,0.07,t);a=smoothstep(outer+0.02,outer-0.02,r)*smoothstep(outer-w-0.03,outer-w+0.02,r)*pow(1.0-t,1.3);}
-   else if(style<1.5){a=smoothstep(0.98,0.86,r)*smoothstep(0.74,0.84,r)*pow(1.0-t,2.0);c=mix(c,vec3(1),0.35);}
-   else if(style<2.5){a=smoothstep(0.95+wob,0.65+wob,r)*pow(1.0-t,2.0);}
-   else if(style<3.5){float rim=smoothstep(0.05,0.012,abs(r-0.95));float dash=step(0.45,fract(ang/6.28318*16.0-time*(0.5+t*1.8)))*smoothstep(0.04,0.012,abs(r-0.87));a=max(max(rim,dash),0.12+0.2*t);a*=step(r,0.99);}
-   else if(style<4.5){float outer=smoothstep(0.045,0.012,abs(r-0.94)),inner=smoothstep(0.03,0.008,abs(r-0.56));float core=smoothstep(0.2,0.14,r)*(0.7+0.3*sin(time*9.0));a=max(max(outer,inner),core);}
-   else if(style<5.5){a=smoothstep(0.9+wob,0.6+wob,r)*smoothstep(0.15,0.4,r)*pow(1.0-t,1.6)*0.5;}
-   else {a=exp(-pow((r-0.93)/mix(0.14,0.035,t),2.0))*pow(1.0-t,1.1);c=mix(c,vec3(1),0.4);}
- }else if(shape==4.0){float n=noise(uv*4.0+seed*17.0+time*0.3);float holes=smoothstep(0.35+0.5*t,0.52+0.5*t,n);
-   a=(1.0-smoothstep(0.85,1.0,r))*holes;c*=0.65+0.35*(1.0-r*r);c+=col*pow(max(uv.y,0),3.0)*0.3;
- }else if(shape==5.0){float band=sin(uv.y*34.0-time*30.0+uv.x*11.0);float edge=1.0-smoothstep(0.7,1.0,abs(uv.x));
-   a=edge*(0.35+0.5*max(band,0.0))*(1.0-t*0.25);c=mix(c,vec3(1),max(band,0.0)*0.32);
- }else if(shape==6.0){float ang=atan(uv.y,uv.x);float spiral=sin(uv.y*24.0+uv.x*12.0-time*19.0+seed*6.0);
-   float wide=mix(0.28,1.0,(uv.y+1.0)*0.5);a=(1.0-smoothstep(wide*0.7,wide,abs(uv.x)))*(0.5+0.5*spiral)*(1.0-t*0.65);
-   c=mix(c,vec3(1),0.22+0.28*max(spiral,0.0));
- }else if(shape==7.0){float rim=exp(-pow((r-0.86)*8.0,2.0));float glare=pow(max(1.0-length(uv-vec2(-0.32,0.36))*2.3,0.0),8.0);
-   a=(0.18+rim*0.62+glare*0.55)*(1.0-smoothstep(0.97,1.0,r));c=mix(col,vec3(1),glare*0.8+rim*0.23);
- }else if(shape==8.0){a=(1.0-smoothstep(0.82,1.0,r))*(1.0-t*0.6);c=col*(1.2+0.8*(1.0-r));
- }else if(shape==9.0){float head=step(-0.4,uv.y)*step(0.12,uv.y)*step(abs(uv.x),0.7);
-   float handle=step(uv.y,-0.25)*step(-0.9,uv.y)*step(abs(uv.x),0.11);
-   a=max(head,handle)*(1.0-t*0.3);c=col*(0.65+0.35*uv.y);
- }else {float body=step(abs(uv.x),0.8)*step(abs(uv.y),0.8);float cone=smoothstep(0.65,0.55,length(uv-vec2(0,0.15)));
-   a=body*(0.65+0.35*cone);c=mix(vec3(0.12,0.16,0.22),col,cone*0.85);}
- a*=alpha;if(a<0.004)discard;outColor=vec4(c,a);
-}
-)GLSL";
-
-// specials.js SWIRL_VS/FS, BEAM_FS and BUBBLE_VS/FS. Geometry and UVs are
-// exported directly from the same THREE.js constructors used by the source.
 constexpr const char* sourceVertexSource=R"GLSL(#version 450 core
 layout(location=0) in vec3 position;
 layout(location=1) in vec3 normal;
@@ -222,9 +129,6 @@ WorldEffects::WorldEffects(const CharacterData& data):data_(&data) {}
 WorldEffects::~WorldEffects() {
     sourceMeshes_.clear();
     if(sourceProgram_)glDeleteProgram(sourceProgram_);
-    if(vbo_)glDeleteBuffers(1,&vbo_);
-    if(vao_)glDeleteVertexArrays(1,&vao_);
-    if(program_)glDeleteProgram(program_);
 }
 float WorldEffects::random() { random_^=random_<<13;random_^=random_>>17;random_^=random_<<5;return float(double(random_)/4294967296.0); }
 glm::vec3 WorldEffects::cone(glm::vec3 normal,float spread) {
@@ -245,34 +149,13 @@ void WorldEffects::spawn(Item item) {
     } else live_.push_back(item);
 }
 void WorldEffects::burst(glm::vec3 pos,glm::vec3 normal,glm::vec3 color,float size,int count) {
-    normal=unit(normal);
-    for(int i=0;i<count;i++) {
-        const glm::vec3 dir=cone(normal,0.9f*pi*0.5f),at=pos+normal*0.04f;
-        const float speed=4.0f*(0.5f+random()*0.8f),sz=size*(0.35f+random()*0.6f);
-        spawn({Shape::Drop,at,dir*speed,normal,color,sz,0,0,1.6f+random()*0.6f,1,0,random()});
-        if(random()<0.45f) {
-            const float sat=speed*(0.7f+random()*0.5f);
-            spawn({Shape::Drop,at,dir*sat+glm::vec3((random()-0.5f)*0.8f,(random()-0.5f)*0.8f,(random()-0.5f)*0.8f),normal,color,sz*0.4f,0,0,1.2f,1,0,random()});
-        }
-    }
-    const float splash=size*(1.6f+0.5f*std::sqrt(float(count)));
-    if(count>=4)spawn({Shape::Shell,pos+normal*splash*0.12f,{},normal,color,splash*1.1f,0,0,0.17f+splash*0.12f,0.95f,0,random()});
+    WorldFxRecipeContext context;context.count=count;context.size=size;
+    auto items=BuildWorldFxRecipe("burst",pos,normal,color,0,random_,-1.6,camera_,{},context);
+    for(auto& item:items)spawn(std::move(item));
 }
 void WorldEffects::explosion(glm::vec3 pos,glm::vec3 color,float radius) {
-    const float rv=std::min(radius,2.4f),speed=std::sqrt(std::max(radius,0.1f)/3.0f);
-    spawn({Shape::Glow,pos,{},{0,1,0},color*4.5f,rv*0.85f,0,0,0.12f,1,0,random()});
-    spawn({Shape::Glow,pos,{},{0,1,0},color*1.15f,rv*1.6f,0,0,0.17f,0.5f,0,random()});
-    spawn({Shape::Shell,pos,{},{0,1,0},color,rv*0.78f,0,0,0.34f,1,0,random()});
-    auto drops=[&](int n,float size,float life,float scale) {
-        for(int i=0;i<n;i++) { const float a=random()*2*pi,r=random();
-            const glm::vec3 d=unit(glm::vec3(std::cos(a)*std::sqrt(1-r*r),r*0.85f+0.12f,std::sin(a)*std::sqrt(1-r*r)));
-            spawn({Shape::Drop,pos+d*(rv*0.3f),d*(scale*(0.7f+random()*0.6f)*speed),d,color,size*(0.7f+random()*0.6f),0,0,life,1,0,random()});
-        }
-    };
-    drops(26,0.045f,1.6f,9.5f);drops(6,0.085f,2.2f,4.0f);drops(18,0.02f,1.0f,7.0f);
-    spawn({Shape::Ring,pos,{},{0,1,0},color,radius,0,0,0.55f,0.9f,0,random()});
-    for(int i=0;i<4;i++)spawn({Shape::Puff,pos+glm::vec3((random()-0.5f)*radius,random()*radius*0.4f,(random()-0.5f)*radius),
-        glm::vec3((random()-0.5f)*2,0.5f+random(),(random()-0.5f)*2),{0,1,0},glm::mix(color,glm::vec3(1),0.42f),rv*0.45f,0,0,0.55f+random()*0.3f,0.15f,0,random()});
+    auto items=BuildWorldFxRecipe("explosion",pos,{0,1,0},color,radius,random_,-1.6,camera_);
+    for(auto& item:items)spawn(std::move(item));
 }
 void WorldEffects::emitSpecial(const char* kind,glm::vec3 pos,glm::vec3 normal,glm::vec3 color,float radius,glm::vec3 camera) {
     const std::string_view recipe(kind);
@@ -309,11 +192,24 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
     const auto add=[&](Item item){if(world_.size()<2048)world_.push_back(item);};
 
     lastEvents_=combat.takeVisualEvents();
+    weaponHooks(dt,combat,camera);
+    weaponDeviceHooks(dt,combat,camera);
+    kitHooks(dt,combat,camera);
+    specialHooks(dt,combat,camera);
+    warningHooks(dt,combat,camera);
     for(const auto& event:lastEvents_) {
         if(event.kind=="device_arm"||event.kind=="device_warning"||event.kind=="device_hit"||event.kind=="device_destroy"
            ||event.kind=="special_warning"||event.kind=="special_audio"||event.kind=="bubble_pop")continue;
         if(event.kind=="beam")continue; // Source charger ribbons are owned by ProjectileRenderer.
         if(!near(event.pos,65))continue;
+        if(event.kind=="bulletImpact") {
+            const bool blast=event.source=="blast";
+            WorldFxRecipeContext context;context.count=blast?14:5;context.speed=blast?5:3;context.size=0.07;context.paint=false;
+            WorldFxRippleSink ripple;if(paint_)ripple=[this](glm::dvec3 p,double a,double w,double s,double l){paint_->requestVisualRipple({p,a,w,s,l});};
+            auto particles=BuildWorldFxRecipe("burst",event.pos,event.normal,ink(event.team),0,random_,-1.6,camera,ripple,context);
+            for(auto& particle:particles)spawn(std::move(particle));
+            continue;
+        }
         emitSpecial(event.kind.c_str(),glm::vec3(event.pos),glm::vec3(event.normal),ink(event.team),float(event.radius),glm::vec3(camera));
     }
 
@@ -439,8 +335,6 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
                 cloudPuff(std::cos(a)*r,y,std::sin(a)*r,size,true);
             }
             cloudPuff(0,1.15f,0,1.0f,true);
-            if(dt>0)for(int i=0,n=int(radius*radius*3.2f*dt+random());i<n;i++){float a=random()*2*pi,rr=std::sqrt(random())*radius*0.95f;
-                spawn({Shape::Drop,pos+glm::vec3(std::cos(a)*rr,-0.4f,std::sin(a)*rr),{0.35f,-19.0f-random()*4,0.12f},{0,1,0},glm::mix(col,glm::vec3(1),0.35f),0.022f+random()*0.012f,0,0,1,0.9f,0,random()});}
         } else if(object.kind=="strikeMissile") {
             const float flight=std::max(timer,0.01f),k=clamp01(age/flight);
             const glm::vec3 target(object.target),from=pos;
@@ -491,12 +385,21 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
     for(const auto& device:combat.devices()) {
         if(!device.live||!near(device.pos,65))continue;
         const glm::vec3 pos(device.pos),col=ink(device.team);
+        // The warning is independent of the solid device model.
+        if(device.kind=="bomb"&&device.fuse>=0&&near(device.pos,40)){
+            const auto ground=combat.geometry().raycast(device.pos+glm::dvec3(0,.3,0),{0,-1,0},2.5,true);
+            const glm::vec3 normal=ground.hit?glm::vec3(ground.normal):glm::vec3(0,1,0);
+            const glm::vec3 point=ground.hit?glm::vec3(ground.point):pos-glm::vec3(0,.2f,0);
+            const auto& spec=GetEquipment(EquipmentCategory::Sub,"bomb");
+            const float k=clamp01(float(1-device.fuse/std::max(spec.number("fuse"),.001)));
+            add({Shape::Ring,point+normal*.02f,{},normal,col,float(spec.number("radius")),0,k,1,.95f,3,.37f});
+        }
         if(models_&&device.kind!="sonar")continue;
         if(device.kind=="sonar")add({Shape::Ring,pos,{},{0,1,0},col,float(device.radius),0,0,1,0.8f,7,0});
         else if(device.shield)add({Shape::Bubble,pos,{},{0,1,0},col,float(std::max(device.R,device.radius)),0,0,1,0.45f,0,0});
         else {
             add({Shape::Orb,pos,{},{0,1,0},col,float(std::clamp(device.radius*0.3,0.15,0.6)),0,0,1,0.9f,0,0});
-            if(device.fuse>0)add({Shape::Ring,pos,{},{0,1,0},col,float(std::max(device.radius,0.6)),0,0,1,0.7f,3,0});
+            if(device.kind!="bomb"&&device.fuse>0)add({Shape::Ring,pos,{},{0,1,0},col,float(std::max(device.radius,0.6)),0,0,1,0.7f,3,0});
         }
     }
 
@@ -519,29 +422,18 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
     UpdateWorldFxRecipe(live_,dt,random_,collider,-1.6f,paint_!=nullptr,true,speck,ripple);
 }
 
-void WorldEffects::Clear(){live_.clear();world_.clear();lastEvents_.clear();actors_.clear();time_=0;}
+#include "WorldFxKitHooks.inc"
+#include "WorldFxSpecialHooks.inc"
+#include "WorldFxWeaponHooks.inc"
+#include "WorldFxWeaponDeviceHooks.inc"
+#include "WorldFxKitWarnings.inc"
+
+void WorldEffects::Clear(){live_.clear();world_.clear();lastEvents_.clear();actors_.clear();weaponActors_.clear();kitActors_.clear();kitDevices_.clear();sloshHeads_.clear();weaponTrailDistance_.clear();bombFx_.clear();specialFx_.clear();warningActors_.clear();warningObjects_.clear();time_=0;}
 WorldEffects::Counts WorldEffects::counts() const {
     Counts c;c.world=world_.size();
     for(const auto& p:live_)switch(p.shape){case Shape::Drop:++c.drops;break;case Shape::Puff:++c.puffs;break;
         case Shape::Glow:++c.glows;break;case Shape::Ring:++c.rings;break;case Shape::Shell:++c.shells;break;case Shape::Beam:++c.beams;break;default:break;}
     return c;
-}
-
-void WorldEffects::initGpu() {
-    if(program_)return;
-    const GLuint vs=shader(GL_VERTEX_SHADER,vertexSource);
-    GLuint gs=0,fs=0;
-    try { gs=shader(GL_GEOMETRY_SHADER,geometrySource);fs=shader(GL_FRAGMENT_SHADER,fragmentSource); }
-    catch(...) {glDeleteShader(vs);if(gs)glDeleteShader(gs);throw;}
-    const GLuint p=glCreateProgram();glAttachShader(p,vs);glAttachShader(p,gs);glAttachShader(p,fs);glLinkProgram(p);
-    glDeleteShader(vs);glDeleteShader(gs);glDeleteShader(fs);
-    GLint ok=0;glGetProgramiv(p,GL_LINK_STATUS,&ok);
-    if(!ok){char log[4096]{};glGetProgramInfoLog(p,sizeof(log),nullptr,log);glDeleteProgram(p);throw std::runtime_error(std::string("WorldEffects link: ")+log);}
-    GLuint vao=0,vbo=0;glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
-    glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,vbo);
-    for(GLuint i=0;i<5;++i){glEnableVertexAttribArray(i);glVertexAttribPointer(i,4,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(sizeof(glm::vec4)*i));}
-    glBindVertexArray(0);glBindBuffer(GL_ARRAY_BUFFER,0);
-    program_=p;vao_=vao;vbo_=vbo;
 }
 
 void WorldEffects::initSourceGpu() {
@@ -710,49 +602,8 @@ int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& project
 
 int WorldEffects::Draw(const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const CharacterLightState* lights) {
     if(live_.empty()&&world_.empty())return 0;
-    std::vector<Vertex> vertices,glows;vertices.reserve(live_.size()+world_.size());
-    const auto sourceShape=[](WorldFxShape shape){return shape==Shape::Swirl||shape==Shape::Bubble||shape==Shape::Orb
-        ||shape==Shape::Stamp||shape==Shape::Speaker||shape==Shape::Missile||shape==Shape::Cloud
-        ||shape==Shape::WarningRing||shape==Shape::SourceBeam;};
-    const auto collect=[&](const std::vector<Item>& items) {
-        for(const auto& p:items) {
-            if(sourceShape(p.shape)||p.radius<=0||p.alpha<=0)continue;
-            const bool glow=p.shape==Shape::Glow;
-            auto& batch=glow?glows:vertices;
-            batch.push_back({glm::vec4(p.pos,glow?p.renderRadius:p.radius),glm::vec4(unit(p.normal),p.length),
-                glm::vec4(p.color,glow?p.renderAlpha:p.alpha),glm::vec4(float(static_cast<int>(p.shape)),
-                    p.life>0?clamp01(p.age/p.life):0,glow?p.kind:p.style,p.seed),glm::vec4(p.vel,0)});
-        }
-    };
-    collect(live_);collect(world_);
-    int calls=0;
-    if(!vertices.empty()||!glows.empty()){
-        initGpu();
-        GLint oldProgram=0,oldVao=0,oldBuffer=0,oldSrc=0,oldDst=0,oldSrcAlpha=0,oldDstAlpha=0,oldEquation=0,oldEquationAlpha=0;
-        GLboolean oldDepth=GL_TRUE;
-        const GLboolean blended=glIsEnabled(GL_BLEND),culled=glIsEnabled(GL_CULL_FACE);
-        glGetIntegerv(GL_CURRENT_PROGRAM,&oldProgram);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&oldVao);
-        glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&oldBuffer);glGetIntegerv(GL_BLEND_SRC_RGB,&oldSrc);glGetIntegerv(GL_BLEND_DST_RGB,&oldDst);glGetIntegerv(GL_BLEND_SRC_ALPHA,&oldSrcAlpha);glGetIntegerv(GL_BLEND_DST_ALPHA,&oldDstAlpha);glGetIntegerv(GL_BLEND_EQUATION_RGB,&oldEquation);glGetIntegerv(GL_BLEND_EQUATION_ALPHA,&oldEquationAlpha);
-        glGetBooleanv(GL_DEPTH_WRITEMASK,&oldDepth);
-        glEnable(GL_BLEND);glDisable(GL_CULL_FACE);glDepthMask(GL_FALSE);glBlendEquation(GL_FUNC_ADD);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-        glUseProgram(program_);glUniformMatrix4fv(glGetUniformLocation(program_,"view"),1,GL_FALSE,glm::value_ptr(view));
-        glUniformMatrix4fv(glGetUniformLocation(program_,"projection"),1,GL_FALSE,glm::value_ptr(projection));
-        glUniform1f(glGetUniformLocation(program_,"time"),time_);
-        glBindVertexArray(vao_);glBindBuffer(GL_ARRAY_BUFFER,vbo_);
-        glBufferData(GL_ARRAY_BUFFER,GLsizeiptr(vertices.size()*sizeof(Vertex)),vertices.data(),GL_STREAM_DRAW);
-        if(!vertices.empty())glDrawArrays(GL_POINTS,0,GLsizei(vertices.size()));
-        if(!glows.empty()){
-            // fx.js GLOW_FRAG emits premultiplied light into an additive pass.
-            glBlendFunc(GL_ONE,GL_ONE);
-            glBufferData(GL_ARRAY_BUFFER,GLsizeiptr(glows.size()*sizeof(Vertex)),glows.data(),GL_STREAM_DRAW);
-            glDrawArrays(GL_POINTS,0,GLsizei(glows.size()));
-        }
-        glBindBuffer(GL_ARRAY_BUFFER,GLuint(oldBuffer));glBindVertexArray(GLuint(oldVao));glUseProgram(GLuint(oldProgram));
-        glDepthMask(oldDepth);glBlendFuncSeparate(GLenum(oldSrc),GLenum(oldDst),GLenum(oldSrcAlpha),GLenum(oldDstAlpha));glBlendEquationSeparate(GLenum(oldEquation),GLenum(oldEquationAlpha));
-        if(culled)glEnable(GL_CULL_FACE);if(!blended)glDisable(GL_BLEND);
-        ++calls;
-    }
-    calls+=drawSourceItems(view,projection,camera,lights);
-    return calls;
+    if(!particles_)particles_=std::make_unique<WorldFxParticleRenderer>();
+    const int props=drawSourceItems(view,projection,camera,lights);
+    return props+particles_->Draw(live_,world_,view,projection,camera,lights,time_);
 }
 }

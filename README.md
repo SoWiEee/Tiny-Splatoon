@@ -24,12 +24,13 @@
 - 角色換裝、主／副／特殊武器、Bot AI 與固定 60 Hz 模擬。
 - 連續墨水、動態場景、陰影／反射／後製與可調畫質。
 - 繁中介面、Noto Sans TC／Inter、音樂與定位音效、玩家資料自動保存。
+- GNS 私人房碼、八人房間、換主與遊戲同步；存活名單、隊友名牌、武器準心及動態墨槽。
 
 ![原生標題與角色預覽](docs/images/menu.png)
-*標題選單與角色預覽。*
+*新版選單、參考版烏賊圖樣與角色預覽。*
 
 ![塗地對戰遊戲畫面](docs/images/turf.png)
-*原生塗地對戰。*
+*原生塗地對戰、隊伍存活名單、隊友名牌與準心墨槽。*
 
 ![區域爭奪遊戲畫面](docs/images/zones.png)
 *Zones 計數、控制區與小地圖。*
@@ -57,7 +58,7 @@ cmake --build build --parallel 4
 .\build\Tiny-Splatoon-Server.exe --bind 192.168.1.10 --port 27020
 ```
 
-請將範例 IP 換成服務電腦的實際位址。房間服務獨立於房主程序，房主離線後可由下一位玩家接手；跨網部署及 NAT 穿透尚未提供。詳見[多人連線契約](docs/network-source-contract.md)。
+請將範例 IP 換成服務電腦的實際位址。房間服務獨立於房主程序，房主離線後可由下一位玩家接手；跨網部署及 NAT 穿透尚未提供。詳見[多人連線契約](docs/contracts/network-source-contract.md)。
 
 ## ⌨️ Controls
 
@@ -79,7 +80,7 @@ ctest --test-dir build -C Release --output-on-failure
 .\build\Tiny-Splatoon.exe --reference-zones tidewater
 ```
 
-[擷取、效能與來源對照](docs/development.md) · [最新驗收](docs/acceptance-2026-10-22.md) · [發布流程](docs/release-workflow.md)
+[擷取、效能與來源對照](docs/development.md) · [最新驗收](docs/acceptance/acceptance-2026-10-23.md) · [HUD 差異](docs/audits/hud-source-audit.md) · [傷害核對](docs/audits/damage-source-audit.md) · [發布流程](docs/release-workflow.md)
 
 ## 🗂️ Project Layout
 
@@ -90,7 +91,7 @@ ctest --test-dir build -C Release --output-on-failure
 | `src/render/`、`src/gui/`、`src/audio/` | OpenGL、RmlUi 與 miniaudio |
 | `src/network/` | GNS 傳輸、房間服務及遊戲同步 |
 | `assets/` | 已匯出的原生資產、UI、字體與音訊 |
-| `tests/`、`tools/` | 回歸、來源匯出與效能工具 |
-| `docs/` | 契約、還原進度與驗收證據 |
+| [tests/](tests/README.md)、[tools/](tools/README.md) | 回歸測試、獨立 fixtures、來源匯出與效能工具 |
+| [docs/](docs/README.md) | 依契約、差異盤點、驗收及歷史紀錄分層 |
 
-[架構說明](architecture.md) · [UI 翻譯](docs/ui-translations.md) · [場景](docs/stage-visual-source-contract.md) · [視效](docs/worldfx-source-contract.md) · [音訊](docs/audio-source-contract.md)
+[架構說明](architecture.md) · [UI 翻譯](docs/ui-translations.md) · [場景](docs/contracts/stage-visual-source-contract.md) · [視效](docs/contracts/worldfx-source-contract.md) · [音訊](docs/contracts/audio-source-contract.md)

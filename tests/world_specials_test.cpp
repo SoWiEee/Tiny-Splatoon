@@ -1,7 +1,7 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/game/WorldSpecials.hpp"
 #include "../src/game/ArsenalData.hpp"
-#include "world_specials_source_fixtures.hpp"
+#include "fixtures/world_specials_source_fixtures.hpp"
 
 #include <cmath>
 #include <algorithm>

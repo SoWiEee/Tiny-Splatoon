@@ -1,5 +1,5 @@
 #include "../src/game/PlayerSimulation.hpp"
-#include "combat_kit_fixtures.hpp"
+#include "fixtures/combat_kit_fixtures.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>

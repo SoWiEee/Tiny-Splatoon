@@ -31,7 +31,7 @@ const output=['#pragma once','#include <array>','namespace restoration::test {',
   `inline constexpr std::array<CombatRunnerFixture, ${rows.length}> combatRunnerFixtures{{`,
   ...rows.map(r=>`  {"${r.id}",${n(r.dt)},${n(r.hold)},${r.frame},${[r.ink,r.charge,r.burst,r.speed].map(n).join(',')},${r.shots},${r.charging},${r.rolling},${r.firing},${r.busy}},`),
   '}};','}',''].join('\n');
-const path=new URL('./combat_runner_fixtures.hpp',import.meta.url);
+const path=new URL('./fixtures/combat_runner_fixtures.hpp',import.meta.url);
 if(process.argv.includes('--check')) {if(readFileSync(path,'utf8')!==output)throw new Error('Combat source action oracle differs');}
 else writeFileSync(path,output);
 console.log(`Locked WeaponRunner: ${rows.length} action/state snapshots`);

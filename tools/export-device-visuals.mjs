@@ -8,6 +8,7 @@ const {G}=await import('../splat-ref/src/core/ctx.js');
 const {SUBS}=await import('../splat-ref/src/config.js');
 const {getSpecialProp}=await import('../splat-ref/src/game/special-props.js');
 const {getWeaponDef}=await import('../splat-ref/src/game/character-weapons.js');
+const {Projectiles}=await import('../splat-ref/src/game/weapons.js');
 const {getPlasticMaterial,getInkMaterial}=await import('../splat-ref/src/game/character-mats.js');
 const {SubSystem,CURTAIN_VS,CURTAIN_FS}=await import('../splat-ref/src/game/subs.js');
 const {SpecialSystem,propMesh,IMPL,sourcePropsReady}=await import('../splat-ref/src/game/specials.js');
@@ -22,12 +23,20 @@ const flat=v=>typeof v==='number'||typeof v==='boolean'?[Number(v)]:v?.toArray?v
 const models=[],summary=[];
 let randomState=0x6d2b79f5;Math.random=()=>{randomState^=randomState<<13;randomState^=randomState>>>17;randomState^=randomState<<5;return (randomState>>>0)/4294967296;};
 G.teamColors=[new THREE.Color(1,.2541520943200296,.0069954101845983935),new THREE.Color(.028426039499072558,.10461648408208657,1)];G.scene=new THREE.Scene();G.camera=null;G.actors=[];G.time=0;
-const subs=new SubSystem(G.scene),sys=new SpecialSystem(G.scene);
+const subs=new SubSystem(G.scene),sys=new SpecialSystem(G.scene),projectiles=new Projectiles(G.scene);
 const kitBuilders={};for(const kind of ['shaker','waddle','torpedo','tracer','boomerang'])kitBuilders[kind]=(await import(`../splat-ref/src/game/kits/${kind}.js`)).sourceWorldModel;
 for(let team=0;team<2;team++){
   const templates=[];
   for(const kind of Object.keys(SUBS)){let model,refs;if(kitBuilders[kind]){refs=kitBuilders[kind](team);model=refs.outer??refs;}else {model=subs._prop(kind,team);refs=model.userData;}
+    if(kind==='bomb'){
+      projectiles.throwBomb({team,pos:new THREE.Vector3(),vel:new THREE.Vector3(),aimYaw:0,aimPitch:0,isLocal:false,_nearCamera:()=>false});
+      const bomb=projectiles.bombs.pop();model=bomb.mesh;model.position.set(0,0,0);refs={body:bomb.body};
+    }else if(kind==='boomerang')model.userData.ph=model.userData.blur.geometry.parameters.radius/1.04;
+    else if(refs?.inner&&Number.isFinite(refs.lift))refs.inner.userData.ph=refs.lift; // inner phase stores the source tumble pivot lift
     templates.push({kind,model,refs});}
+  const shakerModule=await import('../splat-ref/src/game/kits/shaker.js');
+  const lampGroup=new THREE.Group();const hand=shakerModule.sourceHandProp({color:G.teamColors[team],character:{bomb:{kind:'shaker',group:lampGroup}}});
+  templates.push({kind:'shakerHandLamps',model:lampGroup,refs:Object.fromEntries(hand.lamps.map((lamp,i)=>['lamp'+i,lamp]))});
   for(const kind of ['kraken','jetpack','speaker','missile']){
     const d=getSpecialProp(kind),model=propMesh(d,team,sys.glowMat(team)),refs={};
     if(kind==='speaker'){const cone=new THREE.Group();cone.position.copy(d.coneAt);const parts=new THREE.Group();parts.position.copy(d.coneAt).negate();parts.add(new THREE.Mesh(d.cone,getPlasticMaterial()),new THREE.Mesh(d.coneInk,getInkMaterial(G.teamColors[team])));cone.add(parts);model.add(cone);refs.cone=cone;}
@@ -54,7 +63,7 @@ for(let team=0;team<2;team++){
   }
 }
 artifact('models.txt',models.join('\n')+'\n');
-const sources=['subs.js','specials.js','special-props.js','character-weapons.js',...['shaker','waddle','torpedo','tracer','boomerang'].map(k=>'kits/'+k+'.js')];
+const sources=['weapons.js','subs.js','specials.js','special-props.js','character-weapons.js',...['shaker','waddle','torpedo','tracer','boomerang'].map(k=>'kits/'+k+'.js')];
 artifact('manifest.json',JSON.stringify({source:Object.fromEntries(await Promise.all(sources.map(async p=>[p,hash(await readFile('splat-ref/src/game/'+p))]))),models:summary,files:Object.fromEntries([...files].map(([n,b])=>[n,hash(b)]))},null,2)+'\n');
 await mkdir(out,{recursive:true});for(const [n,b]of files){if(check){if(!b.equals(await readFile(resolve(out,n))))throw Error(`Stale source device visual ${n}`);}else await writeFile(resolve(out,n),b);}
 console.log(`${check?'Checked':'Exported'} ${summary.length} source device/special models, ${files.size} assets`);

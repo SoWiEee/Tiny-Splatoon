@@ -15,7 +15,7 @@ cmake --build build --parallel 4
 
 Optimus 入口會請求 NVIDIA GPU；啟動紀錄的 `GPU` 行顯示實際 renderer，Windows／驅動偏好可能覆寫。低／中／高畫質可在選單設定；完整效能矩陣尚未驗收。
 
-多人服務與房碼流程見[多人連線契約](network-source-contract.md)。建置遊戲目標也會建置同目錄的 `Tiny-Splatoon-Server.exe`；服務獨立於玩家程序，需使用相同服務位址才能查找房碼。單獨驗證網路流程：
+多人服務與房碼流程見[多人連線契約](contracts/network-source-contract.md)。建置遊戲目標也會建置同目錄的 `Tiny-Splatoon-Server.exe`；服務獨立於玩家程序，需使用相同服務位址才能查找房碼。單獨驗證網路流程：
 
 ```powershell
 ctest --test-dir build -C Release --output-on-failure -R '^native_network_'
@@ -42,4 +42,4 @@ ctest --test-dir build -C Release --output-on-failure
 
 若有 Node.js 22.17+，CMake 會加入來源 oracle／CLI 檢查。重建來源資料另需符合[基準雜湊](reference-baseline.sha256)的 `splat-ref/`；不得改寫基準掩蓋差異。參考資料夾尚未退役，部分測試仍讀取來源，移除門檻見[待辦](next-round-backlog.md)。
 
-GPU 測試、遊戲擷取與效能量測應依序執行，避免同時佔用 GPU。完整測試與視覺／聽感驗收的界線，見[還原進度](restoration-progress.md)、[最新驗收](acceptance-2026-10-22.md)與[規格](../spec.md)。元件測試通過不代表全遊戲像素或音訊一致。
+GPU 測試、遊戲擷取與效能量測應依序執行，避免同時佔用 GPU。完整測試與視覺／聽感驗收的界線，見[還原進度](restoration-progress.md)、[最新驗收](acceptance/acceptance-2026-10-22.md)與[規格](../spec.md)。元件測試通過不代表全遊戲像素或音訊一致。

@@ -1,7 +1,12 @@
 <rml>
 <head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /></head>
 <body id="hud" class="hud">
-  <div class="hud-top"><span id="stage-name" class="stage-name"></span><div id="clock" class="clock">03:00</div><span id="pause-hint" class="pause-hint">Esc 暫停</span></div>
+  <div class="hud-top"><span id="stage-name" class="stage-name"></span><span id="pause-hint" class="pause-hint">Esc 暫停</span></div>
+  <div id="battle-top" class="battle-top">
+    <div class="squad squad-own"><div id="squad-a-count" class="squad-count"></div><div id="squad-a" class="squad-slots"></div></div>
+    <div id="clock" class="clock">03:00</div>
+    <div class="squad squad-enemy"><div id="squad-b-count" class="squad-count"></div><div id="squad-b" class="squad-slots"></div></div>
+  </div>
   <div id="team-score" class="team-score"><span id="score-a" class="team-a">0.0%</span><span class="score-divider">／</span><span id="score-b" class="team-b">0.0%</span></div>
   <div id="zones-hud" class="zones-hud hidden">
     <div class="zones-counts">
@@ -16,8 +21,10 @@
   <div id="boss" class="boss hidden"><div class="boss-heading"><strong>破艦巨獸</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-hp"></span></div></div>
   <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><strong>場地地圖</strong><span id="terrain-status"></span></div><div id="minimap-map" class="minimap-map"></div><div id="position-status" class="position-status"><span id="position-team-coverage"></span></div><div id="jump-map-help" class="jump-map-help"></div><div id="jump-map-queue" class="jump-map-queue"></div><div id="jump-map-legend" class="jump-map-legend"></div></div>
   <div id="fps" class="fps">影格 <strong id="fps-value">60</strong></div>
-  <div class="player-info"><div class="player-bars"><span>生命 <strong id="hp">100</strong></span><span>墨量 <strong id="ink">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
-  <div id="player-status" class="player-status"></div><div id="reticle" class="reticle"></div>
+  <div id="ally-markers" class="ally-markers"></div>
+  <div class="player-info"><div class="player-bars"><span>生命 <strong id="hp">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
+  <div id="ink-gauge" class="ink-gauge" role="meter" aria-label="剩餘墨量" aria-valuemin="0" aria-valuemax="100"><ink-tank id="ink-tank"></ink-tank><span id="ink" class="hidden">100</span><span id="ink-low" class="ink-low hidden">墨量不足</span></div>
+  <div id="player-status" class="player-status"></div><weapon-reticle id="reticle" class="reticle"></weapon-reticle>
   <div id="pause" class="overlay hidden">
     <div class="dialog pause-dialog">
       <h1 id="pause-title">已暫停</h1><p id="pause-description" class="intro">準備好後，繼續這場對戰。</p>

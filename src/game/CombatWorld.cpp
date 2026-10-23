@@ -272,7 +272,7 @@ bool CombatWorld::blockShot(glm::dvec3 from,glm::dvec3 to,int team,double damage
     const auto destroyed=[&](CombatDevice& d,double charge=0.0) {
         d.live=false;
         WorldVisualEvent event;event.kind="device_destroy";event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
-        event.team=d.team;event.charge=charge;event.source=d.kind;emitVisual(std::move(event));
+        event.team=d.team;event.charge=charge;event.source=d.kind;event.id=d.id;emitVisual(std::move(event));
     };
     for(auto& d:devices_) {
         if(!d.live || d.exploding || d.team==team) continue;
@@ -357,7 +357,7 @@ double CombatWorld::blockRay(glm::dvec3 from,glm::dvec3 dir,double length,int te
     const auto destroyed=[&](CombatDevice& d) {
         d.live=false;
         WorldVisualEvent event;event.kind="device_destroy";event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
-        event.team=d.team;event.source=d.kind;emitVisual(std::move(event));
+        event.team=d.team;event.source=d.kind;event.id=d.id;emitVisual(std::move(event));
     };
     double shieldDistance=length;
     blockCanopyShot(from,to,team,damage,nullptr,&shieldDistance);
@@ -398,7 +398,7 @@ void CombatWorld::damageDevices(glm::dvec3 at,double radius,double damage,int te
     const auto destroyed=[&](CombatDevice& d,double charge=0.0) {
         d.live=false;
         WorldVisualEvent event;event.kind="device_destroy";event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
-        event.team=d.team;event.charge=charge;event.source=d.kind;emitVisual(std::move(event));
+        event.team=d.team;event.charge=charge;event.source=d.kind;event.id=d.id;emitVisual(std::move(event));
     };
     for(auto& d:devices_) {
         if(!d.live || d.exploding || d.team==team) continue;
@@ -792,7 +792,7 @@ void CombatWorld::tick(double dt) {
             }
             if(p.belowFalloff) dmg*=1-std::clamp((p.start.y-(e->state.pos.y+0.8)-0.5)*p.belowFalloff,0.0,p.belowFalloffMax);
             applyHit(owner,*e,dmg,p.weaponId);
-            if(p.kind!="blast")emitVisual({"bulletImpact",at,path/(distance>1e-9?distance:1.0),p.radius,owner.team()});
+            if(p.kind!="blast")emitVisual({"bulletImpact",at,path/(distance>1e-9?distance:1.0),p.radius,owner.team(),0,.08,0,p.kind,p.id});
             if(p.kind=="blast") {const auto& w=owner.weapon();burst(owner,at,w.number("splashRadius"),w.number("splashDamageMax"),w.number("splashDamageMin"),w.number("impactRadius"),p.weaponId,e,p.special);}
             done=true;break;
         }
@@ -811,7 +811,7 @@ void CombatWorld::tick(double dt) {
                         if(p.kind=="drop")amount+=(p.damageFar-amount)*std::clamp(glm::length(p.start-bossHit->point)/7.0,0.0,1.0);
                         boss_->hit(owner,amount,*bossHit,p.weaponId);
                     }
-                    if(p.kind!="blast")emitVisual({"bulletImpact",bossHit->point,path/(distance>1e-9?distance:1.0),p.radius,owner.team()});
+                    if(p.kind!="blast")emitVisual({"bulletImpact",bossHit->point,path/(distance>1e-9?distance:1.0),p.radius,owner.team(),0,.08,0,p.kind,p.id});
                     if(p.kind=="blast"){
                         const auto& w=owner.weapon();
                         burst(owner,bossHit->point,w.number("splashRadius"),w.number("splashDamageMax"),w.number("splashDamageMin"),w.number("impactRadius"),p.weaponId,nullptr,p.special,true);
@@ -825,7 +825,7 @@ void CombatWorld::tick(double dt) {
             if(hit.hit) {
                 SplatOptions options;options.stretch=glm::normalize(p.vel);options.hasStretch=true;options.stretchAmt=0.7;
                 paint(owner,hit.point+hit.normal*0.14,p.radius*(0.85+owner.random()*0.3),p.seed,options,p.special);
-                if(p.kind!="blast")emitVisual({"bulletImpact",hit.point,hit.normal,p.radius,owner.team()});
+                emitVisual({"bulletImpact",hit.point,hit.normal,p.radius,owner.team(),0,.08,0,p.kind,p.id});
                 if(p.kind=="blast") {const auto& w=owner.weapon();burst(owner,hit.point,w.number("splashRadius"),w.number("splashDamageMax"),w.number("splashDamageMin"),w.number("impactRadius"),p.weaponId,nullptr,p.special);}
                 done=true;
             }
@@ -865,7 +865,7 @@ void CombatWorld::tickBladeWave(ShooterProjectile& wave,double dt) {
     wave.age+=dt;const double step=glm::length(wave.vel)*dt;
     wave.pos+=wave.vel*dt;wave.distance+=step;
     if(blockCanopyShot(previous,wave.pos,owner.team(),wave.damage,&wave)
-       || specials_.shotHit(previous,wave.pos,owner.team(),wave.damage,&owner)) {wave.owner=nullptr;return;}
+       || specials_.shotHit(previous,wave.pos,owner.team(),wave.damage,&owner)) {emitVisual({"blade_wave_stop",wave.pos,{0,1,0},0,owner.team(),0,.08,0,"blade",wave.id});wave.owner=nullptr;return;}
     const double hd=std::hypot(wave.vel.x,wave.vel.z);const glm::dvec3 f=hd>1e-8?glm::dvec3(wave.vel.x/hd,0,wave.vel.z/hd):glm::dvec3(0,0,1);
     const double damage=wave.damage+(wave.damageFar-wave.damage)*std::clamp(wave.distance/std::max(0.01,wave.range),0.0,1.0);
     for(auto* actor:actors_) {
@@ -876,16 +876,20 @@ void CombatWorld::tickBladeWave(ShooterProjectile& wave,double dt) {
         const double y=actor->state.pos.y+actor->state.smoothY,h=actor->hitHeight();
         if(y+h<cy-wave.size*0.55 || y>cy+wave.size*0.45)continue;
         wave.tagged.push_back(actor);applyHit(owner,*actor,damage,"blade");
+        emitVisual({"blade_wave_hit",wave.pos,-glm::normalize(wave.vel),.09,owner.team(),0,.08,0,"blade",wave.id});
     }
-    if(blockShot(previous,wave.pos,owner.team(),damage)) {wave.owner=nullptr;return;}
+    if(blockShot(previous,wave.pos,owner.team(),damage)) {emitVisual({"blade_wave_stop",wave.pos,{0,1,0},0,owner.team(),0,.08,0,"blade",wave.id});wave.owner=nullptr;return;}
     const auto path=wave.pos-previous;const double length=glm::length(path);
-    if(length>1e-8 && geometry_.raycast(previous,path/length,length,true).hit) {wave.owner=nullptr;return;}
+    if(length>1e-8){const auto hit=geometry_.raycast(previous,path/length,length,true);if(hit.hit){emitVisual({"blade_wave_wall",hit.point,hit.normal,.1,owner.team(),0,.08,0,"blade",wave.id});wave.owner=nullptr;return;}}
     wave.trail+=step;
     if(wave.trail>=wave.trailEvery) {
         wave.trail=0;const auto ground=geometry_.raycast(wave.pos,{0,-1,0},wave.size*0.52+1.4,true);
         if(ground.hit) {SplatOptions options;options.stretch=f;options.hasStretch=true;options.stretchAmt=0.85;paint(owner,ground.point+ground.normal*0.08,wave.trailRadius,owner.random(),options,wave.special);}
     }
-    if(wave.distance>=wave.range || wave.age>=wave.life || wave.pos.y<-3.4)wave.owner=nullptr;
+    if(wave.distance>=wave.range || wave.age>=wave.life || wave.pos.y<-3.4){
+        if(wave.distance>=wave.range)emitVisual({"blade_wave_stop",wave.pos,{0,1,0},0,owner.team(),0,.08,0,"blade",wave.id});
+        wave.owner=nullptr;
+    }
 }
 
 void CombatWorld::burstFist(ShooterProjectile& fist,glm::dvec3 at,PlayerSimulation* direct,const glm::dvec3* normal) {
@@ -919,12 +923,14 @@ void CombatWorld::lodgeArrow(ShooterProjectile& arrow,glm::dvec3 point,glm::dvec
     arrow.state="lodged";arrow.age=0;arrow.hitPoint=point;arrow.hitNormal=normal;
     if(glm::length(direction)>1e-8)arrow.flightDir=glm::normalize(direction);
     arrow.pos=point+arrow.flightDir*0.12;
+    emitVisual({"bow_lodge",point,normal,.06,arrow.owner->team(),0,.08,0,"bow",arrow.id});
     SplatOptions options;options.stretch=arrow.flightDir;options.hasStretch=true;options.stretchAmt=0.5;
     paint(*arrow.owner,point+normal*0.08,arrow.stickPaint,arrow.seed,options,arrow.special);
 }
 void CombatWorld::burstArrow(ShooterProjectile& arrow) {
     auto& owner=*arrow.owner;
     const auto center=arrow.hitPoint+arrow.hitNormal*0.18;
+    emitVisual({"bow_burst",center,arrow.hitNormal,arrow.burstRadius*(arrow.tier==2?.7:.55),owner.team(),double(arrow.tier),.08,0,"bow",arrow.id});
     paint(owner,arrow.hitPoint+arrow.hitNormal*0.1,arrow.burstPaint,arrow.seed,{},arrow.special);
     for(int i=0;i<2;++i) {
         const double angle=arrow.seed*20.0+i*2.7,r=arrow.burstPaint*0.55;
@@ -981,6 +987,7 @@ void CombatWorld::tickArrow(ShooterProjectile& arrow,double dt) {
         if(hit.dist>=actor->hitRadius()*0.95+0.11)continue;
         const auto at=previous+(arrow.pos-previous)*hit.t;
         applyHit(owner,*actor,arrow.damage,"bow");
+        emitVisual({"bow_impact",at,-arrow.flightDir,.07,owner.team(),1,.08,0,"bow",arrow.id});
         if(!arrow.lodge) {arrow.owner=nullptr;return;}
         arrow.noHit=true;arrow.flightDir=glm::length(arrow.vel)>1e-8?glm::normalize(arrow.vel):arrow.flightDir;
         arrow.pos=at;arrow.vel={arrow.flightDir.x*1.5,-9.0,arrow.flightDir.z*1.5};
@@ -1004,6 +1011,7 @@ void CombatWorld::tickArrow(ShooterProjectile& arrow,double dt) {
             } else {
                 SplatOptions options;options.stretch=arrow.flightDir;options.hasStretch=true;options.stretchAmt=0.7;
                 paint(owner,hit.point+hit.normal*0.12,arrow.radius*(0.85+0.3*arrow.seed),arrow.seed,options,arrow.special);
+                emitVisual({"bow_impact",hit.point,hit.normal,.07,owner.team(),0,.08,0,"bow",arrow.id});
                 arrow.owner=nullptr;
             }
             return;
@@ -1055,7 +1063,7 @@ void CombatWorld::updateDevices(double dt) {
     };
     auto deviceCue=[&](const char* kind,const CombatDevice& d,double charge=0.0) {
         WorldVisualEvent event;event.kind=kind;event.pos=d.pos;event.normal=d.normal;event.radius=d.radius;
-        event.team=d.team;event.charge=charge;event.source=d.kind;emitVisual(std::move(event));
+        event.team=d.team;event.charge=charge;event.source=d.kind;event.id=d.id;emitVisual(std::move(event));
     };
     auto stick=[&](CombatDevice& d,const RayHit& hit,const std::string& state,double timer) {
             d.pos=hit.point+hit.normal*0.005;d.normal=hit.normal;d.state=state;d.grounded=true;d.age=0;d.timer=timer;d.hp=GetEquipment(EquipmentCategory::Sub,d.kind).number("hp",1);
@@ -1201,7 +1209,7 @@ void CombatWorld::updateDevices(double dt) {
                 if(directHit) {
                     applyHit(*d.owner,*directHit,s.number("directDamage"),d.kind);
                     track(*d.owner,*directHit,d.team,s.number("directMark"));
-                    WorldVisualEvent event;event.kind="device_hit";event.pos=directHit->isLocal()?glm::dvec3(0.0):d.pos;
+                    WorldVisualEvent event;event.kind="device_hit";event.pos=d.pos;
                     event.team=d.team;event.source="tracer";event.sourceLocal=d.owner->isLocal();event.sourceVictimLocal=directHit->isLocal();
                     event.victimNid=directHit->networkNid();
                     emitVisual(std::move(event));
@@ -1228,7 +1236,7 @@ void CombatWorld::updateDevices(double dt) {
                     }
                     if(touched) {
                         applyHit(*d.owner,*e,s.number("trailDamage"),d.kind);track(*d.owner,*e,d.team,s.number("trailMark"));d.tagged.push_back(e);
-                        WorldVisualEvent event;event.kind="device_hit";event.pos=e->isLocal()?glm::dvec3(0.0):trailHitPosition;
+                        WorldVisualEvent event;event.kind="device_hit";event.pos=trailHitPosition;
                         event.team=d.team;event.source="tracer_trail";event.sourceLocal=d.owner->isLocal();event.sourceVictimLocal=e->isLocal();
                         event.victimNid=e->networkNid();
                         emitVisual(std::move(event));

@@ -10,7 +10,7 @@ const outputArgs = args.filter(arg => arg !== '--check');
 if (outputArgs.length > 1 || outputArgs[0]?.startsWith('--'))
   throw new Error('Usage: node tools/export-character-variant-fixtures.mjs [output.json] [--check]');
 const outputArg = outputArgs[0];
-const target = resolve(outputArg ?? resolve(root, 'tests/character_variant_fixtures.json'));
+const target = resolve(outputArg ?? resolve(root, 'tests/fixtures/character_variant_fixtures.json'));
 
 const { captureCharacterPose } = await import('./export-character-pose.mjs');
 const THREE = await import('three');

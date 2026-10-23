@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "generator": "source FX ShaderMaterial + buildSourceMaterialShader + source base geometry",
+  "source": {
+    "path": "splat-ref/src/fx/fx.js",
+    "sha256": "9e8a646a6154824b64f9b35eeab1e4347f3bdb282ff7c337645dca14f8b88bc8"
+  },
+  "entries": [
+    {
+      "name": "drops",
+      "vertex": "drops.vert",
+      "fragment": "drops.frag",
+      "mesh": "drops.mesh",
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "digest": "ae9178fbef0a89fe928087d88a3442a3273f302ad9086687d644bb820249a79b",
+      "uniforms": {
+        "uSunDirV": [
+          0,
+          1,
+          0
+        ],
+        "uUpV": [
+          0,
+          1,
+          0
+        ],
+        "uSunCol": [
+          1,
+          0.93,
+          0.84
+        ],
+        "uSkyCol": [
+          0.42,
+          0.62,
+          0.95
+        ],
+        "uGroundCol": [
+          0.5,
+          0.46,
+          0.42
+        ]
+      },
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false,
+        "alphaToCoverage": true,
+        "polygonOffset": false,
+        "polygonOffsetFactor": 0,
+        "polygonOffsetUnits": 0,
+        "renderOrder": 4,
+        "frustumCulled": false
+      }
+    },
+    {
+      "name": "puffs",
+      "vertex": "puffs.vert",
+      "fragment": "puffs.frag",
+      "mesh": "puffs.mesh",
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "digest": "3e7aa6388a4b02868ab2a888d881e9436f4c1aab8399c615a7f38803064a7f79",
+      "uniforms": {},
+      "renderState": {
+        "transparent": true,
+        "opacity": 1,
+        "depthWrite": false,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 1,
+        "premultipliedAlpha": false,
+        "alphaToCoverage": false,
+        "polygonOffset": false,
+        "polygonOffsetFactor": 0,
+        "polygonOffsetUnits": 0,
+        "renderOrder": 12,
+        "frustumCulled": false
+      }
+    },
+    {
+      "name": "glows",
+      "vertex": "glows.vert",
+      "fragment": "glows.frag",
+      "mesh": "glows.mesh",
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "digest": "6f26f6d74133ce787a4a46daeaabb5d32b1a87963c21e9b7054e8df378f052a5",
+      "uniforms": {},
+      "renderState": {
+        "transparent": true,
+        "opacity": 1,
+        "depthWrite": false,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 0,
+        "blending": 2,
+        "premultipliedAlpha": false,
+        "alphaToCoverage": false,
+        "polygonOffset": false,
+        "polygonOffsetFactor": 0,
+        "polygonOffsetUnits": 0,
+        "renderOrder": 20,
+        "frustumCulled": false
+      }
+    },
+    {
+      "name": "rings",
+      "vertex": "rings.vert",
+      "fragment": "rings.frag",
+      "mesh": "rings.mesh",
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "digest": "3c23a76b03886de004d17ad3b759774d06d4a080a0da88bd7af98e63da30b24e",
+      "uniforms": {
+        "uTime": 0
+      },
+      "renderState": {
+        "transparent": true,
+        "opacity": 1,
+        "depthWrite": false,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 2,
+        "blending": 1,
+        "premultipliedAlpha": false,
+        "alphaToCoverage": false,
+        "polygonOffset": true,
+        "polygonOffsetFactor": -4,
+        "polygonOffsetUnits": -4,
+        "renderOrder": 8,
+        "frustumCulled": false
+      }
+    },
+    {
+      "name": "shells",
+      "vertex": "shells.vert",
+      "fragment": "shells.frag",
+      "mesh": "shells.mesh",
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "digest": "9ab72a71f7508f87b56c1f6682e5045c45419217c98695340055b0caae61b4b0",
+      "uniforms": {
+        "uTime": 0,
+        "uSunDir": [
+          -0.40971330099885506,
+          0.8294196093391456,
+          -0.37973427897454864
+        ],
+        "uSunCol": [
+          1,
+          0.93,
+          0.84
+        ],
+        "uSkyCol": [
+          0.42,
+          0.62,
+          0.95
+        ]
+      },
+      "renderState": {
+        "transparent": false,
+        "opacity": 1,
+        "depthWrite": true,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 2,
+        "blending": 1,
+        "premultipliedAlpha": false,
+        "alphaToCoverage": true,
+        "polygonOffset": false,
+        "polygonOffsetFactor": 0,
+        "polygonOffsetUnits": 0,
+        "renderOrder": 5,
+        "frustumCulled": false
+      }
+    },
+    {
+      "name": "beams",
+      "vertex": "beams.vert",
+      "fragment": "beams.frag",
+      "mesh": "beams.mesh",
+      "sourceKey": "onBeforeCompile( /* shaderobject, renderer */ ) {}",
+      "digest": "c4ad4d82c8d6c19ecb052434410d776f6eed0dc72fd213d8307898a49433c291",
+      "uniforms": {
+        "uTime": 0
+      },
+      "renderState": {
+        "transparent": true,
+        "opacity": 1,
+        "depthWrite": false,
+        "depthTest": true,
+        "depthFunc": 3,
+        "side": 2,
+        "blending": 1,
+        "premultipliedAlpha": false,
+        "alphaToCoverage": false,
+        "polygonOffset": false,
+        "polygonOffsetFactor": 0,
+        "polygonOffsetUnits": 0,
+        "renderOrder": 18,
+        "frustumCulled": false
+      }
+    }
+  ]
+}

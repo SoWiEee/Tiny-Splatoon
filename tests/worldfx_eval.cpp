@@ -52,10 +52,50 @@ int main(){
     std::cout<<std::setprecision(9);std::string name;
     while(std::getline(std::cin,name)){
         if(name.empty())continue;std::uint32_t rng=0x6d2b79f5u;glm::dvec3 pos(0),normal(0,1,0),color=orange();double radius=1;
-        if(name=="explosion")radius=3;if(name=="slamWave")radius=5.2f;if(name=="stormStart")radius=3.4f;if(name=="rainSheet"){pos.y=4.6f;radius=3.4f;}
+        const glm::dvec3 camera(0,10,0),forward(0,0,1),velocity(2.5,4,-1.75),diagonal(0.3,0.2,0.9),wallNormal(1,0,0);
+        glm::dvec3 direction=forward;WorldFxRecipeContext context;double time=0,dt=1.0/60.0;
+        std::string recipe=name;
+        if(name=="explosion")radius=3;if(name=="slamWave")radius=5.2f;if(name=="stormStart")radius=3.4f;if(name=="stormFlash")radius=3.4;if(name=="rainSheet"){pos.y=4.6f;radius=3.4f;}
         if(name=="formPop")radius=1;if(name=="dive"||name=="emerge")radius=4;if(name=="wake"){normal={0,0,1};radius=8;}
         if(name.rfind("footstep",0)==0){normal={0,0,1};radius=5;}
-        auto items=BuildWorldFxRecipe(name,pos,normal,color,radius,rng);
+        if(name=="muzzleBlaster"||name=="muzzleCharger"||name=="flickCurtain")direction=forward;
+        if(name=="flickCurtain")radius=50;
+        if(name=="rollerSpray"){normal=forward;direction=forward;radius=1.1;context.factor=0.7;}
+        if(name=="dryFire")direction=forward;
+        if(name=="bombTrail"){normal=velocity;direction=velocity;}
+        if(name=="bounceSplash")normal={0,1,0};
+        if(name=="beepPulse"||name=="beepPulseNoPoint"){
+            recipe="beepPulse";radius=3.1;context.factor=0.7;context.point={0,0.01,0};context.hasPoint=name!="beepPulseNoPoint";
+        }
+        if(name=="shotTrail"||name=="shotTrailBig"){
+            recipe="shotTrail";radius=name=="shotTrailBig"?1:0;normal=velocity;direction=velocity;
+        }
+        if(name=="sloshTrail"||name=="sloshTrailHead"){
+            recipe="sloshTrail";radius=name=="sloshTrailHead"?1:0;normal=velocity;direction=velocity;
+        }
+        if(name=="sloshImpact"){normal={0,1,0};direction=diagonal;}
+        if(name=="chargeGlow")radius=0.65;
+        if(name=="laserDot"){normal={0,1,0};radius=0.65;}
+        if(name=="beamImpact"){normal={0,1,0};radius=0.75;}
+        if(name=="beamTrail"){normal={0.7,1.1,4.2};radius=0.75;}
+        if(name=="spinUp"||name=="spinStream"){radius=0.72;direction=diagonal;}
+        if(name=="spinFull")direction=diagonal;
+        if(name=="dodgeSplash"||name=="dodgeSkid"||name=="dodgePlant")direction=forward;
+        if(name=="dodgeSkid")context.factor=0.35;
+        if(name=="mistAlpha20"||name=="mistAlpha30"){
+            recipe="mist";radius=0.2;direction=velocity;context.factor=name=="mistAlpha20"?0.2:0.3;
+        }
+        if(name=="leapRing")radius=1.3;
+        if(name=="canopyBreakRing")radius=0.84;
+        if(name=="wailRing"){normal=forward;radius=1.3;}
+        if(name=="drop"){radius=0.15;direction=velocity;}
+        if(name=="mist"){radius=0.2;direction=velocity;}
+        if(name=="climbDrip")normal=wallNormal;
+        if(name=="superJumpTrail")direction=velocity;
+        if(name=="waterPlop"){pos.y=-1.6;radius=0.6;}
+        if(name=="glint")radius=0.12;
+        if(name=="ring"){radius=0.8;direction.y=0.35;}
+        auto items=BuildWorldFxRecipe(recipe,pos,normal,color,radius,rng,-1.6,camera,{},context,direction,time,dt);
         std::cout<<"{\"recipe\":\""<<name<<"\",\"immediatePools\":";pools(items,false);
         UpdateWorldFxRecipe(items,1.0/60.0,rng);
         std::cout<<",\"firstFramePools\":";pools(items,true);

@@ -1,24 +1,22 @@
-# Tiny Splatoon v0.7.5
+# Tiny Splatoon v0.8.0
 
-OpenGL 原生還原開發版，改善潛水墨面效果、Boss 音訊、HUD 可讀性，並移除舊診斷介面。
+## 新增與調整
 
-- 正式地形 shader 接上來源游泳資料：墨面隆起、波峰與持續尾流；分開處理魷魚變形、入墨／出墨及游泳水花。
-- Boss 匯出全部 20 個命名 socket，聲源跟隨同一次固定步動畫姿勢；原有十個戰鬥碰撞點保持原樣。
-- 補上部分 Boss 開場、預警與連續招式的來源音效延遲；結果 XP 顯示加入計數動畫與 65 ms 音效節奏。
-- Zones HUD 更緊湊，放大 HUD／選單／結果字級；小地圖移除開發座標，保留隊伍與區域資訊。
-- 移除舊 ImGui 練習診斷頁、stage lab、專用腳本與套件依賴；正式介面統一使用 RmlUi。
-- README 簡化，加入技術 badges、Old Demo 與三張目前版本的真實遊戲截圖。
+- 原生 GameNetworkingSockets 私人房間：房碼、八人名單、分隊與準備、換主、遊戲同步及返回同房。
+- 更新選單視覺與操作回饋，沿用來源烏賊／武器圖示；設定頁可捲動，返回列固定可見。
+- 戰鬥上方顯示隊伍存活狀態、復活倒數與特殊就緒；準心右側新增動態墨管、副武器耗墨刻線與低墨提示。
+- 選單 BGM 改為 LifeWillChange_Instrumental.mp3，對戰 BGM 改為 Splattack.mp3；依實際音檔長度循環，最後一分鐘及 Boss 換階段沿用同一串流。
+- 十二種主武器專屬準心、實際散布與蓄力狀態；隊友頭頂名牌、武器、特殊就緒與離屏方向。
+- 六類世界粒子改用來源 shader／mesh，補接槍口、尾跡、甩墨、閃避、充能與命中墨花。
+- 補齊普通炸彈與插地箭倒數範圍、Shaker 動畫噴口／充能燈／泡沫、迴旋鏢滴墨、傘破裂及特殊武器粒子事件；波刃停止後短暫消退。
+- README 更新三張原生遊戲截圖，並附 HUD 差異與傷害來源核對文件。
 
-## Windows x64
+- 文件依用途歸檔、測試 fixture 獨立分層，補上導覽並修正來源瀏覽器暫存清理。
 
-完整解壓 `Tiny-Splatoon-v0.7.5-windows-x64.zip`，執行 `Tiny-Splatoon.exe`；請保留同目錄 DLL 與 assets。需要支援 OpenGL 4.5 的 GPU／驅動。
+## 安裝與驗收
 
-玩家保存位於 `%LOCALAPPDATA%/Tiny-Splatoon/profile.json`，新版不會覆蓋該路徑。GTX 1650 可先使用低畫質；中／高畫質的完整效能矩陣尚未驗收。
+完整解壓 Tiny-Splatoon-v0.8.0-windows-x64.zip，執行 Tiny-Splatoon.exe；請保留同目錄 DLL 與 assets。需要支援 OpenGL 4.5 的 GPU／驅動；多人房間服務 Tiny-Splatoon-Server.exe 隨包附上。
 
-## 驗收範圍
+玩家資料仍位於 %LOCALAPPDATA%/Tiny-Splatoon/profile.json。畫質與音量可在選單設定。
 
-MSVC Release 全目標建置成功；最終整合補驗 12/12 通過（32.16 秒），正式墨面尾流 GPU 檢查與 720p／1080p UI 檢查通過。Boss 嚴格姿勢 16/16、World FX 十個來源配方比對通過。
-
-本版驗收結果見 [本輪紀錄](docs/acceptance-2026-10-22.md)，逐項狀態見 [還原進度](docs/restoration-progress.md)。元件 oracle、GPU 可見性與 UI 回歸不代表全遊戲像素或主觀音訊一致。
-
-線上多人、部分道具／特殊技能與 Boss 次級視效、來源 paint-ripple 回呼、完整音訊空間化／混響及跨 GPU 最壞負載仍待完成。參考來源尚未退役；此版沒有刪除 splat-ref。
+驗收範圍與已知差異見 [本輪紀錄](docs/acceptance/acceptance-2026-10-23.md)、[HUD 對照](docs/audits/hud-source-audit.md)、[傷害核對](docs/audits/damage-source-audit.md)及[還原進度](docs/restoration-progress.md)。本機多人驗證不代表跨網／NAT／公開服務已驗收；完整來源 HUD 演出與最壞負載仍待完成。

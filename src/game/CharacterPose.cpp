@@ -272,6 +272,8 @@ struct CharacterPose::State {
     glm::dvec2 dodgeRollDirection{0.0,1.0};
     double dodgeX=0.0, dodgeZ=1.0, dodgeDuration=0.3;
     bool bombHeld=false, subPrev=false, subPropHidden=false, hairOdd=false;
+    bool shakerCharging=false;double shakerCharge=0,shakerKick=0,shakerPreviousCharge=0;
+    std::uint32_t shakerRandom=0x6d2b79f5u;
     double hairAccum=0.0;
     double bombTime=0.0,bombScale=1.0;
     double tumble=0.0, tumbleX=1.0, tumbleZ=0.0, tumbleDrop=0.0;
@@ -2632,6 +2634,13 @@ struct CharacterPose::State {
             if(node.binding=="sub/group") {
                 part.local.visible=bombOn&&!subPropHidden;
                 part.local.scale=glm::dvec3(bombScale);
+                if(sub=="shaker"&&shakerCharging){
+                    const double amplitude=.035+.09*shakerCharge+.22*shakerKick;
+                    const auto next=[&](){shakerRandom^=shakerRandom<<13;shakerRandom^=shakerRandom>>17;shakerRandom^=shakerRandom<<5;return double(shakerRandom)/4294967296.;};
+                    const glm::dvec3 angles((next()*2-1)*amplitude,(next()*2-1)*amplitude*.5,(next()*2-1)*amplitude);
+                    const auto jolt=euler(angles,false);const glm::dvec3 grip(0,.1915,0);
+                    part.local.position+=part.local.rotation*(grip-jolt*grip);part.local.rotation*=jolt;
+                }
             }
             frame.parts.push_back(std::move(part));
         }
@@ -2669,6 +2678,14 @@ struct CharacterPose::State {
             return result;
         };
         const auto kidWorld=frame.root.matrix()*frame.model.matrix()*frame.kid.matrix();
+        if(const auto prop=modelWorld(subModel,"sub/group")){
+            frame.subPropWorld=kidWorld*(*prop);
+            const double az=.95;const glm::dvec3 n=glm::normalize(glm::dvec3(std::sin(az)*.72,.7,std::cos(az)*.72));
+            const glm::dvec3 p=glm::dvec3(std::sin(az)*.029,.1648,std::cos(az)*.029)+n*.019;
+            frame.shakerKick=shakerKick;
+            frame.subNozzle=glm::dvec3(frame.subPropWorld*glm::dvec4(p,1));
+            frame.subNozzleDirection=glm::normalize(glm::dmat3(frame.subPropWorld)*n);
+        }
         const auto muzzle=modelWorld(weaponModel,"weapon/right/muzzle");
         const auto leftMuzzle=modelWorld(weaponModel,"weapon/left/muzzle");
         const int headIndex=find("head");
@@ -3042,6 +3059,10 @@ const CharacterPoseFrame& CharacterPose::update(double dt, const CharacterAnimSt
     if(input.subAim&&!s.subPrev&&input.form==CharacterForm::Kid) { s.bombHeld=true; s.bombTime=0.0; }
     if(!input.subAim&&s.subWeight<0.3) s.bombHeld=false;
     s.subPrev=input.subAim; s.bombTime+=dt; s.subPropHidden=input.subPropHidden;
+    s.shakerCharging=input.shakerCharging;s.shakerCharge=input.shakerCharging?clamp(input.shakerCharge,0.,1.):0.;
+    const auto shakerLevel=[](double k){return k>=1?3:k>=.5?2:1;};
+    if(shakerLevel(s.shakerCharge)>shakerLevel(s.shakerPreviousCharge))s.shakerKick=1;
+    s.shakerKick=std::max(0.,s.shakerKick-dt*4);s.shakerPreviousCharge=s.shakerCharge;
     s.hitAcc=std::max(0.0,s.hitAcc-dt*1.4);
     s.stepOfsX=damp(s.stepOfsX,0.0,2.2,dt); s.stepOfsZ=damp(s.stepOfsZ,0.0,2.2,dt);
     s.tired=damp(s.tired,input.hp?sstep(0.45,0.12,*input.hp>1.001?*input.hp/100.0:*input.hp):sstep(0.55,0.9,s.hurt)*0.6,3.0,dt);

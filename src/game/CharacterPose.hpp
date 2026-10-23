@@ -74,6 +74,7 @@ struct CharacterAnimState {
     bool grounded = true, firing = false, rolling = false, subAim = false;
     bool lowInk = false, inEnemyInk = false, invuln = false, visible = true, subPropHidden = false;
     double charge = 0.0, ink = 1.0, special = 0.0;
+    bool shakerCharging=false;double shakerCharge=0;
     glm::dvec3 wallNormal{0.0, 0.0, 1.0};
     std::optional<CharacterRunnerState> runner;
 };
@@ -132,6 +133,9 @@ struct CharacterPoseFrame {
     std::vector<CharacterPartPose> parts;
     CharacterMaterialState material;
     glm::dvec3 muzzle{0.0}, muzzleLeft{0.0}, head{0.0};
+    glm::dmat4 subPropWorld{1.0};
+    glm::dvec3 subNozzle{0.0},subNozzleDirection{0,1,0};
+    double shakerKick=0.0;
     std::array<float, CharacterPoseChannelCount> channels{};
 };
 

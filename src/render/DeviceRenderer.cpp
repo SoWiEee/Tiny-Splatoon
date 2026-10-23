@@ -7,6 +7,7 @@
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/euler_angles.hpp>
 #include <fstream>
 #include <map>
 #include <cmath>
@@ -25,7 +26,7 @@ struct DeviceRenderer::Impl {
     struct Mesh {GLuint vao=0,index=0;std::vector<GLuint> buffers;GLsizei count=0;~Mesh(){if(vao)glDeleteVertexArrays(1,&vao);if(index)glDeleteBuffers(1,&index);if(!buffers.empty())glDeleteBuffers(static_cast<GLsizei>(buffers.size()),buffers.data());}};
     struct Program {std::unique_ptr<CharacterShader> shader;std::map<std::string,std::vector<double>> defaults;};
     struct ActorMotion {double leg=0,gun=0,roll=0,speed=0;};
-    struct DeviceMotion {glm::dvec3 previous{0};double roll=0,prop=0,fin=0,open=0,glow=1.2,walk=0,moveSpeed=0,spin=0,spinSpeed=30,blink=0,tiltX=0,tiltZ=0;};
+    struct DeviceMotion {glm::dvec3 previous{0};double roll=0,prop=0,fin=0,open=0,glow=1.2,walk=0,moveSpeed=0,spin=0,spinSpeed=30,blink=0,tiltX=0,tiltZ=0,tumbleX=0,tumbleY=0,tumbleZ=0,rateX=0,rateZ=0,rattleX=0,rattleZ=0;glm::dquat tumble{1,0,0,0};std::uint32_t rng=0x6d2b79f5u;};
     struct TracerTail {int team=0;glm::dvec3 direction{0,0,1};std::vector<std::pair<glm::dvec3,double>> points;bool active=false;double lastSeen=0;};
     struct RibbonGpu {
         GLuint vao=0,position=0,info=0,index=0;
@@ -107,7 +108,7 @@ struct DeviceRenderer::Impl {
         for(const auto& a:source.attributes){const auto at=shader.attribute(a.name);if(at<0)continue;GLuint b=0;glGenBuffers(1,&b);m->buffers.push_back(b);glBindBuffer(GL_ARRAY_BUFFER,b);glBufferData(GL_ARRAY_BUFFER,a.values.size()*4,a.values.data(),GL_STATIC_DRAW);glEnableVertexAttribArray(at);glVertexAttribPointer(at,a.components,GL_FLOAT,GL_FALSE,0,nullptr);}
         glGenBuffers(1,&m->index);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,m->index);glBufferData(GL_ELEMENT_ARRAY_BUFFER,source.indices.size()*4,source.indices.data(),GL_STATIC_DRAW);m->count=static_cast<GLsizei>(source.indices.size());return *meshes.emplace(key,std::move(m)).first->second;
     }
-    int draw(const std::string& kind,int team,const glm::dmat4& root,double age,const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,bool shadow,const CombatDevice* device=nullptr,const SpecialPose* special=nullptr,const ActorMotion* actorMotion=nullptr,double opacity=1,double phase=0){
+    int draw(const std::string& kind,int team,const glm::dmat4& root,double age,const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,bool shadow,const CombatDevice* device=nullptr,const SpecialPose* special=nullptr,const ActorMotion* actorMotion=nullptr,double opacity=1,double phase=0,const CombatPose* handPose=nullptr){
         const auto found=models.find(kind+std::to_string(team));if(found==models.end())return 0;const auto& nodes=found->second;
         const DeviceMotion* motionState=nullptr;if(device){const auto state=deviceMotion.find(device->id);if(state!=deviceMotion.end())motionState=&state->second;}
         std::vector<glm::dmat4> world;std::vector<bool> visible;std::vector<std::size_t> render;world.reserve(nodes.size());visible.reserve(nodes.size());
@@ -119,8 +120,10 @@ struct DeviceRenderer::Impl {
             if(kind=="speaker"&&n.tag=="cone"){const double pulse=phase<.5?1+std::sin(age*40)*.05*std::clamp(age/1.3,0.,1.):phase<1.5?1+std::sin(age*60)*.12:1;local=glm::scale(local,glm::dvec3(1,1,pulse));}
             if(kind=="crab"&&special){if(n.tag=="hullG")show=!special->roll;else if(n.tag=="ball"){show=special->roll;local=rotate(local,actorMotion?actorMotion->roll:0,device?device->heading:0,0);}else if(n.tag=="gunSpin")local=rotate(local,0,0,actorMotion?actorMotion->gun:age*2);else if(n.tag.rfind("legs",0)==0){const int index=n.tag.back()-'0';local=rotate(local,std::sin((actorMotion?actorMotion->leg:age)*5+index*1.7)*.28*std::min(1.,speed/1.5),0,0);}}
             if(device){
+                if(n.tag=="inner"&&device->state=="fly"&&kind!="brolly")local[3].y-=n.phase;
+                if(kind=="shaker"&&motionState){if(n.tag=="inner")local*=glm::toMat4(motionState->tumble);else if(n.tag=="model"&&device->grounded&&device->held)local=rotate(local,motionState->rattleX,0,motionState->rattleZ);}
                 if(kind=="brolly"&&n.tag=="inner"){local[3].y=.76+(device->h0-.76)*std::max(0.,1-age/.22)+.012*std::sin(age*11);local=rotate(local,0,0,.035*std::sin(age*7.3));}
-                if(n.tag=="spin")local=rotate(local,0,kind=="boomerang"&&motionState?motionState->spin:device->spin,0);
+                if(n.tag=="spin")local=rotate(local,0,kind=="boomerang"&&motionState?motionState->spin:kind=="beacon"?device->age*1.5:device->spin,0);
                 if(kind=="boomerang"&&n.tag=="tilt"&&motionState)local=rotate(local,motionState->tiltX,device->heading,motionState->tiltZ);
                 if(kind=="boomerang"&&n.tag=="blur"&&device->state=="armed"){
                     const double k=std::clamp(device->age/std::max(device->timer,1e-9),0.,1.);
@@ -151,6 +154,19 @@ struct DeviceRenderer::Impl {
                     if(kind=="boomerang"&&device&&device->state=="armed"&&n.tag=="blur")
                         color*=1+1.4*std::clamp(device->age/std::max(device->timer,1e-9),0.,1.);
                     shader.uniform(k,{color.x,color.y,color.z});
+                }else if(kind=="shaker"&&device&&n.tag.rfind("lamps",0)==0&&k=="emissive"){
+                    const auto& spec=GetEquipment(EquipmentCategory::Sub,"shaker");const double progress=std::clamp(device->fuse>=0?1-device->fuse/spec.number("fuse"):1-device->timer/spec.number("gap"),0.,1.);
+                    const double brightness=(n.tag.back()-'0')<device->uses?(device->held?2.3+2.5*std::max(0.,std::sin(device->age*(14+20*progress))):2.3):.05;
+                    const auto color=InkColors[team==1?1:0]*brightness;shader.uniform(k,{color.x,color.y,color.z});
+                }else if(kind=="shakerHandLamps"&&handPose&&n.tag.rfind("lamp",0)==0&&k=="emissive"){
+                    const double f=handPose->shakerCharge;const int level=f>=1?3:f>=.5?2:1,index=n.tag.back()-'0';
+                    const double part=level<3?std::clamp(f*2-(level-1),0.,1.):1.;
+                    const double brightness=index<level?((level>=3?2.4+1.2*std::sin(age*18):2.2)+2.5*phase):index==level?.12+.9*part*(.6+.4*std::sin(age*22)):.05;
+                    const auto color=InkColors[team==1?1:0]*brightness;shader.uniform(k,{color.x,color.y,color.z});
+                }else if(kind=="bomb"&&device&&n.tag=="body"&&k=="emissive"){
+                    const double progress=std::clamp(1-device->fuse/GetEquipment(EquipmentCategory::Sub,"bomb").number("fuse"),0.,1.);
+                    const double pulse=device->fuse<0?0:(std::sin(device->age*(10+progress*30))*.5+.5)*(.4+progress*1.8);
+                    const auto color=InkColors[team==1?1:0]*pulse;shader.uniform(k,{color.x,color.y,color.z});
                 }else if(kind=="waddle"&&device&&n.tag=="lamp"&&k=="emissive"&&v.size()==3
                     &&(device->state=="sense"||device->state=="wake"||device->state=="walk")){
                     const double progress=device->state=="sense"?std::clamp(device->age/std::max(device->timer,1e-9),0.0,1.0):0.0;
@@ -183,11 +199,37 @@ void DeviceRenderer::Update(double dt,const CombatWorld& world,glm::dvec3 eye){
     impl_->dt=std::clamp(dt,0.,.1);const double now=world.time();
     if(impl_->clockInitialized&&now+1e-9<impl_->clock){impl_->tracerTails.clear();impl_->deviceMotion.clear();impl_->motion.clear();}
     impl_->clock=now;impl_->clockInitialized=true;
-    impl_->devices.clear();for(const auto& d:world.devices())if(d.live&&glm::distance(d.pos,eye)<65)impl_->devices.push_back(d);
+    int localTeam=-1;for(const auto* actor:world.actors())if(actor->isLocal()){localTeam=actor->team();break;}
+    impl_->devices.clear();for(const auto& d:world.devices())if(d.live&&glm::distance(d.pos,eye)<65){
+        if(d.kind=="mine"&&d.fuse<0&&localTeam>=0&&d.team!=localTeam){
+            const auto ground=world.geometry().raycast(d.pos+glm::dvec3(0,.4,0),{0,-1,0},1,true);
+            if(ground.hit&&world.paintSurface().sample(ground.face,ground.u,ground.v)-1==d.team)continue;
+        }
+        impl_->devices.push_back(d);
+    }
     std::unordered_set<std::uint64_t> deviceIds;
     std::unordered_set<std::uint64_t> liveTracerIds;
     for(const auto& d:world.devices()){
-        if(!d.live)continue;deviceIds.insert(d.id);auto [it,inserted]=impl_->deviceMotion.try_emplace(d.id);auto& m=it->second;if(inserted)m.previous=d.pos;
+        if(!d.live)continue;deviceIds.insert(d.id);auto [it,inserted]=impl_->deviceMotion.try_emplace(d.id);auto& m=it->second;
+        if(inserted){
+            m.previous=d.pos;
+            // Cosmetic RNG stays separate from gameplay and is stable for a network device ID.
+            std::uint32_t seed=static_cast<std::uint32_t>(d.id^(d.id>>32))^0x6d2b79f5u;
+            const auto random=[&](){seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return double(seed)/4294967296.;};
+            m.rateX=d.kind=="bomb"?random()*8:d.kind=="shaker"?4+random()*5:3+random()*6;m.rateZ=d.kind=="bomb"?random()*8:d.kind=="shaker"?3+random()*5:3+random()*6;
+            if(d.kind=="shaker"){m.tumbleX=random()*6;m.tumbleY=random()*6;m.tumble=glm::quat_cast(rotate(glm::dmat4(1),m.tumbleX,m.tumbleY,0));}m.rng=seed;
+        }
+        if(d.kind=="shaker"&&d.grounded&&d.held){
+            m.tumble=glm::slerp(m.tumble,glm::dquat(1,0,0,0),1-std::exp(-14*impl_->dt));
+            glm::extractEulerAngleXYZ(glm::toMat4(m.tumble),m.tumbleX,m.tumbleY,m.tumbleZ);
+            const auto& spec=GetEquipment(EquipmentCategory::Sub,"shaker");const double progress=std::clamp(d.fuse>=0?1-d.fuse/spec.number("fuse"):1-d.timer/spec.number("gap"),0.,1.);
+            const auto random=[&](){m.rng^=m.rng<<13;m.rng^=m.rng>>17;m.rng^=m.rng<<5;return double(m.rng)/4294967296.;};
+            const double amount=.05+.1*progress;m.rattleX=(random()*2-1)*amount;m.rattleZ=(random()*2-1)*amount;
+        }else if(d.state=="fly"){
+            const double speed=d.kind=="bomb"&&d.fuse>=0?.2:1;
+            m.tumbleX+=impl_->dt*m.rateX*speed;m.tumbleZ+=impl_->dt*m.rateZ*speed;
+            if(d.kind=="shaker")m.tumble=glm::quat_cast(rotate(glm::dmat4(1),m.tumbleX,m.tumbleY,m.tumbleZ));
+        }
         if(d.kind=="tracer"){
             liveTracerIds.insert(d.id);auto& tail=impl_->tracerTails[d.id];tail.team=d.team;tail.active=true;tail.lastSeen=now;
             if(glm::dot(d.vel,d.vel)>1e-8)tail.direction=glm::normalize(d.vel);
@@ -231,6 +273,7 @@ void DeviceRenderer::Update(double dt,const CombatWorld& world,glm::dvec3 eye){
     for(const auto* a:world.actors()){const auto s=a->specialPose();if(!a->state.alive||!s.active||s.kind!="crab")continue;alive.insert(a);auto& m=impl_->motion[a];m.speed=std::hypot(a->state.vel.x,a->state.vel.z);if(s.roll)m.roll+=m.speed/.95*dt;else{m.leg+=dt*(1+m.speed*2.2);m.gun+=dt*(s.firing>0?40:2);}}
     for(auto it=impl_->motion.begin();it!=impl_->motion.end();)if(!alive.count(it->first))it=impl_->motion.erase(it);else ++it;
 }
+double DeviceRenderer::VisualRadius(const std::string& kind)const { const auto it=impl_->models.find(kind+"0");return it!=impl_->models.end()&&!it->second.empty()?it->second.front().phase:0; }
 std::size_t DeviceRenderer::Count()const{return impl_->devices.size();}
 std::size_t DeviceRenderer::TracerTailCount()const{return impl_->tracerTails.size();}
 std::size_t DeviceRenderer::TracerRibbonSegmentCount()const{std::size_t count=0;for(const auto& [id,tail]:impl_->tracerTails){(void)id;if(tail.points.size()>1)count+=tail.points.size()-1;}return count;}
@@ -243,9 +286,10 @@ int DeviceRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm
         auto root=glm::translate(glm::dmat4(1),d.pos);
         if(d.kind=="brolly")root=rotate(root,0,std::atan2(d.N.x,d.N.z),0);
         else if(d.kind=="tracer"||d.kind=="torpedo"){root*=along(d.kind=="torpedo"&&d.state=="unfold"?d.N:d.vel);const auto m=impl_->deviceMotion.find(d.id);root=rotate(root,0,0,d.kind=="tracer"?d.age*26:m!=impl_->deviceMotion.end()?m->second.roll:0);}
-        else if(d.state=="fly")root=rotate(root,d.age*8,0,d.age*5);
-        else if(d.kind=="sprinkler"||d.kind=="sticky")root*=glm::toMat4(glm::rotation(glm::dvec3(0,1,0),glm::normalize(d.normal)));
+        else if(d.state=="fly"&&d.kind!="shaker"){const auto m=impl_->deviceMotion.find(d.id);if(m!=impl_->deviceMotion.end())root=rotate(root,m->second.tumbleX,0,m->second.tumbleZ);}
+        else if(d.kind=="sprinkler"||d.kind=="sticky"||d.kind=="mine"||d.kind=="beacon")root*=glm::toMat4(glm::rotation(glm::dvec3(0,1,0),glm::normalize(d.normal)));
         else root=rotate(root,0,d.heading,0);
+        if(d.kind=="bomb"&&d.fuse>=0){const double k=std::clamp(1-d.fuse/GetEquipment(EquipmentCategory::Sub,"bomb").number("fuse"),0.,1.);root=glm::scale(root,glm::dvec3(1+k*.35+std::sin(d.age*40)*.03*k));}
         if(d.state=="stuck"&&d.timer>0){const double k=std::clamp(d.age/d.timer,0.,1.);root=glm::scale(root,glm::dvec3(1+k*.3+std::sin(d.age*40)*.025*k));}
         if(d.kind=="mine"&&d.fuse>=0)root=glm::scale(root,glm::dvec3(1+std::sin(d.age*50)*.08));
         draws+=impl_->draw(d.kind,d.team,root,d.age,view,projection,eye,lights,depthOnly,&d);
@@ -257,7 +301,9 @@ int DeviceRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm
         }
     }
     if(!depthOnly){const double life=GetEquipment(EquipmentCategory::Sub,"tracer").number("trailLife",1.0);for(const auto& [id,tail]:impl_->tracerTails){(void)id;if(tail.points.size()>1&&glm::distance(tail.points.back().first,eye)<65)draws+=impl_->drawRibbon(tail,impl_->clock,life,view,projection,eye);}}
-    for(const auto& item:actors){const auto& a=*item.actor;const auto s=a.specialPose();if(!s.active||!a.state.alive)continue;const auto& f=*item.frame;
+    for(const auto& item:actors){const auto& a=*item.actor;const auto s=a.specialPose();const auto combat=a.combatPose();
+        if(a.state.alive&&combat.shakerCharging&&!a.state.squid)draws+=impl_->draw("shakerHandLamps",a.team(),item.frame->subPropWorld,impl_->clock,view,projection,eye,lights,depthOnly,nullptr,nullptr,nullptr,1,item.frame->shakerKick,&combat);
+        if(!s.active||!a.state.alive)continue;const auto& f=*item.frame;
         auto root=glm::translate(glm::dmat4(1),a.visualPos());
         if(s.kind=="kraken"){
             const double speed=std::hypot(a.state.vel.x,a.state.vel.z),sq=a.state.grounded?1+std::sin(s.elapsed*14)*.04*std::min(1.,speed/4):std::clamp(1+a.state.vel.y*.025,.8,1.25);

@@ -1,5 +1,5 @@
 #include "../src/world/StageGeometry.hpp"
-#include "reference_fixtures.hpp"
+#include "fixtures/reference_fixtures.hpp"
 
 #include <cmath>
 #include <iostream>

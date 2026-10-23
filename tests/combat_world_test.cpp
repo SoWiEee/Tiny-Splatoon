@@ -1,6 +1,6 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/game/ArsenalData.hpp"
-#include "world_specials_source_fixtures.hpp"
+#include "fixtures/world_specials_source_fixtures.hpp"
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -20,6 +20,16 @@ int main(){
         auto check=[](bool condition,const char* message){if(!condition)throw std::runtime_error(message);};
         world.applyHit(*a,*ally,36,"shooter");check(ally->state.hp==100,"Friendly fire changed ally HP");
         world.applyHit(*a,*enemy,36,"shooter");check(enemy->state.hp==64,"One shared-world hit applied more than once");
+        {
+            enemy->state.invuln=1;
+            world.applyHit(*a,*enemy,36,"shooter");check(enemy->state.hp==64,"Spawn protection must reject weapon damage");
+            enemy->state.invuln=0;
+            world.applyHit(*a,*enemy,36,"shooter");check(enemy->state.alive&&enemy->state.hp==28,"Two source shooter hits must leave 28 HP");
+            const int splats=a->splats();
+            world.applyHit(*a,*enemy,36,"shooter");check(!enemy->state.alive&&enemy->state.hp==0&&a->splats()==splats+1,"Three source shooter hits must splat exactly once");
+            world.applyHit(*a,*enemy,36,"shooter");check(a->splats()==splats+1,"A dead victim must not award duplicate splats");
+            enemy->spawnAt(stage->spawnPads[1],0);enemy->state.invuln=0;
+        }
         glm::dvec3 point;bool found=false;
         for(int id=0;id<static_cast<int>(stage->faces.size())&&!found;++id){
             const auto& f=stage->faces[id];const auto& grid=paint.faceGrid(id);if(!f.turf||grid.offset<0)continue;

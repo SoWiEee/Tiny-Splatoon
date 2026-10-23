@@ -4,7 +4,7 @@
   <div class="menu-shell">
     <div class="menu-left">
       <div class="menu-header">
-        <div><div id="brand-wordmark" class="wordmark">Tiny Splatoon</div><div id="screen-title" class="muted">離線遊玩</div></div>
+        <div><div id="brand-wordmark" class="wordmark"><img class="brand-squid" src="weapons/squid.png" />Tiny Splatoon</div><div id="screen-title" class="muted">離線遊玩</div></div>
         <div id="profile-header" class="profile-header"></div>
       </div>
       <div class="menu-layout">
@@ -20,9 +20,9 @@
           <div class="nav-space"></div>
           <button id="close" class="nav exit">離開遊戲</button>
         </div>
-        <div class="content">
+        <div id="menu-content" class="content">
           <div id="panel-title" class="panel hidden">
-            <div class="title-lockup"><div class="title-eyebrow">離線遊玩</div><h1>Tiny Splatoon</h1><p class="intro">準備好後，前往廣場選擇你的裝備與玩法。</p><button id="title-start" class="primary">按 Enter 開始</button></div>
+            <div class="title-lockup"><img class="title-mascot" src="weapons/squid.png" /><h1>Tiny Splatoon</h1><p class="intro">準備好後，前往廣場選擇你的裝備與玩法。</p><button id="title-start" class="primary">按 Enter 開始</button></div>
           </div>
           <div id="panel-home" class="panel">
             <h1>回到廣場</h1><p class="intro">選好裝備與外觀，開始一場離線塗地對戰。</p>

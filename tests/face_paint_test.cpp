@@ -1,6 +1,6 @@
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/StageGeometry.hpp"
-#include "reference_paint_fixtures.hpp"
+#include "fixtures/reference_paint_fixtures.hpp"
 
 #include <algorithm>
 #include <cmath>

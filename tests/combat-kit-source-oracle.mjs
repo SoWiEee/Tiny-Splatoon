@@ -96,7 +96,7 @@ const output = ['#pragma once', '#include <array>', 'namespace restoration::test
   `inline constexpr std::array<CombatKitFixture, ${rows.length}> combatKitFixtures{{`,
   ...rows.map((r) => `  {${r.caseIndex},"${r.id}",${n(r.hold)},${n(r.jump)},${r.frame},${[r.ink,r.charge,r.yaw,r.vx,r.vy,r.vz,r.range,r.damage].map(n).join(',')},${[r.shots,r.ringEvents,r.ring,r.charging,r.firing,r.leaping,r.leaps,r.arrows,r.tier,r.lodge,r.busy].join(',')}},`),
   '}};', '}', ''].join('\n');
-const path = new URL('./combat_kit_fixtures.hpp', import.meta.url);
+const path = new URL('./fixtures/combat_kit_fixtures.hpp', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(path, 'utf8') !== output) throw new Error('Combat kit source action oracle differs');
 } else writeFileSync(path, output);

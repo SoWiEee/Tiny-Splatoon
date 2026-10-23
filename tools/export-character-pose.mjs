@@ -196,7 +196,7 @@ export async function exportCharacterPose() {
 export { capture as captureCharacterPose };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const output = resolve(process.argv[2] ?? resolve(root, 'tests/character_pose_fixtures.json'));
+  const output = resolve(process.argv[2] ?? resolve(root, 'tests/fixtures/character_pose_fixtures.json'));
   const data = await exportCharacterPose();
   const text = JSON.stringify(data) + '\n';
   await writeFile(output, text);

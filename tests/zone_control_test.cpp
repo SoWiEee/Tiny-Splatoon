@@ -5,7 +5,7 @@
 #include "PlayerSimulation.hpp"
 #include "ReferenceData.hpp"
 #include "StageGeometry.hpp"
-#include "zone_control_fixtures.hpp"
+#include "fixtures/zone_control_fixtures.hpp"
 
 #include <algorithm>
 #include <array>

@@ -27,12 +27,21 @@ using WorldFxCollider = std::function<bool(glm::vec3 from, glm::vec3 to, WorldFx
 using WorldFxRippleSink = std::function<void(glm::dvec3,double,double,double,double)>;
 using WorldFxSpeckSink = std::function<void(const WorldFxHit&,glm::vec3,float)>;
 
+struct WorldFxRecipeContext {
+    double factor=0;
+    glm::dvec3 point{0};
+    // fx.js burst() options. Defaults preserve the source recipe's defaults.
+    double count=12, speed=4, size=0.1, spread=0.9, gravity=1;
+    bool paint=false, sheet=true, ring=false, mist=false, hasPoint=true;
+};
+
 // Builds the source fx.js pooled recipes using its xorshift-fixture Math.random
 // stream. `rng` is stateful and must be shared across sequential calls.
 std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,
     glm::dvec3 pos, glm::dvec3 normal, glm::dvec3 color, double radius,
     std::uint32_t& rng, double waterY=-1.6, glm::dvec3 camera={0,10,0},
-    const WorldFxRippleSink& ripple={});
+    const WorldFxRippleSink& ripple={}, const WorldFxRecipeContext& context={},
+    glm::dvec3 direction={0,0,1}, double time=0.0, double dt=1.0/60.0);
 
 // Mirrors fx.js pool update equations and Float32Array write boundaries. The
 // optional collider has the same segment contract as FX.setCollider.

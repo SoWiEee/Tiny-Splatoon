@@ -54,6 +54,6 @@ try{
 }finally{Math.random=previousRandom;}
 const hash=createHash('sha256').update(await readFile(new URL('../splat-ref/src/fx/screenfx.js',import.meta.url))).digest('hex');
 const text=JSON.stringify({sourceHash:hash,names,lensKeys,cases})+'\n';
-const path=new URL('../tests/screen_effects_fixtures.json',import.meta.url);
+const path=new URL('../tests/fixtures/screen_effects_fixtures.json',import.meta.url);
 if(process.argv.includes('--check')){if(await readFile(path,'utf8')!==text)throw Error('Stale screen effects fixture');}else await writeFile(path,text);
 console.log(`Screen FX source: ${cases.length} scenarios / ${cases.reduce((n,c)=>n+c.records.length,0)} frames`);

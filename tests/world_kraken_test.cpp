@@ -1,7 +1,7 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/game/WorldSpecials.hpp"
 #include "../src/game/ArsenalData.hpp"
-#include "kraken_source_fixtures.hpp"
+#include "fixtures/kraken_source_fixtures.hpp"
 #include <cmath>
 #include <iostream>
 #include <stdexcept>

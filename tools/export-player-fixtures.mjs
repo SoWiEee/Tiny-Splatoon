@@ -122,7 +122,7 @@ const lines = [
   '} // namespace restoration::test',
   '',
 ];
-const target = new URL('../tests/player_fixtures.hpp', import.meta.url), output = lines.join('\n');
+const target = new URL('../tests/fixtures/player_fixtures.hpp', import.meta.url), output = lines.join('\n');
 if (process.argv.includes('--check')) {
   if (readFileSync(target, 'utf8') !== output) throw new Error('Player fixtures differ from reference Actor');
 } else writeFileSync(target, output);

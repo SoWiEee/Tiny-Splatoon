@@ -15,7 +15,7 @@ const { ZONE_DEFS } = await import('../splat-ref/src/world/zones-data.js');
 const { ZoneControl } = await import('../splat-ref/src/game/zones.js');
 const { G } = await import('../splat-ref/src/core/ctx.js');
 
-const output = resolve(import.meta.dirname, '../tests/zone_control_fixtures.hpp');
+const output = resolve(import.meta.dirname, '../tests/fixtures/zone_control_fixtures.hpp');
 const args = process.argv.slice(2);
 const check = args.includes('--check');
 if (args.some((arg) => arg !== '--check') || args.filter((arg) => arg === '--check').length > 1)

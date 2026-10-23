@@ -1,5 +1,5 @@
 #include "../src/game/FollowCamera.hpp"
-#include "camera_fixtures.hpp"
+#include "fixtures/camera_fixtures.hpp"
 
 #include <cmath>
 #include <iostream>

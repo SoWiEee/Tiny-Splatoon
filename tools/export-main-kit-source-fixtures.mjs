@@ -175,7 +175,7 @@ const output = ['#pragma once', '#include <array>', 'namespace restoration::test
   `inline constexpr std::array<MainKitTraceFixture, ${rows.length}> mainKitTraceFixtures{{`,
   ...rows.map(r => `  {"${r.weapon}","${r.action}",${r.frame},${r.ordinal},${n(r.ink)},${n(r.charge)},${r.projectileCount},${[r.speed,r.range,r.damage,r.sideDamage,r.fan,r.radius,r.delay,r.x,r.y,r.z,r.vx,r.vy,r.vz].map(n).join(',')},${r.event},${n(r.chargeAtDraw)},${n(r.drawnInk)},${r.state}},`),
   '}};', '}', ''].join('\n');
-const path = new URL('../tests/main_kit_source_fixtures.hpp', import.meta.url);
+const path = new URL('../tests/fixtures/main_kit_source_fixtures.hpp', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(path, 'utf8') !== output) throw new Error('Main kit source action oracle differs');
 } else writeFileSync(path, output);

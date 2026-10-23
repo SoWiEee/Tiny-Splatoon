@@ -44,7 +44,7 @@ for (const [id, kitPaths] of Object.entries(weapons)) {
 }
 lines.push('}', '');
 const output = lines.join('\n');
-const target = new URL('../tests/main_weapon_source_fixtures.hpp', import.meta.url);
+const target = new URL('../tests/fixtures/main_weapon_source_fixtures.hpp', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(target, 'utf8') !== output) throw new Error('Main weapon source fixtures differ from locked source');
 } else writeFileSync(target, output);

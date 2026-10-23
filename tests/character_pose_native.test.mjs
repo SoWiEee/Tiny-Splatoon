@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const executable = resolve(process.argv[2] ?? process.env.POSE_EVAL_EXE ?? resolve(root, 'build/character_pose_eval.exe'));
-const oracle = JSON.parse(await readFile(resolve(root, process.argv[3] ?? 'tests/character_pose_fixtures.json'), 'utf8'));
+const oracle = JSON.parse(await readFile(resolve(root, process.argv[3] ?? 'tests/fixtures/character_pose_fixtures.json'), 'utf8'));
 const firstDifferenceByScenario = new Map();
 const rememberDifference = (scenario, message) => {
   if (!firstDifferenceByScenario.has(scenario)) firstDifferenceByScenario.set(scenario, message);

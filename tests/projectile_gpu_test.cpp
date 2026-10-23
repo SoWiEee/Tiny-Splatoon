@@ -5,6 +5,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -47,6 +48,43 @@ int main(int argc,char** argv){
             if(calls<1||visible<8||glGetError()!=GL_NO_ERROR)throw std::runtime_error(std::string("Source kit projectile invisible or invalid: ")+kind);
             if(argc>2){const auto path=std::filesystem::path(argv[2]).parent_path()/(std::string("projectile-")+kind+".png");stbi_write_png(path.string().c_str(),256,256,4,pixels.data(),256*4);}
         }
+        StageData wallStage{};wallStage.bounds={-30,30,-30,30};wallStage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+        BlockData wall{};wall.center={0,0,.5};wall.half={3,3,.1};wall.axes={glm::dvec3(1,0,0),glm::dvec3(0,1,0),glm::dvec3(0,0,1)};wall.faces.fill(-1);wall.solid=true;wallStage.blocks.push_back(wall);
+        StageGeometry wallGeometry(wallStage);FacePaint wallPaint(wallStage,wallGeometry);CombatWorld wallWorld(wallStage,wallGeometry,wallPaint);
+        {
+            PlayerSimulation waveOwner(wallStage,wallGeometry,wallPaint,0,&wallWorld);waveOwner.state.alive=true;
+            ShooterProjectile wave;wave.owner=&waveOwner;wave.kind="bladewave";wave.weaponId="blade";wave.pos={0,0,0};wave.vel={0,0,28};wave.range=10;wave.life=1;wave.radius=.35;wave.size=1.7;wallWorld.launch(wave);
+            const auto waveId=wallWorld.projectiles().back().id;
+            renderer.Update(0,wallWorld,{});
+            renderer.Update(0,wallWorld,{{"blade_wave_hit",{0,0,0},{0,0,-1},.09,0,0,.08,0,"blade",waveId}});
+            if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave hit event incorrectly ended the projectile");
+            wallWorld.tick(.02);const auto wallEvents=wallWorld.takeVisualEvents();
+            if(std::none_of(wallEvents.begin(),wallEvents.end(),[&](const auto& event){return event.kind=="blade_wave_wall"&&event.id==waveId;}))throw std::runtime_error("Blade wave wall impact event missing");
+            renderer.Update(.02,wallWorld,wallEvents);
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave wall fade did not render");
+            glReadPixels(0,0,256,256,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+            std::size_t fading=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++fading;
+            if(fading<8)throw std::runtime_error("Blade wave wall fade produced no visible pixels");
+        }
+        wallWorld.tick(.07);renderer.Update(.07,wallWorld,{});
+        if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave fade expired before 0.14 seconds");
+        wallWorld.tick(.08);renderer.Update(.08,wallWorld,{});
+        if(renderer.Draw(view,projection,eye,lights)!=0)throw std::runtime_error("Blade wave wall fade outlived 0.14 seconds");
+
+        StageData rangeStage{};rangeStage.bounds={-30,30,-30,30};rangeStage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
+        StageGeometry rangeGeometry(rangeStage);FacePaint rangePaint(rangeStage,rangeGeometry);CombatWorld rangeWorld(rangeStage,rangeGeometry,rangePaint);
+        {
+            PlayerSimulation waveOwner(rangeStage,rangeGeometry,rangePaint,0,&rangeWorld);waveOwner.state.alive=true;
+            ShooterProjectile wave;wave.owner=&waveOwner;wave.kind="bladewave";wave.weaponId="blade";wave.pos={0,0,0};wave.vel={0,0,28};wave.range=.1;wave.life=.1;wave.radius=.35;wave.size=1.7;rangeWorld.launch(wave);
+            const auto waveId=rangeWorld.projectiles().back().id;
+            renderer.Update(0,rangeWorld,{});rangeWorld.tick(.02);const auto rangeEvents=rangeWorld.takeVisualEvents();
+            if(std::none_of(rangeEvents.begin(),rangeEvents.end(),[&](const auto& event){return event.kind=="blade_wave_stop"&&event.id==waveId;}))throw std::runtime_error("Blade wave range stop event missing");
+            renderer.Update(.02,rangeWorld,rangeEvents);
+            if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave range expiry did not start its fade");
+        }
+        rangeWorld.tick(.15);renderer.Update(.15,rangeWorld,{});
+        if(renderer.Draw(view,projection,eye,lights)!=0)throw std::runtime_error("Blade wave range fade outlived 0.14 seconds");
         if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Source projectile renderer GL error");
         std::cout<<"PROJECTILE_GPU source_teardrop=4 visible_pixels="<<colored<<" ribbon_lifecycle=pass renderer="<<glGetString(GL_RENDERER)<<'\n';
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';result=1;}

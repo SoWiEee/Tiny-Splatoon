@@ -1,5 +1,6 @@
 #include "GameUi.hpp"
 #include "ArsenalData.hpp"
+#include "WeaponReticleElement.hpp"
 #include "MatchSimulation.hpp"
 #include "PlayerController.hpp"
 #include "ZoneControl.hpp"
@@ -8,6 +9,7 @@
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -43,12 +45,15 @@ int main(int argc,char** argv){
         int framebufferWidth=0,framebufferHeight=0;glfwGetFramebufferSize(window,&framebufferWidth,&framebufferHeight);
         Check(framebufferWidth>=1920&&framebufferHeight>=1080,"Frameless UI test framebuffer must support 1920x1080 captures (actual="+std::to_string(framebufferWidth)+"x"+std::to_string(framebufferHeight)+")");
         using namespace restoration;
+        for(const auto& weapon:MainEquipment())Check(std::filesystem::exists(std::filesystem::path(argv[1])/"assets/ui/weapons"/(std::string(weapon.kind)+".png")),"Every selectable main weapon must have source HUD artwork: "+std::string(weapon.id));
         GameUi ui(window,std::filesystem::path(argv[1])/"assets");
         std::vector<std::string> sounds;float master=0;
         ui.SetSoundSink([&](const auto& name){sounds.push_back(name);});
         ui.SetVolumeSink([&](float a,float,float){master=a;});
         ui.ShowTitle("tidewater");
         auto* context=Rml::GetContext("game-ui");Check(context!=nullptr,"Missing game UI context");
+        // Wheel geometry must not depend on wall-clock animation progress.
+        context->SetDefaultScrollBehavior(Rml::ScrollBehavior::Instant,1.f);
         auto* menu=context->GetDocument("menu");Check(menu!=nullptr,"Missing menu document");
         auto element=[&](const char* id){auto* e=menu->GetElementById(id);Check(e!=nullptr,"Missing menu control");return e;};
         auto render=[&]{glViewport(0,0,1600,900);glClearColor(.96f,.97f,.95f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return ui.RenderMenu(1600,900);};
@@ -114,6 +119,25 @@ int main(int argc,char** argv){
         element("nav-settings")->Click();render();Check(element("settings-save-error")->IsVisible(),"Profile write errors must be visible in settings");
         element("nav-home")->Click();render();
         ui.SetSaveError("");
+        element("nav-settings")->Click();render();
+        for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
+            auto settingsRender=[&]{glViewport(0,0,size[0],size[1]);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return ui.RenderMenu(size[0],size[1]);};
+            settingsRender();auto* scroll=element("menu-content");scroll->SetScrollTop(0);settingsRender();
+            Check(scroll->GetScrollHeight()>scroll->GetClientHeight()+40,"Settings must expose vertical overflow instead of clipping its lower controls: scroll="+std::to_string(scroll->GetScrollHeight())+" client="+std::to_string(scroll->GetClientHeight())+" panel="+std::to_string(element("panel-settings")->GetOffsetHeight()));
+            const auto offset=scroll->GetAbsoluteOffset();
+            context->ProcessMouseMove(int(offset.x+scroll->GetClientWidth()/2),int(offset.y+40),0);
+            context->ProcessMouseWheel(Rml::Vector2f(0,40),0);settingsRender();
+            Check(scroll->GetScrollTop()>0,"Settings must respond to the mouse wheel inside the content region");
+            scroll->SetScrollTop(scroll->GetScrollHeight());settingsRender();
+            auto* last=element("reduced-motion");const auto lastOffset=last->GetAbsoluteOffset();
+            Check(lastOffset.y>=offset.y-1&&lastOffset.y+last->GetOffsetHeight()<=offset.y+scroll->GetClientHeight()+1,"The last settings checkbox must be reachable inside the scroll viewport");
+            Check(element("menu-back")->GetAbsoluteOffset(Rml::BoxArea::Border).y+element("menu-back")->GetOffsetHeight()<=size[1]+1,"Settings return action must remain visible independently of scrolling");
+            Check(last->Focus(),"The last settings control must remain keyboard focusable");
+            Capture(std::filesystem::path(argv[2])/("settings-bottom-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+            element("nav-settings")->Focus();settingsRender();scroll->SetScrollTop(0);settingsRender();
+            Check(scroll->GetScrollTop()<1,"The settings viewport must be able to return to its first option");
+            Capture(std::filesystem::path(argv[2])/("settings-top-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+        }
         element("nav-play")->Click();render();
         if(!element("duration-row")->IsVisible()||dynamic_cast<Rml::ElementFormControlSelect*>(element("duration"))->GetNumOptions()!=2)
             throw std::runtime_error("Turf duration: visible="+std::to_string(element("duration-row")->IsVisible())+" options="+std::to_string(dynamic_cast<Rml::ElementFormControlSelect*>(element("duration"))->GetNumOptions())+" mode="+ui.setup().mode);
@@ -181,6 +205,117 @@ int main(int argc,char** argv){
         Check(!menu->IsVisible()&&hud->IsVisible(),"Starting a match must hide the menu and reveal the HUD");
         Check(hud->GetElementById("pause")->IsVisible(),"Pause overlay did not appear");
         Check(hud->GetElementById("minimap")->IsVisible()&&hud->GetElementById("fps")->IsVisible(),"Saved minimap and FPS preferences must apply to the HUD");
+        {
+            const auto saved=match.local().state;auto* gauge=hud->GetElementById("ink-gauge");
+            Check(gauge&&hud->GetElementById("ink-tank"),"HUD must provide the reference's reticle-side ink tube");
+            match.local().state.ink=50;
+            for(int frame=0;frame<12;++frame){glfwSetTime(glfwGetTime()+.05);hudRender(false);}
+            Check(gauge->IsVisible()&&!gauge->IsClassSet("idle")&&gauge->IsClassSet("nosub"),"Half ink must show the tank and mark an unaffordable default bomb");
+            Check(gauge->GetAttribute<Rml::String>("aria-valuenow","")=="50","The ink meter must expose actual ink, independent of its smoothed liquid");
+            for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
+                glViewport(0,0,size[0],size[1]);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                ui.RenderHud(*stage,paint,match,size[0],size[1],false,true);
+                const auto position=gauge->GetAbsoluteOffset(Rml::BoxArea::Border);const auto bounds=gauge->GetBox().GetSize(Rml::BoxArea::Border);
+                Check(position.x>size[0]*.5&&position.x<size[0]*.6&&std::abs(position.y+bounds.y*.5-size[1]*.5)<2,"The ink tube must sit immediately right of the reticle and stay vertically centered");
+                const auto pixels=Capture(std::filesystem::path(argv[2])/("ink-tank-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+                int inkPixels=0;
+                for(int y=int(position.y);y<int(position.y+bounds.y);++y)for(int x=int(position.x);x<int(position.x+bounds.x);++x){
+                    const auto pixel=(std::size_t(size[1]-1-y)*size[0]+x)*3;
+                    const auto high=std::max({pixels[pixel],pixels[pixel+1],pixels[pixel+2]});const auto low=std::min({pixels[pixel],pixels[pixel+1],pixels[pixel+2]});
+                    if(high>120&&high-low>60)++inkPixels;
+                }
+                Check(inkPixels>20,"The native framebuffer must contain colored liquid inside the ink tube");
+            }
+            match.local().state.ink=10;hudRender(false);
+            Check(gauge->IsClassSet("low")&&hud->GetElementById("ink-low")->IsVisible(),"Below 18 ink must show a visible low-ink warning");
+            match.local().state.ink=100;
+            for(int frame=0;frame<22;++frame){glfwSetTime(glfwGetTime()+.1);hudRender(false);}
+            Check(gauge->IsClassSet("idle"),"A full idle ink tube must fade after the source's 1.4-second delay");
+            Check(hud->GetElementById("ink-tank")->GetComputedValues().opacity()<.01f,"The custom ink geometry must inherit the completed idle opacity");
+            match.local().state.ink=90;hudRender(false);Check(!gauge->IsClassSet("idle"),"Spending ink must reveal the tube immediately");
+            hudRender(true);Check(!gauge->IsVisible(),"The reticle ink tube must hide while the pause menu is open");
+            match.local().state=saved;
+        }
+        {
+            auto& actor=match.local();const auto saved=actor.state;const auto main=actor.mainId(),sub=actor.subId(),special=actor.specialId();
+            actor.state.squid=false;actor.state.alive=true;
+            auto* aim=dynamic_cast<WeaponReticleElement*>(hud->GetElementById("reticle"));Check(aim,"A native custom reticle must replace the generic dot");
+            std::vector<std::vector<unsigned char>> familyPixels;
+            for(const char* kind:{"shooter","blaster","roller","brush","charger","twins","bucket","spinner","bow","mitts","brolly","blade"}){
+                actor.setLoadout(kind);hudRender(false);Check(aim->IsVisible()&&aim->GetAttribute<Rml::String>("data-weapon","")==kind,"The active weapon must reach the reticle renderer");
+                auto pixels=Capture(std::filesystem::path(argv[2])/(std::string("reticle-")+kind+".png"),1600,900);
+                std::vector<unsigned char> crop;int visible=0;
+                for(int y=380;y<520;++y)for(int x=680;x<920;++x){const auto at=(std::size_t(y)*1600+x)*3;for(int c=0;c<3;++c)crop.push_back(pixels[at+c]);if(pixels[at]>180&&pixels[at+1]>180&&pixels[at+2]>180)++visible;}
+                Check(visible>20,"Every weapon family must draw visible native reticle geometry");
+                if(std::string(kind)!="brush"){for(const auto& old:familyPixels)Check(old!=crop,"Distinct source reticle families must not collapse to a generic dot");familyPixels.push_back(std::move(crop));}
+            }
+            const auto input=actor.input;actor.setLoadout("charger");hudRender(false);
+            std::vector<unsigned char> empty(100*100*3),full(empty.size());glReadPixels(750,400,100,100,GL_RGB,GL_UNSIGNED_BYTE,empty.data());
+            actor.input.fire=true;for(int frame=0;frame<120;++frame)actor.tick(1./60);hudRender(false);
+            glReadPixels(750,400,100,100,GL_RGB,GL_UNSIGNED_BYTE,full.data());
+            Check(actor.combatPose().charge>.99&&empty!=full,"Actual weapon charging must update native charge-arc pixels");actor.input=input;
+            actor.setLoadout(main,sub,special);actor.state=saved;actor.state.squid=true;hudRender(false);Check(!aim->IsVisible(),"Submerged form must hide the weapon reticle");actor.state=saved;
+        }
+        {
+            std::vector<PlayerState> saved;for(const auto& actor:match.actors())saved.push_back(actor->state);
+            const auto anchor=match.local().state.pos;
+            const glm::vec3 eye=glm::vec3(anchor)+glm::vec3(0,3,12);
+            ui.SetWorldView(glm::perspective(glm::radians(60.f),1600.f/900,.1f,200.f)*glm::lookAt(eye,glm::vec3(anchor)+glm::vec3(0,1,0),glm::vec3(0,1,0)),eye);
+            std::size_t ally=0,enemy=0;
+            for(std::size_t i=0;i<match.actors().size();++i){auto& actor=*match.actors()[i];actor.state.pos=anchor;actor.state.smoothY=anchor.y;actor.state.alive=true;if(!actor.isLocal())(actor.team()==match.local().team()?ally:enemy)=i;}
+            hudRender(false);
+            auto* markers=hud->GetElementById("ally-markers");
+            auto marker=[&](std::size_t i){return hud->GetElementById("ally-marker-"+std::to_string(i));};
+            Check(markers->IsVisible()&&markers->GetNumChildren()==3&&marker(ally),"Every living teammate must have an overhead position tag");
+            Check(!marker(enemy),"An untracked enemy must never receive an ally position marker");
+            Check(!marker(ally)->IsClassSet("offscreen"),"A visible teammate must use an overhead tag");
+            match.actors()[ally]->state.pos.x+=100;hudRender(false);
+            Check(marker(ally)->IsClassSet("offscreen"),"A teammate outside the view must have a screen-edge direction marker");
+            const auto offset=marker(ally)->GetAbsoluteOffset();
+            Check(offset.x>=0&&offset.x+marker(ally)->GetOffsetWidth()<=1601,"An edge marker must fit inside the viewport");
+            match.actors()[enemy]->state.track=3;match.actors()[enemy]->state.trackTeam=match.local().team();hudRender(false);
+            Check(marker(enemy)&&marker(enemy)->IsClassSet("tracked"),"Only an enemy tracked by the local team may show a marked enemy tag");
+            match.actors()[ally]->state.alive=false;hudRender(false);Check(!marker(ally),"A splatted teammate must lose its world tag");
+            Capture(std::filesystem::path(argv[2])/"ally-markers-1600x900.png",1600,900);
+            hudRender(true);Check(!markers->IsVisible(),"Pause must hide world position markers");
+            for(std::size_t i=0;i<saved.size();++i)match.actors()[i]->state=saved[i];hudRender(false);
+        }
+        {
+            auto* own=hud->GetElementById("squad-a");auto* enemy=hud->GetElementById("squad-b");
+            Check(own->GetNumChildren()==4&&enemy->GetNumChildren()==4,"Combat roster must display both four-player teams");
+            Check(hud->GetElementById("squad-a-count")->GetInnerRML().find("4 / 4")!=Rml::String::npos,"Squad count must report actual living actors");
+            auto& actor=match.local();const auto saved=actor.state;
+            actor.state.alive=false;actor.state.respawnTimer=2.2;hudRender(false);
+            auto* badge=hud->GetElementById("squad-player-0");
+            Check(badge&&badge->IsClassSet("self")&&badge->IsClassSet("dead")&&badge->GetInnerRML().find(">3<")!=Rml::String::npos,"A splatted local actor must retain its badge, cross and rounded respawn countdown");
+            Check(hud->GetElementById("squad-a-count")->GetInnerRML().find("3 / 4")!=Rml::String::npos,"Death must lower the living count without removing the roster slot");
+            Capture(std::filesystem::path(argv[2])/"battle-death-1600x900.png",1600,900);
+            actor.state=saved;actor.state.specialCharge=actor.weapon().number("specialCost",190);hudRender(false);
+            badge=hud->GetElementById("squad-player-0");
+            Check(badge->IsClassSet("ready")&&!badge->IsClassSet("dead"),"Respawn and special-ready must refresh the existing player's HUD state");
+            for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
+                glViewport(0,0,size[0],size[1]);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                ui.RenderHud(*stage,paint,match,size[0],size[1],false,true);
+                const auto clockOffset=hud->GetElementById("clock")->GetAbsoluteOffset();
+                const auto left=own->GetAbsoluteOffset();const auto right=enemy->GetAbsoluteOffset();
+                Check(left.x+own->GetOffsetWidth()<=clockOffset.x+1&&right.x>=clockOffset.x+hud->GetElementById("clock")->GetOffsetWidth()-1,"Squads must flank the clock without overlap");
+                Capture(std::filesystem::path(argv[2])/("battle-roster-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+            }
+            actor.state=saved;hudRender(false,true);
+            Check(!own->IsVisible()&&!enemy->IsVisible(),"Practice must hide competitive team slots");hudRender(true);
+            FacePaint onlinePaint(*stage,geometry);MatchOptions onlineOptions;onlineOptions.network=true;onlineOptions.duration=180;onlineOptions.localPeer=2;onlineOptions.authorityPeer=1;
+            for(unsigned i=0;i<3;++i){network::RosterEntry entry;entry.nid=i;entry.owner=i==1?2:1;entry.bot=i==2;entry.team=i==0?0:1;entry.slot=i==2?1:0;entry.name=i==1?"<self>":"Peer";entry.main="shooter";onlineOptions.networkRoster.push_back(entry);}
+            MatchSimulation onlineMatch(*stage,geometry,onlinePaint,nav,onlineOptions);
+            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            Check(own->GetNumChildren()==2&&enemy->GetNumChildren()==1&&hud->GetElementById("squad-player-1")->IsClassSet("self"),"A guest must see its actual team on the left even when its actor is not index zero");
+            onlineMatch.setNetworkActorActive(2,false);ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            Check(own->GetNumChildren()==1&&hud->GetElementById("squad-player-2")==nullptr,"An inactive departed actor must leave both the roster and its living count");
+            FacePaint bossPaint(*stage,geometry);MatchOptions bossOptions;bossOptions.mode="boss";
+            MatchSimulation bossMatch(*stage,geometry,bossPaint,nav,bossOptions);
+            glViewport(0,0,1600,900);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+            Check(own->GetNumChildren()==4&&enemy->GetNumChildren()==4&&hud->GetElementById("squad-a-count")->GetInnerRML().find("8 / 8")!=Rml::String::npos,"Boss HUD must split the eight-person squad around the timer and count the full squad");
+            Capture(std::filesystem::path(argv[2])/"boss-roster-1600x900.png",1600,900);hudRender(true);
+        }
         {
             FacePaint jumpPaint(*stage,geometry);
             MatchOptions jumpOptions; jumpOptions.duration=90; jumpOptions.seed=73;

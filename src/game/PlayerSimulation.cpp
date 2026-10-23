@@ -98,6 +98,10 @@ CombatPose PlayerSimulation::combatPose() const {
 }
 
 SpecialPose PlayerSimulation::specialPose() const { return networkSpecialPose_?*networkSpecialPose_:world_->specials_.pose(*this); }
+double PlayerSimulation::streamDuration() const {
+    const auto& w=weapon();if(w.kind!="spinner")return 1;return w.number("burstMin")+(w.number("burstMax")-w.number("burstMin"))*runner_.burstPower_;
+}
+
 double PlayerSimulation::hitRadius() const { const auto special=specialPose();return special.hitRadius>0?special.hitRadius:0.38; }
 double PlayerSimulation::hitHeight() const { const auto special=specialPose();return special.hitHeight>0?special.hitHeight:(state.squid?0.55:1.45); }
 

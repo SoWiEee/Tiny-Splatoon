@@ -1,6 +1,6 @@
 #include "../src/game/PlayerSimulation.hpp"
-#include "combat_runner_fixtures.hpp"
-#include "controller_fixtures.hpp"
+#include "fixtures/combat_runner_fixtures.hpp"
+#include "fixtures/controller_fixtures.hpp"
 #include <cmath>
 #include <exception>
 #include <iostream>
@@ -28,6 +28,14 @@ int main() {
     }
     if(failures)return 1;
     std::cout<<test::combatRunnerFixtures.size()<<" source WeaponRunner snapshots passed\n";
+
+    for(const auto* main : {"shooter","charger","spinner","bow","blade","mitts"}) {
+        PlayerSimulation empty(stage,geometry,paint);empty.setLoadout(main);empty.state.ink=0;empty.state.grounded=true;
+        WeaponRunner dry(empty);dry.tick(1./60,true,true);
+        const auto events=empty.combatWorld().takeVisualEvents();
+        require(std::any_of(events.begin(),events.end(),[](const auto& e){return e.kind=="lowink";}),"An empty weapon must emit its dry-fire visual trigger");
+        require(empty.state.ink==0&&empty.shotsFired()==0,"Dry-fire visuals must not spend ink or fire gameplay shots");
+    }
 
     PlayerSimulation shaker(stage,geometry,paint);
     shaker.setLoadout("shooter","shaker");

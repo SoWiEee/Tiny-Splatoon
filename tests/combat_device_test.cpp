@@ -1,9 +1,9 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/game/ArsenalData.hpp"
-#include "controller_fixtures.hpp"
-#include "brolly_source_fixtures.hpp"
-#include "main_kit_source_fixtures.hpp"
-#include "main_weapon_source_fixtures.hpp"
+#include "fixtures/controller_fixtures.hpp"
+#include "fixtures/brolly_source_fixtures.hpp"
+#include "fixtures/main_kit_source_fixtures.hpp"
+#include "fixtures/main_weapon_source_fixtures.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -47,9 +47,8 @@ void runTracerContact(double sideOffset,double expectedDamage,double expectedMar
     if(hit==events.end())return;
     check(hit->sourceLocal==ownerLocal && hit->sourceVictimLocal==victimLocal,
           "Tracer hit audio must preserve the local owner/victim playback gates");
-    if(victimLocal)
-        check(glm::length(hit->pos-glm::dvec3(0.0))<1e-12,
-              "Tracer victim-local audio event must omit its spatial source position");
+    check(glm::distance(hit->pos,victim.visualPos())<2.0,
+          "Tracer contact FX must retain the world hit position even for a local victim; GameAudio applies nonspatial playback separately");
 }
 
 void checkBrollyConfig() {

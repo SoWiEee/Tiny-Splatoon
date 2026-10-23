@@ -401,8 +401,8 @@ const header = [
   `inline constexpr std::array<std::string_view, ${sourcePaths.length}> sonarWailSourceHashes{{${hashes.map((hash) => `"${hash}"`).join(',')}}};`,
   '}', '',
 ].join('\n');
-const headerPath = new URL('../tests/sonar_wail_source_fixtures.hpp', import.meta.url);
-const jsonPath = new URL('../tests/sonar_wail_source_fixtures.json', import.meta.url);
+const headerPath = new URL('../tests/fixtures/sonar_wail_source_fixtures.hpp', import.meta.url);
+const jsonPath = new URL('../tests/fixtures/sonar_wail_source_fixtures.json', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(headerPath, 'utf8') !== header) throw new Error('Sonar/Wail C++ source fixture differs');
   if (readFileSync(jsonPath, 'utf8') !== outputJson) throw new Error('Sonar/Wail JSON source fixture differs');

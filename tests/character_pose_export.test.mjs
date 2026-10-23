@@ -5,14 +5,14 @@ import { createHash } from 'node:crypto';
 import { exportCharacterPose } from '../tools/export-character-pose.mjs';
 
 test('actual Character oracle reproduces the checked-in pose and material samples', { timeout: 120000 }, async () => {
-  const expected = await readFile(new URL('./character_pose_fixtures.json', import.meta.url), 'utf8');
+  const expected = await readFile(new URL('./fixtures/character_pose_fixtures.json', import.meta.url), 'utf8');
   const actual = JSON.stringify(await exportCharacterPose()) + '\n';
   const hash = s => createHash('sha256').update(s).digest('hex');
   assert.equal(hash(actual), hash(expected), 'Source Character outputs changed; inspect the first pose divergence before replacing fixtures');
 });
 
 test('fixture envelope preserves the complete rig, live face/hair, forms, and all main weapons', async () => {
-  const data = JSON.parse(await readFile(new URL('./character_pose_fixtures.json', import.meta.url), 'utf8'));
+  const data = JSON.parse(await readFile(new URL('./fixtures/character_pose_fixtures.json', import.meta.url), 'utf8'));
   assert.equal(data.boneNames.length, 87);
   assert.equal(new Set(data.boneNames).size, 87);
   assert.equal(data.scenarios.filter(s => s.definition.weapon).length, 12);

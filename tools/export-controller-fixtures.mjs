@@ -140,7 +140,7 @@ const lines = [
   ...capsuleDistances.map(f => `  {${cppVec(f.a)}, ${cppVec(f.b)}, ${cppVec(f.base)}, ${num(f.point)}, ${num(f.segment.dist)}, ${num(f.segment.t)}},`), '}};',
   '} // namespace restoration::controller_fixtures', '',
 ];
-const path = resolve(import.meta.dirname, '../tests/controller_fixtures.hpp');
+const path = resolve(import.meta.dirname, '../tests/fixtures/controller_fixtures.hpp');
 const generated = lines.join('\n');
 if (process.argv.includes('--check')) {
   if (await readFile(path, 'utf8') !== generated) throw Error('Controller fixtures are stale');

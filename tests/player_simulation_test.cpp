@@ -1,6 +1,6 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/world/FacePaint.hpp"
-#include "player_fixtures.hpp"
+#include "fixtures/player_fixtures.hpp"
 
 #include <cmath>
 #include <iostream>

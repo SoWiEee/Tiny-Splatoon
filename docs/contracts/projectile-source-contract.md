@@ -1,0 +1,15 @@
+# Native projectile presentation
+
+`CombatWorld` continues to own flight, collisions, paint and damage. `ProjectileRenderer` consumes its live rounds and the visual-event snapshot once per fixed tick; drawing cannot apply gameplay effects. The old projectile billboard and generic charger beam paths in `WorldEffects` are removed to avoid drawing each round twice.
+
+`tools/export-projectile-visuals.mjs` reads the immutable source `Projectiles` constructors, actual materials and geometry. It exports the 14×12 sphere with the source glossy teardrop vertex deformation, physical fragment shader, source charger ribbon shaders, and the bow arrow/fletching/glow/streak, mitts fist and blade wave geometry/materials. Private kit constructors are exposed only in an in-memory module; source files are never rewritten. Standard materials use expanded bundled Three.js shader chunks and the existing source DFG lookup table; missing DFG data produced NaN lighting and was caught by the isolated GPU test.
+
+`BuildProjectileBlobs` preserves the source muzzle pop, velocity-dependent tapered tail, wobble, blast swelling and satellite placement equations, including Float32 instance-buffer writes and the 700-instance bound. Twenty-four fixtures execute the real JavaScript `Projectiles._draw` and compare matrices, shape inputs, colors and counts at an absolute 0.00001 threshold. Runtime visual size variations derive from the shot's existing seed so presentation does not advance the gameplay RNG; the source browser's unrelated random stream is not claimed identical.
+
+The actor muzzle adapter uses the live rig's right/left socket and rejects non-finite, distant or wall-obstructed sockets before falling back to the existing physics muzzle. The source's predictive `aimReady/getAimMuzzle` blending is not yet exposed by `CharacterPose`. Projectile shadow casting and complete bomb/device models remain outside this renderer's current coverage.
+
+`reference_projectile_gpu` draws only the projectile under test in a hidden OpenGL 4.5 context. It requires visible pixels separately for the source teardrop/satellites, arrow, fist and blade wave, plus real charger-ribbon submission/expiration and no GL errors. Its captures are under `build/captures/projectile-*.png`. This is stronger than counting a projectile in the simulation or requiring unrelated FX to change some pixels; whole-scene reference image parity remains a separate acceptance requirement.
+
+## Blade stop transition (v0.8.0)
+
+Wall, shield and range termination emit a visual stop event with the projectile id. The renderer snapshots position, velocity, color and wave parameters without an actor pointer, then applies the source 0.14-second fade. A victim contact does not terminate the wave. World-time rollback clears retained fades; lodged bow glow also uses world time. The isolated GPU test checks visible wall fades, range-stop events, nonterminal hit behavior and expiry, including owner destruction during the retained fade.

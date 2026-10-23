@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -11,6 +12,8 @@
 #include <limits>
 #include <random>
 #include <sstream>
+#include <system_error>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -149,6 +152,10 @@ struct AudioEngine::Impl {
         bool initialized = false, active = false, looping = true;
         bool sourceInitialized = false, recording = false;
         std::string track;
+        std::filesystem::path recordingPath;
+        double recordingGain = 1;
+        ma_uint64 loopBegin = MA_DATA_SOURCE_DEFAULT_LOOP_POINT_BEG;
+        ma_uint64 loopEnd = MA_DATA_SOURCE_DEFAULT_LOOP_POINT_END;
         std::uint64_t serial = 0;
         double stopAt = 0;
     };
@@ -159,7 +166,7 @@ struct AudioEngine::Impl {
     std::filesystem::path assetDirectory;
     std::unordered_map<std::string, SourceMetadata> catalog;
     std::unordered_map<std::string, MusicMetadata> musicCatalog;
-    struct Recording {std::filesystem::path path;double gain=1;};
+    struct Recording {std::filesystem::path path;double gain=1;bool loop=false;};
     std::unordered_map<std::string,std::vector<Recording>> recordings;
     std::unordered_map<std::string,std::size_t> recordingNext;
     std::unordered_map<std::string,std::filesystem::path> recordingLast;
@@ -214,6 +221,7 @@ struct AudioEngine::Impl {
             catch (...) { }
         }
         std::ifstream files(assetDirectory/"custom-music.tsv");
+        std::unordered_map<std::string,std::vector<Recording>> customRecordings;
         for(std::string line;std::getline(files,line);){
             std::istringstream row(line);std::string track,gain,path;
             if(!std::getline(row,track,'\t')||(track!="battle"&&track!="battle_final")||!std::getline(row,gain,'\t')||!std::getline(row,path))continue;
@@ -225,9 +233,43 @@ struct AudioEngine::Impl {
             try{
                 std::size_t consumed=0;const double db=std::stod(gain,&consumed);
                 if(consumed==gain.size()&&std::isfinite(db)&&db>=-60&&db<=24)
-                    recordings[track].push_back({assetDirectory/p,std::pow(10.,db/20.)});
+                    customRecordings[track].push_back({assetDirectory/p,std::pow(10.,db/20.),false});
             }catch(...){}
         }
+        const std::array<std::pair<std::string_view, std::string_view>, 7> bundledTracks{{
+                {"title", "LifeWillChange_Instrumental.mp3"}, {"menu", "LifeWillChange_Instrumental.mp3"},
+                {"battle", "Splattack.mp3"}, {"battle_final", "Splattack.mp3"}, {"boss", "Splattack.mp3"},
+                {"boss_2", "Splattack.mp3"}, {"boss_3", "Splattack.mp3"}}};
+        std::ifstream bundled(assetDirectory / "bundled-music.tsv");
+        for (std::string line; std::getline(bundled, line);) {
+            std::istringstream row(line);
+            std::string track, gain, filename;
+            if (!std::getline(row, track, '\t') || !std::getline(row, gain, '\t') || !std::getline(row, filename)) continue;
+            const auto mapping = std::find_if(bundledTracks.begin(), bundledTracks.end(), [&](const auto& item) {
+                return item.first == track && item.second == filename;
+            });
+            if (mapping == bundledTracks.end() || !musicCatalog.count(track)) continue;
+            const auto p = std::filesystem::u8path(filename);
+            if (filename.find_first_of("\\\t\r\n") != std::string::npos || p.is_absolute() || p.has_root_name() ||
+                p.has_root_directory() || !p.parent_path().empty() || !SafeName(p.stem().string()) || p.extension() != ".mp3") continue;
+            double db = 0;
+            try {
+                std::size_t consumed = 0;
+                db = std::stod(gain, &consumed);
+                if (consumed != gain.size() || !std::isfinite(db) || db < -60 || db > 24) continue;
+            } catch (...) { continue; }
+            const auto path = assetDirectory / p;
+            std::error_code ec;
+            const auto root = std::filesystem::weakly_canonical(assetDirectory, ec);
+            if (ec) continue;
+            const auto resolved = std::filesystem::weakly_canonical(path, ec);
+            if (ec) continue;
+            const auto relative = resolved.lexically_relative(root);
+            if (relative.empty() || relative.is_absolute() ||
+                std::any_of(relative.begin(), relative.end(), [](const auto& part) { return part == ".."; })) continue;
+            recordings[track].push_back({path, std::pow(10., db / 20.), true});
+        }
+        for (auto& [track, entries] : customRecordings) recordings[track] = std::move(entries);
     }
 
     double Now() const {
@@ -319,7 +361,11 @@ struct AudioEngine::Impl {
         if (voice.initialized) { ma_sound_stop(&voice.sound); ma_sound_uninit(&voice.sound); voice.initialized = false; }
         if (voice.sourceInitialized) { ma_audio_buffer_ref_uninit(&voice.source); voice.sourceInitialized = false; }
         voice.pcm.clear();
-        voice.active = false; voice.looping = true; voice.recording=false;voice.track.clear(); voice.stopAt = 0;
+        voice.active = false; voice.looping = true; voice.recording=false;voice.track.clear();
+        voice.recordingPath.clear(); voice.recordingGain = 1;
+        voice.loopBegin = MA_DATA_SOURCE_DEFAULT_LOOP_POINT_BEG;
+        voice.loopEnd = MA_DATA_SOURCE_DEFAULT_LOOP_POINT_END;
+        voice.stopAt = 0;
     }
     bool PlayMusicRiser(double duration) {
         constexpr ma_uint32 sampleRate = 48000;
@@ -430,6 +476,80 @@ struct AudioEngine::Impl {
 
 AudioEngine::AudioEngine(std::filesystem::path assetDirectory) : impl_(std::make_unique<Impl>(std::move(assetDirectory))) {}
 AudioEngine::~AudioEngine() = default;
+
+bool AudioEngineMusicTestState(const AudioEngine& engine, std::filesystem::path& path, bool& looping,
+    std::uint64_t& loopBegin, std::uint64_t& loopEnd, std::uint64_t& serial, double& durationSeconds) {
+    const auto& impl = *engine.impl_;
+    if (impl.currentMusic >= kMusicVoices) return false;
+    const auto& voice = impl.musicVoices[impl.currentMusic];
+    if (!voice.active || !voice.recording || voice.recordingPath.empty()) return false;
+    auto& sound = const_cast<ma_sound&>(voice.sound);
+    float duration = 0;
+    if (ma_sound_get_length_in_seconds(&sound, &duration) != MA_SUCCESS) return false;
+    path = voice.recordingPath;
+    looping = ma_sound_is_looping(&voice.sound) == MA_TRUE;
+    loopBegin = voice.loopBegin;
+    loopEnd = voice.loopEnd;
+    serial = voice.serial;
+    durationSeconds = duration;
+    return true;
+}
+
+bool AudioEngineMusicTestReadsAcrossEnd(AudioEngine& engine) {
+    auto& impl = *engine.impl_;
+    if (impl.currentMusic >= kMusicVoices) return false;
+    auto& voice = impl.musicVoices[impl.currentMusic];
+    if (!voice.active || !voice.recording || !voice.looping || !voice.initialized) return false;
+
+    // Stop the device as well so no in-flight callback can consume the test stream.
+    if (ma_sound_stop(&voice.sound) != MA_SUCCESS || ma_engine_stop(&impl.engine) != MA_SUCCESS) return false;
+    auto* source = ma_sound_get_data_source(&voice.sound);
+    if (source == nullptr || ma_data_source_is_looping(source) != MA_TRUE) return false;
+
+    ma_uint64 length = 0;
+    if (ma_data_source_get_length_in_pcm_frames(source, &length) != MA_SUCCESS) return false;
+    const ma_uint64 loopBegin = voice.loopBegin;
+    const ma_uint64 loopEnd = voice.loopEnd == MA_DATA_SOURCE_DEFAULT_LOOP_POINT_END
+        ? length
+        : std::min<ma_uint64>(voice.loopEnd, length);
+    constexpr ma_uint64 framesBeforeEnd = 8;
+    constexpr ma_uint64 framesToRead = 32;
+    if (loopEnd <= loopBegin || loopEnd - loopBegin <= framesBeforeEnd) return false;
+    ma_format format{};ma_uint32 channels=0;
+    if(ma_data_source_get_data_format(source,&format,&channels,nullptr,nullptr,0)!=MA_SUCCESS||channels==0||channels>32)return false;
+    const auto bytesPerFrame=ma_get_bytes_per_sample(format)*channels;
+    if(bytesPerFrame==0||bytesPerFrame>32*8)return false;
+    std::array<ma_uint8,32*32*8> pcm{};
+
+    // A streaming MP3 may need its end page loaded after the seek. Bound the wait,
+    // preserve partial reads, and pass only after all requested frames cross the loop.
+    bool positioned = false;
+    ma_uint64 totalFramesRead = 0;
+    for (int attempt = 0; attempt < 50; ++attempt) {
+        if (!positioned) {
+            const ma_result seekResult = ma_data_source_seek_to_pcm_frame(source, loopEnd - framesBeforeEnd);
+            if (seekResult == MA_BUSY) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            if (seekResult != MA_SUCCESS) return false;
+            positioned = true;
+        }
+        ma_uint64 framesRead = 0;
+        const ma_result readResult = ma_data_source_read_pcm_frames(
+            source, pcm.data()+totalFramesRead*bytesPerFrame, framesToRead - totalFramesRead, &framesRead);
+        totalFramesRead += framesRead;
+        if (totalFramesRead == framesToRead) {
+            if (readResult != MA_SUCCESS) return false;
+            ma_uint64 cursor = 0;
+            return ma_data_source_get_cursor_in_pcm_frames(source, &cursor) == MA_SUCCESS &&
+                cursor == loopBegin + framesToRead - framesBeforeEnd;
+        }
+        if (readResult != MA_BUSY && readResult != MA_SUCCESS) return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return false;
+}
 
 double AudioEngine::VolumeGain(double value) {
     if (!std::isfinite(value)) return 0.0;
@@ -668,6 +788,18 @@ bool AudioEngine::PlayMusic(std::string_view track, double fadeSeconds) {
         impl_->pendingMusic.reset();
         return true;
     }
+    const auto recordings = impl_->recordings.find(std::string(track));
+    if (impl_->currentMusic < kMusicVoices) {
+        const auto& current = impl_->musicVoices[impl_->currentMusic];
+        if (current.active && current.recording && recordings != impl_->recordings.end() &&
+            std::any_of(recordings->second.begin(), recordings->second.end(), [&](const auto& recording) {
+                return recording.path == current.recordingPath && recording.gain == current.recordingGain &&
+                    recording.loop && current.looping;
+            })) {
+            impl_->pendingMusic.reset();
+            return true;
+        }
+    }
     impl_->pendingMusic.reset();
     if (!impl_->atMusicBoundary && fade > 0 && impl_->currentMusic < kMusicVoices) {
         auto& current = impl_->musicVoices[impl_->currentMusic];
@@ -704,24 +836,29 @@ bool AudioEngine::PlayMusic(std::string_view track, double fadeSeconds) {
     config.flags = MA_SOUND_FLAG_STREAM | MA_SOUND_FLAG_NO_SPATIALIZATION; config.isLooping = MA_TRUE;
     config.loopPointBegInPCMFrames = meta->second.loopBegin; config.loopPointEndInPCMFrames = meta->second.loopEnd;
     ma_result result = ma_sound_init_ex(&impl_->engine, &config, &voice.sound);
-    double recordingGain=1;voice.recording=false;
-    const auto files=impl_->recordings.find(std::string(track));
-    if(files!=impl_->recordings.end()&&!files->second.empty()){
+    double recordingGain=1; bool recordingLooping = true, recordingStarted = false;
+    auto recordingPath = std::filesystem::path{};
+    ma_uint64 loopBegin = meta->second.loopBegin, loopEnd = meta->second.loopEnd;
+    if(recordings!=impl_->recordings.end()&&!recordings->second.empty()){
         if(result==MA_SUCCESS)ma_sound_uninit(&voice.sound);
         auto& index=impl_->recordingNext[std::string(track)];
-        if(index%files->second.size()==0&&files->second.size()>1){
+        if(index%recordings->second.size()==0&&recordings->second.size()>1){
             // Source recordings use a shuffled bag; rotate its first entry to avoid immediate repeats.
-            for(std::size_t i=files->second.size()-1;i>0;--i){impl_->randomState^=impl_->randomState<<13;impl_->randomState^=impl_->randomState>>7;impl_->randomState^=impl_->randomState<<17;std::swap(files->second[i],files->second[impl_->randomState%(i+1)]);}
-            if(files->second.front().path==impl_->recordingLast[std::string(track)])std::swap(files->second[0],files->second[1]);
+            for(std::size_t i=recordings->second.size()-1;i>0;--i){impl_->randomState^=impl_->randomState<<13;impl_->randomState^=impl_->randomState>>7;impl_->randomState^=impl_->randomState<<17;std::swap(recordings->second[i],recordings->second[impl_->randomState%(i+1)]);}
+            if(recordings->second.front().path==impl_->recordingLast[std::string(track)])std::swap(recordings->second[0],recordings->second[1]);
         }
-        const auto& recording=files->second[index++%files->second.size()];const auto customPath=recording.path.wstring();config.pFilePathW=customPath.c_str();config.isLooping=MA_FALSE;config.loopPointBegInPCMFrames=config.loopPointEndInPCMFrames=0;
+        const auto& recording=recordings->second[index++%recordings->second.size()];const auto customPath=recording.path.wstring();config.pFilePathW=customPath.c_str();config.isLooping=recording.loop?MA_TRUE:MA_FALSE;
+        config.loopPointBegInPCMFrames=MA_DATA_SOURCE_DEFAULT_LOOP_POINT_BEG;
+        config.loopPointEndInPCMFrames=MA_DATA_SOURCE_DEFAULT_LOOP_POINT_END;
         impl_->recordingLast[std::string(track)]=recording.path;
         result=ma_sound_init_ex(&impl_->engine,&config,&voice.sound);
-        if(result==MA_SUCCESS){voice.recording=true;recordingGain=recording.gain;}
+        if(result==MA_SUCCESS){recordingStarted=true;recordingGain=recording.gain;recordingLooping=recording.loop;recordingPath=recording.path;loopBegin=config.loopPointBegInPCMFrames;loopEnd=config.loopPointEndInPCMFrames;}
         else {config.pFilePathW=nativePath.c_str();config.isLooping=MA_TRUE;config.loopPointBegInPCMFrames=meta->second.loopBegin;config.loopPointEndInPCMFrames=meta->second.loopEnd;result=ma_sound_init_ex(&impl_->engine,&config,&voice.sound);}
     }
     if (result != MA_SUCCESS) { impl_->error = MiniaudioError("ma_sound_init_ex(music)", result); return false; }
-    voice.initialized = true; voice.active = true; voice.track = std::string(track); voice.serial = ++impl_->serial;
+    voice.initialized = true; voice.active = true; voice.looping = recordingLooping; voice.recording = recordingStarted;
+    voice.track = std::string(track); voice.recordingPath = std::move(recordingPath); voice.recordingGain = recordingGain;
+    voice.loopBegin = loopBegin; voice.loopEnd = loopEnd; voice.serial = ++impl_->serial;
     ma_sound_set_volume(&voice.sound, 1.0f);
     ma_sound_set_fade_in_milliseconds(&voice.sound, 0, static_cast<float>(recordingGain), static_cast<ma_uint64>(std::ceil(fadeIn * 1000)));
     result = ma_sound_start(&voice.sound);
@@ -756,7 +893,7 @@ void AudioEngine::Duck(double amount, double seconds) {
 
 void AudioEngine::Update() {
     if(impl_->currentMusic<kMusicVoices){auto& voice=impl_->musicVoices[impl_->currentMusic];
-        if(voice.active&&voice.recording&&ma_sound_at_end(&voice.sound)){
+        if(voice.active&&voice.recording&&!voice.looping&&ma_sound_at_end(&voice.sound)){
             const auto track=voice.track;impl_->StopMusicVoice(voice);impl_->currentMusic=kMusicVoices;
             if(track=="battle")PlayMusic(track,.15);
         }

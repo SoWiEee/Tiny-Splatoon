@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { createReadStream, existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 
@@ -34,6 +34,7 @@ export async function referenceBrowser(root, profileName) {
     if(child.exitCode===null)await Promise.race([new Promise(resolve=>child.once('exit',resolve)),pause(2000)]);
     if(child.exitCode===null)child.kill();
     await new Promise(resolve=>server.close(resolve));
+    await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:100});
   }
   try{
     let port;

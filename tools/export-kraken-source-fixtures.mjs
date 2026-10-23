@@ -390,8 +390,8 @@ const header = [
   `inline constexpr std::array<double, 3> krakenHopVel{${hopFixture.vel.join(',')}};`,
   '}', '',
 ].join('\n');
-const headerPath = new URL('../tests/kraken_source_fixtures.hpp', import.meta.url);
-const jsonPath = new URL('../tests/kraken_source_fixtures.json', import.meta.url);
+const headerPath = new URL('../tests/fixtures/kraken_source_fixtures.hpp', import.meta.url);
+const jsonPath = new URL('../tests/fixtures/kraken_source_fixtures.json', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(headerPath, 'utf8') !== header) throw new Error('Kraken C++ source fixture differs');
   if (readFileSync(jsonPath, 'utf8') !== outputJson) throw new Error('Kraken JSON source fixture differs');

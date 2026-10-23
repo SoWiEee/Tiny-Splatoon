@@ -2,7 +2,7 @@
 #include "../src/game/CombatWorld.hpp"
 #include "../src/world/FacePaint.hpp"
 #include "../src/game/PlayerSimulation.hpp"
-#include "remaining_specials_source_fixtures.hpp"
+#include "fixtures/remaining_specials_source_fixtures.hpp"
 
 #include <algorithm>
 #include <cmath>

@@ -5,6 +5,7 @@
 /.playwright-cli/
 .codegraph/
 .cache/
+.impeccable/
 /CMakeUserPresets.json
 *.obj
 *.pdb

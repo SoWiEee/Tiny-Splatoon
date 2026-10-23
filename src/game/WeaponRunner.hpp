@@ -91,6 +91,7 @@ private:
     glm::dvec3 scatter(glm::dvec3 dir, double degrees);
     glm::dvec3 ballistic(glm::dvec3 from, glm::dvec3 dir, double speed, double straight, double gravity, double drag, double range) const;
     double spread() const;
+    void dryFire();
     bool spend(double ink);
     PlayerSimulation& actor_;
     double cooldown_ = 0.0, bloom_ = 0.0, firingT_ = 0.0;

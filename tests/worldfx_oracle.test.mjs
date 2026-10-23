@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const fixture = JSON.parse(readFileSync(new URL('./worldfx_source_fixtures.json', import.meta.url), 'utf8'));
+const fixture = JSON.parse(readFileSync(new URL('./fixtures/worldfx_source_fixtures.json', import.meta.url), 'utf8'));
 const source = readFileSync(new URL('../splat-ref/src/fx/fx.js', import.meta.url));
 assert.equal(createHash('sha256').update(source).digest('hex'), fixture.sha256, 'source fx.js hash');
 const names = Object.keys(fixture.recipes);
@@ -31,17 +31,32 @@ function trigSensitive(path) {
     if (recipe === 'slamWave') return true;
     if (recipe === 'stormStart') return direct[1] === 'puffs';
     if (recipe === 'formPop' || recipe === 'dive' || recipe === 'emerge') return direct[1] === 'drops' && direct[2] === 'vel';
+    if (['muzzleBlaster', 'muzzleCharger', 'beamImpact', 'dodgeSplash', 'dodgePlant'].includes(recipe)) return direct[1] === 'drops' && direct[2] === 'vel';
+    if (recipe === 'dodgeSkid') return direct[1] === 'drops' && ['pos', 'vel'].includes(direct[2]);
+    if (['flickCurtain', 'bounceSplash', 'sloshImpact', 'waterPlop'].includes(recipe)) return direct[1] === 'drops' && ['pos', 'vel'].includes(direct[2]);
+    if (['spinUp', 'spinStream', 'spinFull'].includes(recipe)) return direct[1] === 'drops' && ['pos', 'vel'].includes(direct[2]);
+    if (recipe === 'superJumpLand') return ['drops', 'puffs'].includes(direct[1]) && ['pos', 'vel'].includes(direct[2]);
     return false;
   }
-  const render = /\.(drops|puffs)\.render\.(aPosR|aPosSize|aVelS)\[(\d+)\]$/.exec(path);
+  const directSprite = /\.(glows|puffs)\.(pos|vel)\[(\d+)\]$/.exec(path);
+  if (directSprite)
+    return (['chargeGlow', 'chargeFull'].includes(recipe) && directSprite[1] === 'glows')
+      || (recipe === 'flickCurtain' && directSprite[1] === 'puffs');
+  const render = /\.(drops|puffs|glows)\.render\.(aPosR|aPosSize|aVelS)\[(\d+)\]$/.exec(path);
   if (render) {
     const component = Number(render[3]) % 4;
     if (render[2] === 'aPosR' || render[2] === 'aPosSize') {
       if (component === 3) return false;
-      return recipe === 'explosion' || recipe === 'slamWave' || (recipe === 'stormStart' && render[1] === 'puffs');
+      return recipe === 'explosion' || recipe === 'slamWave' || (recipe === 'stormStart' && render[1] === 'puffs')
+        || (recipe === 'flickCurtain' && render[1] === 'drops')
+        || (recipe === 'flickCurtain' && render[1] === 'puffs')
+        || (['chargeGlow', 'chargeFull'].includes(recipe) && render[1] === 'glows')
+        || (recipe === 'superJumpLand' && render[1] === 'puffs')
+        || (recipe === 'waterPlop' && render[1] === 'drops')
+        || (recipe === 'dodgeSkid' && render[1] === 'drops');
     }
     if (render[2] === 'aVelS')
-      return render[1] === 'drops' && ['burst', 'explosion', 'slamLaunch', 'slamWave', 'formPop', 'dive', 'emerge'].includes(recipe);
+      return render[1] === 'drops' && ['burst', 'explosion', 'slamLaunch', 'slamWave', 'formPop', 'dive', 'emerge', 'muzzleBlaster', 'muzzleCharger', 'flickCurtain', 'bounceSplash', 'sloshImpact', 'beamImpact', 'spinUp', 'spinStream', 'spinFull', 'waterPlop', 'dodgeSplash', 'dodgeSkid', 'dodgePlant'].includes(recipe);
   }
   return false;
 }

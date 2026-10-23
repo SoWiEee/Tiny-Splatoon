@@ -1,6 +1,6 @@
 #include "../src/game/NavGraph.hpp"
 #include "../src/game/NavDirections.hpp"
-#include "ai_nav_fixtures.hpp"
+#include "fixtures/ai_nav_fixtures.hpp"
 
 #include <iostream>
 #include <string>

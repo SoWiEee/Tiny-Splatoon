@@ -52,6 +52,6 @@ for(const scenario of cases){
  }
  scenario.records=records;model.dispose();
 }
-const text=JSON.stringify({sourceHashes:hashes,boneNames,cases})+'\n',path=new URL('../tests/boss_pose_fixtures.json',import.meta.url);
+const text=JSON.stringify({sourceHashes:hashes,boneNames,cases})+'\n',path=new URL('../tests/fixtures/boss_pose_fixtures.json',import.meta.url);
 if(process.argv.includes('--check')){if(await readFile(path,'utf8')!==text)throw Error('Stale source Boss pose fixture');}else await writeFile(path,text);
 console.log(`Source Boss pose: ${cases.length} scenarios, ${boneNames.length} bones, ${cases.reduce((n,c)=>n+c.inputs.length,0)} updates, ${cases.reduce((n,c)=>n+c.records.length,0)} complete snapshots`);

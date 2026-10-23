@@ -29,15 +29,19 @@ struct ProjectileRenderer::Impl {
         ~Part(){if(vao)glDeleteVertexArrays(1,&vao);const GLuint buffers[]={vertices,indices};glDeleteBuffers(2,buffers);}
     };
     struct Ribbon {glm::dvec3 pos,dir,color;double age=0,life=.34,length=1,width=.08,charge=0,seed=0;bool sight=false;};
+    struct Wave {std::uint64_t id=0;glm::dvec3 pos,vel,color;double age=0,distance=0;};
+    struct FadingWave {Wave wave;double started=0;};
     CharacterShader blobShader,ribbonShader;
     GLuint vao=0,vertex=0,index=0,instance=0,ribbonVao=0,ribbonVertex=0,dfg=0;
     GLsizei indexCount=0;
     std::vector<ProjectileBlob> blobs;
     std::vector<Ribbon> beams,sights;
     std::vector<ShooterProjectile> custom;
+    std::vector<Wave> waves;
+    std::vector<FadingWave> fadingWaves;
     std::map<std::string,std::unique_ptr<Part>> parts;
     std::filesystem::path assets;
-    bool environment=false;
+    double gameTime=0;bool environment=false,timeInitialized=false;
     explicit Impl(const std::filesystem::path& assets,bool environment)
       :blobShader(CharacterShader::readSource(assets/"blob.vert"),CharacterShader::readSource(assets/"blob.frag"),true,environment),
        ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),assets(assets),environment(environment) {
@@ -121,9 +125,27 @@ ProjectileRenderer::~ProjectileRenderer()=default;
 const std::vector<ProjectileBlob>& ProjectileRenderer::blobs()const{return impl_->blobs;}
 std::size_t ProjectileRenderer::ribbons()const{return impl_->beams.size()+impl_->sights.size();}
 void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::vector<WorldVisualEvent>& events) {
+    const double now=world.time();
+    if(impl_->timeInitialized&&now<impl_->gameTime){impl_->waves.clear();impl_->fadingWaves.clear();impl_->beams.clear();}
+    impl_->gameTime=now;impl_->timeInitialized=true;
     impl_->blobs=BuildProjectileBlobs(world.projectiles());
+    auto previousWaves=std::move(impl_->waves);
+    impl_->waves.clear();
     impl_->custom.clear();
-    for(const auto& p:world.projectiles())if(p.owner&&p.delay<=0&&(p.kind=="arrow"||p.kind=="fist"||p.kind=="bladewave"))impl_->custom.push_back(p);
+    for(const auto& p:world.projectiles())if(p.owner&&p.delay<=0&&(p.kind=="arrow"||p.kind=="fist"||p.kind=="bladewave")){
+        impl_->custom.push_back(p);
+        if(p.kind=="bladewave")impl_->waves.push_back({p.id,p.pos,p.vel,teamColor(p.owner->team()),p.age,p.distance});
+    }
+    impl_->fadingWaves.erase(std::remove_if(impl_->fadingWaves.begin(),impl_->fadingWaves.end(),[&](const auto& wave){return now-wave.started>=.14;}),impl_->fadingWaves.end());
+    for(const auto& event:events)if(event.kind=="blade_wave_wall"||event.kind=="blade_wave_stop"){
+        if(std::none_of(impl_->fadingWaves.begin(),impl_->fadingWaves.end(),[&](const auto& fade){return fade.wave.id==event.id;})){
+            const auto found=std::find_if(previousWaves.begin(),previousWaves.end(),[&](const auto& wave){return wave.id==event.id;});
+            auto wave=found==previousWaves.end()?Impl::Wave{event.id,event.pos,-event.normal,teamColor(event.team)}:*found;
+            wave.pos=event.pos;wave.color=teamColor(event.team);wave.age+=dt;wave.distance+=glm::length(wave.vel)*dt;
+            impl_->fadingWaves.push_back({wave,now});
+        }
+        impl_->custom.erase(std::remove_if(impl_->custom.begin(),impl_->custom.end(),[&](const auto& p){return p.id==event.id&&p.kind=="bladewave";}),impl_->custom.end());
+    }
     for(auto& beam:impl_->beams)beam.age+=dt;
     auto& beams=impl_->beams;
     beams.erase(std::remove_if(beams.begin(),beams.end(),[](const auto& b){return b.age>=b.life;}),beams.end());
@@ -143,7 +165,7 @@ void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::ve
     }
 }
 int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights) {
-    if(impl_->blobs.empty()&&ribbons()==0&&impl_->custom.empty())return 0;
+    if(impl_->blobs.empty()&&ribbons()==0&&impl_->custom.empty()&&impl_->fadingWaves.empty())return 0;
     GLint program,vao,buffer,srcRgb,dstRgb,srcAlpha,dstAlpha,activeTexture,oldDfg;GLboolean depth;
     glGetIntegerv(GL_CURRENT_PROGRAM,&program);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&vao);glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&buffer);
     glGetIntegerv(GL_BLEND_SRC_RGB,&srcRgb);glGetIntegerv(GL_BLEND_DST_RGB,&dstRgb);glGetIntegerv(GL_BLEND_SRC_ALPHA,&srcAlpha);glGetIntegerv(GL_BLEND_DST_ALPHA,&dstAlpha);glGetBooleanv(GL_DEPTH_WRITEMASK,&depth);
@@ -158,13 +180,20 @@ int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection
         glBufferData(GL_ARRAY_BUFFER,impl_->blobs.size()*sizeof(ProjectileBlob),impl_->blobs.data(),GL_STREAM_DRAW);
         glDrawElementsInstanced(GL_TRIANGLES,impl_->indexCount,GL_UNSIGNED_INT,nullptr,static_cast<GLsizei>(impl_->blobs.size()));++draws;
     }
-    const auto drawPart=[&](const char* name,const glm::dmat4& model,glm::dvec3 color,double time=0) {
+    const auto drawPart=[&](const char* name,const glm::dmat4& model,glm::dvec3 color,double time=0,double fade=1) {
         const std::string key(name);const bool additive=key=="arrowGlow"||key=="arrowStreak",alpha=key=="wave";
         if(additive||alpha){glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,additive?GL_ONE:GL_ONE_MINUS_SRC_ALPHA);glDepthMask(GL_FALSE);glDisable(GL_CULL_FACE);}
         else{glDisable(GL_BLEND);glDepthMask(GL_TRUE);glEnable(GL_CULL_FACE);}
         auto& part=impl_->part(key);auto& shader=*part.shader;shader.use();shader.matrices(model,view,projection,eye);shader.lights(lights,view);shader.uniform("dfgLUT",6);
-        shader.uniform("diffuse",{color.x,color.y,color.z});shader.uniform("uColor",{color.x,color.y,color.z});shader.uniform("uTint",{color.x,color.y,color.z});shader.uniform("uT",time);shader.uniform("uFade",1);
+        shader.uniform("diffuse",{color.x,color.y,color.z});shader.uniform("uColor",{color.x,color.y,color.z});shader.uniform("uTint",{color.x,color.y,color.z});shader.uniform("uT",time);shader.uniform("uFade",fade);
         glBindVertexArray(part.vao);glDrawElements(GL_TRIANGLES,part.count,GL_UNSIGNED_INT,nullptr);++draws;
+    };
+    const auto drawWave=[&](const glm::dvec3& pos,const glm::dvec3& velocity,double distance,double age,const glm::dvec3& color,double fade){
+        auto direction=glm::length(velocity)>1e-8?glm::normalize(velocity):glm::dvec3(0,0,1);
+        auto x=glm::cross(glm::dvec3(0,1,0),direction);x=glm::length(x)>1e-6?glm::normalize(x):glm::dvec3(1,0,0);const auto y=glm::normalize(glm::cross(direction,x));
+        const auto basis=glm::dmat4(glm::dmat3(x,y,direction));const auto& weapon=GetEquipment(EquipmentCategory::Main,"blade");
+        const double grow=std::min(1.0,.55+age*6);
+        drawPart("wave",glm::translate(glm::dmat4(1),pos)*basis*glm::scale(glm::dmat4(1),glm::dvec3(weapon.number("waveWidth")*1.45*grow,weapon.number("waveHeight")*.5*grow,1+std::min(1.0,distance/4)*.9)),color,age,fade);
     };
     for(const auto& p:impl_->custom) {
         const auto color=teamColor(p.owner->team());
@@ -176,7 +205,7 @@ int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection
             drawPart("arrowInk",model,color);drawPart("arrowFletch",model,glm::dvec3(1));
             glm::dvec3 at;double radius,brightness;
             if(p.state=="lodged") {
-                const double k=std::clamp(p.age/std::max(.001,p.fuse),0.0,1.0),beat=.5+.5*std::sin(p.age*(14+30*k));
+                const double k=std::clamp(p.age/std::max(.001,p.fuse),0.0,1.0),beat=.5+.5*std::sin(impl_->gameTime*(14+30*k));
                 at=p.hitPoint+p.hitNormal*.05;radius=.07+.07*k+.035*beat;brightness=1.2+2.2*k+1.6*beat;
             }else{at=p.pos-direction*.05;radius=p.tier==2?.085:p.tier?.07:.05;brightness=p.tier==2?2.4:p.tier?1.6:.9;}
             drawPart("arrowGlow",glm::translate(glm::dmat4(1),at)*rotation*glm::scale(glm::dmat4(1),glm::dvec3(radius)),color*brightness);
@@ -191,10 +220,13 @@ int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection
                 const double grow=std::min(1.0,.45+p.age/.05*.55),wob=std::sin(p.age*46+p.seed*6)*.1,k=1.25*grow;
                 drawPart("fist",glm::translate(glm::dmat4(1),p.pos)*basis*glm::scale(glm::dmat4(1),glm::dvec3(k*(1+wob*.6),k*(1+wob*.6),k*(1-wob))),color);
             }else{
-                const auto& w=GetEquipment(EquipmentCategory::Main,"blade");const double grow=std::min(1.0,.55+p.age*6);
-                drawPart("wave",glm::translate(glm::dmat4(1),p.pos)*basis*glm::scale(glm::dmat4(1),glm::dvec3(w.number("waveWidth")*1.45*grow,w.number("waveHeight")*.5*grow,1+std::min(1.0,p.distance/4)*.9)),color,p.age);
+                drawWave(p.pos,p.vel,p.distance,p.age,color,1);
             }
         }
+    }
+    for(const auto& fade:impl_->fadingWaves){
+        const double alpha=std::clamp(1-(impl_->gameTime-fade.started)/.14,0.0,1.0);
+        drawWave(fade.wave.pos,fade.wave.vel,fade.wave.distance,fade.wave.age+(impl_->gameTime-fade.started),fade.wave.color,alpha);
     }
     if(ribbons()) {
         glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDisable(GL_CULL_FACE);glDepthMask(GL_FALSE);

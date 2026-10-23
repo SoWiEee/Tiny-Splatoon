@@ -159,7 +159,7 @@ for (const c of cases) {
   lines.push(`  Oracle{"${c.name}", "${c.special}", ${c.seed}u, ${c.frames}, ${vec(c.botPos)}, ${vec(c.foePos)}, ${bool(c.grounded)}, ${bool(c.active)}, ${bool(c.ready)}, ${n(c.charge)}, ${c.specialFrames}, ${c.fireFrames}, ${c.subPresses}, ${c.jumpFrames}, ${c.squidFrames}, ${vec(c.move)}, ${bool(c.fire)}, ${bool(c.sub)}, ${bool(c.specialInput)}, ${bool(c.jump)}, ${bool(c.squid)}},`);
 }
 lines.push('}};', '} // namespace restoration::bot_special_fixtures', '');
-const file = resolve(root, 'tests/bot_special_control_fixtures.hpp');
+const file = resolve(root, 'tests/fixtures/bot_special_control_fixtures.hpp');
 const output = lines.join('\n');
 if (process.argv.includes('--check')) {
   if (await readFile(file, 'utf8') !== output) throw new Error('Bot special-control fixtures differ from source BotBrain');

@@ -1,7 +1,7 @@
 #include "../src/render/CharacterArt.hpp"
 #include "../src/game/ArsenalData.hpp"
-#include "character_render_fixtures.hpp"
-#include "character_tank_fixtures.hpp"
+#include "fixtures/character_render_fixtures.hpp"
+#include "fixtures/character_tank_fixtures.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>

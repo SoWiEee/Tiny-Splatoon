@@ -113,8 +113,14 @@ double WeaponRunner::spread() const {
     if(w.kind=="spinner")return base;
     return base*lerp(w.kind=="twins"?0.5:w.number("spreadFirst",0.45),1,bloom_);
 }
+void WeaponRunner::dryFire() {
+    actor_.world_->emitVisual({"lowink",actor_.muzzle(),actor_.aimDir(),0,actor_.team(),0,.08,0,actor_.mainId(),actor_.networkNid()});
+}
 bool WeaponRunner::spend(double ink) {
-    if(actor_.state.ink<ink)return false;
+    if(actor_.state.ink<ink){
+        dryFire();
+        return false;
+    }
     actor_.state.ink-=ink;actor_.lastFire_=0;return true;
 }
 void WeaponRunner::fireRound(double cone,const std::string& kind,double power,int side) {
@@ -294,7 +300,7 @@ void WeaponRunner::bow(bool fire,double dt) {
     const auto& w=actor_.weapon();
     if(fire && cooldown_<=0) {
         if(!charging_) {
-            if(actor_.state.ink<w.number("inkFull")*w.number("inkMin"))return;
+            if(actor_.state.ink<w.number("inkFull")*w.number("inkMin")){dryFire();return;}
             charging_=true;charge_=chargeT_=0;bowRing_=0;
         }
         const double maxCharge=std::clamp(actor_.state.ink/w.number("inkFull"),0.0,1.0);
@@ -397,7 +403,7 @@ void WeaponRunner::blade(bool fire,bool pressed,double dt) {
                 bladeSwing_={};bladeSwing_.active=true;bladeSwing_.yaw=bladeYaw(a);bladeSwing_.pitch=a.input.aimPitch;
                 bladeCooldown_=w.number("tapInterval");firingT_=0.4;a.fireFacing_=0.45;
                 CharacterTrigger event{"blade_slash"};event.side=bladeSide_;event.amount=bladeSide_;a.triggerPose(event);
-            } else bladeCooldown_=0.18;
+            } else {dryFire();bladeCooldown_=0.18;}
         } else bladeQueued_=0.16;
         bladeHeld_=true;bladeHoldTime_=0;bladeCharging_=false;bladeCharge_=0;bladeFull_=false;
     }
@@ -502,7 +508,7 @@ void WeaponRunner::mitts(bool fire,double dt) {
     if(!fire || mittsCharging_ || mittsLeaping_) { if(mittsCooldown_<0)mittsCooldown_=0;return; }
     firingT_=0.35;a.fireFacing_=0.5;
     for(int guard=0;mittsCooldown_<=0 && guard<2;++guard) {
-        if(a.state.ink<w.number("inkPerPunch")){mittsCooldown_=w.number("punchInterval");break;}
+        if(a.state.ink<w.number("inkPerPunch")){dryFire();mittsCooldown_=w.number("punchInterval");break;}
         a.state.ink-=w.number("inkPerPunch");a.lastFire_=0;mittsSide_=1-mittsSide_;fireMittsFist(mittsSide_);mittsCooldown_+=w.number("punchInterval");
     }
 }
@@ -548,7 +554,7 @@ void WeaponRunner::shooter(double,bool fire) {
 void WeaponRunner::charger(bool fire,double dt) {
     const auto& w=actor_.weapon();
     if(fire && cooldown_<=0) {
-        if(!charging_){if(actor_.state.ink<w.number("inkFull")*0.2)return;charging_=true;charge_=chargeT_=0;}
+        if(!charging_){if(actor_.state.ink<w.number("inkFull")*0.2){dryFire();return;}charging_=true;charge_=chargeT_=0;}
         chargeT_=std::min(1.0,chargeT_+dt/w.number("chargeTime"));
         charge_=std::min(std::clamp(actor_.state.ink/w.number("inkFull"),0.0,1.0),chargeT_<0.2?chargeT_*1.25:0.25+(chargeT_-0.2)*0.9375);actor_.fireFacing_=0.4;
     } else if(charging_) {
@@ -568,7 +574,7 @@ void WeaponRunner::spinner(bool fire,double dt) {
     if(burstT_>0){burstT_-=dt;streamCd_-=dt;firingT_=0.2;actor_.fireFacing_=0.5;actor_.lastFire_=0;
         for(int guard=0;streamCd_<=0 && guard<4;++guard){fireRound(spread(),"shot",burstPower_);streamCd_+=w.number("fireInterval");}
         if(burstT_<=0){burstT_=0;cooldown_=0.2;}return;}
-    if(fire && cooldown_<=0){if(!charging_){if(actor_.state.ink<w.number("inkFull")*0.15)return;charging_=true;charge_=chargeT_=0;}
+    if(fire && cooldown_<=0){if(!charging_){if(actor_.state.ink<w.number("inkFull")*0.15){dryFire();return;}charging_=true;charge_=chargeT_=0;}
         chargeT_=std::min(1.0,chargeT_+dt/w.number("chargeTime"));charge_=std::min(std::clamp(actor_.state.ink/w.number("inkFull"),0.0,1.0),chargeT_);actor_.fireFacing_=0.4;
     }else if(charging_){charging_=false;double c=std::max(0.15,charge_);actor_.state.ink=std::max(0.0,actor_.state.ink-w.number("inkFull")*c);burstPower_=c;burstT_=lerp(w.number("burstMin"),w.number("burstMax"),c);streamCd_=charge_=chargeT_=0;}
 }

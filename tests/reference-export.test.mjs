@@ -46,7 +46,7 @@ test('reference export matches locked source and generated artifacts', () => {
   assert.equal(zones.propColliderCount, 297);
   const cargo = content.stages.find((stage) => stage.id === 'cargo' && stage.mode === 'turf');
   assert.ok(cargo.propColliderCount > 400);
-  const fixtures = readFileSync(resolve(root, 'tests/reference_fixtures.hpp'), 'utf8');
+  const fixtures = readFileSync(resolve(root, 'tests/fixtures/reference_fixtures.hpp'), 'utf8');
   assert.match(fixtures, /std::array<GroundFixture, 851>/);
   assert.match(fixtures, /std::array<RayFixture, 920>/);
 });

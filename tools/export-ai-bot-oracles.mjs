@@ -189,7 +189,7 @@ for (const c of cases) {
   lines.push(`  Oracle{"${c.name}", "${c.difficulty}", ${c.seed}u, ${c.frames}, ${vec(c.botPos)}, ${vec(c.foePos)}, ${n(c.ink)}, ${n(c.hp)}, ${bool(c.hasFoe)}, "${c.threat}", "${c.mode}", ${bool(c.targetSeen)}, ${c.fireFrames}, ${c.subPresses}, ${vec(c.move)}, {${c.aim.map(n).join(', ')}}, ${bool(c.action.fire)}, ${bool(c.action.sub)}, ${bool(c.action.special)}, ${bool(c.action.squid)}, ${bool(c.action.jump)}, ${bool(c.action.cheer)}},`);
 }
 lines.push('}};', '} // namespace restoration::ai_bot_fixtures', '');
-const file = resolve(root, 'tests/ai_bot_oracle_fixtures.hpp');
+const file = resolve(root, 'tests/fixtures/ai_bot_oracle_fixtures.hpp');
 const output = lines.join('\n');
 if (process.argv.includes('--check')) {
   if (await readFile(file, 'utf8') !== output) throw new Error('AI bot oracle fixtures differ from source BotBrain');

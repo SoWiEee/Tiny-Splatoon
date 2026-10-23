@@ -252,8 +252,8 @@ const raw = { schema: 2, source: 'splat-ref', coverage: 'layout and PropKit coll
 const artifacts = new Map([
   ['assets/reference/content.json', JSON.stringify(raw, (_key, value) => typeof value === 'function' ? { $function: String(value) } : value, 2) + '\n'],
   ['src/world/ReferenceData.cpp', cpp.join('\n')],
-  ['tests/reference_fixtures.hpp', fixture],
-  ['tests/reference_paint_fixtures.hpp', paintHeader.join('\n')],
+  ['tests/fixtures/reference_fixtures.hpp', fixture],
+  ['tests/fixtures/reference_paint_fixtures.hpp', paintHeader.join('\n')],
 ]);
 for (const [path, content] of artifacts) {
   const destination = resolve(root, path);

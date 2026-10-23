@@ -12,6 +12,9 @@ const checksum = createHash('sha256').update(source).digest('hex');
 const check = process.argv.includes('--check');
 if (process.argv.slice(2).some(arg => arg !== '--check')) throw new Error('Usage: node tools/export-worldfx-source-fixtures.mjs [--check]');
 const origin = new THREE.Vector3(0, 0, 0), up = new THREE.Vector3(0, 1, 0);
+const forward = new THREE.Vector3(0, 0, 1), velocity = new THREE.Vector3(2.5, 4, -1.75);
+const diagonal = new THREE.Vector3(0.3, 0.2, 0.9);
+const wallNormal = new THREE.Vector3(1, 0, 0), waterPos = new THREE.Vector3(0, -1.6, 0);
 const orange = new THREE.Color('#ff8a14');
 const nativeRandom = Math.random;
 let seed = 0x6d2b79f5;
@@ -49,7 +52,11 @@ function pool(fx, name, immediate) {
 function snapshot(fx, immediate) {
   return Object.fromEntries(['drops', 'puffs', 'glows', 'rings', 'shells', 'beams'].map(name => [name, pool(fx, name, immediate)]));
 }
-for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart', 'rainSheet', 'formPop', 'dive', 'emerge', 'wake', 'footstepOwn', 'footstepEnemy', 'footstepDry']) {
+for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart', 'rainSheet', 'formPop', 'dive', 'emerge', 'wake', 'footstepOwn', 'footstepEnemy', 'footstepDry',
+  'muzzleBlaster', 'muzzleCharger', 'flickCurtain', 'rollerSpray', 'dryFire', 'bombTrail', 'bounceSplash', 'beepPulse', 'beepPulseNoPoint',
+  'shotTrail', 'shotTrailBig', 'sloshTrail', 'sloshTrailHead', 'sloshImpact', 'chargeGlow', 'chargeFull', 'laserDot', 'beamImpact', 'beamTrail', 'spinUp', 'spinStream', 'spinFull',
+  'dodgeSplash', 'dodgeSkid', 'dodgePlant', 'mistAlpha20', 'mistAlpha30', 'leapRing', 'canopyBreakRing', 'wailRing',
+  'drop', 'mist', 'climbDrip', 'superJumpTrail', 'superJumpLand', 'waterPlop', 'ring', 'glint', 'stormPuddle', 'stormFlash']) {
   const fx = new FX(new THREE.Scene(), { quality: 1 });
   seed = 0x6d2b79f5;
   if (name === 'burst') fx.burst(origin, up, orange, { count: 12, size: 0.1 });
@@ -63,6 +70,46 @@ for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart'
   if (name === 'emerge') fx.emerge(origin, orange, 4);
   if (name === 'wake') fx.wake(origin, new THREE.Vector3(0, 0, 1), orange, 8);
   if (name.startsWith('footstep')) fx.footstep(origin, orange, name === 'footstepOwn' ? 1 : name === 'footstepEnemy' ? 2 : 0, new THREE.Vector3(0, 0, 1), 5);
+  if (name === 'muzzleBlaster') fx.muzzle(origin, forward, orange, 'blaster');
+  if (name === 'muzzleCharger') fx.muzzle(origin, forward, orange, 'charger');
+  if (name === 'flickCurtain') fx.flickCurtain(origin, forward, orange, 50);
+  if (name === 'rollerSpray') fx.rollerSpray(origin, forward, 1.1, orange, 0.7);
+  if (name === 'dryFire') fx.dryFire(origin, forward);
+  if (name === 'bombTrail') fx.bombTrail(origin, velocity, orange);
+  if (name === 'bounceSplash') fx.bounceSplash(origin, up, orange);
+  if (name === 'beepPulse') fx.beepPulse(origin, new THREE.Vector3(0, 0.01, 0), up, orange, 3.1, 0.7);
+  if (name === 'beepPulseNoPoint') fx.beepPulse(origin, null, up, orange, 3.1, 0.7);
+  if (name === 'shotTrail') fx.shotTrail(origin, velocity, orange, false);
+  if (name === 'shotTrailBig') fx.shotTrail(origin, velocity, orange, true);
+  if (name === 'sloshTrail') fx.sloshTrail(origin, velocity, orange, false);
+  if (name === 'sloshTrailHead') fx.sloshTrail(origin, velocity, orange, true);
+  if (name === 'sloshImpact') fx.sloshImpact(origin, up, diagonal, orange);
+  if (name === 'chargeGlow') fx.chargeGlow(origin, orange, 0.65);
+  if (name === 'chargeFull') fx.chargeFull(origin, orange);
+  if (name === 'laserDot') fx.laserDot(origin, up, orange, 0.65);
+  if (name === 'beamImpact') fx.beamImpact(origin, up, orange, 0.75);
+  if (name === 'beamTrail') fx.beamTrail(origin, new THREE.Vector3(0.7, 1.1, 4.2), orange, 0.75);
+  if (name === 'spinUp') fx.spinUp(origin, diagonal, orange, 0.72, false);
+  if (name === 'spinStream') fx.spinUp(origin, diagonal, orange, 0.72, true);
+  if (name === 'spinFull') fx.spinFull(origin, diagonal, orange);
+  if (name === 'dodgeSplash') fx.dodgeSplash(origin, forward, orange);
+  if (name === 'dodgeSkid') fx.dodgeSkid(origin, forward, orange, 0.35);
+  if (name === 'dodgePlant') fx.dodgePlant(origin, forward, orange);
+  if (name === 'mistAlpha20') fx.mist(origin, velocity, orange, 0.2, 0.2);
+  if (name === 'mistAlpha30') fx.mist(origin, velocity, orange, 0.2, 0.3);
+  if (name === 'leapRing') fx.ring(origin, up, orange, { radius: 1.3, life: 0.35, style: 0, alpha: 0.95, thickness: 1, snap: false });
+  if (name === 'canopyBreakRing') fx.ring(origin, up, orange, { radius: 0.84, life: 0.3, style: 0, alpha: 0.95, thickness: 1, snap: false });
+  if (name === 'wailRing') fx.ring(origin, forward, orange, { radius: 1.3, life: 0.3, style: 2, alpha: 0.9, thickness: 1, snap: false });
+  if (name === 'drop') fx.drop(origin, velocity, orange, { size: 0.15, life: 1.2, gravity: 1, stretch: 1 });
+  if (name === 'mist') fx.mist(origin, velocity, orange, 0.2, 0.25);
+  if (name === 'climbDrip') fx.climbDrip(origin, wallNormal, orange);
+  if (name === 'superJumpTrail') fx.superJumpTrail(origin, velocity, orange);
+  if (name === 'superJumpLand') fx.superJumpLand(origin, orange);
+  if (name === 'waterPlop') fx.waterPlop(waterPos, 0.6);
+  if (name === 'ring') fx.ring(origin, up, orange, { radius: 0.8, life: 0.35, style: 0, alpha: 0.95, thickness: 1, snap: false });
+  if (name === 'glint') fx.glint(origin, orange, 0.12);
+  if (name === 'stormPuddle') fx.stormPuddle(origin, up, orange);
+  if (name === 'stormFlash') fx.stormFlash(origin, orange, 3.4);
   const immediate = fx.stats();
   const immediatePools = snapshot(fx, true);
   fx.update(1 / 60);
@@ -75,7 +122,7 @@ for (const name of ['burst', 'explosion', 'slamLaunch', 'slamWave', 'stormStart'
 }
 Math.random = nativeRandom;
 const out = { source: 'splat-ref/src/fx/fx.js', sha256: checksum, rng: 'xorshift32(seed=0x6d2b79f5, Math.random call order)', vectorColor: '#ff8a14 (THREE.Color linear RGB)', recipes };
-const path = new URL('../tests/worldfx_source_fixtures.json', import.meta.url);
+const path = new URL('../tests/fixtures/worldfx_source_fixtures.json', import.meta.url);
 const data = JSON.stringify(out, (key, value) =>
   typeof value === 'number' && Object.is(value, -0) ? '__WORLD_FX_NEGATIVE_ZERO__' : value, 2)
   .replaceAll('"__WORLD_FX_NEGATIVE_ZERO__"', '-0') + '\n';

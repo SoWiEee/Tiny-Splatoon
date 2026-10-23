@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(Tiny-Splatoon VERSION 0.7.5 LANGUAGES CXX C)
+project(Tiny-Splatoon VERSION 0.8.0 LANGUAGES CXX C)
 
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # MSVC emits UTF-8 here; a system-codepage probe can corrupt Ninja's include prefix.
@@ -76,7 +76,7 @@ add_dependencies(Tiny-Splatoon Tiny-Splatoon-Server)
 if(MSVC)
     target_compile_options(restoration_core PRIVATE /utf-8)
 endif()
-add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/RmlRenderer.cpp src/gui/UiText.cpp)
+add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/InkTankElement.cpp src/gui/WeaponReticleElement.cpp src/gui/RmlRenderer.cpp src/gui/UiText.cpp)
 target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
 add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp src/audio/ZoneHum.cpp src/audio/NativeReverb.cpp)
 target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
@@ -86,7 +86,7 @@ add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp)
 target_link_libraries(projectile_visuals PUBLIC restoration_core)
 target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/OnlinePlay.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
-    src/render/WorldEffects.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
+    src/render/WorldEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp
     src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp src/render/ZoneRenderer.cpp)
 target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals game_network)
@@ -342,7 +342,7 @@ if(BUILD_TESTING)
     add_executable(worldfx_eval tests/worldfx_eval.cpp src/render/WorldFxRecipes.cpp)
     target_link_libraries(worldfx_eval PRIVATE glm::glm)
 
-    add_executable(worldfx_gpu_test tests/worldfx_gpu_test.cpp src/render/WorldEffects.cpp src/render/WorldFxRecipes.cpp src/render/DeviceRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
+    add_executable(worldfx_gpu_test tests/worldfx_gpu_test.cpp src/render/WorldEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/WorldFxRecipes.cpp src/render/DeviceRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(worldfx_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
     add_test(NAME reference_worldfx_gpu COMMAND worldfx_gpu_test)
     set_tests_properties(reference_worldfx_gpu PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -373,7 +373,7 @@ if(BUILD_TESTING)
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/character_pose_native.test.mjs "$<TARGET_FILE:character_pose_eval>")
         set_tests_properties(reference_character_pose_native PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         add_test(NAME reference_character_pose_variants
-            COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/character_pose_native.test.mjs "$<TARGET_FILE:character_pose_eval>" tests/character_variant_fixtures.json)
+            COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/character_pose_native.test.mjs "$<TARGET_FILE:character_pose_eval>" tests/fixtures/character_variant_fixtures.json)
         set_tests_properties(reference_character_pose_variants PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         add_test(NAME reference_native_entry_cli
             COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/native_entry_cli.test.mjs "$<TARGET_FILE:Tiny-Splatoon>")
@@ -412,6 +412,8 @@ if(BUILD_TESTING)
             set_tests_properties(reference_screen_effects_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_worldfx_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-worldfx-source-fixtures.mjs --check)
             set_tests_properties(reference_worldfx_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+            add_test(NAME reference_worldfx_particle_assets COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-worldfx-particle-shaders.mjs --check)
+            set_tests_properties(reference_worldfx_particle_assets PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_worldfx_assets COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-worldfx-assets.mjs --check)
             set_tests_properties(reference_worldfx_assets PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_post_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" --test tests/post_export.test.mjs)

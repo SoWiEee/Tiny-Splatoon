@@ -21,7 +21,7 @@ function parts(c){
  tree(c.weapon.pivotL,'weapon/mirror');tree(c.tank.group,'tank/group',false);tree(c.tank.fill,'tank/fill');tree(c.squidRoot,'squid');return out;
 }
 try{
- const fixtures=await(await fetch('character_pose_fixtures.json')).json();
+ const fixtures=await(await fetch('fixtures/character_pose_fixtures.json')).json();
  G.camera=null;G.actors=[];G.mode='match';
  const presets=new URLSearchParams(location.search).has('presets');
  const subs=new URLSearchParams(location.search).has('subs');

@@ -5,7 +5,7 @@
 #include "../src/game/NavGraph.hpp"
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/world/StageGeometry.hpp"
-#include "bot_special_control_fixtures.hpp"
+#include "fixtures/bot_special_control_fixtures.hpp"
 
 #include <algorithm>
 #include <cmath>

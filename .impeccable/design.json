@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "updated": "2026-10-23",
+  "direction": "Bold, source-inspired game lobby",
+  "palette": {
+    "paper": "#f4ecdc",
+    "ink": "#211d27",
+    "orange": "#f28a24",
+    "cobalt": "#2f5bff",
+    "cream": "#fff8ea"
+  },
+  "typography": {
+    "latin": "Inter",
+    "traditionalChinese": "Noto Sans TC",
+    "principle": "Confident headings and controls with readable body text"
+  },
+  "layout": {
+    "menu": "Left paper menu with fixed right-side character preview lane",
+    "settings": "Content is bounded between the 94dp header and 46dp fixed footer; the outer column scrolls independently of navigation and Return.",
+    "onlineRoster": "Bounded scroll region for the eight-player roster"
+  },
+  "interaction": [
+    "Distinct hover, pressed, selected, disabled, and keyboard-focus states",
+    "Visible focus border and fill treatment on all interactive controls",
+    "Short color transitions; honor the existing reduced-motion preference"
+  ],
+  "constraints": [
+    "Preserve menu IDs, actions, and preview placement compatibility",
+    "Use the existing native RmlUi and RCSS feature set",
+    "Use locally shipped fonts; add no dependencies",
+    "Keep the gameplay HUD legible with orange and cobalt team accents"
+  ]
+}

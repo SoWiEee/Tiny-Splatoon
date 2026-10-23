@@ -389,8 +389,8 @@ const header = [
   `inline constexpr CrabSourceFixture crabSourceFixture{${[crab.duration, crab.hp, crab.rollSpeed, crab.rollArmor, crab.gunInterval, crab.gunDamage, crab.gunSpeed, crab.frontDamage === 0 ? 1 : 0, crab.backDamage > 0 ? 1 : 0, crab.rollDamage === 0 ? 1 : 0, crab.weaponHiddenAfter ? 0 : 1, crab.expiryFrame, crab.afterFront.hp, crab.backDamage, crab.afterRollHit.hp, crab.afterRollHit.rider, ...crab.prop.gunMuzzle, ...crab.prop.cannonMuzzle, crab.prop.seatAt[1]].map((v, i) => i >= 7 && i <= 11 ? String(v) : Number(v).toPrecision(17)).join(',')}};`,
   `inline constexpr std::array<std::string_view, ${sourcePaths.length}> remainingSpecialSourceHashes{{${hashes.map((h) => `"${h}"`).join(',')}}};`, '}', '',
 ].join('\n');
-const headerPath = new URL('../tests/remaining_specials_source_fixtures.hpp', import.meta.url);
-const jsonPath = new URL('../tests/remaining_specials_source_fixtures.json', import.meta.url);
+const headerPath = new URL('../tests/fixtures/remaining_specials_source_fixtures.hpp', import.meta.url);
+const jsonPath = new URL('../tests/fixtures/remaining_specials_source_fixtures.json', import.meta.url);
 if (process.argv.includes('--check')) {
   if (readFileSync(headerPath, 'utf8') !== header) throw new Error('Remaining special C++ source fixture differs');
   if (readFileSync(jsonPath, 'utf8') !== outputJson) throw new Error('Remaining special JSON source fixture differs');

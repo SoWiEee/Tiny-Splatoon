@@ -17,6 +17,7 @@ public:
     int DrawModel(const std::string& kind,int team,const glm::dmat4& root,double age,const glm::dmat4& view,const glm::dmat4& projection,
         glm::dvec3 eye,const CharacterLightState& lights,bool depthOnly=false,double opacity=1,double phase=0);
     std::size_t Count()const;
+    double VisualRadius(const std::string& kind)const;
     std::size_t TracerTailCount()const;
     std::size_t TracerRibbonSegmentCount()const;
 private:

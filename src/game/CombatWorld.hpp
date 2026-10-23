@@ -181,6 +181,7 @@ public:
     std::size_t attackCount(const PlayerSimulation& actor) const;
     std::uint64_t newVolley() { return allocateId(); }
     const StageGeometry& geometry() const { return geometry_; }
+    const FacePaint& paintSurface() const { return paint_; }
     double time() const { return time_; }
     std::vector<WorldObjectView> visualObjects() const;
     std::vector<WorldVisualEvent> takeVisualEvents();

@@ -497,6 +497,8 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         auto* state=live.get();
         auto* pose=live->pose.get();
         actor->setMuzzleSource([pose](int side){return side>0?pose->frame().muzzleLeft:pose->frame().muzzle;});
+        actor->setSubNozzleSource([pose](){return std::make_pair(pose->frame().subNozzle,pose->frame().subNozzleDirection);});
+        actor->setTankSource([pose,state,&art](){return art.attachment(pose->frame(),state->style,"tank/group");});
         characters.push_back(std::move(live));
         actor->setPoseTriggerSink([pose,actor,&gameAudio](const CharacterTrigger& event) {
             pose->trigger(event);
@@ -527,6 +529,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             animation.firing=combat.firing||special.firing>0.0;
             animation.rolling=combat.rolling;
             animation.subAim=combat.subAim||special.raise;
+            animation.shakerCharging=combat.shakerCharging;animation.shakerCharge=combat.shakerCharge;
             animation.subPropHidden=special.kind=="booyah"&&special.active&&!special.thrown;
             animation.lowInk=current.ink<18.0;
             animation.inEnemyInk=current.grounded&&current.groundTeam==2&&!current.submerged&&!special.inkProof;
@@ -776,6 +779,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
                     jumpTargets.push_back({target.key,target.x,target.z,target.label,target.available});
             }
             ui.SetJumpMap(jumpMapOpen,std::move(jumpTargets),controller.QueuedSuperJumpKey(),controller.QueuedSuperJumpLabel());
+            ui.SetWorldView(projection*view,renderEye,projection[1][1]);
             if(gearOpen&&showcase){const auto p=ui.preview();if(p.width>0&&p.height>0)showcase->drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);}
             const auto hudAction=gearOpen?ui.RenderMenu(width,height):ui.RenderHud(stage,paint,match,width,height,paused,nativeApp,options.practice);
             const int jumpMapSelection=ui.TakeJumpMapSelection();

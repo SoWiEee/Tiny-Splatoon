@@ -38,7 +38,7 @@ for (const map of OFFLINE_MAPS) {
   console.log(`${map.id}: ${nav.planIds.length} plan cells`);
 }
 const output = `${JSON.stringify(rows, null, 2)}\n`;
-const file = resolve(root, 'tests/boss_nav_fixtures.json');
+const file = resolve(root, 'tests/fixtures/boss_nav_fixtures.json');
 if (process.argv.includes('--check')) {
   if (await readFile(file, 'utf8') !== output) throw new Error('Boss nav fixtures differ from locked source');
 } else await writeFile(file, output);

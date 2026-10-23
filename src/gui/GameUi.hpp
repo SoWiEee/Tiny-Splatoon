@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <glm/glm.hpp>
 
 struct GLFWwindow;
 namespace restoration {
@@ -67,6 +68,7 @@ public:
     void SetSoundSink(std::function<void(const std::string&)> sink);
     void SetVolumeSink(std::function<void(float,float,float)> sink);
     void SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel={});
+    void SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY=1.78f);
     int TakeJumpMapSelection();
     void ShowOnline();
     void SetOnlineState(const network::RoomView& view);
