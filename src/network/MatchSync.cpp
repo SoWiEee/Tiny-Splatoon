@@ -541,6 +541,11 @@ void MatchSync::applyTrigger(const GamePacket& packet,Reader& r){
        (event.amount&&(*event.amount< -1000||*event.amount>1000))||glm::length(event.direction)>100)return;
     target->applyNetworkPoseTrigger(event);
 }
-void MatchSync::applyVisual(const GamePacket&,Reader& r){WorldVisualEvent e;e.kind=r.string(64);e.pos=readVec(r);e.normal=readVec(r);e.radius=r.f64();e.team=r.i32();e.charge=r.f64();e.width=r.f64();e.seed=r.f64();e.source=r.string(64);e.id=r.u64();e.sourceLocal=r.boolean();e.sourceVictimLocal=r.boolean();e.victimNid=r.u32();r.finish();if(e.team< -1||e.team>1||e.radius<0||e.radius>100||e.width<0||e.width>100||e.charge<0||e.charge>1000)return;e.sourceLocal=false;e.sourceVictimLocal=ownsActor(localPeer_,e.victimNid);if(e.sourceVictimLocal)e.pos=glm::dvec3(0);match_.world().queueRemoteVisual(std::move(e));}
+void MatchSync::applyVisual(const GamePacket& packet,Reader& r){WorldVisualEvent e;e.kind=r.string(64);e.pos=readVec(r);e.normal=readVec(r);e.radius=r.f64();e.team=r.i32();e.charge=r.f64();e.width=r.f64();e.seed=r.f64();e.source=r.string(64);e.id=r.u64();e.sourceLocal=r.boolean();e.sourceVictimLocal=r.boolean();e.victimNid=r.u32();r.finish();if(e.team< -1||e.team>1||e.radius<0||e.radius>100||e.width<0||e.width>100||e.charge<0||e.charge>1000)return;if(e.kind=="hud_hit"||e.kind=="hud_splat"){
+    auto* victim=actor(e.victimNid);auto* attacker=e.id==kUnattributedNid?nullptr:e.id<=std::numeric_limits<std::uint32_t>::max()?actor(static_cast<std::uint32_t>(e.id)):nullptr;
+    if(!victim||!ownsActor(packet.from,e.victimNid)||victim->team()!=e.team||(e.id!=kUnattributedNid&&!attacker)||(attacker&&attacker->team()==victim->team())||(e.kind=="hud_hit"&&e.charge<=0))return;
+    match_.world().recordRemoteHudEvent(e.kind=="hud_hit"?CombatHudEvent::Kind::Hit:CombatHudEvent::Kind::Splat,attacker,*victim,e.charge,e.source);return;
+}
+e.sourceLocal=false;e.sourceVictimLocal=ownsActor(localPeer_,e.victimNid);if(e.sourceVictimLocal)e.pos=glm::dvec3(0);match_.world().queueRemoteVisual(std::move(e));}
 
 } // namespace restoration::network

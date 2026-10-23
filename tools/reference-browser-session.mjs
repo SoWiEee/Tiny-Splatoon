@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createServer as createTcpServer } from 'node:net';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
@@ -25,7 +26,10 @@ export async function referenceBrowser(root, profileName) {
   await mkdir(path.join(root,'build'),{recursive:true});
   const profile=await mkdtemp(path.join(root,'build',profileName+'-'));
   // Keep Canvas rasterization reproducible while leaving the source WebGL texture baker on the GPU.
-  const child=spawn(executable,['--headless=new','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-accelerated-2d-canvas','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{windowsHide:true,stdio:'ignore'});
+  // Edge may omit DevToolsActivePort; reserve an explicit local port instead.
+  const reserve=createTcpServer();await new Promise(resolve=>reserve.listen(0,'127.0.0.1',resolve));
+  const debugPort=reserve.address().port;await new Promise(resolve=>reserve.close(resolve));
+  const child=spawn(executable,['--headless=new','--no-first-run','--no-default-browser-check','--disable-extensions','--disable-accelerated-2d-canvas',`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profile}`,'about:blank'],{windowsHide:true,stdio:'ignore'});
   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   let socket;const pending=new Map();let request=0;
   async function close(){
@@ -37,14 +41,13 @@ export async function referenceBrowser(root, profileName) {
     await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:100});
   }
   try{
-    let port;
+    let info;
     for(let i=0;i<200;i++){
-      if(child.exitCode!==null)throw new Error('Source browser exited before DevTools opened');
-      try{port=Number((await readFile(path.join(profile,'DevToolsActivePort'),'utf8')).split(/\r?\n/)[0]);if(port>0)break;}catch{}
+      try{const response=await fetch(`http://127.0.0.1:${debugPort}/json/version`);if(response.ok){info=await response.json();break;}}catch{}
+      if(child.exitCode!==null&&child.exitCode!==0)throw new Error('Source browser exited before DevTools opened');
       await pause(100);
     }
-    if(!port)throw new Error('Timed out waiting for Edge DevTools');
-    const info=await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+    if(!info)throw new Error('Timed out waiting for Edge DevTools');
     socket=new WebSocket(info.webSocketDebuggerUrl);
     await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
     socket.addEventListener('message',event=>{
@@ -69,5 +72,5 @@ export async function referenceBrowser(root, profileName) {
     for(let i=0;i<100;i++){try{ready=await evaluate('document.readyState === "complete"');}catch{}if(ready)break;await pause(100);}
     if(!ready)throw new Error('Source export page did not finish loading');
     return {evaluate,close};
-  }catch(error){await close();throw error;}
+  }catch(error){try{await close();}catch{}throw error;}
 }

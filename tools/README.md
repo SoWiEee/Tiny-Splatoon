@@ -7,7 +7,7 @@
 | 遊戲／AI fixtures | `export-arsenal`、`export-controller`、`export-player`、`export-*-source-fixtures`、`export-ai-*` → `src/game/`、`tests/fixtures/` |
 | 角色／動畫／Boss | `export-character-*`、`export-boss-*` → 原生角色資料、材質與姿勢 fixtures |
 | 場景／渲染 | `export-stage-*`、`export-environment-*`、`export-post-shaders` → `assets/reference/` |
-| 武器／道具／HUD | [裝置](export-device-visuals.mjs)、[投射物](export-projectile-visuals.mjs)、[世界粒子](export-worldfx-particle-shaders.mjs)、[HUD 圖示](export-hud-icons.mjs) |
+| 武器／道具／HUD | [裝置](export-device-visuals.mjs)、[投射物](export-projectile-visuals.mjs)、[世界粒子](export-worldfx-particle-shaders.mjs)、[武器圖示](export-hud-icons.mjs)、[副武器／特殊圖示](export-hud-equipment-icons.mjs) |
 | 音訊 | [來源音效](export-audio-source.mjs)、[混響 fixture](export-native-reverb-fixture.mjs) |
 | 來源載入 helpers | `reference-loader.mjs`、`device-reference-loader.mjs`、`reference-browser-session.mjs`；供匯出器共用 |
 | 原生工具 | [匯入自訂音樂](import-music.mjs)、[七圖效能量測](Measure-ReferenceTurf.ps1) |

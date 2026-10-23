@@ -1,5 +1,6 @@
 #include "GameUi.hpp"
 #include "ArsenalData.hpp"
+#include "../src/gui/UiText.hpp"
 #include "WeaponReticleElement.hpp"
 #include "MatchSimulation.hpp"
 #include "PlayerController.hpp"
@@ -605,6 +606,45 @@ int main(int argc,char** argv){
         hud->GetElementById("results-rematch")->Click();Check(hudRender(false)==UiAction::Rematch,"Results rematch action did not reach the match loop");
         hud->GetElementById("results-menu")->Click();Check(hudRender(false)==UiAction::StageSelect,"Return action did not reach the match loop");
         ui.ShowMenu("tidewater");Check(render()==UiAction::None&&menu->IsVisible(),"Returning from results did not restore the menu");
+        {
+            for(const auto& equipment:SubEquipment())Check(std::filesystem::exists(std::filesystem::path(argv[1])/"assets/ui/equipment"/("sub-"+std::string(equipment.id)+".png")),"Every sub must have source HUD artwork");
+            for(const auto& equipment:SpecialEquipment())Check(std::filesystem::exists(std::filesystem::path(argv[1])/"assets/ui/equipment"/("special-"+std::string(equipment.id)+".png")),"Every special must have source HUD artwork");
+            FacePaint combatPaint(*stage,geometry);MatchOptions options;options.duration=90;
+            MatchSimulation combatMatch(*stage,geometry,combatPaint,nav,options);combatMatch.startPlaying();
+            auto draw=[&](int w=1600,int h=900,bool paused=false){glViewport(0,0,w,h);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,combatPaint,combatMatch,w,h,paused,true);};
+            auto& local=combatMatch.local();local.state.invuln=0;std::vector<PlayerSimulation*> foes;PlayerSimulation* ally=nullptr;
+            for(const auto& actor:combatMatch.actors()){actor->state.invuln=0;if(actor->team()!=local.team())foes.push_back(actor.get());else if(actor.get()!=&local)ally=actor.get();}
+            Check(foes.size()==4&&ally,"Combat HUD fixture needs two complete teams");draw();
+            Check(hud->GetElementById("special-display")->IsVisible(),"Combat HUD must show the special orb");
+            local.state.ink=0;local.input.sub=true;local.tick(1./60);local.input.sub=false;local.tick(1./60);draw();Check(hud->GetElementById("equipment-denied")->IsVisible(),"An unaffordable sub must display denial feedback");local.input.sub=false;local.state.ink=100;
+            local.state.specialCharge=local.weapon().number("specialCost",190);draw();
+            Check(hud->GetElementById("special-percent")->GetInnerRML().find("就緒")!=Rml::String::npos,"A full special must show its ready state");
+            auto before=Capture(std::filesystem::path(argv[2])/"battle-hud-ready.png",1600,900);
+            for(int y=300;y<600;++y)for(int x=1458;x<1470;++x){const auto i=(y*1600+x)*3;Check(std::abs(int(before[i])-64)<3&&std::abs(int(before[i+1])-76)<3&&std::abs(int(before[i+2])-89)<3,"Special liquid mesh must remain inside its orb, without full-height edge artifacts");}
+
+            combatMatch.world().applyHit(local,*foes[0],36,"shooter");draw();
+            Check(hud->GetElementById("battle-feedback")->GetAttribute<Rml::String>("data-hit","")=="true","Applied damage must trigger a hit marker");
+            auto hit=Capture(std::filesystem::path(argv[2])/"battle-hud-hit.png",1600,900);int changed=0;
+            for(int y=380;y<520;++y)for(int x=730;x<870;++x){const auto i=(y*1600+x)*3;if(before[i]!=hit[i]||before[i+1]!=hit[i+1]||before[i+2]!=hit[i+2])++changed;}
+            Check(changed>20,"Hit feedback must change real crosshair-area pixels");
+            combatMatch.world().applyHit(local,*foes[0],100,"shooter");draw();
+            Check(hud->GetElementById("kill-cards")->GetNumChildren()==1&&hud->GetElementById("battle-callout")->GetInnerRML().find("首次")!=Rml::String::npos,"A first splat must show its victim card and first-splat callout");
+            const auto cards=hud->GetElementById("kill-cards")->GetInnerRML();draw();Check(cards==hud->GetElementById("kill-cards")->GetInnerRML(),"Rendering the same journal must not replay or duplicate kill cards");
+            combatMatch.world().applyHit(local,*foes[1],15,"shooter");combatMatch.world().applyHit(*ally,*foes[1],100,"shooter");draw();
+            Check(hud->GetElementById("kill-cards")->GetInnerRML().find("助攻")!=Rml::String::npos,"Recent damage followed by an allied splat must show an assist card");
+            combatMatch.world().applyHit(local,*foes[2],100,"shooter");draw();
+            Check(hud->GetElementById("battle-callout")->GetInnerRML().find("雙重")!=Rml::String::npos,"Two local splats within 4.2 seconds must show the source multi-splat callout");
+            combatMatch.world().applyHit(local,*foes[3],100,"shooter");draw();
+            Check(hud->GetElementById("battle-callout")->GetInnerRML().find("全隊")!=Rml::String::npos,"Wipeout must take priority over multi-splat callouts");
+            Capture(std::filesystem::path(argv[2])/"battle-hud-wipeout.png",1600,900);
+            foes[0]->spawnAt(foes[0]->state.pos,0);foes[0]->state.invuln=0;combatMatch.world().applyHit(*foes[0],local,200,"bomb");draw();
+            Check(hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("death-cause")->GetInnerRML().find(std::string(EquipmentLabel(EquipmentCategory::Sub,"bomb")))!=Rml::String::npos,"Death feedback must preserve the actual subweapon cause");
+            Capture(std::filesystem::path(argv[2])/"battle-hud-death.png",1600,900);
+            draw(1600,900,true);Check(!hud->GetElementById("battle-hud-layer")->IsVisible(),"Paused HUD must hide transient combat overlays");
+            combatMatch.restart();combatMatch.startPlaying();draw();
+            Check(hud->GetElementById("kill-cards")->GetNumChildren()==0&&!hud->GetElementById("death-card")->IsVisible(),"Restart must clear old cards, deaths and journal cursors");
+            for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){draw(dims.first,dims.second);auto* orb=hud->GetElementById("special-display");const auto pos=orb->GetAbsoluteOffset();Check(pos.x>=0&&pos.x+orb->GetOffsetWidth()<=dims.first&&pos.y+orb->GetOffsetHeight()<=dims.second,"Special orb must fit at both supported HUD resolutions");Capture(std::filesystem::path(argv[2])/("battle-hud-"+std::to_string(dims.second)+".png"),dims.first,dims.second);}
+        }
         Check(glGetError()==GL_NO_ERROR,"UI interaction draw produced GL errors");
         std::cout<<"PLAYER_UI keyboard, modes, source loadout and volume sink passed\n";
     }catch(const std::exception& error){std::cerr<<error.what()<<'\n';result=1;}

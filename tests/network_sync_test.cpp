@@ -109,6 +109,10 @@ void turfFlow(){
     host.world().applyHit(host.local(),byId(host,guestNid),25,"shooter");
     f.wait([&]{return guest.local().state.hp==75;});
     f.run(150);check(guest.local().state.hp==75,"Victim owner must apply a hit only once");
+    f.wait([&]{const auto& events=host.world().hudEvents();return std::any_of(events.begin(),events.end(),[&](const auto& e){return e.kind==CombatHudEvent::Kind::Hit&&e.attackerNid==hostNid&&e.victimNid==guestNid&&e.damage==25;});});
+    const auto hudCount=host.world().hudEvents().size();f.run(150);
+    check(host.world().hudEvents().size()==hudCount,"Confirmed HUD feedback must not echo or duplicate across peers");
+
 
     NetworkActorEffect effect;effect.poison=1.5;effect.track=3;effect.reveal=2;effect.effectTeam=host.local().team();effect.velocityImpulse={1,0,0};
     const double vx=guest.local().state.vel.x;

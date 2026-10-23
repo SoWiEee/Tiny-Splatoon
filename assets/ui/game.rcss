@@ -338,3 +338,53 @@ th:first-child, td:first-child { text-align: left; }
   .jump-map-open .minimap-map { height: 320dp; }
   .jump-target { width: 49%; }
 }
+
+/* Source-inspired combat information stays outside the aiming corridor. */
+.battle-hud-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.battle-feedback { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.special-display { position: absolute; right: 24dp; top: 26dp; width: 136dp; height: 150dp; }
+.special-orb { position: absolute; left: 0; top: 0; width: 136dp; height: 136dp; }
+.special-art { position: absolute; left: 34dp; top: 27dp; width: 68dp; height: 68dp; }
+.sub-art { position: absolute; right: -6dp; bottom: 7dp; width: 42dp; height: 42dp; }
+.special-percent { position: absolute; top: 96dp; left: 3dp; width: 126dp; text-align: center; font-size: 17dp; color: #fff9e9; }
+.personal-turf { position: absolute; top: 188dp; right: 30dp; width: 120dp; padding: 6dp 12dp; text-align: right; background-color: #15121cf2; border: 3dp #fff9e9; border-radius: 18dp; color: #fff9e9; font-size: 24dp; }
+.turf-pop { position: absolute; right: 8dp; top: 46dp; font-size: 22dp; color: #fff9ad; background-color: #15121c; padding: 2dp 10dp; border-radius: 10dp; }
+.equipment-denied { position: absolute; left: 50%; top: 58%; margin-left: -150dp; width: 300dp; text-align: center; font-size: 20dp; font-weight: 700; color: #ffffff; background-color: #a91135; border: 3dp #15121c; border-radius: 14dp; padding: 8dp; }
+.kill-feed { position: absolute; left: 26dp; top: 108dp; width: 300dp; }
+.kill-cards { position: absolute; top: 64%; left: 50%; margin-left: -170dp; width: 340dp; }
+.battle-note { display: flex; align-items: center; background-color: #15121cf2; color: #fff9e9; border: 3dp #fff9e9; border-radius: 14dp 22dp 14dp 22dp; margin-bottom: 7dp; padding: 7dp 11dp; font-size: 18dp; font-weight: 700; }
+.battle-note img { width: 31dp; height: 31dp; margin-right: 10dp; }
+.battle-note.kill { font-size: 23dp; }
+.battle-note.assist { font-size: 21dp; }
+.battle-callout { position: absolute; top: 33%; left: 50%; margin-left: -250dp; width: 500dp; text-align: center; font-size: 38dp; font-weight: 700; padding: 12dp 8dp; color: #15121c; background-color: #fff9ad; border: 4dp #15121c; border-radius: 26dp 12dp 26dp 12dp; }
+.death-card { position: absolute; top: 62%; left: 50%; margin-left: -290dp; width: 580dp; padding: 18dp; box-sizing: border-box; display: flex; align-items: center; background-color: #15121cf5; color: #fff9e9; border: 4dp #fff9e9; border-radius: 28dp 14dp 28dp 14dp; }
+.death-weapon { width: 80dp; height: 80dp; margin-right: 15dp; }
+.death-description { width: 305dp; }
+.death-description strong { display: block; font-size: 23dp; margin-bottom: 6dp; }
+.death-description span { display: block; font-size: 19dp; }
+.death-description small { display: block; font-size: 14dp; margin-top: 10dp; }
+.death-respawn { position: relative; width: 100dp; height: 100dp; text-align: center; }
+.death-respawn hud-ring { display: block; width: 100%; height: 100%; }
+.death-respawn strong { position: absolute; top: 13dp; left: 0; width: 100%; font-size: 36dp; }
+.death-respawn span { position: absolute; top: 58dp; left: 0; width: 100%; font-size: 13dp; }
+.squad-ring { position: absolute; left: -4dp; top: -4dp; width: 54dp; height: 54dp; display: none; }
+.squad-player.dead .squad-ring { display: block; }
+.intro-lineup { position: absolute; top: 32%; left: 12%; width: 76%; display: flex; justify-content: space-between; }
+.lineup-team { width: 42%; background-color: #15121ced; color: #fff9e9; border: 4dp #fff9e9; border-radius: 24dp; padding: 15dp; }
+.lineup-team h2 { font-size: 25dp; margin: 0 0 14dp; }
+.lineup-player { display: flex; align-items: center; font-size: 20dp; margin-bottom: 7dp; }
+.lineup-player img { width: 34dp; height: 34dp; margin-right: 10dp; }
+.battle-banner { position: absolute; top: 24%; left: 50%; width: 500dp; margin-left: -250dp; font-size: 42dp; font-weight: 700; text-align: center; color: #15121c; background-color: #fff9ad; padding: 10dp 0; border: 4dp #15121c; border-radius: 18dp; }
+.final-countdown { position: absolute; bottom: 60dp; left: 50%; width: 110dp; margin-left: -55dp; font-size: 54dp; font-weight: 700; text-align: center; color: #fff9ad; background-color: #15121c; border: 3dp #fff9ad; border-radius: 24dp; }
+.hud .pause-hint { margin-right: 164dp; }
+.hud .fps { top: 22dp; right: 294dp; }
+.hud .player-info { bottom: 25dp; left: auto; right: 24dp; width: 220dp; padding: 12dp 15dp; }
+.hud .special-meter, .hud .special-status { display: none; }
+.hud .minimap { top: auto; right: auto; left: 24dp; bottom: 24dp; border: 3dp #15121c; border-radius: 22dp; }
+.hud .minimap.jump-map-open { top: 72dp; bottom: auto; right: auto; left: 50%; border: 3dp #15121c; }
+
+.battle-hud-layer.hidden, .battle-hud-layer .hidden { display: none; }
+
+.special-art { left: 41dp; top: 24dp; }
+.sub-art { right: auto; bottom: auto; left: 20dp; top: 73dp; width: 40dp; height: 40dp; }
+.special-percent { left: 55dp; top: 100dp; width: 78dp; font-size: 15dp; }

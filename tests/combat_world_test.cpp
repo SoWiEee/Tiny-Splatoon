@@ -1,6 +1,7 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/game/ArsenalData.hpp"
 #include "fixtures/world_specials_source_fixtures.hpp"
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -18,18 +19,42 @@ int main(){
         auto enemy=std::make_unique<PlayerSimulation>(*stage,geometry,paint,1,&world);
         a->state.invuln=ally->state.invuln=enemy->state.invuln=0;
         auto check=[](bool condition,const char* message){if(!condition)throw std::runtime_error(message);};
-        world.applyHit(*a,*ally,36,"shooter");check(ally->state.hp==100,"Friendly fire changed ally HP");
+        world.applyHit(*a,*ally,36,"shooter");check(ally->state.hp==100&&world.hudEvents().empty(),"Friendly fire changed ally HP or emitted HUD feedback");
         world.applyHit(*a,*enemy,36,"shooter");check(enemy->state.hp==64,"One shared-world hit applied more than once");
+        const auto firstHitSerial=world.hudEvents().back().serial;
+        const auto& firstHit=world.hudEvents().back();
+        check(firstHit.kind==CombatHudEvent::Kind::Hit&&firstHit.attacker==a.get()&&firstHit.victim==enemy.get()
+            &&firstHit.attackerTeam==0&&firstHit.victimTeam==1&&firstHit.attackerWeapon==a->mainId()
+            &&firstHit.victimWeapon==enemy->mainId()&&firstHit.damage==36&&firstHit.source=="shooter"
+            &&glm::length(firstHit.attackerPos-a->state.pos)<1e-9&&glm::length(firstHit.victimPos-enemy->state.pos)<1e-9,
+            "HUD hit event missed its source or combat snapshots");
         {
             enemy->state.invuln=1;
-            world.applyHit(*a,*enemy,36,"shooter");check(enemy->state.hp==64,"Spawn protection must reject weapon damage");
+            world.applyHit(*a,*enemy,36,"shooter");check(enemy->state.hp==64&&world.hudEvents().back().serial==firstHitSerial,"Spawn protection must reject damage and HUD feedback");
             enemy->state.invuln=0;
             world.applyHit(*a,*enemy,36,"shooter");check(enemy->state.alive&&enemy->state.hp==28,"Two source shooter hits must leave 28 HP");
             const int splats=a->splats();
             world.applyHit(*a,*enemy,36,"shooter");check(!enemy->state.alive&&enemy->state.hp==0&&a->splats()==splats+1,"Three source shooter hits must splat exactly once");
+            check(world.hudEvents().back().kind==CombatHudEvent::Kind::Splat&&world.hudEvents().back().attacker==a.get()
+                &&world.hudEvents().back().victim==enemy.get()&&world.hudEvents().back().source=="shooter"
+                &&std::count_if(world.hudEvents().begin(),world.hudEvents().end(),[&](const auto& event){return event.kind==CombatHudEvent::Kind::Splat&&event.victimNid==enemy->networkNid();})==1
+                &&world.hudEvents()[2].damage==28,"Lethal HUD event duplicated or lost capped damage");
             world.applyHit(*a,*enemy,36,"shooter");check(a->splats()==splats+1,"A dead victim must not award duplicate splats");
             enemy->spawnAt(stage->spawnPads[1],0);enemy->state.invuln=0;
         }
+        world.applyHit(*ally,*enemy,20,"roller");
+        const auto assistHit=world.hudEvents().back();
+        world.tick(2.0);
+        world.applyHit(*a,*enemy,100,"slam");
+        const auto assistKill=world.hudEvents().back();
+        check(assistHit.kind==CombatHudEvent::Kind::Hit&&assistHit.attacker==ally.get()
+            &&assistKill.kind==CombatHudEvent::Kind::Splat&&assistKill.attacker==a.get()
+            &&assistKill.victim==enemy.get()&&assistKill.source=="slam"&&assistKill.time-assistHit.time<=4.0,
+            "HUD journal lost assist or killer attribution within the source window");
+        for(int i=0;i<513;++i){enemy->state.alive=true;enemy->state.hp=100;enemy->state.invuln=0;world.applyHit(*a,*enemy,1,"shooter");}
+        const auto cleanupAttackerSerial=world.hudEvents().back().serial;
+        check(world.hudEvents().size()==512&&world.hudEvents().front().serial+511==world.hudEvents().back().serial,
+            "HUD event journal must retain only its bounded newest entries");
         glm::dvec3 point;bool found=false;
         for(int id=0;id<static_cast<int>(stage->faces.size())&&!found;++id){
             const auto& f=stage->faces[id];const auto& grid=paint.faceGrid(id);if(!f.turf||grid.offset<0)continue;
@@ -48,8 +73,19 @@ int main(){
         ShooterProjectile p;p.owner=a.get();p.pos=a->state.pos+glm::dvec3(0,1,0);p.vel={0,0,34};world.launch(p);
         world.deploy(*a,a->subId());check(world.attackCount(*a)>=2,"Shared world did not own projectile and device");
         world.applyHit(*enemy,*a,1000,"shooter");check(!a->state.alive&&world.attackCount(*a)==0,"Death did not clean the actor's attacks");
+        const auto cleanupVictimSerial=world.hudEvents().back().serial;
+        check(world.hudEvents().back().kind==CombatHudEvent::Kind::Splat&&world.hudEvents().back().victim==a.get(),"Splat event must retain live actor references");
         a.reset();check(world.actors().size()==2,"Actor destruction left a registered pointer");
-        world.clear();check(world.projectiles().empty()&&world.devices().empty(),"Restart did not clear attacks");
+        const auto removedAttacker=std::find_if(world.hudEvents().begin(),world.hudEvents().end(),[&](const auto& event){return event.serial==cleanupAttackerSerial;});
+        const auto removedVictim=std::find_if(world.hudEvents().begin(),world.hudEvents().end(),[&](const auto& event){return event.serial==cleanupVictimSerial;});
+        check(removedAttacker!=world.hudEvents().end()&&removedAttacker->attacker==nullptr
+            &&removedVictim!=world.hudEvents().end()&&removedVictim->victim==nullptr,"Removed actors must not leave dangling HUD references");
+        const auto priorEpoch=world.hudEventEpoch();
+        world.clear();check(world.projectiles().empty()&&world.devices().empty()&&world.hudEvents().empty()
+            &&world.hudEventEpoch()==priorEpoch+1,"Restart did not clear attacks and HUD journal epoch");
+        world.applyHit(*ally,*enemy,1,"shooter");
+        check(world.hudEvents().size()==1&&world.hudEvents().back().serial==1&&world.hudEvents().back().time==0,
+            "HUD event serial and time must restart with the clear epoch");
         auto fixture=[](std::string_view id)->const test::SpecialSourceFixture& {
             for(const auto& row:test::specialSourceFixtures)if(row.id==id)return row;
             throw std::runtime_error("Missing locked source special fixture");

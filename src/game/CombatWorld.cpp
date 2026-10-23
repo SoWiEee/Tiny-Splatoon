@@ -117,6 +117,10 @@ void CombatWorld::cleanup(PlayerSimulation& actor) {
 }
 void CombatWorld::removeActor(PlayerSimulation& actor) {
     cleanup(actor);
+    for (auto& event : hudEvents_) {
+        if (event.attacker == &actor) event.attacker = nullptr;
+        if (event.victim == &actor) event.victim = nullptr;
+    }
     if (ticking_) {
         for (auto*& registered : actors_) if (registered == &actor) registered = nullptr;
     } else {
@@ -126,6 +130,9 @@ void CombatWorld::removeActor(PlayerSimulation& actor) {
 void CombatWorld::clear() {
     specials_.clear();
     visualEvents_.clear();
+    hudEvents_.clear();
+    ++hudEventEpoch_;
+    hudEventSerial_ = 0;
     volleyBossHits_.clear();
     remoteWorlds_.clear();
     pendingProjectiles_.clear();
@@ -137,6 +144,49 @@ void CombatWorld::clear() {
         projectiles_.clear(); devices_.clear(); volleyHits_.clear();
     }
     time_ = 0;
+}
+void CombatWorld::recordRemoteHudEvent(CombatHudEvent::Kind kind, PlayerSimulation* attacker, PlayerSimulation& victim,
+                                      double damage, const std::string& source) {
+    recordHudEvent(kind, attacker, victim, damage, source, false);
+}
+void CombatWorld::recordHudDenial(PlayerSimulation& actor, const std::string& source, bool lowInk) {
+    recordHudEvent(CombatHudEvent::Kind::Denied, nullptr, actor, lowInk ? 1.0 : 0.0, source, false);
+}
+void CombatWorld::recordHudEvent(CombatHudEvent::Kind kind, PlayerSimulation* attacker, PlayerSimulation& victim,
+                                double damage, const std::string& source, bool broadcast) {
+    if (hudEvents_.size() == 512) hudEvents_.erase(hudEvents_.begin());
+    CombatHudEvent event;
+    event.serial = ++hudEventSerial_;
+    event.time = time_;
+    event.kind = kind;
+    event.victim = &victim;
+    event.victimNid = victim.networkNid();
+    event.victimTeam = victim.team();
+    event.victimWeapon = victim.mainId();
+    event.victimPos = victim.state.pos;
+    event.damage = damage;
+    event.source = source;
+    if (attacker && attacker != &victim) {
+        event.attacker = attacker;
+        event.attackerNid = attacker->networkNid();
+        event.attackerTeam = attacker->team();
+        event.attackerWeapon = attacker->mainId();
+        event.attackerPos = attacker->state.pos;
+    }
+    hudEvents_.push_back(std::move(event));
+    if (broadcast && !networkApplying_ && networkVisualForwarder_) {
+        const auto& recorded = hudEvents_.back();
+        WorldVisualEvent visual;
+        visual.kind = kind == CombatHudEvent::Kind::Hit ? "hud_hit" : "hud_splat";
+        visual.pos = recorded.victimPos;
+        visual.normal = recorded.attackerPos;
+        visual.team = recorded.victimTeam;
+        visual.charge = recorded.damage;
+        visual.source = recorded.source;
+        visual.id = recorded.attackerNid;
+        visual.victimNid = recorded.victimNid;
+        networkVisualForwarder_(visual);
+    }
 }
 void CombatWorld::launch(ShooterProjectile p) {
     if(!p.owner || !p.owner->state.alive) return;

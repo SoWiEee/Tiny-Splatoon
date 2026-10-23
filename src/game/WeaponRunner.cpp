@@ -113,12 +113,13 @@ double WeaponRunner::spread() const {
     if(w.kind=="spinner")return base;
     return base*lerp(w.kind=="twins"?0.5:w.number("spreadFirst",0.45),1,bloom_);
 }
-void WeaponRunner::dryFire() {
+void WeaponRunner::dryFire(bool recordHudDenial) {
     actor_.world_->emitVisual({"lowink",actor_.muzzle(),actor_.aimDir(),0,actor_.team(),0,.08,0,actor_.mainId(),actor_.networkNid()});
+    if(recordHudDenial)actor_.world_->recordHudDenial(actor_,actor_.mainId(),true);
 }
-bool WeaponRunner::spend(double ink) {
+bool WeaponRunner::spend(double ink, bool recordHudDenial) {
     if(actor_.state.ink<ink){
-        dryFire();
+        dryFire(recordHudDenial);
         return false;
     }
     actor_.state.ink-=ink;actor_.lastFire_=0;return true;
@@ -224,7 +225,11 @@ void WeaponRunner::tick(double dt,bool fire,bool pressed,bool sub,bool subReleas
     if(aimingSub_)actor_.fireFacing_=0.3;
     if(subReleased && aimingSub_ && !actor_.state.squid) {
         aimingSub_=false;
-        if(actor_.world_->canDeploy(actor_,actor_.subId()) && spend(subDef.number("inkCost"))) {
+        if(!actor_.world_->canDeploy(actor_,actor_.subId())) {
+            actor_.world_->recordHudDenial(actor_,actor_.subId(),false);
+        } else if(!spend(subDef.number("inkCost"),false)) {
+            actor_.world_->recordHudDenial(actor_,actor_.subId(),true);
+        } else {
             actor_.world_->deploy(actor_,actor_.subId(),false,subCharge_); actor_.triggerPose({"throw"});
         }
         subCharge_=subChargeBudget_=0;

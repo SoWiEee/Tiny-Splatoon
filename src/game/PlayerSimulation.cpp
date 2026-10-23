@@ -115,6 +115,7 @@ bool PlayerSimulation::damageFromCombat(double amount, PlayerSimulation* attacke
     if (!(amount > 0.0)) return false;
     amount = runner_.damageTaken(amount, attacker);
     if (!(amount > 0.0)) return false;
+    world_->recordHudEvent(CombatHudEvent::Kind::Hit, attacker, *this, std::min(amount, std::max(0.0, state.hp)), source, true);
     if(damageSink_)damageSink_(amount,attacker&&attacker!=this?&attacker->state.pos:nullptr);
     state.hp -= amount;
     lastDamage_ = 0.0;
@@ -130,12 +131,13 @@ bool PlayerSimulation::damageFromCombat(double amount, PlayerSimulation* attacke
     }
     if (state.hp <= 0.0) {
         if(attacker && attacker != this && attacker->team() != team()) ++attacker->splats_;
-        splat(false); return true;
+        splat(false, attacker, source); return true;
     }
     return false;
 }
 
-void PlayerSimulation::splat(bool water) {
+void PlayerSimulation::splat(bool water, PlayerSimulation* attacker, const std::string& source) {
+    world_->recordHudEvent(CombatHudEvent::Kind::Splat, attacker, *this, 0.0, source, true);
     const bool shakerFizzle = runner_.pose().shakerCharging;
     ++deaths_;
     superJump_.reset();
@@ -646,11 +648,13 @@ void PlayerSimulation::tick(double dt) {
         finishFrame(dt);
         return;
     }
-    if (specialPressed && !world_->specials_.pose(*this).active
-        && state.specialCharge >= weapon().number("specialCost", 190.0)
-        && world_->specials_.activate(*this, specialId_)) {
-        finishFrame(dt);
-        return;
+    if (specialPressed && !world_->specials_.pose(*this).active) {
+        if (state.specialCharge >= weapon().number("specialCost", 190.0)
+            && world_->specials_.activate(*this, specialId_)) {
+            finishFrame(dt);
+            return;
+        }
+        world_->recordHudDenial(*this, specialId_, false);
     }
 
     const bool fireWins = (input.fire || fireBuffer_ > 0.0) && firePressT_ >= squidPressT_;
@@ -713,7 +717,7 @@ void PlayerSimulation::tick(double dt) {
     if(state.reveal>0 && state.ink<inkBefore)state.ink=std::max(0.0,state.ink-(inkBefore-state.ink)*(GetEquipment(EquipmentCategory::Special,"sonar").number("inkMul")-1));
     world_->specials_.tickActor(*this, dt);
     if (state.pos.y < -1.45 && !std::isfinite(geometry_.groundHeight(state.pos.x, state.pos.z, state.pos.y + 0.6)))
-        splat(true);
+        splat(true, nullptr, "water");
     finishFrame(dt);
 }
 

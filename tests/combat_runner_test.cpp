@@ -1,4 +1,5 @@
 #include "../src/game/PlayerSimulation.hpp"
+#include "../src/game/ArsenalData.hpp"
 #include "fixtures/combat_runner_fixtures.hpp"
 #include "fixtures/controller_fixtures.hpp"
 #include <cmath>
@@ -35,7 +36,55 @@ int main() {
         const auto events=empty.combatWorld().takeVisualEvents();
         require(std::any_of(events.begin(),events.end(),[](const auto& e){return e.kind=="lowink";}),"An empty weapon must emit its dry-fire visual trigger");
         require(empty.state.ink==0&&empty.shotsFired()==0,"Dry-fire visuals must not spend ink or fire gameplay shots");
+        const auto& hudEvents=empty.combatWorld().hudEvents();
+        require(std::count_if(hudEvents.begin(),hudEvents.end(),[&](const auto& e) {
+                    return e.kind==CombatHudEvent::Kind::Denied && e.source==main && e.damage==1.0;
+                })==1,
+                "An insufficient main-weapon attempt must record one low-ink denial");
+        require(std::none_of(hudEvents.begin(),hudEvents.end(),[](const auto& e) {
+                    return e.kind==CombatHudEvent::Kind::Hit || e.kind==CombatHudEvent::Kind::Splat;
+                }),
+                "A dry-fire denial must not create an HP hit or splat event");
     }
+
+    PlayerSimulation zeroInkSub(stage,geometry,paint);
+    zeroInkSub.setLoadout("shooter","bomb");
+    zeroInkSub.state.ink=zeroInkSub.subWeapon().number("inkCost");
+    WeaponRunner zeroInkSubRunner(zeroInkSub);
+    zeroInkSubRunner.tick(1./60,false,false,true,false);
+    zeroInkSubRunner.tick(1./60,false,false,false,true);
+    require(zeroInkSub.state.ink==0.0,
+            "A sub deployment with exactly enough ink must consume it to zero");
+    require(std::any_of(zeroInkSub.combatWorld().devices().begin(),zeroInkSub.combatWorld().devices().end(),[](const auto& device) {
+                return device.kind=="bomb";
+            }),
+            "A sub deployment with exactly enough ink must still deploy successfully");
+    require(std::none_of(zeroInkSub.combatWorld().hudEvents().begin(),zeroInkSub.combatWorld().hudEvents().end(),[](const auto& e) {
+                return e.kind==CombatHudEvent::Kind::Denied;
+            }),
+            "A successful sub deployment that leaves zero ink must not record a denial");
+
+    PlayerSimulation blockedSub(stage,geometry,paint);
+    blockedSub.setLoadout("shooter","torpedo");
+    blockedSub.combatWorld().deploy(blockedSub,"torpedo");
+    require(!blockedSub.combatWorld().canDeploy(blockedSub,"torpedo"),
+            "The blocked-sub denial fixture must begin with a live torpedo");
+    WeaponRunner blockedSubRunner(blockedSub);
+    blockedSubRunner.tick(1./60,false,false,true,false);
+    blockedSubRunner.tick(1./60,false,false,false,true);
+    const auto& blockedEvents=blockedSub.combatWorld().hudEvents();
+    require(std::count_if(blockedEvents.begin(),blockedEvents.end(),[](const auto& e) {
+                return e.kind==CombatHudEvent::Kind::Denied && e.source=="torpedo" && e.damage==0.0;
+            })==1,
+            "A blocked sub release must record exactly one non-ink denial");
+
+    PlayerSimulation deniedSpecial(stage,geometry,paint);
+    deniedSpecial.input.special=true;
+    deniedSpecial.tick(1./60);
+    require(std::count_if(deniedSpecial.combatWorld().hudEvents().begin(),deniedSpecial.combatWorld().hudEvents().end(),[&](const auto& e) {
+                return e.kind==CombatHudEvent::Kind::Denied && e.source==deniedSpecial.specialId() && e.damage==0.0;
+            })==1,
+            "An insufficient special activation press must record one denial");
 
     PlayerSimulation shaker(stage,geometry,paint);
     shaker.setLoadout("shooter","shaker");

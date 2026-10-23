@@ -1,6 +1,8 @@
 #include "GameUi.hpp"
 #include "InkTankElement.hpp"
 #include "WeaponReticleElement.hpp"
+#include "SpecialGaugeElement.hpp"
+#include "BattleFeedbackElement.hpp"
 #include "RmlRenderer.hpp"
 #include "../game/ArsenalData.hpp"
 #include "../game/MatchSimulation.hpp"
@@ -97,6 +99,9 @@ struct GameUi::Impl : Rml::EventListener {
     RmlRenderer renderer;
     Rml::ElementInstancerGeneric<InkTankElement> inkTankInstancer;
     Rml::ElementInstancerGeneric<WeaponReticleElement> reticleInstancer;
+    Rml::ElementInstancerGeneric<SpecialGaugeElement> specialGaugeInstancer;
+    Rml::ElementInstancerGeneric<BattleFeedbackElement> feedbackInstancer;
+    Rml::ElementInstancerGeneric<HudRingElement> ringInstancer;
     Rml::Context* context=nullptr;
     Rml::ElementDocument *menu=nullptr,*hud=nullptr;
     UiSetup selection;
@@ -154,6 +159,9 @@ struct GameUi::Impl : Rml::EventListener {
         try{
             Rml::Factory::RegisterElementInstancer("ink-tank",&inkTankInstancer);
             Rml::Factory::RegisterElementInstancer("weapon-reticle",&reticleInstancer);
+            Rml::Factory::RegisterElementInstancer("special-gauge",&specialGaugeInstancer);
+            Rml::Factory::RegisterElementInstancer("battle-feedback",&feedbackInstancer);
+            Rml::Factory::RegisterElementInstancer("hud-ring",&ringInstancer);
             if(!Rml::LoadFontFace((assets/"fonts/Inter.ttf").string(),false,Rml::Style::FontWeight::Normal)||
                !Rml::LoadFontFace((assets/"fonts/Inter.ttf").string(),false,Rml::Style::FontWeight::Bold)||
                !Rml::LoadFontFace((assets/"fonts/NotoSansTC.ttf").string(),true,Rml::Style::FontWeight::Normal)||
@@ -751,7 +759,7 @@ struct GameUi::Impl : Rml::EventListener {
         const auto rgb=std::stoul(std::string(hex.substr(1)),nullptr,16);
         InkTankFrame frame;frame.ink=state.ink;frame.subCost=subCost;frame.low=low;frame.aiming=combat.subAim;
         frame.reducedMotion=player.settings.reducedMotion;frame.yaw=actor.input.aimYaw;frame.vx=state.vel.x;frame.vz=state.vel.z;frame.dt=dt;
-        frame.color=Rml::Colourb((rgb>>16)&255,(rgb>>8)&255,rgb&255,255);tank->Update(frame);
+        frame.color=Rml::Colourb((rgb>>16)&255,(rgb>>8)&255,rgb&255,255);if(match.world().time()<battle.emptyUntil)frame.color=Rml::Colourb(255,70,88,255);tank->Update(frame);
         auto* reticle=dynamic_cast<WeaponReticleElement*>(Find(hud,"reticle"));
         if(!reticle)throw std::runtime_error("Weapon reticle element was not registered");
         WeaponReticleFrame aim;aim.weapon=kind;aim.pose=combat;aim.dt=dt;aim.shotsFired=actor.shotsFired();
@@ -779,7 +787,7 @@ struct GameUi::Impl : Rml::EventListener {
                 const auto label=EquipmentLabel(EquipmentCategory::Main,actor.mainId());
                 markup+="<div id=\"squad-player-"+std::to_string(i)+"\" class=\"squad-player"+std::string(actor.state.alive?"":" dead")+(ready?" ready":"")+(actor.isLocal()?" self":"")+"\" title=\""+Escape(entry.name+" · "+std::string(label)+" · "+status)+"\" style=\"background-color:"+std::string(actor.state.alive?palette[actor.team()]:"#403c4a")+";\">";
                 markup+="<img class=\"squad-weapon\" src=\"weapons/"+std::string(actor.weapon().kind)+".png\" /><i class=\"squad-cross-a\"></i><i class=\"squad-cross-b\"></i>";
-                markup+="<span class=\"squad-state\">"+(actor.state.alive?(ready?std::string("就緒"):std::string()):actor.canRespawn()?Integer(std::ceil(actor.state.respawnTimer)):std::string("退場"))+"</span><span class=\"squad-self\">你</span></div>";
+                markup+="<hud-ring id=\"squad-ring-"+std::to_string(i)+"\" class=\"squad-ring\"></hud-ring><span class=\"squad-state\">"+(actor.state.alive?(ready?std::string("就緒"):std::string()):actor.canRespawn()?Integer(std::ceil(actor.state.respawnTimer)):std::string("退場"))+"</span><span class=\"squad-self\">你</span></div>";
             }
             const char* id=side==0?"squad-a":"squad-b";
             const auto key=std::string("hud/")+id;
@@ -878,6 +886,7 @@ struct GameUi::Impl : Rml::EventListener {
             if(const auto* boss=match.boss())rows+="<td>"+Integer(boss->squadDamage()[i])+"</td><td>"+std::to_string(boss->squadWeakHits()[i])+"</td><td>"+std::to_string(boss->squadSplats()[i])+"</td>";rows+="</tr>";}
         const auto key="hud/results-table";if(textCache[key]!=rows){Find(hud,"results-table")->SetInnerRML(rows);textCache[key]=rows;}
     }
+    #include "BattleHud.inc"
     void RenderHudData(const StageData& stage,const FacePaint& paint,MatchSimulation& match,bool paused,bool nativeApp,bool practice){
         const bool results=match.phase()==MatchPhase::Results;
         const bool onlineMatch=online.phase==network::RoomPhase::Match||online.phase==network::RoomPhase::Starting;
@@ -898,6 +907,7 @@ struct GameUi::Impl : Rml::EventListener {
         Text(hud,"hp",Integer(state.hp));Text(hud,"ink",Integer(state.ink));Text(hud,"special-status",state.specialCharge>=cost?"特殊技能就緒  F / Q":Integer(state.specialCharge)+" / "+Integer(cost));
         Find(hud,"special-fill")->SetProperty("width",Integer(std::clamp(state.specialCharge/cost,0.,1.)*100)+"%");Find(hud,"special-meter")->SetClass("ready",state.specialCharge>=cost);
         UpdateInkGauge(match,paused,results);
+        UpdateBattleHud(match,paused,results,practice);
         UpdateAllyMarkers(match,paused||results||jumpMapOpen||hudOverlay||practiceGear);
         Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
         Text(hud,"jump-map-help",state.alive?"按 1–3 選隊友　4 回生點　5–0 選隊伍訊標":"復活規劃：按數字選擇隊友或隊伍訊標，4 清除規劃");

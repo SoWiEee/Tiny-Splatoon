@@ -144,7 +144,7 @@ private:
     void railFeet(double lo, double hi);
     void roofSlide(const BlockData& block, double dt);
     void surface();
-    void splat(bool water=false);
+    void splat(bool water=false, PlayerSimulation* attacker=nullptr, const std::string& source="environment");
     bool damageFromCombat(double amount, PlayerSimulation* attacker, const std::string& source);
     void finishFrame(double dt);
     void triggerPose(CharacterTrigger event) { if (poseTriggerSink_) poseTriggerSink_(event); if(networkPoseTriggerSink_)networkPoseTriggerSink_(event); }

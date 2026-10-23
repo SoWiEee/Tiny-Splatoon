@@ -117,6 +117,21 @@ struct WorldVisualEvent {
     std::uint32_t victimNid = std::numeric_limits<std::uint32_t>::max();
 };
 
+struct CombatHudEvent {
+    enum class Kind { Hit, Splat, Denied };
+    std::uint64_t serial = 0;
+    double time = 0.0;
+    Kind kind = Kind::Hit;
+    PlayerSimulation* attacker = nullptr;
+    PlayerSimulation* victim = nullptr;
+    std::uint32_t attackerNid = std::numeric_limits<std::uint32_t>::max();
+    std::uint32_t victimNid = std::numeric_limits<std::uint32_t>::max();
+    int attackerTeam = -1, victimTeam = -1;
+    std::string attackerWeapon, victimWeapon, source;
+    glm::dvec3 attackerPos{0.0}, victimPos{0.0};
+    double damage = 0.0; // Applied HP loss on Hit; Denied uses 1 for low ink, 0 otherwise.
+};
+
 // Small owner-routed gameplay effects applied to an actor by another actor or world object.
 struct NetworkActorEffect {
     double poison = 0.0;
@@ -185,6 +200,11 @@ public:
     double time() const { return time_; }
     std::vector<WorldObjectView> visualObjects() const;
     std::vector<WorldVisualEvent> takeVisualEvents();
+    const std::vector<CombatHudEvent>& hudEvents() const { return hudEvents_; }
+    std::uint64_t hudEventEpoch() const { return hudEventEpoch_; }
+    void recordHudDenial(PlayerSimulation& actor, const std::string& source, bool lowInk);
+    void recordRemoteHudEvent(CombatHudEvent::Kind kind, PlayerSimulation* attacker, PlayerSimulation& victim,
+                             double damage, const std::string& source);
     void emitVisual(WorldVisualEvent event);
 private:
     friend class WorldSpecials;
@@ -203,6 +223,8 @@ private:
     void updateDevices(double dt);
     void explodeDevice(CombatDevice& device, PlayerSimulation* direct = nullptr);
     void paintDevice(CombatDevice& device, glm::dvec3 at, double radius);
+    void recordHudEvent(CombatHudEvent::Kind kind, PlayerSimulation* attacker, PlayerSimulation& victim,
+                        double damage, const std::string& source, bool broadcast);
     const StageData& stage_;
     const StageGeometry& geometry_;
     FacePaint& paint_;
@@ -222,6 +244,8 @@ private:
     double time_ = 0.0;
     bool ticking_ = false;
     std::vector<WorldVisualEvent> visualEvents_;
+    std::vector<CombatHudEvent> hudEvents_;
+    std::uint64_t hudEventSerial_ = 0, hudEventEpoch_ = 0;
     std::function<bool(PlayerSimulation&,PlayerSimulation&,double,const std::string&)> networkHitForwarder_;
     std::function<void(std::uint32_t,std::uint64_t,double,int)> networkDeviceHitForwarder_;
     std::function<void(PlayerSimulation&,PlayerSimulation&,const NetworkActorEffect&)> networkActorEffectForwarder_;
