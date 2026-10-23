@@ -1,4 +1,5 @@
 #include "BossRenderer.hpp"
+#include "TeamPalette.hpp"
 #include "BossPose.hpp"
 #include "BossSimulation.hpp"
 #include "StageGeometry.hpp"
@@ -129,6 +130,8 @@ struct BossRenderer::State {
             shader.uniform("boneTexture",7);shader.uniform("bindMatrix",identityMatrix);shader.uniform("bindMatrixInverse",identityMatrix);
             shader.uniform("dfgLUT",6);shader.uniform("uStencil",8);
             for(const auto& [name,values]:pose.materialUniforms())shader.uniform(name,values);
+            shader.uniform("uInk",{InkColors[1].r,InkColors[1].g,InkColors[1].b});
+            shader.uniform("uWeak",{InkColors[0].r,InkColors[0].g,InkColors[0].b});
             glBindVertexArray(mesh.vao);glDrawElements(GL_TRIANGLES,mesh.count,GL_UNSIGNED_INT,nullptr);
         }
     }

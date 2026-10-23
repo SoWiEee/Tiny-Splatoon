@@ -24,8 +24,11 @@ public:
 
 private:
     struct Actor;
+    struct Stage;
+    std::filesystem::path directory_;
     CharacterArt art_;
     std::vector<std::unique_ptr<Actor>> actors_;
+    std::unique_ptr<Stage> stage_;
 };
 
 } // namespace restoration

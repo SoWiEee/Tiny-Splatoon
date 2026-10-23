@@ -132,7 +132,12 @@ struct CharacterPoseFrame {
     std::array<glm::dmat4, CharacterBoneCount> skinMatrices;
     std::vector<CharacterPartPose> parts;
     CharacterMaterialState material;
-    glm::dvec3 muzzle{0.0}, muzzleLeft{0.0}, head{0.0};
+    glm::dvec3 muzzle{0.0}, muzzleLeft{0.0}, aimMuzzle{0.0}, head{0.0};
+    double aimReady=1.0;
+    glm::dvec3 shotMuzzle(int side) const {
+        if(side>0)return muzzleLeft;
+        return aimReady<0.98?muzzle+(aimMuzzle-muzzle)*(1.0-aimReady):muzzle;
+    }
     glm::dmat4 subPropWorld{1.0};
     glm::dvec3 subNozzle{0.0},subNozzleDirection{0,1,0};
     double shakerKick=0.0;

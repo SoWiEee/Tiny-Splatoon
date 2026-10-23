@@ -2,6 +2,8 @@
 
 #include <RmlUi/Core/RenderInterface.h>
 
+#include <glad/glad.h>
+
 #include <memory>
 
 namespace restoration {
@@ -27,9 +29,12 @@ public:
     Rml::TextureHandle GenerateTexture(Rml::Span<const Rml::byte> source,
                                        Rml::Vector2i sourceDimensions) override;
     void ReleaseTexture(Rml::TextureHandle texture) override;
+    void SetNativeMapTexture(GLuint texture);
 
     void EnableScissorRegion(bool enable) override;
     void SetScissorRegion(Rml::Rectanglei region) override;
+    void EnableClipMask(bool enable) override;
+    void RenderToClipMask(Rml::ClipMaskOperation operation, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
     void SetTransform(const Rml::Matrix4f* transform) override;
 
 private:

@@ -2592,7 +2592,7 @@ struct CharacterPose::State {
         cacheFoot(rightFoot,1);
     }
 
-    void updateParts() {
+    void updateParts(double aimPitch) {
         frame.parts.clear();
         const auto append = [&](const CharacterModel& model, bool body) {
             for(const auto& node:model.nodes) {
@@ -2678,6 +2678,18 @@ struct CharacterPose::State {
             return result;
         };
         const auto kidWorld=frame.root.matrix()*frame.model.matrix()*frame.kid.matrix();
+        const auto& weaponRig=GetCharacterWeaponRig(weapon);
+        const auto& hold=GetCharacterWeaponHold(weapon);
+        frame.aimReady=form!=CharacterForm::Kid||hold.animKind=="roller"?1.0:aimWeight;
+        if(form==CharacterForm::Kid&&hold.animKind!="roller"){
+            const double pitch=clamp(aimPitch,-1.0,1.15);
+            const double posePitch=clamp(pitch,-0.8,1.0);
+            const auto anchor=glm::angleAxis(-posePitch,glm::dvec3(1,0,0))*hold.aim.p+CharacterAimPivot;
+            const auto rotation=glm::angleAxis(hold.aim.r.y,glm::dvec3(0,1,0))*
+                glm::angleAxis(hold.aim.r.x-pitch,glm::dvec3(1,0,0))*
+                glm::angleAxis(hold.aim.r.z,glm::dvec3(0,0,1));
+            frame.aimMuzzle=glm::dvec3(kidWorld*glm::dvec4(rotation*weaponRig.muzzle+anchor,1.0));
+        }
         if(const auto prop=modelWorld(subModel,"sub/group")){
             frame.subPropWorld=kidWorld*(*prop);
             const double az=.95;const glm::dvec3 n=glm::normalize(glm::dvec3(std::sin(az)*.72,.7,std::cos(az)*.72));
@@ -2697,6 +2709,7 @@ struct CharacterPose::State {
         } else frame.head=glm::dvec3(kidWorld[3]);
         if(form==CharacterForm::Kid&&muzzle) frame.muzzle=glm::dvec3(kidWorld*(*muzzle)[3]);
         else frame.muzzle=frame.head;
+        if(form!=CharacterForm::Kid||hold.animKind=="roller")frame.aimMuzzle=frame.muzzle;
         if(form==CharacterForm::Kid&&leftMuzzle) frame.muzzleLeft=glm::dvec3(kidWorld*(*leftMuzzle)[3]);
         else frame.muzzleLeft=frame.muzzle;
     }
@@ -3092,7 +3105,7 @@ const CharacterPoseFrame& CharacterPose::update(double dt, const CharacterAnimSt
             s.updateSquid(dt,input,scene);
         }
         else { s.squidInitialized=false; f.squid.visible=false; }
-        s.updateParts(); s.updateMaterials(input);
+        s.updateParts(input.aimPitch); s.updateMaterials(input);
         return f;
     }
 
@@ -3334,7 +3347,7 @@ const CharacterPoseFrame& CharacterPose::update(double dt, const CharacterAnimSt
     }
     s.updateBones(scene.lifeLevel);
     for(std::size_t i=0;i<f.channels.size();++i) f.channels[i]=static_cast<float>(s.p[i]);
-    s.updateParts();
+    s.updateParts(input.aimPitch);
     s.updateMaterials(input);
     return f;
 }

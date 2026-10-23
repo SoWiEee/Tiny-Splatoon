@@ -1,5 +1,5 @@
 <rml>
-<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /></head>
+<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /><link type="text/rcss" href="menu-reference.rcss" /></head>
 <body id="menu" class="menu">
   <div class="menu-shell">
     <div class="menu-left">
@@ -78,16 +78,27 @@
             </div>
           </div>
           <div id="panel-loadout" class="panel hidden">
-            <h1>裝備</h1><p class="intro">主要武器會套用建議搭配；次要武器與特殊武器仍可分別調整。</p>
-            <div class="field"><label for="main">主要武器</label><select id="main"></select></div>
-            <div class="field"><label for="sub">次要武器</label><select id="sub"></select></div>
-            <div class="field"><label for="special">特殊武器</label><select id="special"></select></div>
-            <div class="stats-heading">能力</div>
-            <div class="stat-row"><span>射程</span><div class="stat-track"><div id="stat-range"></div></div><b id="stat-range-value"></b></div>
-            <div class="stat-row"><span>傷害</span><div class="stat-track"><div id="stat-damage"></div></div><b id="stat-damage-value"></b></div>
-            <div class="stat-row"><span>連射</span><div class="stat-track"><div id="stat-rate"></div></div><b id="stat-rate-value"></b></div>
-            <div class="stat-row"><span>機動</span><div class="stat-track"><div id="stat-mobility"></div></div><b id="stat-mobility-value"></b></div>
-            <div class="stat-row"><span>塗地</span><div class="stat-track"><div id="stat-paint"></div></div><b id="stat-paint-value"></b></div>
+            <h1>裝備</h1><p class="intro">選擇主要武器，並瀏覽完整的次要與特殊武器搭配。</p>
+            <div id="loadout-form-controls" class="hidden" aria-hidden="true"><select id="main"></select><select id="sub"></select><select id="special"></select></div>
+            <div class="loadout-heading"><h2>主要武器</h2><span id="weapon-count">1 / 12</span></div>
+            <div id="weapon-cards" class="weapon-cards" role="group" aria-label="主要武器"></div>
+            <div id="loadout-detail" class="loadout-detail" aria-live="polite">
+              <div class="weapon-detail">
+                <div class="weapon-detail-heading"><h2 id="weapon-name"></h2><span id="weapon-equipped" class="equipped-badge">✓ 已裝備</span></div>
+                <p id="weapon-blurb" class="weapon-blurb"></p>
+                <div class="weapon-stats"><div class="stats-heading">能力</div>
+                  <div class="stat-row"><span>射程</span><div class="stat-track"><div id="stat-range"></div></div><b id="stat-range-value"></b></div>
+                  <div class="stat-row"><span>傷害</span><div class="stat-track"><div id="stat-damage"></div></div><b id="stat-damage-value"></b></div>
+                  <div class="stat-row"><span>連射</span><div class="stat-track"><div id="stat-rate"></div></div><b id="stat-rate-value"></b></div>
+                  <div class="stat-row"><span>機動</span><div class="stat-track"><div id="stat-mobility"></div></div><b id="stat-mobility-value"></b></div>
+                  <div class="stat-row"><span>塗地</span><div class="stat-track"><div id="stat-paint"></div></div><b id="stat-paint-value"></b></div>
+                </div>
+              </div>
+              <div class="loadout-kits">
+                <div class="kit-card"><img id="sub-icon" class="kit-icon" src="equipment/sub-bomb.png" alt="" /><div class="kit-copy"><small>次要武器</small><h3 id="sub-name"></h3><p id="sub-blurb"></p><span id="sub-ink-cost" class="kit-cost"></span></div><div class="kit-actions"><button id="sub-prev" aria-label="上一個次要武器">上一個</button><button id="sub-next" aria-label="下一個次要武器">下一個</button></div></div>
+                <div class="kit-card"><img id="special-icon" class="kit-icon" src="equipment/special-barrage.png" alt="" /><div class="kit-copy"><small>特殊武器</small><h3 id="special-name"></h3><p id="special-blurb"></p><span id="special-cost" class="kit-cost"></span></div><div class="kit-actions"><button id="special-prev" aria-label="上一個特殊武器">上一個</button><button id="special-next" aria-label="下一個特殊武器">下一個</button></div></div>
+              </div>
+            </div>
             <button id="loadout-locker" class="secondary">調整角色外觀</button>
           </div>
           <div id="panel-locker" class="panel hidden">
@@ -111,40 +122,62 @@
           <div id="panel-settings" class="panel hidden">
             <h1>設定</h1><p class="intro">控制、畫面、聲音與遊戲偏好會保存在玩家資料中。</p>
             <div id="settings-save-error" class="save-error hidden" role="status" aria-live="polite"></div>
-            <div class="settings-group"><h2>操作</h2>
-              <div class="setting-row"><label for="sensitivity">滑鼠靈敏度</label><input id="sensitivity" type="range" min="0.2" max="3" step="0.05" /><span id="sensitivity-value"></span></div>
-              <div class="setting-row"><label for="pad-sensitivity">手把靈敏度</label><input id="pad-sensitivity" type="range" min="0.2" max="3" step="0.05" /><span id="pad-sensitivity-value"></span></div>
-              <div class="setting-check"><input id="invert-y" type="checkbox" /><label for="invert-y">反轉垂直視角</label></div>
-              <div class="setting-row"><label for="aim-assist">手把輔助瞄準</label><input id="aim-assist" type="range" min="0" max="1" step="0.05" /><span id="aim-assist-value"></span></div>
-              <div class="setting-check"><input id="aim-assist-mouse" type="checkbox" /><label for="aim-assist-mouse">滑鼠輔助瞄準</label></div>
-              <div class="setting-row"><label for="touch-controls">觸控操作</label><select id="touch-controls" disabled="disabled"><option value="auto">自動</option><option value="on">開啟</option><option value="off">關閉</option></select></div>
-              <div class="setting-row"><label for="touch-sensitivity">觸控靈敏度</label><input id="touch-sensitivity" type="range" min="0.2" max="3" step="0.05" disabled="disabled" /><span id="touch-sensitivity-value"></span></div>
-              <div class="setting-check"><input id="touch-invert-y" type="checkbox" disabled="disabled" /><label for="touch-invert-y">反轉觸控垂直視角</label></div>
-              <p class="muted capability-note">支援鍵盤、滑鼠與相容手把；目前尚未提供觸控操作與手把震動。</p>
-            </div>
-            <div class="settings-group"><h2>畫面</h2>
-              <div class="setting-row"><label for="graphics-preset">畫質</label><select id="graphics-preset"><option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="custom">自訂</option></select></div>
-              <div class="setting-row"><label for="fov">視野</label><input id="fov" type="range" min="65" max="100" step="1" /><span id="fov-value"></span></div>
-              <div class="setting-check"><input id="graphics-shadows" type="checkbox" /><label for="graphics-shadows">陰影</label></div>
-              <div class="setting-check"><input id="graphics-reflections" type="checkbox" /><label for="graphics-reflections">反射</label><input id="graphics-post" type="checkbox" /><label for="graphics-post">後製效果</label><input id="bloom" type="checkbox" /><label for="bloom">光暈</label></div>
-              <div class="setting-check"><input id="show-fps" type="checkbox" /><label for="show-fps">顯示 FPS</label><input id="fullscreen" type="checkbox" /><label for="fullscreen">全螢幕偏好</label></div>
-              <div class="setting-row"><label for="fps-cap">影格上限</label><select id="fps-cap"><option value="0">跟隨螢幕更新率</option><option value="60">60</option><option value="30">30</option></select></div>
-            </div>
-            <div class="settings-group"><h2>聲音</h2>
-              <div class="setting-row"><label for="master">主音量</label><input id="master" type="range" min="0" max="100" step="5" /><span id="master-value"></span></div>
-              <div class="setting-row"><label for="music">音樂</label><input id="music" type="range" min="0" max="100" step="5" /><span id="music-value"></span></div>
-              <div class="setting-row"><label for="sfx">音效</label><input id="sfx" type="range" min="0" max="100" step="5" /><span id="sfx-value"></span></div>
-            </div>
-            <div class="settings-group"><h2>遊戲</h2>
-              <div class="setting-row"><label for="camera-shake">鏡頭震動</label><input id="camera-shake" type="range" min="0" max="1" step="0.05" /><span id="camera-shake-value"></span></div>
-              <div class="setting-row"><label for="rumble">手把震動</label><input id="rumble" type="range" min="0" max="1" step="0.05" disabled="disabled" /><span id="rumble-value"></span></div>
-              <div class="setting-check"><input id="colorblind" type="checkbox" /><label for="colorblind">色盲安全隊伍顏色</label><input id="minimap" type="checkbox" /><label for="minimap">小地圖</label></div>
-              <div class="setting-row"><label for="palette">隊伍色盤</label><select id="palette"><option value="0">橘紅・鈷藍</option><option value="1">泡泡糖・薄荷</option><option value="2">檸檬・葡萄</option><option value="3">水藍・櫻桃</option><option value="4">萊姆・洋紅</option></select></div>
-              <div class="setting-row"><label for="default-mode">預設模式</label><select id="default-mode"><option value="turf">塗地對戰</option><option value="zones">區域爭奪</option><option value="boss">破艦巨獸協力</option></select></div>
-              <div class="setting-row"><label for="default-difficulty">預設難度</label><select id="default-difficulty"><option value="easy">輕鬆</option><option value="normal">標準</option><option value="hard">挑戰</option></select></div>
-              <div class="setting-row"><label for="match-length">塗地預設時長</label><select id="match-length"><option value="90">1.5 分鐘</option><option value="180">3 分鐘</option></select></div>
-              <div class="setting-row"><label for="time-of-day">預設時段</label><select id="time-of-day"><option value="day">白天</option><option value="dusk">黃昏</option></select></div>
-              <div class="setting-check"><input id="reduced-motion" type="checkbox" /><label for="reduced-motion">減少畫面動態</label></div>
+            <div class="settings-panel">
+              <div class="settings-tabs" role="tablist" aria-label="設定分類">
+                <button id="settings-tab-controls" class="settings-tab selected" role="tab" aria-selected="true" aria-controls="settings-controls" tabindex="0">操作</button>
+                <button id="settings-tab-video" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-video" tabindex="-1">畫面</button>
+                <button id="settings-tab-audio" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-audio" tabindex="-1">聲音</button>
+                <button id="settings-tab-gameplay" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-gameplay" tabindex="-1">遊戲</button>
+              </div>
+              <div id="settings-scroll" class="settings-scroll" tabindex="0" aria-label="設定選項">
+                <section id="settings-controls" class="settings-section" role="tabpanel" aria-labelledby="settings-tab-controls" aria-hidden="false">
+                  <div class="settings-group"><h2>瞄準與操作</h2>
+                    <div class="setting-row"><label for="sensitivity">滑鼠靈敏度</label><input id="sensitivity" type="range" min="0.2" max="3" step="0.05" /><span id="sensitivity-value"></span></div>
+                    <div class="setting-row"><label for="pad-sensitivity">手把靈敏度</label><input id="pad-sensitivity" type="range" min="0.2" max="3" step="0.05" /><span id="pad-sensitivity-value"></span></div>
+                    <div class="setting-check"><input id="invert-y" type="checkbox" /><label for="invert-y">反轉垂直視角</label></div>
+                    <div class="setting-row"><label for="aim-assist">手把輔助瞄準</label><input id="aim-assist" type="range" min="0" max="1" step="0.05" /><span id="aim-assist-value"></span></div>
+                    <div class="setting-check"><input id="aim-assist-mouse" type="checkbox" /><label for="aim-assist-mouse">滑鼠輔助瞄準</label></div>
+                    <div class="setting-row"><label for="touch-controls">觸控操作</label><select id="touch-controls" disabled="disabled"><option value="auto">自動</option><option value="on">開啟</option><option value="off">關閉</option></select></div>
+                    <div class="setting-row"><label for="touch-sensitivity">觸控靈敏度</label><input id="touch-sensitivity" type="range" min="0.2" max="3" step="0.05" disabled="disabled" /><span id="touch-sensitivity-value"></span></div>
+                    <div class="setting-check"><input id="touch-invert-y" type="checkbox" disabled="disabled" /><label for="touch-invert-y">反轉觸控垂直視角</label></div>
+                    <p class="muted capability-note">支援鍵盤、滑鼠與相容手把；目前尚未提供觸控操作與手把震動。</p>
+                  </div>
+                </section>
+                <section id="settings-video" class="settings-section hidden" role="tabpanel" aria-labelledby="settings-tab-video" aria-hidden="true">
+                  <div class="settings-group"><h2>畫面與效能</h2>
+                    <div class="setting-row"><label for="graphics-preset">畫質</label><select id="graphics-preset"><option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="custom">自訂</option></select></div>
+                    <div class="setting-row"><label for="fov">視野</label><input id="fov" type="range" min="65" max="100" step="1" /><span id="fov-value"></span></div>
+                    <div class="setting-check"><input id="graphics-shadows" type="checkbox" /><label for="graphics-shadows">陰影</label></div>
+                    <div class="setting-check"><input id="graphics-reflections" type="checkbox" /><label for="graphics-reflections">反射</label></div>
+                    <div class="setting-check"><input id="graphics-post" type="checkbox" /><label for="graphics-post">後製效果</label></div>
+                    <div class="setting-check"><input id="bloom" type="checkbox" /><label for="bloom">光暈</label></div>
+                    <div class="setting-check"><input id="show-fps" type="checkbox" /><label for="show-fps">顯示 FPS</label></div>
+                    <div class="setting-check"><input id="fullscreen" type="checkbox" /><label for="fullscreen">全螢幕偏好</label></div>
+                    <div class="setting-row"><label for="fps-cap">影格上限</label><select id="fps-cap"><option value="0">跟隨螢幕更新率</option><option value="60">60</option><option value="30">30</option></select></div>
+                  </div>
+                </section>
+                <section id="settings-audio" class="settings-section hidden" role="tabpanel" aria-labelledby="settings-tab-audio" aria-hidden="true">
+                  <div class="settings-group"><h2>音量</h2>
+                    <div class="setting-row"><label for="master">主音量</label><input id="master" type="range" min="0" max="100" step="5" /><span id="master-value"></span></div>
+                    <div class="setting-row"><label for="music">音樂</label><input id="music" type="range" min="0" max="100" step="5" /><span id="music-value"></span></div>
+                    <div class="setting-row"><label for="sfx">音效</label><input id="sfx" type="range" min="0" max="100" step="5" /><span id="sfx-value"></span></div>
+                  </div>
+                </section>
+                <section id="settings-gameplay" class="settings-section hidden" role="tabpanel" aria-labelledby="settings-tab-gameplay" aria-hidden="true">
+                  <div class="settings-group"><h2>遊戲偏好</h2>
+                    <div class="setting-row"><label for="camera-shake">鏡頭震動</label><input id="camera-shake" type="range" min="0" max="1" step="0.05" /><span id="camera-shake-value"></span></div>
+                    <div class="setting-row"><label for="rumble">手把震動</label><input id="rumble" type="range" min="0" max="1" step="0.05" disabled="disabled" /><span id="rumble-value"></span></div>
+                    <div class="setting-check"><input id="colorblind" type="checkbox" /><label for="colorblind">色盲安全隊伍顏色</label></div>
+                    <div class="setting-check"><input id="minimap" type="checkbox" /><label for="minimap">小地圖</label></div>
+                    <div class="setting-row"><label for="palette">隊伍色盤</label><select id="palette"><option value="0">橘紅・鈷藍</option><option value="1">泡泡糖・薄荷</option><option value="2">檸檬・葡萄</option><option value="3">水藍・櫻桃</option><option value="4">萊姆・洋紅</option></select></div>
+                    <div class="setting-row"><label for="default-mode">預設模式</label><select id="default-mode"><option value="turf">塗地對戰</option><option value="zones">區域爭奪</option><option value="boss">破艦巨獸協力</option></select></div>
+                    <div class="setting-row"><label for="default-difficulty">預設難度</label><select id="default-difficulty"><option value="easy">輕鬆</option><option value="normal">標準</option><option value="hard">挑戰</option></select></div>
+                    <div class="setting-row"><label for="match-length">塗地預設時長</label><select id="match-length"><option value="90">1.5 分鐘</option><option value="180">3 分鐘</option></select></div>
+                    <div class="setting-row"><label for="time-of-day">預設時段</label><select id="time-of-day"><option value="day">白天</option><option value="dusk">黃昏</option></select></div>
+                    <div class="setting-check"><input id="reduced-motion" type="checkbox" /><label for="reduced-motion">減少畫面動態</label></div>
+                  </div>
+                </section>
+              </div>
             </div>
           </div>
           <div id="panel-howto" class="panel hidden">

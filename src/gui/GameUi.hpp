@@ -34,6 +34,8 @@ struct UiJumpMapTarget {
     double x=0.0,z=0.0;
     std::string label;
     bool available=false;
+    double y=0.0;
+    std::string weapon;
 };
 struct UiOnlineRequest {
     enum class Kind { Create, Join, Leave, Ready, Team, Settings, Start, Emote, LocalService };
@@ -69,6 +71,7 @@ public:
     void SetVolumeSink(std::function<void(float,float,float)> sink);
     void SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel={});
     void SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY=1.78f);
+    void SetNativeMap(unsigned int texture,const glm::mat4& viewProjection);
     int TakeJumpMapSelection();
     void ShowOnline();
     void SetOnlineState(const network::RoomView& view);

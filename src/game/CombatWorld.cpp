@@ -162,6 +162,7 @@ void CombatWorld::recordHudEvent(CombatHudEvent::Kind kind, PlayerSimulation* at
     event.victim = &victim;
     event.victimNid = victim.networkNid();
     event.victimTeam = victim.team();
+    event.victimTrackedTeam = victim.state.track>0 ? victim.state.trackTeam : -1;
     event.victimWeapon = victim.mainId();
     event.victimPos = victim.state.pos;
     event.damage = damage;

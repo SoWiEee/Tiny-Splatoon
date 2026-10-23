@@ -38,6 +38,7 @@ int main(){
         Check(profile.settings.invertY&&profile.settings.fov==91&&profile.settings.palette==4&&profile.settings.reducedMotion,"player settings persistence failed");
         Check(profile.settings.bossLength==300&&profile.settings.lastMode=="boss","Boss preferences did not survive reload");
         Check(profile.settings.graphics.preset==GraphicsPreset::Custom&&profile.settings.graphics.renderScale==.72f&&profile.settings.graphics.shadowMapSize==4096&&profile.settings.graphics.reflections,"graphics settings persistence failed");
+        Check(ProfilePaletteColors(1)[0]=="#ff3f9e"&&ProfilePaletteColors(1)[1]=="#18d48c"&&ProfilePaletteColors(1,false,true)[1]=="#2f5bff","Pink/green palette and Boss blue ink must remain distinct");
         Check(ProfilePaletteColors(4)[0]=="#a6f01a"&&ProfilePaletteColors(2,true)[1]=="#2a52ff","source team palette colors changed");
 
         Write(path,R"({"name":"","weapon":"splatling","level":-1,"settings":{"fov":200,"fpsCap":144,"quality":"potato"}})");

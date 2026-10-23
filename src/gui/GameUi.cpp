@@ -9,6 +9,7 @@
 #include "../game/PlayerSimulation.hpp"
 #include "../game/ZoneControl.hpp"
 #include "UiText.hpp"
+#include "EquipmentDescriptionZhTw.hpp"
 #include "../world/FacePaint.hpp"
 #include "../world/ReferenceData.hpp"
 #include <RmlUi/Core.h>
@@ -20,8 +21,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <string_view>
@@ -39,6 +42,10 @@ std::string Integer(double n){return std::to_string(static_cast<int>(std::round(
 std::string ZoneCount(double n){return std::to_string(static_cast<int>(std::ceil(std::max(0.0,n)-1e-9)));}
 std::string Percent(double n){char out[32];std::snprintf(out,sizeof(out),"%.1f%%",n*100);return out;}
 std::string Number(double n,int decimals=2){char out[32];std::snprintf(out,sizeof(out),decimals==0?"%.0f":"%.2f",n);return out;}
+std::string DeathMarkIcon(const PlayerProfile& profile,int team){
+    const int palette=profile.settings.colorblind?5:(profile.settings.palette>=0&&profile.settings.palette<5?profile.settings.palette:0);
+    return "markers/death-"+std::to_string(palette)+"-"+std::to_string(team==0?0:1)+".png";
+}
 std::string ZoneReason(std::string_view reason){
     if(reason=="knockout")return "擊倒勝";
     if(reason=="time")return "時間結束";
@@ -138,20 +145,26 @@ struct GameUi::Impl : Rml::EventListener {
     const MatchSimulation* inkMatch=nullptr;
     const PlayerSimulation* inkActor=nullptr;
     glm::mat4 worldView{1.f};
+    glm::mat4 nativeMapView{1.f};
     float projectionY=1.78f;
     glm::dvec3 worldEye{0};
-    bool haveWorldView=false;
+    bool haveWorldView=false,haveNativeMapView=false;
     double nextMinimapUpdate=0;
     int hudFps=0;
     std::string minimapCache;
-    std::string terrainStage;
     std::string stageOptionMode,durationOptionMode;
-    std::vector<unsigned char> terrainCells;
     const ZoneControl* displayedZones=nullptr;
     std::size_t zoneEventCursor=0;
     double zoneCalloutUntil=0.0;
     const MatchSimulation* resultXpMatch=nullptr;
     double resultXpStartedAt=0.0,resultXpNextTick=0.0;
+    bool resultIntro=false,resultSkipped=false,resultDone=false,resultFocused=false;
+    struct DeathMark { glm::dvec3 pos; std::string name; int team=0; double born=0; std::uint64_t serial=0; };
+    const MatchSimulation* deathMatch=nullptr;
+    std::uint64_t deathEpoch=0,deathSeenSerial=0;
+    std::vector<DeathMark> deathMarks;
+    double deathClock=0.0;
+    std::uint64_t deathSerial=0;
 
     Impl(GLFWwindow* value,const std::filesystem::path& assets):window(value),system(value){
         Rml::SetSystemInterface(&system);Rml::SetRenderInterface(&renderer);
@@ -265,9 +278,16 @@ struct GameUi::Impl : Rml::EventListener {
         ControlSync sync(syncingControls);
         RebuildStageOptions();
         auto fillCategory=[&](const char* id,const std::vector<EquipmentData>& rows,EquipmentCategory category){
-            std::string items;for(const auto& row:rows){auto label=EquipmentLabel(category,row.id);if(label.empty())label=row.name;items+="<option value=\""+Escape(std::string(row.id))+"\">"+Escape(std::string(label))+"</option>";}auto* select=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,id));select->RemoveAll();select->SetInnerRML(items);
+            std::string items;for(const auto& row:rows){auto label=EquipmentLabel(category,row.id);if(label.empty())label="未翻譯裝備";items+="<option value=\""+Escape(std::string(row.id))+"\">"+Escape(std::string(label))+"</option>";}auto* select=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,id));select->RemoveAll();select->SetInnerRML(items);
         };
         fillCategory("main",MainEquipment(),EquipmentCategory::Main);fillCategory("sub",SubEquipment(),EquipmentCategory::Sub);fillCategory("special",SpecialEquipment(),EquipmentCategory::Special);
+        std::string weaponCards;
+        for(const auto& row:MainEquipment()){
+            const auto label=EquipmentLabel(EquipmentCategory::Main,row.id);
+            const std::string name=label.empty()?"未翻譯武器":std::string(label);
+            weaponCards+="<button id=\"weapon-card-"+Escape(std::string(row.id))+"\" class=\"weapon-card\" aria-label=\""+Escape(name)+"\" aria-pressed=\"false\"><img src=\"weapons/"+Escape(std::string(row.kind))+".png\" alt=\"\"/><span>"+Escape(name)+"</span></button>";
+        }
+        Find(menu,"weapon-cards")->SetInnerRML(weaponCards);
         std::string presets="<option value=\"custom\">自訂造型</option>";for(std::size_t i=0;i<CharacterPresets.size();++i){const auto& row=CharacterPresets[i];auto label=StyleLabel("preset",static_cast<int>(i));if(label.empty())label=row.name;presets+="<option value=\""+Escape(row.id)+"\">"+Escape(std::string(label))+"</option>";}
         auto* stylePreset=dynamic_cast<Rml::ElementFormControlSelect*>(Find(menu,"style-preset"));stylePreset->RemoveAll();stylePreset->SetInnerRML(presets);
         FillStyleOptions(menu,"style-hair","hair",HairNames);FillStyleOptions(menu,"style-hat","hat",HatNames);FillStyleOptions(menu,"style-skin","skin",SkinNames);
@@ -314,12 +334,53 @@ struct GameUi::Impl : Rml::EventListener {
     void UpdateLoadoutStats(){
         try{
             const auto& main=GetEquipment(EquipmentCategory::Main,player.weapon.empty()?selection.main:player.weapon);
+            const auto& mains=MainEquipment();
+            const auto selected=std::find_if(mains.begin(),mains.end(),[&](const auto& item){return item.id==main.id;});
+            const std::size_t selectedIndex=selected==mains.end()?0:static_cast<std::size_t>(selected-mains.begin());
+            const auto label=[](EquipmentCategory category,const EquipmentData& item){const auto translated=EquipmentLabel(category,item.id);return translated.empty()?std::string("未翻譯裝備"):std::string(translated);};
+            Text(menu,"weapon-count",std::to_string(selectedIndex+1)+" / "+std::to_string(mains.size()));
+            Text(menu,"weapon-name",label(EquipmentCategory::Main,main));
+            Text(menu,"weapon-blurb",std::string(EquipmentDescriptionZhTw(EquipmentCategory::Main,main.id)));
+            for(const auto& item:mains)if(auto* card=menu->GetElementById("weapon-card-"+std::string(item.id))){const bool equipped=item.id==main.id;card->SetClass("selected",equipped);card->SetAttribute("aria-pressed",equipped?"true":"false");}
+            const auto& sub=GetEquipment(EquipmentCategory::Sub,player.sub.empty()?main.sub:player.sub);
+            const auto& special=GetEquipment(EquipmentCategory::Special,player.special.empty()?main.special:player.special);
+            Find(menu,"sub-icon")->SetAttribute("src","equipment/sub-"+std::string(sub.id)+".png");
+            Find(menu,"special-icon")->SetAttribute("src","equipment/special-"+std::string(special.id)+".png");
+            Text(menu,"sub-name",label(EquipmentCategory::Sub,sub));Text(menu,"sub-blurb",std::string(EquipmentDescriptionZhTw(EquipmentCategory::Sub,sub.id)));
+            const double inkCost=sub.number("inkCost",0.0);Text(menu,"sub-ink-cost",inkCost>0?"消耗 "+Integer(inkCost<=1?inkCost*100:inkCost)+"% 墨水":"");
+            Text(menu,"special-name",label(EquipmentCategory::Special,special));Text(menu,"special-blurb",std::string(EquipmentDescriptionZhTw(EquipmentCategory::Special,special.id)));
+            const double specialCost=main.number("specialCost",0.0);Text(menu,"special-cost",specialCost>0?Integer(specialCost)+"p":"");
             const std::array<std::pair<const char*,const char*>,5> stats={{{"range","射程"},{"damage","傷害"},{"rate","連射"},{"mobility","機動"},{"paint","塗地"}}};
             for(const auto& [key,label]:stats){const std::string id="stat-"+std::string(key);const double value=std::clamp(main.number(std::string("stats.")+key,.5),0.,1.);Find(menu,id)->SetProperty("width",Integer(value*100)+"%");Text(menu,id+"-value",Integer(value*100));}
         }catch(...){for(const char* id:{"stat-range","stat-damage","stat-rate","stat-mobility","stat-paint"})Find(menu,id)->SetProperty("width","0%");}
     }
+    void SelectMainWeapon(const std::string& id){
+        player.weapon=id;const auto& row=GetEquipment(EquipmentCategory::Main,id);player.sub=std::string(row.sub);player.special=std::string(row.special);
+        selection.main=id;selection.sub=player.sub;selection.special=player.special;Value("main",id);Value("sub",player.sub);Value("special",player.special);Commit();Play("ui_click");
+    }
+    void CycleLoadoutPart(EquipmentCategory category,int direction){
+        const auto& items=category==EquipmentCategory::Sub?SubEquipment():SpecialEquipment();
+        const std::string current=category==EquipmentCategory::Sub?player.sub:player.special;
+        const auto found=std::find_if(items.begin(),items.end(),[&](const auto& item){return item.id==current;});
+        const int count=static_cast<int>(items.size());
+        const int index=found==items.end()?(direction>0?-1:0):static_cast<int>(found-items.begin());
+        const auto& item=items[static_cast<std::size_t>((index+direction+count)%count)];
+        const std::string id(item.id);
+        if(category==EquipmentCategory::Sub){player.sub=id;selection.sub=id;Value("sub",id);}else{player.special=id;selection.special=id;Value("special",id);}
+        Commit();Play("ui_click");
+    }
+    void SettingsTab(const std::string& tab){
+        if(tab!="controls"&&tab!="video"&&tab!="audio"&&tab!="gameplay")return;
+        for(const char* name:{"controls","video","audio","gameplay"}){
+            const bool selected=tab==name;Hidden(menu,std::string("settings-")+name,!selected);
+            Find(menu,std::string("settings-")+name)->SetAttribute("aria-hidden",selected?"false":"true");
+            auto* button=Find(menu,std::string("settings-tab-")+name);button->SetClass("selected",selected);
+            button->SetAttribute("aria-selected",selected?"true":"false");button->SetAttribute("tabindex",selected?"0":"-1");
+        }
+    }
     void GoTo(UiScreen destination){
         screen=destination;
+        menu->SetClass("with-preview",destination==UiScreen::Loadout||destination==UiScreen::Locker||practiceGear);
         const std::array<std::pair<UiScreen,const char*>,9> panels={{{UiScreen::Title,"title"},{UiScreen::Home,"home"},{UiScreen::Play,"play"},{UiScreen::Online,"online"},{UiScreen::Loadout,"loadout"},{UiScreen::Locker,"locker"},{UiScreen::Settings,"settings"},{UiScreen::HowTo,"howto"},{UiScreen::Credits,"credits"}}};
         for(const auto& [id,name]:panels){Hidden(menu,std::string("panel-")+name,id!=destination);auto* nav=menu->GetElementById(std::string("nav-")+name);if(nav)nav->SetClass("selected",id==destination);}
         Hidden(menu,"navigation",destination==UiScreen::Title);Hidden(menu,"menu-footer",destination==UiScreen::Title);Hidden(menu,"profile-header",destination==UiScreen::Title);
@@ -456,6 +517,14 @@ struct GameUi::Impl : Rml::EventListener {
         auto* target=event.GetTargetElement();if(!target)return;
         auto* element=target;while(element&&!element->GetId().size())element=element->GetParentNode();if(!element)return;
         const std::string id=element->GetId();const auto type=event.GetType();
+        if(type=="keydown"&&id.rfind("settings-tab-",0)==0){
+            const int key=event.GetParameter<int>("key_identifier",0);
+            if(key==Rml::Input::KI_LEFT||key==Rml::Input::KI_RIGHT){
+                const std::array<const char*,4> tabs={"controls","video","audio","gameplay"};
+                auto current=std::find_if(tabs.begin(),tabs.end(),[&](const char* tab){return id==std::string("settings-tab-")+tab;});
+                if(current!=tabs.end()){const int index=static_cast<int>(current-tabs.begin());const int next=(index+(key==Rml::Input::KI_RIGHT?1:3))%4;const std::string selected=tabs[static_cast<std::size_t>(next)];SettingsTab(selected);Find(menu,"settings-tab-"+selected)->Focus();event.StopPropagation();return;}
+            }
+        }
         if(type=="mouseover"||type=="focus"){
             if((element->GetTagName()=="button"||element->GetTagName()=="select")&&hovered!=id){hovered=id;Play("ui_hover");}return;
         }
@@ -484,10 +553,8 @@ struct GameUi::Impl : Rml::EventListener {
                 else if(selection.mode!="zones")player.settings.matchLength=selection.duration;
                 Commit();
             }
-            else if(id=="main"){
-                player.weapon=value;const auto& row=GetEquipment(EquipmentCategory::Main,value);player.sub=std::string(row.sub);player.special=std::string(row.special);
-                selection.main=value;selection.sub=player.sub;selection.special=player.special;Value("sub",selection.sub);Value("special",selection.special);Commit();Play("ui_click");
-            }else if(id=="sub"){player.sub=value;selection.sub=value;Commit();Play("ui_click");}
+            else if(id=="main")SelectMainWeapon(value);
+            else if(id=="sub"){player.sub=value;selection.sub=value;Commit();Play("ui_click");}
             else if(id=="special"){player.special=value;selection.special=value;Commit();Play("ui_click");}
             else if(id.rfind("style-",0)==0)ApplyCharacterControl(id,value);
             else if(id=="graphics-preset"){
@@ -511,7 +578,11 @@ struct GameUi::Impl : Rml::EventListener {
             if(element->HasAttribute("disabled"))return;
             if(id=="online-server-toggle"){onlineServerSettings=!onlineServerSettings;Hidden(menu,"online-server-settings",!onlineServerSettings);}
             else if(id=="online-settings-toggle"){onlineRoomSettings=!onlineRoomSettings;Hidden(menu,"online-room-settings",!onlineRoomSettings);}
-            else if(id=="online-copy"){glfwSetClipboardString(window,online.code.c_str());onlineNoticeUntil=glfwGetTime()+2;Text(menu,"online-status","房碼已複製，可以分享給朋友。");}
+            else if(id=="online-copy"){
+                glfwGetError(nullptr);glfwSetClipboardString(window,online.code.c_str());
+                const bool copied=glfwGetError(nullptr)==GLFW_NO_ERROR;onlineNoticeUntil=glfwGetTime()+2;
+                Text(menu,"online-status",copied?"房碼已複製，可以分享給朋友。":"無法存取剪貼簿，請手動記下房碼："+online.code);
+            }
             else if(id=="online-create")OnlineRequest(UiOnlineRequest::Kind::Create);
             else if(id=="online-join")OnlineRequest(UiOnlineRequest::Kind::Join);
             else if(id=="online-leave"||id=="online-cancel")OnlineRequest(UiOnlineRequest::Kind::Leave);
@@ -532,7 +603,13 @@ struct GameUi::Impl : Rml::EventListener {
             }
             return;
         }
-        if(id=="title-start"){GoTo(UiScreen::Home);Play("ui_confirm");}
+        if(id.rfind("weapon-card-",0)==0)SelectMainWeapon(id.substr(12));
+        else if(id=="sub-prev")CycleLoadoutPart(EquipmentCategory::Sub,-1);
+        else if(id=="sub-next")CycleLoadoutPart(EquipmentCategory::Sub,1);
+        else if(id=="special-prev")CycleLoadoutPart(EquipmentCategory::Special,-1);
+        else if(id=="special-next")CycleLoadoutPart(EquipmentCategory::Special,1);
+        else if(id.rfind("settings-tab-",0)==0){SettingsTab(id.substr(13));Play("ui_click");}
+        else if(id=="title-start"){GoTo(UiScreen::Home);Play("ui_confirm");}
         else if(id.rfind("nav-",0)==0){Tab(id.substr(4));Play("ui_click");}
         else if(id=="home-play"){GoTo(UiScreen::Play);Play("ui_click");}
         else if(id=="online-play"){GoTo(UiScreen::Play);Play("ui_click");}
@@ -550,6 +627,7 @@ struct GameUi::Impl : Rml::EventListener {
         else if(id=="nav-locker"||id=="loadout-locker"){GoTo(UiScreen::Locker);LockerTab("presets");Play("ui_click");}
         else if(id.rfind("locker-tab-",0)==0){LockerTab(id.substr(11));Play("ui_click");}
         else if(id=="resume"){if(practiceGear){practiceGear=false;menuVisible=false;menu->Hide();hud->Show();action=UiAction::Resume;}else action=UiAction::Resume;Play("ui_back");}
+        else if(id=="result-skip"){resultSkipped=true;resultDone=true;Play("ui_click");}
         else if(id=="results-menu"){action=UiAction::StageSelect;Play("ui_back");}
         else if(id=="results-rematch"){action=UiAction::Rematch;Play("ui_confirm");}
         else if(id=="close"||id=="results-close"){action=UiAction::Close;Play("ui_back");}
@@ -586,7 +664,22 @@ struct GameUi::Impl : Rml::EventListener {
             for(int b=0;b<3;++b){const bool held=glfwGetMouseButton(window,b)==GLFW_PRESS;if(held!=mouse[b]){if(held)context->ProcessMouseButtonDown(b,modifiers);else context->ProcessMouseButtonUp(b,modifiers);mouse[b]=held;}}
             const int nativeKeys[]={GLFW_KEY_TAB,GLFW_KEY_ENTER,GLFW_KEY_SPACE,GLFW_KEY_LEFT,GLFW_KEY_RIGHT,GLFW_KEY_UP,GLFW_KEY_DOWN,GLFW_KEY_ESCAPE,GLFW_KEY_BACKSPACE,GLFW_KEY_DELETE,GLFW_KEY_HOME,GLFW_KEY_END};
             const Rml::Input::KeyIdentifier uiKeys[]={Rml::Input::KI_TAB,Rml::Input::KI_RETURN,Rml::Input::KI_SPACE,Rml::Input::KI_LEFT,Rml::Input::KI_RIGHT,Rml::Input::KI_UP,Rml::Input::KI_DOWN,Rml::Input::KI_ESCAPE,Rml::Input::KI_BACK,Rml::Input::KI_DELETE,Rml::Input::KI_HOME,Rml::Input::KI_END};
-            for(std::size_t i=0;i<keys.size();++i){if(jumpMapOpen&&nativeKeys[i]==GLFW_KEY_TAB)continue;const bool held=glfwGetKey(window,nativeKeys[i])==GLFW_PRESS;if(held!=keys[i]){if(held)context->ProcessKeyDown(uiKeys[i],modifiers);else context->ProcessKeyUp(uiKeys[i],modifiers);keys[i]=held;}}
+            for(std::size_t i=0;i<keys.size();++i){
+                if(jumpMapOpen&&nativeKeys[i]==GLFW_KEY_TAB)continue;
+                const bool held=glfwGetKey(window,nativeKeys[i])==GLFW_PRESS;
+                if(held!=keys[i]){
+                    if(held&&hud->IsVisible()&&Find(hud,"results")->IsVisible()){
+                        if(nativeKeys[i]==GLFW_KEY_ENTER&&!resultDone){resultSkipped=true;resultDone=true;Play("ui_click");keys[i]=held;continue;}
+                        if(nativeKeys[i]==GLFW_KEY_LEFT||nativeKeys[i]==GLFW_KEY_RIGHT){
+                            auto* target=Find(hud,nativeKeys[i]==GLFW_KEY_LEFT?"results-rematch":"results-menu");
+                            if(!target->IsVisible())target=Find(hud,"results-menu");
+                            target->Focus();keys[i]=held;continue;
+                        }
+                    }
+                    if(held)context->ProcessKeyDown(uiKeys[i],modifiers);else context->ProcessKeyUp(uiKeys[i],modifiers);
+                    keys[i]=held;
+                }
+            }
         }
         context->Update();renderer.Begin(width,height);
         if((renderHud&&hud->IsVisible())||(menuVisible&&menu->IsVisible()))context->Render();
@@ -596,11 +689,14 @@ struct GameUi::Impl : Rml::EventListener {
         UiPreview result;result.screen=screen;
         Rml::Element* element=nullptr;
         if((menuVisible||hudOverlay||practiceGear)&&menu&&menu->IsVisible()){
-            element=menu->GetElementById("preview-surface");
             result.screen=practiceGear?UiScreen::PracticeGear:screen;
-            result.type=practiceGear?UiPreviewType::Locker:screen==UiScreen::Loadout?UiPreviewType::Loadout:screen==UiScreen::Locker?UiPreviewType::Locker:UiPreviewType::Player;
+            if(!practiceGear&&screen!=UiScreen::Loadout&&screen!=UiScreen::Locker){result.type=UiPreviewType::None;return result;}
+            element=menu->GetElementById("preview-surface");
+            result.type=practiceGear?UiPreviewType::Locker:screen==UiScreen::Loadout?UiPreviewType::Loadout:UiPreviewType::Locker;
         }else if(hud&&hud->IsVisible()&&hud->GetElementById("results")->IsVisible()){
-            element=hud->GetElementById("results-preview");result.screen=UiScreen::Results;result.type=UiPreviewType::Podium;
+            result.screen=UiScreen::Results;
+            if(resultIntro){result.type=UiPreviewType::None;return result;}
+            element=hud->GetElementById("results-preview");result.type=UiPreviewType::Podium;
         }else if(hud&&hud->IsVisible()&&hud->GetElementById("pause")->IsVisible()){
             result.screen=Find(hud,"leave-confirm")->IsVisible()?UiScreen::LeaveConfirm:UiScreen::Pause;result.type=activePractice?UiPreviewType::Practice:UiPreviewType::None;
             if(result.type==UiPreviewType::None)return result;
@@ -617,91 +713,89 @@ struct GameUi::Impl : Rml::EventListener {
     void UpdateMinimap(const StageData& stage,const FacePaint& paint,MatchSimulation& match){
         if(!player.settings.minimap&&!jumpMapOpen){Hidden(hud,"minimap",true);return;}Hidden(hud,"minimap",false);
         Find(hud,"minimap")->SetClass("jump-map-open",jumpMapOpen);
-        const auto& state=match.local().state;const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
+        const auto& state=match.local().state;const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
         const double now=glfwGetTime();
         const std::string stageKey=std::string(stage.id)+":"+std::string(stage.mode);
         std::string cache=stageKey+":"+std::to_string(paint.version())+":"+std::to_string(player.settings.palette)+":"+Bool(player.settings.colorblind)+":"+std::to_string(context->GetDimensions().x);
         cache+=jumpMapOpen?":jump-map-open":":jump-map-closed";
-        for(const auto& target:jumpMapTargets)cache+=":"+std::to_string(target.key)+","+std::to_string(static_cast<int>(std::round(target.x*4)))+","+std::to_string(static_cast<int>(std::round(target.z*4)))+","+Bool(target.available)+","+target.label;
+        cache+=":"+std::to_string(jumpMapQueuedKey);
+        for(const auto& target:jumpMapTargets)cache+=":"+std::to_string(target.key)+","+std::to_string(static_cast<int>(std::round(target.x*4)))+","+std::to_string(static_cast<int>(std::round(target.y*4)))+","+std::to_string(static_cast<int>(std::round(target.z*4)))+","+Bool(target.available)+","+target.label+","+target.weapon;
         if(const auto* zones=match.zones()){cache+=":"+zones->objective().id;for(const int id:zones->activeIndices())cache+=":"+std::to_string(zones->zones()[id].owner);}
-        for(const auto& actor:match.actors())cache+=":"+std::to_string(static_cast<int>(std::round(actor->state.pos.x*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.z*4)))+","+std::to_string(actor->state.alive);
-        if(minimapCache!=cache&&(now>=nextMinimapUpdate||terrainStage!=stageKey)){
-            constexpr int columns=32,rows=24;const double minX=stage.bounds.x,maxX=stage.bounds.y,minZ=stage.bounds.z,maxZ=stage.bounds.w;
-            const double spanX=std::max(1e-6,maxX-minX),spanZ=std::max(1e-6,maxZ-minZ);
-            if(terrainStage!=stageKey||terrainCells.size()!=columns*rows){
-                terrainStage=stageKey;terrainCells.assign(columns*rows,0);
-                for(int y=0;y<rows;++y)for(int x=0;x<columns;++x){
-                    const double wx=minX+(x+.5)*spanX/columns,wz=maxZ-(y+.5)*spanZ/rows;
-                    for(const auto& face:stage.faces){
-                        if(!face.turf||face.normal.y<.65)continue;
-                        const double det=face.u.x*face.v.z-face.u.z*face.v.x;if(std::abs(det)<1e-8)continue;
-                        const double dx=wx-face.origin.x,dz=wz-face.origin.z;
-                        const double u=(dx*face.v.z-dz*face.v.x)/det,v=(face.u.x*dz-face.u.z*dx)/det;
-                        if(u>=-.01&&u<=face.width+.01&&v>=-.01&&v<=face.height+.01){terrainCells[y*columns+x]=1;break;}
-                    }
-                }
-                for(const auto& block:stage.blocks){
-                    if(!block.solid||block.hidden)continue;
-                    for(int y=0;y<rows;++y)for(int x=0;x<columns;++x){
-                        const double wx=minX+(x+.5)*spanX/columns,wz=maxZ-(y+.5)*spanZ/rows;
-                        const double dx=wx-block.center.x,dz=wz-block.center.z;
-                        const double alongX=dx*block.axes[0].x+dz*block.axes[0].z;
-                        const double alongZ=dx*block.axes[2].x+dz*block.axes[2].z;
-                        if(std::abs(alongX)<=block.half.x&&std::abs(alongZ)<=block.half.z)terrainCells[y*columns+x]=block.grate?3:2;
-                    }
-                }
-            }
-            std::vector<unsigned char> cells=terrainCells;
-            for(int y=0;y<rows;++y)for(int x=0;x<columns;++x){
-                const double wx=minX+(x+.5)*spanX/columns,wz=maxZ-(y+.5)*spanZ/rows;
-                for(std::size_t i=0;i<stage.faces.size();++i){
-                    const auto& face=stage.faces[i];if(!face.paintable||!face.turf||face.normal.y<.65)continue;
-                    const double det=face.u.x*face.v.z-face.u.z*face.v.x;if(std::abs(det)<1e-8)continue;
-                    const double dx=wx-face.origin.x,dz=wz-face.origin.z;
-                    const double u=(dx*face.v.z-dz*face.v.x)/det,v=(face.u.x*dz-face.u.z*dx)/det;
-                    if(u<0||u>face.width||v<0||v>face.height)continue;
-                    if(paint.faceGrid(static_cast<int>(i)).offset<0)continue;
-                    const int ink=paint.sample(static_cast<int>(i),u,v);if(ink)cells[y*columns+x]=ink==1?4:5;
-                }
-            }
-            auto classFor=[](unsigned char code)->const char*{switch(code){case 1:return "map-floor";case 2:return "map-obstacle";case 3:return "map-grate";case 4:return "map-team-a";case 5:return "map-team-b";default:return "";}};
-            std::string markup;
-            for(int y=0;y<rows;++y)for(int x=0;x<columns;){
-                const auto code=cells[y*columns+x];int end=x+1;if(code)while(end<columns&&cells[y*columns+end]==code)++end;
-                if(code){const double left=100.0*x/columns,top=100.0*y/rows,width=100.0*(end-x)/columns,height=100.0/rows;
-                    const std::string color=code==4?std::string(palette[0]):code==5?std::string(palette[1]):std::string();
-                    markup+="<div class=\"map-cell "+std::string(classFor(code))+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;width:"+Number(width,3)+"%;height:"+Number(height,3)+"%;"+(color.empty()?std::string():"background-color:"+color+";")+"\"></div>";}
-                x=end;
-            }
+        for(const auto& actor:match.actors())cache+=":"+std::to_string(static_cast<int>(std::round(actor->state.pos.x*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.y*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.z*4)))+","+std::to_string(actor->state.alive)+","+std::to_string(actor->state.track>0&&actor->state.trackTeam==match.local().team());
+        cache+=":"+std::to_string(deathMarks.size())+","+std::to_string(deathSerial)+","+std::to_string(static_cast<int>(deathClock*10));
+        const glm::mat4& mapView=jumpMapOpen||!haveNativeMapView?worldView:nativeMapView;
+        for(int column=0;column<4;++column)for(int row=0;row<4;++row)
+            cache+=":"+std::to_string(static_cast<int>(std::round(mapView[column][row]*1000.0f)));
+        const auto project=[&](glm::dvec3 point,double& left,double& top){
+            const glm::vec4 clip=mapView*glm::vec4(glm::vec3(point),1.0f);
+            if(clip.w<=1e-4f)return false;
+            const double x=clip.x/clip.w,y=clip.y/clip.w;
+            if(std::abs(x)>1.04||std::abs(y)>1.04)return false;
+            left=(x*.5+.5)*100.0;top=(.5-y*.5)*100.0;return true;
+        };
+        if(minimapCache!=cache&&now>=nextMinimapUpdate){
+            auto* map=Find(hud,"minimap-map");const double mapWidth=map->GetClientWidth(),mapHeight=map->GetClientHeight();
+            std::string markup,targetLegend;
             if(const auto* zones=match.zones()){
-                auto* map=Find(hud,"minimap-map");const double mapWidth=map->GetClientWidth(),mapHeight=map->GetClientHeight();
-                for(const int id:zones->activeIndices()){const auto& zone=zones->zones()[id];const std::string color=zone.owner>=0?std::string(palette[zone.owner]):"#f4cb62";
+                for(const int id:zones->activeIndices()){
+                    const auto& zone=zones->zones()[id];const std::string color=zone.owner>=0?std::string(palette[zone.owner]):"#f4cb62";
                     for(const auto& polygon:zone.region.polygons)for(std::size_t i=0;i<polygon.size();++i){
-                        const auto& a=polygon[i];const auto& b=polygon[(i+1)%polygon.size()];
-                        const double x=(a.x-minX)/spanX,y=(maxZ-a.y)/spanZ,dx=(b.x-a.x)/spanX*mapWidth,dy=(a.y-b.y)/spanZ*mapHeight;
-                        markup+="<div class=\"map-zone-edge\" style=\"left:"+Number(x*100,3)+"%;top:"+Number(y*100,3)+"%;width:"+Number(std::hypot(dx,dy),3)+"px;background-color:"+color+";transform:rotate("+Number(std::atan2(dy,dx)*180/3.141592653589793,3)+"deg);\"></div>";
+                        const auto& a=polygon[i];const auto& b=polygon[(i+1)%polygon.size()];double x0=0,y0=0,x1=0,y1=0;
+                        if(!project({a.x,.15,a.y},x0,y0)||!project({b.x,.15,b.y},x1,y1))continue;
+                        const double dx=(x1-x0)*mapWidth/100.0,dy=(y1-y0)*mapHeight/100.0;
+                        markup+="<div class=\"map-zone-edge\" style=\"left:"+Number(x0,3)+"%;top:"+Number(y0,3)+"%;width:"+Number(std::hypot(dx,dy),3)+"px;background-color:"+color+";transform:rotate("+Number(std::atan2(dy,dx)*180/3.141592653589793,3)+"deg);\"></div>";
                     }
                 }
             }
             for(std::size_t i=0;i<match.actors().size();++i){
                 const auto& actor=match.actors()[i];if(!match.roster()[i].active||!actor->state.alive)continue;
-                const double left=std::clamp((actor->state.pos.x-minX)/spanX*100.,0.,100.);
-                const double top=std::clamp((maxZ-actor->state.pos.z)/spanZ*100.,0.,100.);
+                const bool local=actor->isLocal(),ally=actor->team()==match.local().team();
+                const bool tracked=!ally&&actor->state.track>0&&actor->state.trackTeam==match.local().team();
+                if(!local&&!ally&&!tracked)continue;
+                if(jumpMapOpen&&!local)continue;
+                const auto position=actor->visualPos();double left=0,top=0;if(!project(position,left,top))continue;
                 const std::string color(actor->team()==0?palette[0]:palette[1]);
-                markup+="<div class=\"map-actor "+std::string(actor->isLocal()?"map-actor-local ":"")+(actor->team()==0?"map-actor-a":"map-actor-b")+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;background-color:"+color+";\"></div>";
+                std::string contents;
+                if(local){
+                    double facingX=0,facingY=0,rotation=0;
+                    const auto facing=position+glm::dvec3(std::sin(actor->state.yaw),0,std::cos(actor->state.yaw))*2.0;
+                    if(mapWidth>0&&mapHeight>0&&project(facing,facingX,facingY)){
+                        const double dx=(facingX-left)*mapWidth/100.0,dy=(facingY-top)*mapHeight/100.0;
+                        if(dx*dx+dy*dy>1e-8)rotation=std::atan2(dx,-dy)*180.0/3.141592653589793;
+                    }
+                    contents="<img class=\"map-self-arrow\" src=\"markers/arrow-"+std::to_string(player.settings.colorblind?5:std::clamp(player.settings.palette,0,4))+"-"+std::to_string(actor->team())+".png\" style=\"transform:rotate("+Number(rotation,2)+"deg);\"/>";
+                    if(jumpMapOpen)contents+="<span class=\"map-you-label\">自己</span>";
+                }
+                const std::string actorClass=local?"map-actor-local map-you ":ally?"map-actor-ally ":"map-actor-tracked ";
+                markup+="<div class=\"map-actor "+actorClass+"map-actor-"+(actor->team()==0?"a":"b")+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;background-color:"+(local&&!jumpMapOpen?"transparent":color)+";\">"+contents+"</div>";
             }
-            std::string targetLegend;
+            for(const auto& mark:deathMarks){
+                double left=0,top=0;if(!project(mark.pos,left,top))continue;
+                const double alpha=std::clamp((mark.born+5.0-deathClock)/1.3,0.0,1.0);
+                markup+="<div class=\"map-death-mark\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;opacity:"+Number(alpha)+";\"><img src=\""+DeathMarkIcon(player,mark.team)+"\"/></div>";
+            }
             for(const auto& target:jumpMapTargets){
-                const double left=std::clamp((target.x-minX)/spanX*100.,3.,97.);
-                const double top=std::clamp((maxZ-target.z)/spanZ*100.,5.,95.);
                 const std::string stateClass=target.available?"available":"unavailable";
-                const std::string disabled=target.available?"":" disabled=\"disabled\"";
-                markup+="<div class=\"map-marker\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;\"><button id=\"jump-map-marker-"+std::to_string(target.key)+"\" class=\"map-target "+stateClass+"\""+disabled+" title=\""+Escape(target.label)+"\">"+std::to_string(target.key%10)+"</button></div>";
-                targetLegend+="<button id=\"jump-target-"+std::to_string(target.key)+"\" class=\"jump-target "+stateClass+"\""+disabled+"><strong>"+std::to_string(target.key%10)+"</strong><span>"+Escape(target.label)+"</span><small>"+(target.available?"可用":"暫不可用")+"</small></button>";
+                const std::string disabled=target.available&&jumpMapOpen?"":" disabled=\"disabled\"";
+                const std::string icon=!target.weapon.empty()?"<img src=\"weapons/"+Escape(target.weapon)+".png\"/>":target.key==4?"<span class=\"map-base-icon\"><i></i><b></b><em><u></u></em></span>":(target.key==0||target.key>4)?"<img src=\"equipment/sub-beacon.png\"/>":std::string();
+                targetLegend+="<button id=\"jump-target-"+std::to_string(target.key)+"\" class=\"jump-target "+stateClass+"\""+disabled+">"+icon+"<strong>"+std::to_string(target.key%10)+"</strong><span>"+Escape(target.label)+"</span><small>"+(target.available?"可用":"暫不可用")+"</small></button>";
+                if(!jumpMapOpen)continue;
+                double left=0,top=0;if(!project({target.x,target.y,target.z},left,top))continue;
+                std::string displayLabel=target.label;
+                std::string mapIcon=icon;
+                if(target.key==4){displayLabel="BASE";mapIcon="<span class=\"map-base-icon\"><i></i><b></b><em><u></u></em></span>";}
+                else if(target.key==0||target.key>4){displayLabel="訊標 "+std::to_string(target.key==0?6:target.key-4);mapIcon="<img src=\"equipment/sub-beacon.png\"/>";}
+                else if(displayLabel.rfind("隊友 ",0)==0)displayLabel.erase(0,std::string("隊友 ").size());
+                const std::string teamColor(palette[static_cast<std::size_t>(match.local().team())]);
+                const std::string style=" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;\"";
+                markup+="<div class=\"map-marker\""+style+"><div class=\"map-pin-stem\"></div><div class=\"map-pin-ground\" style=\"background-color:"+teamColor+";\"></div><button id=\"jump-map-marker-"+std::to_string(target.key)+"\" class=\"map-target "+stateClass+(jumpMapQueuedKey==target.key?" queued":"")+"\" style=\"background-color:"+teamColor+";\""+disabled+" title=\""+Escape(target.label)+"\">"+mapIcon+"<strong>"+std::to_string(target.key%10)+"</strong></button><span class=\"map-target-label\">"+Escape(displayLabel)+"</span></div>";
             }
             const auto legendKey=std::string("hud/jump-map-legend");if(textCache[legendKey]!=targetLegend){Find(hud,"jump-map-legend")->SetInnerRML(targetLegend);textCache[legendKey]=targetLegend;}
-            const auto key=std::string("hud/minimap-map");if(textCache[key]!=markup){Find(hud,"minimap-map")->SetInnerRML(markup);textCache[key]=markup;}minimapCache=cache;nextMinimapUpdate=now+.1;
+            const auto key=std::string("hud/minimap-map");if(textCache[key]!=markup){Find(hud,"minimap-map")->SetInnerRML(markup);textCache[key]=markup;}
+            minimapCache=cache;nextMinimapUpdate=now+.1;
         }
+        Text(hud,"jump-map-help",jumpMapOpen?"點擊地圖上的隊友，或按 1–0 選擇跳躍目標　·　Tab / M 關閉":"");
+        Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"");
         const char* ground=state.groundTeam==1?"自隊墨水":state.groundTeam==2?"敵隊墨水":"乾燥地面";
         const auto coverage=paint.coverage();Text(hud,"terrain-status",ground+std::string("　自隊 ")+Percent(coverage[0]));
         Text(hud,"position-team-coverage","敵隊 "+Percent(coverage[1]));
@@ -711,7 +805,7 @@ struct GameUi::Impl : Rml::EventListener {
         if(hidden||!haveWorldView)return;
         const auto size=context->GetDimensions();if(size.x<=0||size.y<=0)return;
         const double marginX=std::max(85.,80.*context->GetDensityIndependentPixelRatio()+5.);
-        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
         struct Placement {std::string id;double x,y,angle,opacity;};
         std::vector<Placement> placements;
         std::string markup;
@@ -736,6 +830,45 @@ struct GameUi::Impl : Rml::EventListener {
         const auto key="hud/ally-markers";if(textCache[key]!=markup){Find(hud,"ally-markers")->SetInnerRML(markup);textCache[key]=markup;}
         for(const auto& p:placements){auto* tag=Find(hud,p.id);tag->SetProperty("left",Number(p.x)+"%");tag->SetProperty("top",Number(p.y)+"%");tag->SetProperty("opacity",Number(p.opacity));tag->GetLastChild()->SetProperty("transform","rotate("+Number(p.angle)+"deg)");}
     }
+    void UpdateDeathMarks(MatchSimulation& match,bool paused,bool hidden){
+        (void)paused;
+        auto& world=match.world();deathClock=world.time();
+        if(deathMatch!=&match||deathEpoch!=world.hudEventEpoch()){
+            deathMatch=&match;deathEpoch=world.hudEventEpoch();deathSeenSerial=0;deathMarks.clear();nextMinimapUpdate=0;
+        }
+        for(const auto& event:world.hudEvents()){
+            if(event.serial<=deathSeenSerial)continue;
+            deathSeenSerial=event.serial;
+            if(event.kind!=CombatHudEvent::Kind::Splat||deathClock-event.time>=5.0||match.phase()==MatchPhase::Results)continue;
+            if(event.victimTeam!=match.local().team()&&event.victimTrackedTeam!=match.local().team())continue;
+            std::string name;
+            for(std::size_t i=0;i<match.actors().size();++i){
+                if(match.actors()[i].get()==event.victim){name=match.roster()[i].name;break;}
+            }
+            if(deathMarks.size()==12)deathMarks.erase(deathMarks.begin());
+            deathMarks.push_back({event.victimPos,std::move(name),event.victimTeam,event.time,++deathSerial});nextMinimapUpdate=0;
+        }
+        if(match.phase()==MatchPhase::Results&&!deathMarks.empty()){deathMarks.clear();nextMinimapUpdate=0;}
+        const auto beforeExpiry=deathMarks.size();
+        deathMarks.erase(std::remove_if(deathMarks.begin(),deathMarks.end(),[&](const DeathMark& mark){return deathClock-mark.born>=5.0;}),deathMarks.end());
+        if(beforeExpiry!=deathMarks.size())nextMinimapUpdate=0;
+        Hidden(hud,"death-markers",hidden||!haveWorldView);
+        if(hidden||!haveWorldView)return;
+        const auto size=context->GetDimensions();if(size.x<=0||size.y<=0)return;
+        std::string markup;
+        for(const auto& mark:deathMarks){
+            const auto clip=worldView*glm::vec4(glm::vec3(mark.pos+glm::dvec3(0,0.95,0)),1);
+            if(clip.w<=0||clip.z/clip.w>1)continue;
+            const double x=(clip.x/clip.w*.5+.5)*size.x,y=(-clip.y/clip.w*.5+.5)*size.y;
+            if(x<0||x>=size.x||y<0||y>=size.y)continue;
+            const double alpha=std::clamp((mark.born+5.0-deathClock)/1.3,0.0,1.0);
+            const double scale=std::clamp(1.12-glm::distance(mark.pos,worldEye)/60.0,0.56,1.0);
+            markup+="<div class=\"death-marker\" style=\"left:"+Number(x*100/size.x)+"%;top:"+Number(y*100/size.y)+"%;opacity:"+Number(alpha)+";transform:scale("+Number(scale)+");\"><img src=\""+DeathMarkIcon(player,mark.team)+"\"/>";
+            if(mark.team==match.local().team()&&!mark.name.empty())markup+="<span>"+Escape(mark.name)+"</span>";
+            markup+="</div>";
+        }
+        const auto key="hud/death-markers";if(textCache[key]!=markup){Find(hud,"death-markers")->SetInnerRML(markup);textCache[key]=markup;}
+    }
     void UpdateInkGauge(MatchSimulation& match,bool paused,bool results){
         auto& actor=match.local();const auto& state=actor.state;
         auto* gauge=Find(hud,"ink-gauge");
@@ -755,7 +888,7 @@ struct GameUi::Impl : Rml::EventListener {
         gauge->SetAttribute("aria-valuenow",Integer(std::clamp(state.ink,0.,100.)));
         Hidden(hud,"ink-gauge",paused||results||!state.alive||jumpMapOpen||hudOverlay||practiceGear);
         Hidden(hud,"ink-low",!low);
-        const auto hex=ProfilePaletteColors(player.settings.palette,player.settings.colorblind)[actor.team()];
+        const auto hex=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr)[actor.team()];
         const auto rgb=std::stoul(std::string(hex.substr(1)),nullptr,16);
         InkTankFrame frame;frame.ink=state.ink;frame.subCost=subCost;frame.low=low;frame.aiming=combat.subAim;
         frame.reducedMotion=player.settings.reducedMotion;frame.yaw=actor.input.aimYaw;frame.vx=state.vel.x;frame.vz=state.vel.z;frame.dt=dt;
@@ -773,7 +906,7 @@ struct GameUi::Impl : Rml::EventListener {
         Hidden(hud,"squad-a",practice);Hidden(hud,"squad-b",practice);
         Hidden(hud,"squad-a-count",practice);Hidden(hud,"squad-b-count",practice);
         Find(hud,"battle-top")->SetClass("boss-squad",match.boss()!=nullptr);
-        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
         for(int side=0;side<2;++side){
             const int team=side==0?match.local().team():1-match.local().team();
             std::string markup;int alive=0,total=0;
@@ -802,7 +935,7 @@ struct GameUi::Impl : Rml::EventListener {
 
         const int localTeam=match.local().team(),enemyTeam=1-localTeam;
         const auto teamName=[&](int team){return team==localTeam?std::string("我方"):team==enemyTeam?std::string("對方"):std::string("無隊伍");};
-        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind);
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
         const auto& counts=zones->counts();const auto& penalties=zones->penalty();
         Text(hud,"zone-team-a-name",teamName(localTeam));Text(hud,"zone-team-b-name",teamName(enemyTeam));
         Text(hud,"zone-count-a",ZoneCount(counts[localTeam]));Text(hud,"zone-count-b",ZoneCount(counts[enemyTeam]));
@@ -858,39 +991,70 @@ struct GameUi::Impl : Rml::EventListener {
         }
         Hidden(hud,"zone-callout",now>=zoneCalloutUntil);
     }
-    void UpdateResults(MatchSimulation& match,const std::array<double,2>& coverage){
-        if(!match.result())return;const auto& result=*match.result();const auto& local=match.local();const bool win=result.boss?result.boss->win:result.winner==local.team();
-        Text(hud,"result-title",win?"勝利":"再接再厲");
-        Text(hud,"result-detail",result.boss?(result.boss->win?"已擊破破艦巨獸":"協力挑戰結束"):result.zones?"區域爭奪 · "+ZoneReason(result.zones->reason)+(result.zones->overtime?" · 延長賽":""):"塗地對戰結束");
-        std::string resultScore;
-        if(result.boss)resultScore="破艦巨獸剩餘生命值  "+Integer(result.boss->hp);
-        else if(result.zones){const auto& zone=*result.zones;const int enemy=1-local.team();resultScore="我方區域計數 "+ZoneCount(zone.counts[local.team()])+"　罰則 "+ZoneCount(zone.penalty[local.team()])+"　／　對方區域計數 "+ZoneCount(zone.counts[enemy])+"　罰則 "+ZoneCount(zone.penalty[enemy]);}
-        else resultScore=Percent(coverage[0])+"  /  "+Percent(coverage[1]);
-        Text(hud,"result-score",resultScore);
-        const double now=glfwGetTime();
-        if(resultXpMatch!=&match){resultXpMatch=&match;resultXpStartedAt=now;resultXpNextTick=now+0.065;}
-        double xpProgress=1.0;
-        const bool animateXp=reward.applied&&reward.gained>0&&!player.settings.reducedMotion;
-        if(animateXp){
-            const double t=std::clamp((now-resultXpStartedAt)/1.7,0.0,1.0);
-            xpProgress=1.0-std::pow(1.0-t,3.0);
-            if(t>0.0&&t<1.0&&now>=resultXpNextTick){Play("xp_tick");resultXpNextTick=now+0.065;}
+    std::string ResultMedals(MatchSimulation& match,const MatchResult& result){
+        std::vector<std::size_t> players;
+        std::size_t self=match.actors().size();
+        for(std::size_t i=0;i<match.actors().size();++i)if(match.roster()[i].active){
+            players.push_back(i);if(match.actors()[i].get()==&match.local())self=i;
         }
-        const int shownXp=animateXp?static_cast<int>(std::round(reward.gained*xpProgress)):reward.gained;
-        std::string xp="本場經驗值（XP） +"+std::to_string(shownXp);
-        if(reward.applied&&reward.levelAfter>reward.levelBefore)xp+="　升級 Lv."+std::to_string(reward.levelBefore)+" → Lv."+std::to_string(reward.levelAfter);
-        else xp+="　Lv."+std::to_string(player.level)+"　"+std::to_string(player.xp)+" / "+std::to_string(XpForLevel(player.level));
-        Text(hud,"result-xp-label",xp);Find(hud,"result-xp-fill")->SetProperty("width",Integer(xpProgress*100)+"%");
-        std::string rows="<tr><th>玩家</th><th>"+std::string(result.zones?"區域塗地":"塗地")+"</th>";if(result.zones)rows+="<th>區域內塗地</th>";rows+="<th>倒下</th>";if(match.boss())rows+="<th>破艦巨獸傷害</th><th>弱點命中</th><th>小螃蟹擊破</th>";rows+="</tr>";
-        for(std::size_t i=0;i<match.actors().size();++i){if(!match.roster()[i].active)continue;const auto& actor=*match.actors()[i];rows+="<tr><td>"+Escape(match.roster()[i].name)+"</td><td>"+Integer(actor.turfPainted())+"</td>";if(result.zones)rows+="<td>"+Integer(actor.zoneTurf())+"</td>";rows+="<td>"+std::to_string(actor.deaths())+"</td>";
-            if(const auto* boss=match.boss())rows+="<td>"+Integer(boss->squadDamage()[i])+"</td><td>"+std::to_string(boss->squadWeakHits()[i])+"</td><td>"+std::to_string(boss->squadSplats()[i])+"</td>";rows+="</tr>";}
-        const auto key="hud/results-table";if(textCache[key]!=rows){Find(hud,"results-table")->SetInnerRML(rows);textCache[key]=rows;}
+        if(self==match.actors().size())return {};
+        const auto& local=*match.actors()[self];
+        std::vector<std::string> awards;
+        auto give=[&](const char* label){if(awards.size()<4)awards.emplace_back(label);};
+        auto turf=[&](std::size_t i){return match.actors()[i]->turfPainted();};
+        auto splats=[&](std::size_t i){return match.actors()[i]->splats();};
+        auto deaths=[&](std::size_t i){return match.actors()[i]->deaths();};
+        double maxTurf=0;int maxSplats=0,maxDeaths=0;
+        for(const auto i:players){maxTurf=std::max(maxTurf,turf(i));maxSplats=std::max(maxSplats,splats(i));maxDeaths=std::max(maxDeaths,deaths(i));}
+        if(const auto* boss=match.boss()){
+            auto damage=[&](std::size_t i){return boss->squadDamage()[i];};
+            auto weak=[&](std::size_t i){return boss->squadWeakHits()[i];};
+            auto brood=[&](std::size_t i){return boss->squadSplats()[i];};
+            double maxDamage=0;int maxWeak=0,maxBrood=0;
+            for(const auto i:players){maxDamage=std::max(maxDamage,damage(i));maxWeak=std::max(maxWeak,weak(i));maxBrood=std::max(maxBrood,brood(i));}
+            auto score=[&](std::size_t i){return damage(i)/std::max(1.0,maxDamage)+.35*weak(i)/std::max(1,maxWeak)+.2*brood(i)/std::max(1,maxBrood)+.15*turf(i)/std::max(1.0,maxTurf)-.25*deaths(i)/std::max(1,maxDeaths);};
+            std::size_t mvp=match.actors().size();
+            for(const auto i:players)if(damage(i)>0||turf(i)>0)if(mvp==match.actors().size()||score(i)>score(mvp)+1e-9)mvp=i;
+            if(mvp==self)give("MVP");
+            if(maxDamage>0&&damage(self)==maxDamage)give("重擊手");
+            if(maxWeak>=3&&weak(self)==maxWeak)give("破殼高手");
+            if(maxBrood>=2&&brood(self)==maxBrood)give("小蟹清道夫");
+            std::vector<std::size_t> active;for(const auto i:players)if(damage(i)>0||turf(i)>=30)active.push_back(i);
+            int zero=0,minDeaths=std::numeric_limits<int>::max(),minCount=0;
+            for(const auto i:active){if(deaths(i)==0)++zero;if(deaths(i)<minDeaths){minDeaths=deaths(i);minCount=1;}else if(deaths(i)==minDeaths)++minCount;}
+            if(zero>0&&zero<=3&&deaths(self)==0&&std::find(active.begin(),active.end(),self)!=active.end())give("不沉之身");
+            else if(zero==0&&minCount==1&&deaths(self)==minDeaths&&std::find(active.begin(),active.end(),self)!=active.end())give("生存者");
+            if(maxTurf>0&&turf(self)==maxTurf)give("清理隊員");
+        }else{
+            auto score=[&](std::size_t i){return turf(i)/std::max(1.0,maxTurf)+.55*splats(i)/std::max(1,maxSplats)-.3*deaths(i)/std::max(1,maxDeaths);};
+            std::size_t mvp=match.actors().size();
+            for(const auto i:players)if(match.roster()[i].team==result.winner&&(turf(i)>0||splats(i)>0))
+                if(mvp==match.actors().size()||score(i)>score(mvp)+1e-9||(std::abs(score(i)-score(mvp))<1e-9&&turf(i)>turf(mvp)))mvp=i;
+            if(mvp==self)give("MVP");
+            const bool king=maxTurf>0&&turf(self)==maxTurf;
+            if(king)give("塗地之王");
+            if(maxSplats>0&&splats(self)==maxSplats)give("擊倒之星");
+            bool teamKing=false;double teamTurf=0;
+            for(const auto i:players)if(match.roster()[i].team==local.team()){teamKing|=maxTurf>0&&turf(i)==maxTurf;teamTurf=std::max(teamTurf,turf(i));}
+            if(!teamKing&&teamTurf>0&&turf(self)==teamTurf)give("隊伍塗地高手");
+            std::vector<std::size_t> active;for(const auto i:players)if(turf(i)>=30||splats(i)>0)active.push_back(i);
+            int zero=0,minDeaths=std::numeric_limits<int>::max(),minCount=0;
+            for(const auto i:active){if(deaths(i)==0)++zero;if(deaths(i)<minDeaths){minDeaths=deaths(i);minCount=1;}else if(deaths(i)==minDeaths)++minCount;}
+            if(zero>0&&zero<=3&&deaths(self)==0&&std::find(active.begin(),active.end(),self)!=active.end())give("毫髮無傷");
+            else if(zero==0&&minCount==1&&deaths(self)==minDeaths&&std::find(active.begin(),active.end(),self)!=active.end())give("生存者");
+            std::stable_sort(players.begin(),players.end(),[&](std::size_t a,std::size_t b){return turf(a)>turf(b);});
+            if(splats(self)==0&&turf(self)>0&&std::find(players.begin(),players.begin()+std::min<std::size_t>(3,players.size()),self)!=players.begin()+std::min<std::size_t>(3,players.size()))give("純粹塗地者");
+        }
+        std::string markup;for(const auto& award:awards)markup+="<span class=\"result-medal\">★ "+award+"</span>";
+        return markup;
     }
+    #include "SourceResults.inc"
     #include "BattleHud.inc"
     void RenderHudData(const StageData& stage,const FacePaint& paint,MatchSimulation& match,bool paused,bool nativeApp,bool practice){
         const bool results=match.phase()==MatchPhase::Results;
         const bool onlineMatch=online.phase==network::RoomPhase::Match||online.phase==network::RoomPhase::Starting;
-        if(!results)resultXpMatch=nullptr;
+        if(!results){resultXpMatch=nullptr;resultIntro=false;resultSkipped=false;resultDone=false;resultFocused=false;}
+        hud->SetClass("results-active",results);
         activePractice=practice;
         interactive=paused||results||practiceGear||hudOverlay;
         interactive=interactive||jumpMapOpen;
@@ -909,13 +1073,20 @@ struct GameUi::Impl : Rml::EventListener {
         UpdateInkGauge(match,paused,results);
         UpdateBattleHud(match,paused,results,practice);
         UpdateAllyMarkers(match,paused||results||jumpMapOpen||hudOverlay||practiceGear);
+        UpdateDeathMarks(match,paused,paused||results||jumpMapOpen||hudOverlay||practiceGear);
         Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
         Text(hud,"jump-map-help",state.alive?"按 1–3 選隊友　4 回生點　5–0 選隊伍訊標":"復活規劃：按數字選擇隊友或隊伍訊標，4 清除規劃");
         Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?"復活彈射："+std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"尚未安排復活彈射");
         Find(hud,"jump-map-queue")->SetClass("queued",jumpMapQueuedKey>=0);
         Hidden(hud,"boss",!match.boss());Hidden(hud,"team-score",match.boss()!=nullptr||match.zones()!=nullptr);
         if(const auto* boss=match.boss()){
-            const auto& state=boss->state();Text(hud,"boss-phase","階段 "+std::to_string(state.phase));Find(hud,"boss-fill")->SetProperty("width",Integer(state.maxHp>0?std::clamp(state.hp/state.maxHp,0.,1.)*100:0)+"%");Text(hud,"boss-hp",Integer(state.hp)+" / "+Integer(state.maxHp));
+            const auto& state=boss->state();
+            const double hp=state.maxHp>0?std::clamp(state.hp/state.maxHp,0.,1.)*100:0;
+            Text(hud,"boss-phase","階段 "+std::string(state.phase>=1?"◆":"◇")+(state.phase>=2?"◆":"◇")+(state.phase>=3?"◆":"◇"));
+            Find(hud,"boss-fill")->SetProperty("width",Integer(hp)+"%");Text(hud,"boss-hp",Integer(hp)+"%");
+            Find(hud,"boss-emblem")->SetAttribute("src",state.phase>=3?"markers/boss-cracked.png":"markers/boss.png");
+            Find(hud,"boss")->SetClass("enraged",state.phase>=3);Find(hud,"boss")->SetClass("open",state.stunned);
+            Text(hud,"boss-state",state.dead?"已擊破":state.stunned?"弱點開啟！":state.anim==2?"換階段 · 怒吼":state.phase>=3?"外殼破裂 · 攻擊腹部！":"");
             std::string move;if(boss->move()){const char* names[]={"重鉗衝擊","貨櫃彈幕","墨砲掃射","船殼衝撞","小蟹群","狂亂攻勢"};move=names[static_cast<int>(boss->move()->id)];switch(boss->move()->phase(state.clock)){case BossMovePhase::Telegraph:move+="  ·  注意預兆";break;case BossMovePhase::Active:move+="  ·  攻擊中";break;case BossMovePhase::Recovery:move+="  ·  恢復中";break;default:break;}}Text(hud,"boss-move",move);
         }
         UpdateZonesHud(match);
@@ -945,16 +1116,17 @@ void GameUi::SetSaveError(std::string error){impl_->SetSaveError(error);}
 void GameUi::SetReward(MatchRewardResult reward){impl_->reward=reward;}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
 void GameUi::SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY){impl_->projectionY=projectionY;impl_->worldView=viewProjection;impl_->worldEye=eye;impl_->haveWorldView=true;}
+void GameUi::SetNativeMap(unsigned int texture,const glm::mat4& viewProjection){auto& p=*impl_;p.renderer.SetNativeMapTexture(static_cast<GLuint>(texture));p.nativeMapView=viewProjection;p.haveNativeMapView=true;}
 void GameUi::SetVolumeSink(std::function<void(float,float,float)> value){impl_->volumes=std::move(value);if(impl_->volumes)impl_->volumes(static_cast<float>(impl_->player.settings.master),static_cast<float>(impl_->player.settings.music),static_cast<float>(impl_->player.settings.sfx));}
 void GameUi::SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey,std::string queuedLabel){
     auto& p=*impl_;
-    if(p.jumpMapOpen!=open)p.minimapCache.clear();
+    if(p.jumpMapOpen!=open){p.minimapCache.clear();p.nextMinimapUpdate=0;}
     p.jumpMapOpen=open;p.jumpMapTargets=std::move(targets);p.jumpMapQueuedKey=queuedKey;p.jumpMapQueuedLabel=std::move(queuedLabel);
     if(!open)p.jumpMapSelection=-1;
 }
 int GameUi::TakeJumpMapSelection(){return std::exchange(impl_->jumpMapSelection,-1);}
 void GameUi::ShowMenu(const std::string& initialStage){
-    auto& p=*impl_;p.resultXpMatch=nullptr;p.inkMatch=nullptr;p.inkActor=nullptr;p.inkFullIdle=0;p.lastHudTime=0;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
+    auto& p=*impl_;p.resultXpMatch=nullptr;p.resultIntro=false;p.resultSkipped=false;p.resultDone=false;p.resultFocused=false;p.inkMatch=nullptr;p.inkActor=nullptr;p.inkFullIdle=0;p.lastHudTime=0;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;
     p.selection.duration=p.selection.mode=="zones"?300:p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;
     p.Value("difficulty",p.selection.difficulty);p.Value("theme",p.selection.theme);p.Value("duration",std::to_string(p.selection.duration));

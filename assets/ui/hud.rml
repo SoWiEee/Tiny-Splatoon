@@ -1,5 +1,5 @@
 <rml>
-<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /></head>
+<head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /><link type="text/rcss" href="results-reference.rcss" /><link type="text/rcss" href="map-reference.rcss" /></head>
 <body id="hud" class="hud">
   <div class="hud-top"><span id="stage-name" class="stage-name"></span><span id="pause-hint" class="pause-hint">Esc 暫停</span></div>
   <div id="battle-top" class="battle-top">
@@ -18,10 +18,11 @@
     <div id="zones-active" class="zones-active"></div>
     <div id="zone-callout" class="zone-callout hidden" aria-live="polite"></div>
   </div>
-  <div id="boss" class="boss hidden"><div class="boss-heading"><strong>破艦巨獸</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-hp"></span></div></div>
-  <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><strong>場地地圖</strong><span id="terrain-status"></span></div><div id="minimap-map" class="minimap-map"></div><div id="position-status" class="position-status"><span id="position-team-coverage"></span></div><div id="jump-map-help" class="jump-map-help"></div><div id="jump-map-queue" class="jump-map-queue"></div><div id="jump-map-legend" class="jump-map-legend"></div></div>
+  <div id="boss" class="boss hidden"><img id="boss-emblem" class="boss-emblem" src="markers/boss.png"/><div class="boss-main"><div class="boss-heading"><strong>破艦巨獸</strong><span id="boss-phase"></span></div><div class="boss-track"><div id="boss-fill"></div><i class="boss-notch notch-two"></i><i class="boss-notch notch-three"></i></div><div class="boss-detail"><span id="boss-move"></span><span id="boss-state"></span></div></div><strong id="boss-hp" class="boss-percent"></strong></div>
+  <div id="minimap" class="minimap"><div id="minimap-heading" class="minimap-heading"><span class="minimap-key">TAB</span><strong>地圖</strong><span id="terrain-status"></span></div><div class="map-surface"><img id="minimap-render" src="native-map"/><div id="minimap-map" class="minimap-map"></div></div><div id="position-status" class="position-status"><span id="position-team-coverage"></span></div><div id="jump-map-help" class="jump-map-help"></div><div id="jump-map-queue" class="jump-map-queue"></div><div id="jump-map-legend" class="jump-map-legend"></div></div>
   <div id="fps" class="fps">影格 <strong id="fps-value">60</strong></div>
   <div id="ally-markers" class="ally-markers"></div>
+  <div id="death-markers" class="death-markers"></div>
   <div class="player-info"><div class="player-bars"><span>生命 <strong id="hp">100</strong></span></div><div id="special-meter" class="special-meter"><div id="special-fill"></div></div><span id="special-status" class="special-status"></span></div>
   <div id="ink-gauge" class="ink-gauge" role="meter" aria-label="剩餘墨量" aria-valuemin="0" aria-valuemax="100"><ink-tank id="ink-tank"></ink-tank><span id="ink" class="hidden">100</span><span id="ink-low" class="ink-low hidden">墨量不足</span></div>
   <div id="player-status" class="player-status"></div><weapon-reticle id="reticle" class="reticle"></weapon-reticle>
@@ -55,13 +56,27 @@
     </div>
   </div>
   <div id="results" class="overlay results-overlay hidden">
-    <div id="results-preview" class="results-preview" aria-label="結果展示"></div>
-    <div class="dialog results-dialog">
-      <h1 id="result-title">對戰結束</h1><p id="result-detail" class="intro"></p>
-      <div id="result-score" class="result-score"></div><div id="result-xp" class="result-xp"><div id="result-xp-label" class="result-xp-label"></div><div class="result-xp-track" aria-hidden="true"><div id="result-xp-fill"></div></div></div>
-      <table id="results-table"></table>
-      <div class="result-actions"><button id="results-rematch" class="primary">再戰一場</button><button id="results-menu">返回選單</button><button id="results-close">離開遊戲</button></div>
+    <div class="result-edge"></div><div class="result-scrim"></div>
+    <div class="result-head">
+      <div id="result-splat" class="result-splat"><i></i><i></i><i></i><i></i></div>
+      <h1 id="result-title">VICTORY!</h1><p id="result-detail"></p>
     </div>
+    <div id="result-medals" class="result-medals"></div>
+    <div id="results-preview" class="results-preview" aria-label="結果展示"></div>
+    <div id="result-body" class="result-body">
+      <div id="result-boss" class="result-boss hidden"><img id="result-boss-emblem" src="markers/boss.png"/><div class="result-boss-main"><div class="result-boss-heading"><strong>破艦巨獸</strong><span id="result-boss-phase"></span><strong id="result-boss-hp"></strong></div><div class="result-boss-track"><div id="result-boss-fill"></div><i class="boss-notch notch-two"></i><i class="boss-notch notch-three"></i></div></div><div class="result-boss-clock"><small>經過時間</small><strong id="result-boss-time"></strong></div><strong id="result-boss-stamp"></strong></div>
+      <div id="result-score" class="result-score">
+        <div class="result-score-names"><span id="result-score-a-name"></span><span id="result-score-b-name"></span></div>
+        <div class="result-score-track"><div id="result-score-a-fill"></div><div id="result-score-b-fill"></div><div class="result-score-center"></div></div>
+      </div>
+      <div id="results-table" class="results-table"></div>
+      <div class="result-footer">
+        <div id="result-xp" class="result-xp"><div class="result-level">等級 <strong id="result-level-value">1</strong></div><div class="result-xp-main"><div class="result-xp-row"><strong id="result-xp-label">+0 XP</strong><span id="result-xp-next"></span></div><div class="result-xp-track" aria-hidden="true"><div id="result-xp-fill"></div></div><div id="result-xp-breakdown" class="result-xp-breakdown"></div></div></div>
+        <div class="result-actions"><button id="results-rematch" class="primary">↻　再戰一場</button><button id="results-menu">〈　返回選單</button><button id="results-close">離開遊戲</button></div>
+      </div>
+    </div>
+    <button id="result-skip" class="result-skip" aria-label="略過結果動畫"></button>
+    <div class="result-prompts"><span>Enter</span> 略過・選擇　 <span>←</span><span>→</span> 移動</div>
   </div>
 </body>
 </rml>

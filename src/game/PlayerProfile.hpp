@@ -46,7 +46,7 @@ struct MatchRewardResult {
 MatchRewardResult ApplyMatchReward(PlayerProfile& profile, const MatchRewardInput& reward);
 int XpForLevel(int level);
 void NormalizeProfile(PlayerProfile& profile);
-std::array<std::string_view,2> ProfilePaletteColors(int palette, bool colorblind=false);
+std::array<std::string_view,2> ProfilePaletteColors(int palette, bool colorblind=false, bool boss=false);
 
 class ProfileStore {
 public:

@@ -418,10 +418,12 @@ MatchRewardResult ApplyMatchReward(PlayerProfile& p,const MatchRewardInput& inpu
     return result;
 }
 
-std::array<std::string_view,2> ProfilePaletteColors(int palette,bool colorblind){
+std::array<std::string_view,2> ProfilePaletteColors(int palette,bool colorblind,bool boss){
     if(colorblind)return {"#ffd21a","#2a52ff"};
     static constexpr std::array<std::array<std::string_view,2>,5> palettes={{{"#ff8a14","#2f5bff"},{"#ff3f9e","#18d48c"},{"#f2e312","#8a3cff"},{"#10d2e6","#ff4150"},{"#a6f01a","#e02cd8"}}};
-    return palettes[palette>=0&&palette<static_cast<int>(palettes.size())?static_cast<std::size_t>(palette):0];
+    auto colors=palettes[palette>=0&&palette<static_cast<int>(palettes.size())?static_cast<std::size_t>(palette):0];
+    if(boss)colors[1]="#2f5bff";
+    return colors;
 }
 
 ProfileStore::ProfileStore(std::filesystem::path path):path_(path.empty()?DefaultProfilePath():std::move(path)){}

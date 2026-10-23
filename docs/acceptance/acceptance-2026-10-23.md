@@ -44,3 +44,24 @@
 - MSVC Release 全目標建置成功；戰鬥事件／武器／網路／UI **4/4**（27.28 秒）與 UI renderer／來源裝備資產 **2/2**（6.77 秒）通過。包含實際命中像素、特殊球邊界、否決、首次／雙重／全隊擊倒／助攻、死亡原因、暫停及重開斷言；不是完整測試集重跑。
 - `build/captures/ui/battle-hud-{ready,hit,wipeout,death,720,1080}.png` 保留本機驗收畫面；720p／1080p 與死亡卡已檢視，修正副武器章／百分比位置、特殊球越界、死亡期間通知重疊。世界死亡標記、3D diorama／登場、完整結果與 Boss 專屬演出仍未全量移植；復仇／終結連殺、主觀動畫時序及跨機 HUD 未逐項目視驗收。
 - 正式 `Tiny-Splatoon.exe --reference-match tidewater --frames 120` 擷取並檢視完整戰場合成；NVIDIA GTX 1650 Max-Q／OpenGL 4.5／591.74，輸出實際 framebuffer 1920×1055（`build/captures/ui/native-battle-hud.png`）。來源目錄與 hash 基準未變更。
+
+
+## 世界標記、玩家流程、投射物與音訊補驗（介面再遷移前）
+
+- 完整 MSVC Release 建置 153/153 完成。第一批 12 項整合回歸中 11 項通過（66.14 秒）；音訊新增 Boss 臨界案例先失敗，原因是測試只前進模擬時計，未經過音訊引擎依真實時計執行的素材最短重播間隔。依素材 metadata 校準等待後，`reference_audio_engine` 通過（29.21 秒）；保留最初失敗紀錄，沒有弱化模擬時間的 60／70／300 ms 門檻斷言。
+- 通過範圍包括網路同步、控制器、角色步行／瞄準、投射物數值與 GPU、UI renderer／互動、CombatRunner／World、角色姿勢與變體。這是受影響範圍的分批檢查，非完整測試集重跑。紀錄：`build/logs/round-details-release-build.log`、`round-details-integration.log`、`round-details-audio-tests4.log`。
+- 世界／地圖死亡標記改用事件位置快照及追蹤權限，五秒到期、最後 1.3 秒淡出、重開清理；預排彈射圈選、來源結果獎章資格與排序、角色預測槍口接入。來源死亡圖示依六組色盤／雙隊匯出，逐位元 `export-hud-icons --check` 通過。圖示換入後與使用者新要求的原版介面一併進行後續 UI 補驗。
+- 音訊加入 300 ms 階段 roar、350 ms 暈眩 loop、恢復／階段／暫停／死亡／同物件重開清理，本機普通／弱點與遠端弱點命中門檻。主觀聽感、完整 HRTF／壓縮器、Boss 精確 foot／impact 事件及被同一快照合併的命中仍未全量還原。
+
+
+## 來源選單、地圖與 Boss 介面整合（10 月 23 日至 24 日）
+
+- 選單採使用者確認的暖紙色／深墨描邊／橘藍色盤及純色背景；十二種武器卡片、完整副／特殊切換、繁中名稱／簡介與四類設定頁已接入。預覽僅裝備／造型顯示，其餘頁面填滿。720p／1080p 卡片與設定捲動、保存、返回入口通過互動驗證。
+- Tab／M 使用原生 3D 場地相機，四輪 fit 與藍隊 post-fit 翻轉通過 source math；小地圖為 256×384 原生 FBO，首次後至少 125 ms 更新間隔，墨量版本改變不繞過節流。RmlUi 借用 GL 紋理，釋放及解構不刪除外部所有權紋理。
+- 地圖來源箭頭、隊友圓點、合法追蹤敵人圓角菱形、白框同色武器圖釘及圓角長框接入。關閉 Tab 時立即重建小地圖標記，消除原 100 ms 快取殘留。未支援的 box-shadow 層造成白色方塊／左上雜框，改為 solid borders；補 stencil clip mask，像素確認圓角外無紋理、中央保留圖像，前後面的 stencil 參數與原有 GL 狀態均還原。
+- SourceResults 採 2.3 秒勝敗／地圖揭曉，再顯示排行／四人台座、分數／XP 時序；首個 Enter 跳過演出，下一次選動作。來源頒獎台八個網格逐位元匯出檢查通過。修正 flex 造成姓名寬度歸零、中文道具說明溢出按鈕區與 Boss class 影響排行的選擇器衝突。
+- Boss HUD 接來源正常／破殼圖徽、三階段菱形、66／33% 刻度、實際 HP、怒吼／弱點開放／破殼狀態；來源原有 16 組姿勢 oracle 通過。Boss 結算以實際勝利／超時生命週期產生，顯示 HP、時間、階段、擊破／逃脫與八人傷害排序雙欄，另列弱點、擊倒、死亡與塗地。正常對戰可選五組含粉紅／薄荷綠色盤；Boss 八人皆 team 0，按本輪使用者要求 Boss 墨色固定藍色（色弱模式保留其藍色），弱點材質跟隨己方墨色。
+- Release 全目標建置通過，最終記錄 `build/logs/source-commit-build.log`。受影響 11 項分批驗收：`source-final-acceptance1.log` 中 10 項通過，UI 新 fixture 誤用僅供線上的狀態入口先失敗，改走真實勝利／超時生命週期後通過（`source-final-ui2.log`，15.19 秒）。後續地圖／裁切修正的 UI 與 renderer 2/2 通過（`map-clip-tests.log`，12.73 秒），獨立新增圓角像素斷言的 renderer 通過（`map-round-pixel-test.log`，4.63 秒），最新圖示匯出 `--check` 通過（`source-final-icons-check.log`）。最新 Boss 四人台座與八人排行的 720p／1080p 場景合成新增檢查通過（`boss-final-composition-test.log`，17.05 秒），確認戰鬥血條隱藏且雙欄保持可讀寬度。未重跑未受影響的完整 99 項測試。
+- 正式 `Tiny-Splatoon.exe --native --frames 3` 及 `--reference-match tidewater --reference-mode boss --frames 600` 完成啟動／擷取；GTX 1650 Max-Q、OpenGL 4.5、591.74。純色標題畫面 1600×900，實際 Boss 戰 1920×1055；檢視確認左上無空黑框、小地圖圓角裁切、同色八人及 Boss 階段條。UI 合成另以準確 1280×720／1920×1080 檢查，含 native Tab、minimap、裝備、設定及完整結果。
+
+仍未驗收／未完成：圖釘重疊避讓與引線、來源游標／視差及完整 3D 登場；Boss title card／連擊數字等完整通知美術、結果印章動態／彩紙物理、來源 PBR 逐像素對照；投射物陰影與預測槍口數值 oracle；音訊精確腳步／impact、主觀定位／HRTF／壓縮器；跨 GPU／品質／最壞負載及跨網矩陣。以上保留在 backlog，不以本輪 UI／元件通過宣稱全遊戲 100%。鎖定的 `splat-ref/` 與來源 hash 基準不修改。

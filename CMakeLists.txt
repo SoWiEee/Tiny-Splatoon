@@ -87,7 +87,7 @@ target_link_libraries(projectile_visuals PUBLIC restoration_core)
 target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/OnlinePlay.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
-    src/render/WorldFxRecipes.cpp
+    src/render/WorldFxRecipes.cpp src/render/StageMapView.cpp src/render/StageMapCamera.cpp
     src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp src/render/ZoneRenderer.cpp)
 target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals game_network)
 
@@ -200,8 +200,15 @@ if(BUILD_TESTING)
     target_link_libraries(rml_renderer_test PRIVATE player_ui)
     add_test(NAME reference_player_ui_renderer COMMAND rml_renderer_test "${CMAKE_CURRENT_SOURCE_DIR}")
 
+    add_executable(stage_map_camera_test tests/stage_map_camera_test.cpp src/render/StageMapCamera.cpp)
+    target_link_libraries(stage_map_camera_test PRIVATE glm::glm)
+    add_test(NAME reference_stage_map_camera COMMAND stage_map_camera_test)
+
     add_executable(game_ui_test tests/game_ui_test.cpp src/app/GpuPreference.cpp)
-    target_link_libraries(game_ui_test PRIVATE player_ui)
+    target_sources(game_ui_test PRIVATE src/render/StageMapView.cpp src/render/StageMapCamera.cpp
+        src/render/StageRenderer.cpp src/render/CharacterShader.cpp src/render/DirectionalShadow.cpp
+        src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/RenderPipeline.cpp src/render/PlayerShowcase.cpp src/render/CharacterArt.cpp)
+    target_link_libraries(game_ui_test PRIVATE player_ui ZLIB::ZLIB)
     add_test(NAME reference_player_ui_interactions COMMAND game_ui_test "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/captures/ui")
 
     add_executable(audio_engine_test tests/audio_engine_test.cpp)
@@ -390,8 +397,10 @@ if(BUILD_TESTING)
             add_test(NAME reference_environment_source_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-environment-source.mjs --check)
             add_test(NAME reference_environment_scene_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-environment-scene.mjs --check)
             add_test(NAME reference_device_visual_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-device-visuals.mjs --check)
+            add_test(NAME reference_showcase_drums_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-showcase-drums.mjs --check)
             set_tests_properties(reference_environment_source_export reference_environment_scene_export reference_device_visual_export
                 PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+            set_tests_properties(reference_showcase_drums_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_boss_material_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tools/export-boss-materials.mjs --check)
             set_tests_properties(reference_boss_material_export PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
             add_test(NAME reference_stage_visual_export COMMAND "${REFERENCE_NODE_EXECUTABLE}" tests/stage_visual_export.test.mjs)

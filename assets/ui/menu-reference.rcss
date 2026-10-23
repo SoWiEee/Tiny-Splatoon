@@ -1,0 +1,183 @@
+/* Source menu palette and hierarchy, scoped to the RmlUi menu document. */
+#menu {
+  background-color: transparent;
+  color: #211d27;
+  font-family: Inter;
+  font-size: 18dp;
+  line-height: 1.35;
+}
+#menu .menu-shell { width: 100%; height: 100%; overflow: hidden; }
+#menu .menu-left {
+  width: 100%;
+  padding: 0 32dp;
+  background-color: transparent;
+  border-right: 0dp transparent;
+}
+#menu .preview-surface { display: none; }
+#menu.with-preview .menu-left { width: 72%; padding: 0 28dp; }
+#menu.with-preview .preview-surface { display: block; right: 0; top: 0; width: 28%; height: 100%; }
+#menu.with-preview #navigation { display: none; }
+#menu .menu-header {
+  height: 94dp;
+  border-bottom: 2dp #b9ab93;
+}
+#menu .menu-header .muted { color: #665b50; font-size: 15dp; }
+#menu .wordmark { color: #211d27; font-size: 25dp; font-weight: 700; }
+#menu .brand-squid { width: 34dp; height: 34dp; }
+#menu .profile-header { border: 1dp #211d27; border-radius: 8dp; background-color: #f8f1e4; color: #211d27; }
+#menu .menu-layout { left: 28dp; right: 28dp; padding: 14dp 0; }
+#menu.with-preview .menu-layout { left: 24dp; right: 24dp; }
+#menu .navigation { width: 168dp; padding-right: 14dp; border-right: 1dp #b9ab93; }
+#menu button {
+  tab-index: auto;
+  color: #211d27;
+  font-family: Inter;
+  font-size: 18dp;
+  font-weight: 700;
+  padding: 10dp 13dp;
+  background-color: #f8f1e4;
+  border: 1dp #211d27;
+  border-radius: 9dp;
+  transition: background-color .12s, border-color .12s;
+}
+#menu button:hover { background-color: #fff1bf; border-color: #81390d; }
+#menu button:focus { background-color: #fff1bf; border: 2dp #211d27; }
+#menu button:active { background-color: #e7c46f; }
+#menu .nav { text-align: left; margin-bottom: 7dp; }
+#menu .nav.selected { color: #1c1424; background-color: #f28a24; border-color: #ffae55; }
+#menu .nav.selected:focus { border-color: #211d27; }
+#menu .nav.exit { background-color: transparent; color: #665b50; border-color: transparent; }
+#menu .nav.exit:hover { background-color: #f6d9ce; color: #211d27; }
+#menu .content { padding-left: 24dp; overflow-y: auto; }
+#menu.title-screen .content { padding-left: 0; }
+#menu .panel { max-width: none; padding: 0; }
+#menu .panel h1 { color: #211d27; font-size: 34dp; font-weight: 700; margin: 0 0 7dp; padding-bottom: 8dp; border-bottom: 2dp #f28a24; }
+#menu .panel h2 { color: #211d27; font-size: 21dp; font-weight: 700; margin: 0; }
+#menu .intro { color: #665b50; font-size: 17dp; line-height: 1.4; margin: 0 0 14dp; }
+#menu .muted { color: #665b50; }
+#menu .description { color: #665b50; }
+#menu .menu-footer { background-color: #f4ecdc; border-top: 1dp #b9ab93; }
+#menu .menu-footer button { color: #211d27; }
+#menu .save-error { color: #211d27; background-color: #632533; border: 1dp #e96b78; border-radius: 8dp; padding: 10dp 12dp; margin: 0 0 10dp; }
+
+/* Loadout: original category artwork, clear selection, real weapon data. */
+#menu .loadout-heading { display: flex; align-items: center; justify-content: space-between; margin: 2dp 0 6dp; }
+#menu .loadout-heading span { color: #81390d; font-size: 17dp; font-weight: 700; }
+#menu .weapon-cards { display: flex; flex-wrap: wrap; margin: 0 -4dp; }
+#menu button.weapon-card {
+  display: flex;
+  flex: 0 0 15%;
+  min-width: 0;
+  max-width: none;
+  height: 112dp;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4dp;
+  padding: 9dp 7dp;
+  overflow: hidden;
+  text-align: center;
+  background-color: #fff9ef;
+  border: 2dp #211d27;
+  border-radius: 12dp;
+}
+#menu button.weapon-card img { width: 56dp; height: 56dp; }
+#menu button.weapon-card span { max-width: 100%; color: #211d27; font-size: 16dp; line-height: 1.15; white-space: nowrap; }
+#menu button.weapon-card small { color: #665b50; font-size: 12dp; font-weight: 700; letter-spacing: .08em; }
+#menu button.weapon-card:hover { background-color: #e4eaff; border-color: #2f5bff; }
+#menu button.weapon-card:focus { background-color: #fff1bf; border: 3dp #211d27; }
+#menu button.weapon-card.selected { background-color: #ffe4b8; border-color: #f28a24; }
+#menu button.weapon-card.selected:focus { border-color: #211d27; }
+#menu #loadout-detail { display: flex; flex-wrap: wrap; margin: 10dp 0 12dp; padding: 15dp; background-color: #fff9ef; border: 1dp #211d27; border-radius: 12dp; }
+#menu .weapon-detail { flex: 1 1 270dp; min-width: 0; padding-right: 16dp; }
+#menu .weapon-detail-heading { display: flex; align-items: center; justify-content: space-between; }
+#menu .weapon-kind { display: block; color: #81390d; font-size: 13dp; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+#menu #weapon-name { font-size: 27dp; line-height: 1.1; }
+#menu .weapon-source-name { color: #665b50; font-size: 14dp; }
+#menu .equipped-badge { flex: none; margin-left: 10dp; color: #211629; background-color: #f28a24; border-radius: 999dp; padding: 6dp 10dp; font-size: 13dp; font-weight: 700; }
+#menu .weapon-blurb { color: #51463b; margin: 8dp 0 12dp; font-size: 15dp; line-height: 1.4; }
+#menu .weapon-stats .stats-heading { color: #665b50; font-size: 16dp; font-weight: 700; margin: 0 0 4dp; }
+#menu .stat-row { display: flex; align-items: center; margin: 7dp 0; color: #211d27; font-size: 15dp; }
+#menu .stat-row > span { flex: none; width: 72dp; }
+#menu .stat-row .stat-track { flex: 1 1 auto; width: auto; height: 11dp; margin: 0 10dp; background-color: #d3c6ae; border: 0dp transparent; border-radius: 999dp; }
+#menu .stat-track > div { height: 100%; background-color: #f28a24; border-radius: 999dp; }
+#menu .stat-row b { flex: none; width: 34dp; color: #211d27; text-align: right; font-size: 15dp; }
+#menu .loadout-kits { flex: 1 1 250dp; display: flex; flex-direction: column; }
+#menu .kit-card { display: flex; align-items: center; justify-content: space-between; min-width: 0; padding: 11dp 12dp; margin: 0 0 8dp; background-color: #efe3cf; border: 1dp #b9ab93; border-radius: 9dp; }
+#menu .kit-icon { flex: none; width: 56dp; height: 56dp; margin-right: 12dp; }
+#menu .kit-copy { flex: 1 1 auto; min-width: 0; padding-right: 10dp; }
+#menu .kit-copy small { color: #665b50; font-size: 12dp; font-weight: 700; letter-spacing: .12em; }
+#menu .kit-copy h3 { color: #211d27; font-size: 19dp; margin: 3dp 0 0; }
+#menu .kit-source-name { color: #665b50; font-size: 14dp; }
+#menu .kit-copy p { color: #51463b; font-size: 14dp; line-height: 1.3; margin: 5dp 0; }
+#menu .kit-cost { color: #81390d; font-size: 13dp; font-weight: 700; }
+#menu .kit-actions { flex: none; display: flex; flex-direction: column; }
+#menu button.kit-actions { width: auto; }
+#menu .kit-actions button { min-width: 88dp; margin: 3dp 0; padding: 6dp 8dp; font-size: 14dp; }
+#menu #loadout-locker { margin-top: 2dp; }
+#menu #loadout-form-controls { display: none; }
+
+/* Settings: fixed tabs, bounded scrolling, existing profile-backed controls. */
+#menu #panel-settings { display: flex; height: 100%; min-height: 0; flex-direction: column; }
+#menu .settings-panel { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; padding: 11dp; background-color: #fff9ef; border: 1dp #211d27; border-radius: 12dp; }
+#menu .settings-tabs { display: flex; flex: none; margin-bottom: 10dp; padding: 4dp; background-color: #e7ddca; border: 1dp #b9ab93; border-radius: 12dp; }
+#menu button.settings-tab { flex: 1 1 0; min-width: 0; min-height: 49dp; margin: 0 3dp; padding: 8dp 10dp; color: #665b50; background-color: transparent; border-color: transparent; border-radius: 9dp; font-size: 18dp; text-align: center; }
+#menu button.settings-tab:hover { color: #211d27; background-color: #e4eaff; }
+#menu button.settings-tab:focus { color: #211d27; border: 2dp #211d27; }
+#menu button.settings-tab.selected { color: #211629; background-color: #f28a24; border-color: #ffae55; }
+#menu .settings-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 7dp 4dp 0; }
+#menu .settings-group { padding: 11dp 13dp 13dp; margin: 0 0 11dp; background-color: #f8f1e4; border: 1dp #b9ab93; border-radius: 10dp; }
+#menu .settings-group h2 { display: block; color: #81390d; font-size: 19dp; font-weight: 700; margin: 0 0 8dp; padding: 0; border: 0dp transparent; }
+#menu .setting-row { display: flex; align-items: center; min-height: 55dp; margin: 6dp 0; padding: 7dp 11dp; background-color: #efe3cf; border: 1dp #d2c3a8; border-radius: 8dp; }
+#menu .setting-row label { flex: 0 0 220dp; width: 220dp; color: #211d27; font-size: 18dp; font-weight: 700; }
+#menu .setting-row input[type=range] { flex: 1 1 120dp; width: 120dp; height: 26dp; margin: 0 12dp; }
+#menu .setting-row select { flex: 1 1 180dp; width: 180dp; height: 43dp; font-size: 18dp; }
+#menu .setting-row span { flex: none; width: 68dp; color: #211d27; text-align: right; font-size: 17dp; font-weight: 700; }
+#menu .setting-check { display: flex; align-items: center; min-height: 52dp; margin: 6dp 0; padding: 7dp 11dp; background-color: #efe3cf; border: 1dp #d2c3a8; border-radius: 8dp; }
+#menu .setting-check input[type=checkbox] { flex: none; width: 26dp; height: 26dp; margin: 0 13dp 0 0; background-color: #17131e; border: 2dp #8b7c99; border-radius: 6dp; }
+#menu .setting-check input[type=checkbox]:checked { background-color: #f28a24; border-color: #ffb264; }
+#menu .setting-check input[type=checkbox]:focus { border-color: #211d27; }
+#menu .setting-check label { color: #211d27; font-size: 18dp; font-weight: 700; }
+#menu input slidertrack { height: 8dp; margin-top: 10dp; background-color: #d3c6ae; border-radius: 5dp; }
+#menu input sliderbar { width: 23dp; height: 23dp; margin-top: -7dp; background-color: #211d27; border: 3dp #33283d; border-radius: 12dp; cursor: pointer; }
+#menu input sliderbar:hover { background-color: #ffd2a4; }
+#menu input[type=range]:focus sliderbar { background-color: #ffad58; border-color: #211d27; }
+#menu input[type=checkbox]:disabled, #menu input[type=range]:disabled, #menu select:disabled { opacity: .42; }
+#menu .capability-note { color: #665b50; font-size: 14dp; margin: 7dp 4dp 0; }
+
+@media (max-width: 900dp) {
+  #menu .menu-left, #menu.with-preview .menu-left { width: 100%; padding: 0 18dp; }
+  #menu.with-preview .preview-surface { display: none; }
+  #menu.with-preview #navigation { display: flex; }
+  #menu .menu-layout, #menu.with-preview .menu-layout { left: 18dp; right: 18dp; padding-top: 10dp; }
+  #menu .content { padding-left: 14dp; }
+  #menu .setting-row label { flex-basis: 170dp; width: 170dp; }
+}
+@media (max-width: 620dp) {
+  #menu .navigation { width: 124dp; padding-right: 8dp; }
+  #menu .content { padding-left: 10dp; }
+  #menu .setting-row { flex-wrap: wrap; }
+  #menu .setting-row label { flex: 1 1 100%; width: auto; margin-bottom: 4dp; }
+  #menu .setting-row input[type=range], #menu .setting-row select { flex: 1 1 150dp; width: 150dp; margin-left: 0; }
+  #menu button.weapon-card { flex-basis: 92dp; min-width: 92dp; max-width: 112dp; }
+  #menu button.settings-tab { font-size: 15dp; padding-left: 5dp; padding-right: 5dp; }
+}
+
+#menu #panel-settings.hidden, #menu .settings-section.hidden, #menu .panel.hidden { display: none; }
+
+#menu .menu-footer { position: absolute; bottom: 0; left: 28dp; right: 28dp; height: 58dp; min-height: 58dp; padding: 0; box-sizing: border-box; align-items: center; }
+#menu .menu-footer button { font-size: 16dp; padding: 5dp 10dp; height: 36dp; }
+#menu .menu-layout { bottom: 62dp; }
+
+#menu .menu-left { background-color: #f4ecdc; }
+#menu .profile-header { background-color: #211d27; color: #fff9e9; }
+#menu .setting-row input[type=range] sliderbar { background-color: #f28a24; }
+#menu .weapon-card.selected { border: 3dp #f28a24; }
+
+#menu .kit-copy { flex: 1 1 0dp; width: 0dp; }
+
+#menu .nav:hover, #menu .settings-tab:hover { background-color: #fff1bf; color: #211d27; }
+#menu .nav.selected:hover, #menu .settings-tab.selected:hover { background-color: #f28a24; }
+
+#menu .kit-copy p { word-break: break-all; overflow: hidden; }

@@ -57,6 +57,10 @@ button.quiet:hover { background-color: #edf0ed; }
 ink-tank { display: block; width: 100%; height: 100%; }
 .ink-low { position: absolute; left: -35dp; top: 98dp; width: 92dp; padding: 4dp 0; background-color: #be1239; color: #ffffff; border: 2dp #15121c; border-radius: 14dp; text-align: center; font-size: 16dp; font-weight: 700; }
 .ally-markers { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.death-markers { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.death-marker { position: absolute; width: 36dp; height: 36dp; margin-left: -18dp; margin-top: -18dp; text-align: center; }
+.death-marker img { width: 36dp; height: 34dp; }
+.death-marker span { position: absolute; top: 36dp; left: 50%; width: 160dp; margin-left: -80dp; padding: 1dp 4dp; background-color: #15121ce8; color: #ffffff; font-size: 12dp; white-space: nowrap; text-align: center; }
 .ally-marker { position: absolute; width: 160dp; margin-left: -80dp; margin-top: -32dp; text-align: center; }
 .ally-tag { display: inline-block; padding: 3dp 10dp; border: 3dp #15121c; border-radius: 18dp; color: #15121c; font-size: 16dp; font-weight: 700; }
 .ally-tag img { width: 24dp; height: 24dp; vertical-align: middle; margin-right: 5dp; }
@@ -269,9 +273,12 @@ th:first-child, td:first-child { text-align: left; }
 .minimap-map { width: 100%; height: 130dp; background-color: #e3e9e1; border-radius: 3dp; overflow: hidden; }
 .minimap-map { position: relative; }
 .map-marker { position: absolute; z-index: 5; width: 30dp; height: 30dp; margin-left: -15dp; margin-top: -15dp; }
+.map-death-mark { position: absolute; z-index: 4; width: 18dp; height: 17dp; margin-left: -9dp; margin-top: -8.5dp; }
+.map-death-mark img { width: 18dp; height: 17dp; }
 .map-target { display: block; position: relative; width: 100%; height: 100%; margin: 0; padding: 0; border: 2dp #ffffff; border-radius: 16dp; box-sizing: border-box; text-align: center; font-size: 18dp; font-weight: 700; color: #ffffff; background-color: #45564c; box-shadow: none; }
 .map-target.available { background-color: #216551; border-color: #ffffff; }
 .map-target.unavailable { background-color: #56615a; border-color: #c7cec7; color: #e1e6e1; }
+.map-target.queued { border-color: #e48b3d; box-shadow: 0 0 0 4dp #f4cb62; }
 .map-target:hover, .map-target:focus { border-color: #e48b3d; }
 .minimap.jump-map-open { position: absolute; z-index: 5; top: 72dp; right: auto; left: 50%; margin-left: -290dp; width: 580dp; box-sizing: border-box; padding: 13dp; background-color: #f5f7f3; border: 1dp #d7dfd6; border-radius: 7dp; }
 .jump-map-open .minimap-heading { flex-direction: row; align-items: baseline; justify-content: space-between; margin-bottom: 9dp; font-size: 22dp; }
@@ -317,8 +324,17 @@ th:first-child, td:first-child { text-align: left; }
 .result-xp-label { font-size: 16dp; }
 .result-xp-track { height: 8dp; margin-top: 7dp; background-color: #dce6dc; border-radius: 4dp; overflow: hidden; }
 #result-xp-fill { width: 0%; height: 100%; background-color: #387860; }
-.results-dialog table { font-size: 14dp; margin-bottom: 14dp; }
+.results-dialog table { font-size: 16dp; margin-bottom: 14dp; }
 .results-dialog th, .results-dialog td { padding: 7dp 7dp; }
+.results-dialog th { font-size: 14dp; }
+.result-team-heading td { padding-top: 13dp; padding-bottom: 4dp; border-bottom: 2dp #c8d4c9; font-weight: 700; }
+.result-medals { display: flex; flex-wrap: wrap; margin: 3dp 0 10dp; }
+.result-medal { display: inline-block; margin-right: 7dp; padding: 4dp 9dp; border: 2dp #9f793b; border-radius: 14dp; background-color: #f7e6ab; color: #553d1c; font-size: 13dp; font-weight: 700; }
+.result-player.result-self td { background-color: #e8f4e7; font-weight: 700; }
+.result-player td:first-child { white-space: nowrap; }
+.result-player em { margin-left: 4dp; color: #496054; font-size: 11dp; font-style: normal; }
+.result-team-dot { display: inline-block; width: 10dp; height: 10dp; margin-right: 6dp; border-radius: 5dp; }
+.result-weapon { width: 24dp; height: 24dp; margin-right: 5dp; vertical-align: middle; }
 .result-actions button { padding: 8dp 12dp; }
 
 @media (max-width: 900dp) {
@@ -388,3 +404,20 @@ th:first-child, td:first-child { text-align: left; }
 .special-art { left: 41dp; top: 24dp; }
 .sub-art { right: auto; bottom: auto; left: 20dp; top: 73dp; width: 40dp; height: 40dp; }
 .special-percent { left: 55dp; top: 100dp; width: 78dp; font-size: 15dp; }
+
+/* Source Boss plate: three phases and the two HP thresholds. */
+#hud .boss { top: 124dp; margin-left: -340dp; width: 680dp; padding: 12dp 16dp; display: flex; align-items: center; background-color: #181523ee; color: #ffffff; border: 4dp #ffffff; border-radius: 32dp; }
+#hud .boss.hidden { display: none; }
+#hud .boss-emblem { width: 86dp; height: 86dp; margin-left: -34dp; margin-right: 12dp; border: 4dp #ffffff; border-radius: 48dp; background-color: #181523; }
+#hud .boss-main { flex: 1; }
+#hud .boss-heading { font-size: 23dp; margin-bottom: 7dp; align-items: center; }
+#hud #boss-phase { font-size: 18dp; color: #8ba5ff; }
+#hud .boss-track { position: relative; height: 24dp; background-color: #080711; border: 2dp #797286; border-radius: 7dp; overflow: visible; }
+#hud #boss-fill { background-color: #4665ff; border-radius: 5dp; }
+#hud .boss-notch { position: absolute; top: -5dp; width: 3dp; height: 33dp; background-color: #ffffff; border: 1dp #15121c; }
+#hud .notch-two { left: 66.67%; }
+#hud .notch-three { left: 33.33%; }
+#hud .boss-detail { color: #c8c5d5; font-size: 13dp; margin-top: 4dp; }
+#hud .boss-percent { width: 76dp; height: 76dp; margin-left: 12dp; line-height: 76dp; text-align: center; font-size: 26dp; border: 4dp #ffffff; border-radius: 44dp; background-color: #15121c; }
+#hud .boss.enraged { border-color: #ffae47; }
+#hud .boss.open #boss-fill { background-color: #ffae47; }

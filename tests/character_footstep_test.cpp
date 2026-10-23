@@ -25,6 +25,23 @@ int main(){
         actor.visible=true;actor.form=CharacterForm::Squid;
         for(int frame=0;frame<60;++frame){actor.position.z+=4.0/60;pose.update(1.0/60,actor,scene);}
         if(count!=running)throw std::runtime_error("Squid form emitted kid footsteps");
+        CharacterAnimState aim;aim.aimPitch=.45;
+        CharacterPose shooter(data,data.rig(0,0,0),"aim-test","shooter");
+        for(int frame=0;frame<120;++frame)shooter.update(1.0/60,aim,scene);
+        const auto idle=shooter.frame();
+        if(idle.aimReady>=.02||glm::distance(idle.aimMuzzle,idle.muzzle)<=.03)
+            throw std::runtime_error("Unready shooter must expose a distinct predictive aim socket");
+        aim.firing=true;
+        for(int frame=0;frame<120;++frame)shooter.update(1.0/60,aim,scene);
+        if(shooter.frame().aimReady<=.98)throw std::runtime_error("Firing shooter must reach its live muzzle socket");
+        CharacterPose roller(data,data.rig(0,0,0),"roller-aim-test","roller");
+        aim.firing=false;roller.update(1.0/60,aim,scene);
+        if(roller.frame().aimReady!=1.0||glm::distance(roller.frame().aimMuzzle,roller.frame().muzzle)>1e-9)
+            throw std::runtime_error("Roller must bypass predictive muzzle blending");
+        CharacterPose twins(data,data.rig(0,0,0),"left-aim-test","twins");
+        twins.update(1.0/60,aim,scene);
+        if(glm::distance(twins.frame().shotMuzzle(1),twins.frame().muzzleLeft)>1e-9)
+            throw std::runtime_error("Dualies must use the left-hand live muzzle without predictive blending");
         std::cout<<"CHARACTER_FOOTSTEP contacts="<<count<<" hidden/squid=quiet\n";
     }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
 }

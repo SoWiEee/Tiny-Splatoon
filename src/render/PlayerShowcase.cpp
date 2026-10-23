@@ -5,7 +5,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <fstream>
 #include <stdexcept>
+#include <utility>
 
 namespace restoration {
 namespace {
@@ -114,7 +119,83 @@ struct PlayerShowcase::Actor {
     }
 };
 
-PlayerShowcase::PlayerShowcase(std::filesystem::path directory):art_(std::move(directory)){}
+struct PlayerShowcase::Stage {
+    struct Vertex {float x,y,z,nx,ny,nz,shade,glow;};
+    struct Mesh {
+        GLuint vao=0,vbo=0,ebo=0;GLsizei count=0;
+        ~Mesh(){if(vao)glDeleteVertexArrays(1,&vao);if(vbo)glDeleteBuffers(1,&vbo);if(ebo)glDeleteBuffers(1,&ebo);}
+        Mesh()=default;Mesh(const Mesh&)=delete;Mesh& operator=(const Mesh&)=delete;
+    };
+    CharacterShader shader;
+    std::array<Mesh,4> bodies,coats;
+
+    explicit Stage(const std::filesystem::path& path):shader(R"GLSL(#version 450 core
+in vec3 position;in vec3 normal;in float shade;in float glow;
+uniform mat4 modelMatrix,viewMatrix,projectionMatrix;
+out vec3 vNormal;out float vShade,vGlow;
+void main(){vec4 world=modelMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*world;vNormal=mat3(modelMatrix)*normal;vShade=shade;vGlow=glow;}
+)GLSL",R"GLSL(#version 450 core
+in vec3 vNormal;in float vShade,vGlow;
+uniform vec3 uBase,uInk;uniform float uCoat;
+layout(location=0) out vec4 fragColor;
+void main(){float key=max(0.0,dot(normalize(vNormal),normalize(vec3(-.4,.85,.35))));float rim=pow(1.0-max(0.0,normalize(vNormal).z),2.0);vec3 base=mix(uBase*vShade,uInk*vShade,uCoat);base*=.65+.45*key;base+=uInk*vGlow*.48+vec3(rim*.12);fragColor=vec4(base,1.0);}
+)GLSL"){
+        auto meshes=readGeometry(path);
+        for(std::size_t i=0;i<bodies.size();++i){upload(bodies[i],std::move(meshes[i*2]));upload(coats[i],std::move(meshes[i*2+1]));}
+        glBindVertexArray(0);
+    }
+
+    static std::vector<std::pair<std::vector<Vertex>,std::vector<std::uint32_t>>> readGeometry(const std::filesystem::path& path){
+        std::ifstream input(path,std::ios::binary);
+        char magic[8]{},sourceHash[32]{};std::uint32_t meshCount=0;
+        if(!input.read(magic,8)||std::memcmp(magic,"IWDRUM1",7)||!input.read(sourceHash,32)||
+           !input.read(reinterpret_cast<char*>(&meshCount),4)||meshCount!=8)
+            throw std::runtime_error("Unable to load source showcase drum geometry: "+path.string());
+        std::vector<std::pair<std::vector<Vertex>,std::vector<std::uint32_t>>> meshes;
+        meshes.reserve(meshCount);
+        for(std::uint32_t mesh=0;mesh<meshCount;++mesh){
+            std::uint32_t vertexCount=0,indexCount=0;
+            if(!input.read(reinterpret_cast<char*>(&vertexCount),4)||
+               !input.read(reinterpret_cast<char*>(&indexCount),4)||vertexCount>200000||indexCount>1200000)
+                throw std::runtime_error("Invalid source showcase drum geometry: "+path.string());
+            std::vector<Vertex> vertices(vertexCount);std::vector<std::uint32_t> indices(indexCount);
+            if(!input.read(reinterpret_cast<char*>(vertices.data()),vertices.size()*sizeof(Vertex))||
+               !input.read(reinterpret_cast<char*>(indices.data()),indices.size()*sizeof(std::uint32_t)))
+                throw std::runtime_error("Incomplete source showcase drum geometry: "+path.string());
+            meshes.emplace_back(std::move(vertices),std::move(indices));
+        }
+        return meshes;
+    }
+    void upload(Mesh& mesh,std::pair<std::vector<Vertex>,std::vector<std::uint32_t>> data){
+        glGenVertexArrays(1,&mesh.vao);glBindVertexArray(mesh.vao);
+        glGenBuffers(1,&mesh.vbo);glBindBuffer(GL_ARRAY_BUFFER,mesh.vbo);
+        glBufferData(GL_ARRAY_BUFFER,data.first.size()*sizeof(Vertex),data.first.data(),GL_STATIC_DRAW);
+        glGenBuffers(1,&mesh.ebo);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,data.second.size()*sizeof(std::uint32_t),data.second.data(),GL_STATIC_DRAW);
+        const auto attribute=[&](const char* name,int size,std::size_t offset){
+            const int location=shader.attribute(name);if(location<0)return;
+            glEnableVertexAttribArray(location);glVertexAttribPointer(location,size,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<const void*>(offset));
+        };
+        attribute("position",3,offsetof(Vertex,x));attribute("normal",3,offsetof(Vertex,nx));
+        attribute("shade",1,offsetof(Vertex,shade));attribute("glow",1,offsetof(Vertex,glow));
+        mesh.count=static_cast<GLsizei>(data.second.size());
+    }
+    void draw(std::size_t count,const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye){
+        static const std::array<glm::dvec3,4> slots={{{0,.72,0},{-1.34,.46,-.14},{1.34,.46,-.14},{2.55,.22,-.36}}};
+        shader.use();glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);
+        shader.uniform("uBase",{.13,.15,.32});
+        shader.uniform("uInk",{SrgbInkColors[0].x,SrgbInkColors[0].y,SrgbInkColors[0].z});
+        for(std::size_t i=0;i<count;++i){
+            const auto model=glm::translate(glm::dmat4(1),slots[i]);
+            shader.matrices(model,view,projection,eye);
+            shader.uniform("uCoat",0);glBindVertexArray(bodies[i].vao);glDrawElements(GL_TRIANGLES,bodies[i].count,GL_UNSIGNED_INT,nullptr);
+            shader.uniform("uCoat",1);glBindVertexArray(coats[i].vao);glDrawElements(GL_TRIANGLES,coats[i].count,GL_UNSIGNED_INT,nullptr);
+        }
+        glBindVertexArray(0);
+    }
+};
+
+PlayerShowcase::PlayerShowcase(std::filesystem::path directory):directory_(directory),art_(std::move(directory)){}
 PlayerShowcase::~PlayerShowcase()=default;
 
 void PlayerShowcase::drawPlayer(const PlayerProfile& profile,const std::string& main,const std::string& sub,
@@ -178,6 +259,8 @@ void PlayerShowcase::drawPodium(const std::vector<PodiumPlayer>& roster,bool won
     const auto view=glm::lookAt(eye,target,glm::dvec3(0.0,1.0,0.0));
     const auto projection=glm::perspective(glm::radians(fov),aspect,0.05,distance+30.0);
     const auto light=showcaseLighting();
+    if(!stage_)stage_=std::make_unique<Stage>(directory_/"showcase-drums.bin");
+    stage_->draw(count,view,projection,eye);
     for(std::size_t i=0;i<count;++i){
         const auto& player=roster[i];
         art_.draw(actors_[i]->pose->frame(),player.style,

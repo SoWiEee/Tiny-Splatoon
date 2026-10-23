@@ -10,6 +10,7 @@
 #include "ArsenalData.hpp"
 #include "PerformanceCapture.hpp"
 #include "StageRenderer.hpp"
+#include "StageMapView.hpp"
 #include "RenderPipeline.hpp"
 #include "DirectionalShadow.hpp"
 #include "ScreenEffectsController.hpp"
@@ -231,6 +232,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     if(nativeApp){setup.playerName=ui.profile().name;setup.style=ui.profile().style;}
     if(online)setup=network::MatchSync::BuildOptions(*online->session(),ui.profile());
     if(nativeApp){camera.horizontalFovDegrees=ui.profile().settings.fov;camera.shake=ui.profile().settings.reducedMotion?0:ui.profile().settings.cameraShake;}
+    SetInkPalette(ProfilePaletteColors(ui.profile().settings.palette,ui.profile().settings.colorblind,setup.mode=="boss"));
     MatchSimulation match(stage,geometry,paint,nav,setup);
     if(!online&&match.actors().size()!=(options.practice?1:8)) throw std::runtime_error("Incorrect offline actor roster");
     if(!online&&match.bots().size()!=(options.practice?0:7)) throw std::runtime_error("Incorrect offline bot roster");
@@ -248,6 +250,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     environment.Load(stage);
     renderer.Load(stage,0,paint);
     renderer.UploadInk(stage,paint);
+    StageMapView nativeMap(stage.bounds,match.local().team()==1);
     RenderPipeline pipeline;
     pipeline.Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects&&(!nativeApp||ui.profile().settings.bloom));
     CharacterArt art(characterAssets,true,true);
@@ -300,6 +303,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
     GLFWgamepadstate pad{};
     bool hasPad=false,usingPad=false;
     bool jumpMapOpen=false;
+    double mapBlend=0.0;
     std::array<bool,10> jumpTargetWasHeld{};
     auto captureMouse=[&](bool capture) {
         fireBlocked=true;
@@ -496,7 +500,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         };
         auto* state=live.get();
         auto* pose=live->pose.get();
-        actor->setMuzzleSource([pose](int side){return side>0?pose->frame().muzzleLeft:pose->frame().muzzle;});
+        actor->setMuzzleSource([pose](int side){return pose->frame().shotMuzzle(side);});
         actor->setSubNozzleSource([pose](){return std::make_pair(pose->frame().subNozzle,pose->frame().subNozzleDirection);});
         actor->setTankSource([pose,state,&art](){return art.attachment(pose->frame(),state->style,"tank/group");});
         characters.push_back(std::move(live));
@@ -641,23 +645,42 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
         previous=now;
         renderer.UploadInk(stage,paint,visualDt);
-        const glm::dvec3 renderEye=benchmark&&!options.benchmarkPlayer?overviewEye:camera.pose().eye;
-        renderer.UpdateSwimWake(visualDt,match.world(),renderEye);
-        const glm::dvec3 renderForward=benchmark&&!options.benchmarkPlayer?glm::normalize(target-overviewEye):camera.pose().forward;
+        const bool mapWanted=jumpMapOpen||(match.phase()==MatchPhase::Results&&!match.boss());
+        const double cameraDt=std::clamp(now-lodPrevious,0.0,.1);
+        mapBlend=std::clamp(mapBlend+cameraDt*(mapWanted?1.0/.42:-1.0/.34),0.0,1.0);
+        const bool hideWorldActors=mapWanted||mapBlend>1e-4||match.phase()==MatchPhase::Results;
+        glm::dvec3 renderEye=benchmark&&!options.benchmarkPlayer?overviewEye:camera.pose().eye;
+        glm::dvec3 renderForward=benchmark&&!options.benchmarkPlayer?glm::normalize(target-overviewEye):camera.pose().forward;
+        float verticalFov=benchmark&&!options.benchmarkPlayer?48.0f:static_cast<float>(camera.pose().verticalFovDegrees);
+        if(mapBlend>1e-4&&(!benchmark||options.benchmarkPlayer)){
+            const auto fitted=FitStageMapCamera(stage.bounds,static_cast<double>(width)/height,match.local().team()==1);
+            const double e=mapBlend<.5?4.0*mapBlend*mapBlend*mapBlend:1.0-std::pow(-2.0*mapBlend+2.0,3.0)*.5;
+            const double up=e+.35*e*(1.0-e);
+            const glm::dvec3 gameTarget=renderEye+renderForward*12.0;
+            const glm::dvec3 mapTarget=glm::mix(gameTarget,fitted.target,e);
+            glm::dvec3 mapEye=glm::mix(renderEye,fitted.eye,e);
+            mapEye.y=glm::mix(renderEye.y,fitted.eye.y,up);
+            renderEye=mapEye;
+            renderForward=glm::normalize(mapTarget-mapEye);
+            verticalFov=static_cast<float>(glm::mix(static_cast<double>(verticalFov),30.0,e));
+        }
+        if(!hideWorldActors)renderer.UpdateSwimWake(visualDt,match.world(),renderEye);
         glm::mat4 projection,view;
         if(benchmark&&!options.benchmarkPlayer) {
             projection=glm::perspective(glm::radians(48.0f),static_cast<float>(width)/height,0.15f,6500.0f);
             view=glm::lookAt(glm::vec3(overviewEye),glm::vec3(target),glm::vec3(0,1,0));
         } else {
-            projection=glm::perspective(glm::radians(static_cast<float>(camera.pose().verticalFovDegrees)),static_cast<float>(width)/height,0.15f,6500.0f);
+            projection=glm::perspective(glm::radians(verticalFov),static_cast<float>(width)/height,0.15f,6500.0f);
             view=glm::lookAt(glm::vec3(renderEye),glm::vec3(renderEye+renderForward),glm::vec3(0,1,0));
         }
         const auto vp=projection*view;
         const double lodStep=benchmark?dt:paused&&!online?0.0:std::clamp(now-lodPrevious,0.0,0.1);
         lodPrevious=now;
         environment.Update(lodStep);
+        if(!mapWanted&&match.phase()!=MatchPhase::Results&&ui.profile().settings.minimap)
+            nativeMap.Render(renderer,environment,paint.version(),now);
         std::vector<CharacterLodFrame> lodFrames(characters.size());
-        for(std::size_t i=0;i<characters.size();++i){
+        for(std::size_t i=0;!hideWorldActors&&i<characters.size();++i){
             auto& character=*characters[i];const auto& pose=character.pose->frame();
             lodFrames[i]=character.lod.update(CharacterLod::screenPixels(pose.root.matrix(),renderEye,
                 projection[1][1],height),character.scene.isLocal,lodStep);
@@ -672,7 +695,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         shadowDraws+=environment.DrawShadow(directionalShadow.matrix());
         const CharacterShadowState shadowCaster{true,0,directionalShadow.matrix(),0.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
-        for(std::size_t i=0;i<characters.size();++i){
+        if(!hideWorldActors)for(std::size_t i=0;i<characters.size();++i){
             if(!match.roster()[i].active)continue;
             const auto& actor=*match.actors()[i];auto& character=*characters[i];const auto& pose=character.pose->frame();const auto& lod=lodFrames[i];
             const auto special=actor.specialPose();const bool hideTank=special.active&&special.kind=="jetpack";
@@ -685,8 +708,10 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             }else shadowDraws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),CharacterTierName(lod.tier),
                 directionalShadow.view(),directionalShadow.projection(),renderEye,lighting,{0,1,true,hideTank},&shadowCaster));
         }
-        if(bossRenderer&&match.boss())shadowDraws+=bossRenderer->DrawShadow(*match.boss(),glm::mat4(directionalShadow.matrix()));
-        shadowDraws+=deviceRenderer.DrawShadow(directionalShadow.matrix(),deviceActors);
+        if(!hideWorldActors){
+            if(bossRenderer&&match.boss())shadowDraws+=bossRenderer->DrawShadow(*match.boss(),glm::mat4(directionalShadow.matrix()));
+            shadowDraws+=deviceRenderer.DrawShadow(directionalShadow.matrix(),deviceActors);
+        }
         glColorMask(colorMask[0],colorMask[1],colorMask[2],colorMask[3]);
         directionalShadow.End();
         }
@@ -718,7 +743,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
 
         const int renderWidth=std::max(1,int(std::round(width*graphics.renderScale))),renderHeight=std::max(1,int(std::round(height*graphics.renderScale)));
         pipeline.Begin(renderWidth,renderHeight,projection,glm::inverse(view),0.15f,6500.0f);
-        const int reflectionDraws=environment.RenderReflection(view,projection,glm::vec3(renderEye),renderWidth,renderHeight,[&](const auto& reflectedView,const auto& reflectedProjection,const auto& reflectedEye){
+        const int reflectionDraws=hideWorldActors?0:environment.RenderReflection(view,projection,glm::vec3(renderEye),renderWidth,renderHeight,[&](const auto& reflectedView,const auto& reflectedProjection,const auto& reflectedEye){
             return renderer.Draw(glm::dmat4(reflectedView),glm::dmat4(reflectedProjection),glm::dvec3(reflectedEye),lighting,false,graphics.shadows?&directionalShadow:nullptr,true);
         });
         glViewport(0,0,renderWidth,renderHeight);
@@ -730,7 +755,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         draws+=environment.DrawSky(view,projection,glm::vec3(renderEye));
         CharacterShadowState receiver{false,graphics.shadows?directionalShadow.texture():0,directionalShadow.matrix(),1.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
-        for(std::size_t i=0;i<characters.size();++i) {
+        if(!hideWorldActors)for(std::size_t i=0;i<characters.size();++i) {
             if(!match.roster()[i].active)continue;
             const auto& actor=*match.actors()[i];
             auto& character=*characters[i];
@@ -748,14 +773,16 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             } else draws+=static_cast<int>(art.draw(pose,character.style,actor.mainId(),actor.subId(),
                     CharacterTierName(lod.tier),glm::dmat4(view),glm::dmat4(projection),renderEye,lighting,{0,1,true,hideTank},&receiver));
         }
-        if(bossRenderer&&match.boss()){
+        if(!hideWorldActors&&bossRenderer&&match.boss()){
             draws+=bossRenderer->Draw(*match.boss(),view,projection,glm::vec3(renderEye),glm::vec3(teamColors[0]),&lighting);
             draws+=bossRenderer->DrawHazards(*match.boss(),geometry,vp,glm::vec3(teamColors[0]));
         }
-        if(zoneRenderer&&match.zones()&&match.phase()!=MatchPhase::Results)draws+=zoneRenderer->Draw(*match.zones(),view,projection,renderEye,0,match.zones()->ended(),match.world().time());
-        draws+=worldEffects.Draw(view,projection,glm::vec3(renderEye),&lighting);
-        draws+=projectileRenderer.Draw(view,projection,renderEye,lighting);
-        draws+=deviceRenderer.Draw(view,projection,renderEye,lighting,deviceActors,&receiver);
+        if(!hideWorldActors&&zoneRenderer&&match.zones()&&match.phase()!=MatchPhase::Results)draws+=zoneRenderer->Draw(*match.zones(),view,projection,renderEye,0,match.zones()->ended(),match.world().time());
+        if(!hideWorldActors){
+            draws+=worldEffects.Draw(view,projection,glm::vec3(renderEye),&lighting);
+            draws+=projectileRenderer.Draw(view,projection,renderEye,lighting);
+            draws+=deviceRenderer.Draw(view,projection,renderEye,lighting,deviceActors,&receiver);
+        }
         if(graphics.postEffects)draws+=lensField.Render(screenController.lens(),renderWidth,renderHeight);
         screen.lensTexture=lensField.texture();screen.lensTexel=lensField.texel();
         screen.enabled=screen.enabled&&graphics.postEffects;
@@ -774,12 +801,14 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             }
             const bool gearOpen=options.practice&&ui.preview().screen==UiScreen::PracticeGear;
             std::vector<UiJumpMapTarget> jumpTargets;
-            if(jumpMapOpen){
+            if(jumpMapOpen||(ui.profile().settings.minimap&&match.phase()==MatchPhase::Playing)){
                 for(const auto& target:controller.SuperJumpMapTargets(match))
-                    jumpTargets.push_back({target.key,target.x,target.z,target.label,target.available});
+                    jumpTargets.push_back({target.key,target.x,target.z,target.label,target.available,target.y,
+                        target.actor?std::string(target.actor->weapon().kind):std::string()});
             }
             ui.SetJumpMap(jumpMapOpen,std::move(jumpTargets),controller.QueuedSuperJumpKey(),controller.QueuedSuperJumpLabel());
             ui.SetWorldView(projection*view,renderEye,projection[1][1]);
+            ui.SetNativeMap(nativeMap.texture(),glm::mat4(nativeMap.viewProjection()));
             if(gearOpen&&showcase){const auto p=ui.preview();if(p.width>0&&p.height>0)showcase->drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);}
             const auto hudAction=gearOpen?ui.RenderMenu(width,height):ui.RenderHud(stage,paint,match,width,height,paused,nativeApp,options.practice);
             const int jumpMapSelection=ui.TakeJumpMapSelection();
@@ -863,8 +892,7 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
         glfwGetFramebufferSize(window,&width,&height);
         if(width<=0||height<=0) {glfwWaitEventsTimeout(0.05);continue;}
         glViewport(0,0,width,height);
-        glClearColor(.96f,.97f,.95f,1.0f);
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glClearColor(.94f,.91f,.84f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         const auto preview=ui.preview();
         if(preview.type!=UiPreviewType::None&&preview.type!=UiPreviewType::Podium&&preview.width>0&&preview.height>0)
             showcase.drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,

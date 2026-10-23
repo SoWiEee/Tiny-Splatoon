@@ -1,0 +1,113 @@
+.hud.results-active > .hud-top, .hud.results-active > .battle-top, .hud.results-active > .team-score,
+.hud.results-active > .zones-hud, .hud.results-active > .boss, .hud.results-active > .minimap,
+.hud.results-active > .fps, .hud.results-active > .player-info, .hud.results-active > .ink-gauge,
+.hud.results-active > .player-status, .hud.results-active > .reticle,
+#hud .hud.results-active > .battle-hud-layer { display: none; }
+
+#hud .results-overlay { display: block; overflow: hidden; background-color: transparent; color: #ffffff; font-family: Inter; }
+#hud .result-edge { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 12dp #a4072b; border-radius: 68dp; pointer-events: none; }
+#hud .result-scrim { position: absolute; top: 43%; left: 0; right: 0; bottom: 0; background-color: #0b0a1ac9; pointer-events: none; }
+#hud .results-intro .result-scrim { display: none; }
+#hud .result-head { position: absolute; top: 3%; left: 3%; width: 66%; z-index: 2; }
+#hud .result-splat { position: absolute; z-index: -1; left: -2%; top: -8%; width: 560dp; height: 182dp; border-radius: 80dp; background-color: #10d2e6; transform: rotate(-5deg); }
+#hud .result-splat i { position: absolute; display: block; width: 42dp; height: 42dp; border-radius: 21dp; background-color: #10d2e6; }
+#hud .result-splat i:nth-child(1) { left: -26dp; top: 142dp; }
+#hud .result-splat i:nth-child(2) { left: 74dp; top: 204dp; }
+#hud .result-splat i:nth-child(3) { left: 310dp; top: 197dp; }
+#hud .result-splat i:nth-child(4) { left: 514dp; top: 151dp; }
+#hud .result-head.defeat .result-splat, #hud .result-head.defeat .result-splat i { background-color: #ff4150; }
+#hud #result-title { margin: 0; color: #ffffff; font-family: Inter; font-size: 88dp; font-weight: 700; line-height: 1; letter-spacing: -5dp; font-effect: outline(6dp #14111e); }
+#hud #result-detail { display: inline-block; margin: 10dp 0 0 7dp; padding: 8dp 14dp; border-radius: 24dp; background-color: #15121cf2; color: #ffffff; font-size: 16dp; font-weight: 700; }
+#hud .result-medals { position: absolute; top: 3%; right: 3%; z-index: 2; width: 28%; text-align: right; }
+#hud .result-medal { display: inline-block; margin: 0 0 5dp 5dp; padding: 5dp 9dp; border: 2dp #15121c; border-radius: 18dp; background-color: #f6c84b; color: #15121c; font-size: 13dp; font-weight: 700; }
+#hud .results-intro .result-medals { display: none; }
+#hud .results-preview { position: absolute; top: 8%; left: 29%; width: 50%; height: 41%; background-color: transparent; pointer-events: none; }
+#hud .results-intro .results-preview { display: none; }
+#hud .result-body { position: absolute; top: 46%; left: 3%; width: 94%; bottom: 7%; transition: top .65s, opacity .45s; }
+#hud .results-intro .result-body { top: 100%; opacity: 0; pointer-events: none; }
+#hud .result-score { margin: 0; height: 62dp; font-size: 22dp; font-weight: 700; }
+#hud .result-score-names { display: flex; justify-content: space-between; margin-bottom: 5dp; font-size: 24dp; font-weight: 700; font-effect: shadow(2dp 2dp #15121c); }
+#hud #result-score-a-name { color: #10d2e6; }
+#hud #result-score-b-name { color: #ff4150; }
+#hud .result-score-track { position: relative; height: 29dp; border: 4dp #ffffff; border-radius: 17dp; background-color: #171524e8; overflow: hidden; }
+#hud #result-score-a-fill, #hud #result-score-b-fill { position: absolute; top: 0; height: 100%; }
+#hud #result-score-a-fill { left: 0; background-color: #10d2e6; }
+#hud #result-score-b-fill { right: 0; background-color: #ff4150; }
+#hud .result-score-center { position: absolute; left: 50%; top: 0; width: 3dp; height: 100%; background-color: #ffffff; }
+#hud .results-table { display: flex; justify-content: space-between; width: 100%; margin-top: 8dp; }
+#hud .result-team { width: 49%; }
+#hud .result-team-head, #hud .result-player { display: flex; align-items: center; box-sizing: border-box; }
+#hud .result-team-head { height: 27dp; padding: 0 6dp; color: #dedde7; font-size: 13dp; font-weight: 700; letter-spacing: 1dp; }
+#hud .result-team-name { display: inline-block; width: 58%; }
+#hud .result-team-name strong { color: #f4cb55; }
+#hud .result-team-head .result-col, #hud .result-player .result-stat { display: inline-block; text-align: center; }
+#hud .result-col.turf, #hud .result-stat.turf { width: 20%; text-align: right; }
+#hud .result-col.small, #hud .result-stat.small { width: 10%; }
+#hud .result-player { height: 35dp; margin-top: 4dp; padding: 0 6dp; border-radius: 10dp; background-color: #333246b8; color: #ffffff; font-size: 16dp; font-weight: 700; }
+#hud .result-player.result-self { border: 2dp #10d2e6; background-color: #10566db8; }
+#hud .result-player.result-mvp { border: 2dp #f5cf50; }
+#hud .result-player .result-identity { display: flex; align-items: center; width: 58%; white-space: nowrap; overflow: hidden; }
+#hud .result-weapon { width: 28dp; height: 28dp; margin-right: 8dp; }
+#hud .result-name { display: inline-block; max-width: 53%; overflow: hidden; }
+#hud .result-player em { margin-left: 6dp; padding: 1dp 5dp; border-radius: 4dp; background-color: #ffffff; color: #15121c; font-size: 11dp; font-style: normal; }
+#hud .result-player .result-stat { font-size: 21dp; }
+#hud .result-player .result-stat.turf { color: #ffffff; }
+#hud .result-player .result-stat small { font-size: 10dp; }
+#hud .result-award { display: inline-block; width: 19dp; height: 19dp; margin-left: 3dp; border-radius: 10dp; background-color: #f5bc38; color: #74460d; font-size: 15dp; text-align: center; }
+#hud .result-footer { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; }
+#hud .result-xp { display: flex; align-items: center; box-sizing: border-box; width: 51%; height: 84dp; margin: 0; padding: 10dp 14dp; border: 3dp #3b3549; border-radius: 18dp; background-color: #171325f0; color: #ffffff; }
+#hud .result-level { display: inline-block; width: 66dp; height: 56dp; margin-right: 14dp; padding-top: 7dp; border-radius: 14dp; box-sizing: border-box; background-color: #ffffff; color: #15121c; font-size: 17dp; font-weight: 700; text-align: center; }
+#hud .result-level strong { display: inline-block; font-size: 29dp; }
+#hud .result-xp-main { width: 83%; }
+#hud .result-xp-row { display: flex; justify-content: space-between; align-items: baseline; }
+#hud #result-xp-label { color: #ffffff; font-size: 24dp; }
+#hud #result-xp-next { color: #d4d0df; font-size: 12dp; font-weight: 700; }
+#hud .result-xp-track { height: 12dp; margin-top: 5dp; border-radius: 8dp; background-color: #08070f; overflow: hidden; }
+#hud #result-xp-fill { width: 0%; height: 100%; background-color: #10d2e6; }
+#hud .result-xp-breakdown { margin-top: 4dp; color: #d4d0df; font-size: 10dp; font-weight: 700; }
+#hud .result-actions { display: flex; justify-content: flex-end; width: 47%; }
+#hud .result-actions button { width: 48%; height: 70dp; margin: 0 0 0 1%; padding: 8dp; border: 3dp #555068; border-radius: 17dp; background-color: #181323; color: #ffffff; font-size: 23dp; font-weight: 700; }
+#hud .result-actions button.primary { border: 5dp #15121c; background-color: #ffffff; color: #15121c; }
+#hud .result-actions button:focus { border-color: #10d2e6; }
+#hud #results-close { display: none; }
+#hud .result-skip { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 0; border: 0; background-color: transparent; }
+#hud .results-full .result-skip { display: none; }
+#hud .result-prompts { position: absolute; right: 2%; bottom: 1%; padding: 6dp 12dp; border: 2dp #393342; border-radius: 20dp; background-color: #15121ce8; color: #ffffff; font-size: 13dp; font-weight: 700; }
+#hud .result-prompts span { display: inline-block; margin-right: 4dp; padding: 3dp 7dp; border-radius: 5dp; background-color: #ffffff; color: #15121c; }
+
+@media (max-width: 900dp) {
+  #hud #result-title { font-size: 58dp; }
+  #hud .result-splat { width: 390dp; height: 130dp; }
+  #hud .result-body { top: 40%; }
+  #hud .result-player { height: 31dp; font-size: 13dp; }
+  #hud .result-player .result-stat { font-size: 15dp; }
+  #hud .result-weapon { width: 22dp; height: 22dp; }
+  #hud .result-footer { bottom: 4dp; }
+  #hud .result-xp { width: 48%; height: 66dp; }
+  #hud .result-actions { width: 50%; }
+  #hud .result-actions button { height: 58dp; font-size: 16dp; }
+}
+
+#hud .results-overlay.hidden { display: none; }
+
+#hud .result-boss { position: relative; display: flex; align-items: center; height: 70dp; background-color: #15121ce8; border: 3dp #555068; border-radius: 20dp; padding: 5dp 14dp; }
+#hud .result-boss.hidden, #hud .result-score.hidden { display: none; }
+#hud #result-boss-emblem { width: 82dp; height: 82dp; margin-right: 12dp; }
+#hud .result-boss-main { flex: 1; }
+#hud .result-boss-heading { display: flex; justify-content: space-between; align-items: center; font-size: 23dp; }
+#hud #result-boss-phase { font-size: 16dp; color: #8ba5ff; }
+#hud .result-boss-track { position: relative; height: 15dp; margin-top: 7dp; border: 2dp #555068; border-radius: 8dp; background-color: #080711; }
+#hud #result-boss-fill { height: 100%; width: 100%; border-radius: 6dp; background-color: #4665ff; }
+#hud .result-boss-track .boss-notch { top: 0; height: 100%; }
+#hud .result-boss-clock { width: 110dp; margin-left: 16dp; text-align: center; }
+#hud .result-boss-clock small { display: block; font-size: 12dp; color: #c9c5d4; }
+#hud #result-boss-time { display: block; font-size: 26dp; }
+#hud #result-boss-stamp { position: absolute; left: 44%; top: -10dp; padding: 2dp 12dp; transform: rotate(-8deg); border: 4dp #f4cb55; border-radius: 6dp; color: #f4cb55; background-color: #15121c; font-size: 30dp; }
+#hud #result-boss-stamp.hidden { display: none; }
+#hud .result-team.boss-team .result-identity, #hud .result-team.boss-team .result-team-name { width: 43%; }
+#hud .result-team.boss-team .result-stat.turf, #hud .result-team.boss-team .result-col.turf { width: 17%; }
+#hud .result-team.boss-team .result-stat.small, #hud .result-team.boss-team .result-col.small { width: 7%; }
+
+#hud .result-name { flex: 1; width: 100dp; min-width: 0; max-width: none; color: #ffffff; }
+
+#hud.results-active > .boss, #hud.results-active > .battle-hud-layer { display: none; }

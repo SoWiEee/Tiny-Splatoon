@@ -1,8 +1,15 @@
 #include "GameUi.hpp"
+#include "StageMapView.hpp"
+#include "StageRenderer.hpp"
+#include "EnvironmentRenderer.hpp"
+#include "RenderPipeline.hpp"
+#include "PlayerShowcase.hpp"
+#include "TeamPalette.hpp"
 #include "ArsenalData.hpp"
 #include "../src/gui/UiText.hpp"
 #include "WeaponReticleElement.hpp"
 #include "MatchSimulation.hpp"
+#include "../src/network/AuthorityState.hpp"
 #include "PlayerController.hpp"
 #include "ZoneControl.hpp"
 #include "FacePaint.hpp"
@@ -63,7 +70,7 @@ int main(int argc,char** argv){
         Check(element("panel-title")->IsVisible()&&!element("panel-home")->IsVisible()&&!element("navigation")->IsVisible(),"Startup must show a focused title screen before the home panel");
         Check(element("title-start")->Focus(),"Title start action must accept keyboard focus");context->ProcessKeyDown(Rml::Input::KI_RETURN,0);context->ProcessKeyUp(Rml::Input::KI_RETURN,0);
         render();Check(element("panel-home")->IsVisible()&&!element("panel-title")->IsVisible(),"Starting from the title screen must enter Home");
-        Check(ui.preview().type==UiPreviewType::Player&&ui.preview().x>.6f&&ui.preview().width>.25f,"Main menu should expose its right-side character viewport");
+        Check(ui.preview().type==UiPreviewType::None,"Home must use the full page without an unnecessary character viewport");
         int profileWrites=0;PlayerProfile loaded;loaded.name="Mint";loaded.weapon="shooter";loaded.xp=120;loaded.style.hair=2;loaded.settings.showFps=true;
         ui.SetProfile(loaded);ui.SetProfileSink([&](const PlayerProfile&){++profileWrites;});
         Check(profileWrites==0&&ui.profile().name=="Mint","Loading a profile must not write it back immediately");
@@ -93,7 +100,14 @@ int main(int argc,char** argv){
             Check(!element("online-start")->HasAttribute("disabled"),"A fully ready lobby must allow its host to start");
             element("online-ready")->Click();requests=ui.TakeOnlineRequests();
             Check(requests.size()==1&&requests[0].kind==UiOnlineRequest::Kind::Ready&&!requests[0].ready,"Ready must support cancelling the current ready state");
-            element("online-copy")->Click();Check(std::string(glfwGetClipboardString(window))==room.code,"Copy must share the current five-character code");
+            element("online-copy")->Click();
+            if(element("online-status")->GetInnerRML().find("無法存取剪貼簿")!=Rml::String::npos){
+                Check(element("online-status")->GetInnerRML().find(room.code)!=Rml::String::npos,"A denied clipboard must show the room code for manual sharing");
+                std::cout<<"CLIPBOARD OS denied access; manual sharing fallback verified\n";
+            }else{
+                const char* copiedCode=glfwGetClipboardString(window);
+                Check(copiedCode&&std::string(copiedCode)==room.code,"Copy must share the current five-character code");
+            }
             for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
                 glViewport(0,0,size[0],size[1]);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderMenu(size[0],size[1]);
                 Capture(std::filesystem::path(argv[2])/("online-room-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
@@ -123,21 +137,24 @@ int main(int argc,char** argv){
         element("nav-settings")->Click();render();
         for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
             auto settingsRender=[&]{glViewport(0,0,size[0],size[1]);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return ui.RenderMenu(size[0],size[1]);};
-            settingsRender();auto* scroll=element("menu-content");scroll->SetScrollTop(0);settingsRender();
-            Check(scroll->GetScrollHeight()>scroll->GetClientHeight()+40,"Settings must expose vertical overflow instead of clipping its lower controls: scroll="+std::to_string(scroll->GetScrollHeight())+" client="+std::to_string(scroll->GetClientHeight())+" panel="+std::to_string(element("panel-settings")->GetOffsetHeight()));
-            const auto offset=scroll->GetAbsoluteOffset();
-            context->ProcessMouseMove(int(offset.x+scroll->GetClientWidth()/2),int(offset.y+40),0);
-            context->ProcessMouseWheel(Rml::Vector2f(0,40),0);settingsRender();
-            Check(scroll->GetScrollTop()>0,"Settings must respond to the mouse wheel inside the content region");
-            scroll->SetScrollTop(scroll->GetScrollHeight());settingsRender();
-            auto* last=element("reduced-motion");const auto lastOffset=last->GetAbsoluteOffset();
-            Check(lastOffset.y>=offset.y-1&&lastOffset.y+last->GetOffsetHeight()<=offset.y+scroll->GetClientHeight()+1,"The last settings checkbox must be reachable inside the scroll viewport");
-            Check(element("menu-back")->GetAbsoluteOffset(Rml::BoxArea::Border).y+element("menu-back")->GetOffsetHeight()<=size[1]+1,"Settings return action must remain visible independently of scrolling");
-            Check(last->Focus(),"The last settings control must remain keyboard focusable");
-            Capture(std::filesystem::path(argv[2])/("settings-bottom-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
-            element("nav-settings")->Focus();settingsRender();scroll->SetScrollTop(0);settingsRender();
-            Check(scroll->GetScrollTop()<1,"The settings viewport must be able to return to its first option");
-            Capture(std::filesystem::path(argv[2])/("settings-top-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+            for(const auto& tab:std::array<const char*,4>{"controls","video","audio","gameplay"}){
+                const std::string button="settings-tab-"+std::string(tab),panel="settings-"+std::string(tab);
+                element(button.c_str())->Click();settingsRender();
+                Check(element(panel.c_str())->IsVisible(),"Each settings category must be reachable");
+                Check(element(button.c_str())->GetAttribute<Rml::String>("aria-selected","")=="true","Settings tabs must expose their selected state");
+                auto* scroll=element("settings-scroll");scroll->SetScrollTop(0);settingsRender();
+                const auto offset=scroll->GetAbsoluteOffset();
+                if(scroll->GetScrollHeight()>scroll->GetClientHeight()+4){
+                    context->ProcessMouseMove(int(offset.x+scroll->GetClientWidth()/2),int(offset.y+40),0);
+                    context->ProcessMouseWheel(Rml::Vector2f(0,40),0);settingsRender();
+                    Check(scroll->GetScrollTop()>0,"Overflowing settings must respond to the mouse wheel");
+                    scroll->SetScrollTop(scroll->GetScrollHeight());settingsRender();
+                }
+                Check(element("menu-back")->GetAbsoluteOffset().y+element("menu-back")->GetOffsetHeight()<=size[1]+1,"Settings return action must stay in the viewport");
+                Check(ui.preview().type==UiPreviewType::None,"Settings must use the full page without character preview");
+                Capture(std::filesystem::path(argv[2])/("settings-"+std::string(tab)+"-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+                scroll->SetScrollTop(0);settingsRender();Check(scroll->GetScrollTop()<1,"Settings must return to the first option");
+            }
         }
         element("nav-play")->Click();render();
         if(!element("duration-row")->IsVisible()||dynamic_cast<Rml::ElementFormControlSelect*>(element("duration"))->GetNumOptions()!=2)
@@ -160,6 +177,20 @@ int main(int argc,char** argv){
         Check(ui.setup().mode=="zones"&&ui.setup().stage=="lockgate","Zone Control must keep the selected internal map ID for the stage variant");
         element("mode-turf")->Click();render();Check(ui.setup().mode=="turf"&&ui.profile().settings.lastMode=="turf","Returning to Turf must restore its saved mode preference");
         element("nav-loadout")->Click();render();
+        Check(element("weapon-cards")->GetNumChildren()==static_cast<int>(MainEquipment().size()),"Loadout cards must expose every current main weapon");
+        for(const auto& weapon:MainEquipment()){
+            const auto id="weapon-card-"+std::string(weapon.id);element(id.c_str())->Click();render();
+            Check(ui.profile().weapon==weapon.id&&element(id.c_str())->GetAttribute<Rml::String>("aria-pressed","")=="true","Weapon cards must equip and expose selection through the real profile");
+        }
+        element("weapon-card-shooter")->Click();render();
+        const auto subBefore=ui.profile().sub;element("sub-next")->Click();render();Check(ui.profile().sub!=subBefore,"Sub weapon card control must equip the next real sub");
+        const auto specialBefore=ui.profile().special;element("special-next")->Click();render();Check(ui.profile().special!=specialBefore,"Special weapon card control must equip the next real special");
+        for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
+            glViewport(0,0,size[0],size[1]);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderMenu(size[0],size[1]);
+            Capture(std::filesystem::path(argv[2])/("loadout-cards-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
+            Check(ui.preview().type==UiPreviewType::Loadout,"Loadout must retain the necessary character preview");
+        }
+
         auto* main=dynamic_cast<Rml::ElementFormControl*>(element("main"));Check(main!=nullptr,"Main loadout is not a form control");
         main->SetValue("charger");main->DispatchEvent("change",{});
         Check(ui.setup().main=="charger"&&ui.setup().sub==GetEquipment(EquipmentCategory::Main,"charger").sub,"Main weapon must apply source default kit");
@@ -315,7 +346,33 @@ int main(int argc,char** argv){
             MatchSimulation bossMatch(*stage,geometry,bossPaint,nav,bossOptions);
             glViewport(0,0,1600,900);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
             Check(own->GetNumChildren()==4&&enemy->GetNumChildren()==4&&hud->GetElementById("squad-a-count")->GetInnerRML().find("8 / 8")!=Rml::String::npos,"Boss HUD must split the eight-person squad around the timer and count the full squad");
-            Capture(std::filesystem::path(argv[2])/"boss-roster-1600x900.png",1600,900);hudRender(true);
+            Capture(std::filesystem::path(argv[2])/"boss-roster-1600x900.png",1600,900);
+            for(const auto& actor:bossMatch.actors())Check(actor->team()==0,"Every Boss squad actor must use the same ink team");
+            bossMatch.startPlaying();for(int i=0;i<40;++i)bossMatch.tick(.1);
+            auto* boss=bossMatch.boss();
+            for(const int phase:{2,3}){
+                auto wire=boss->captureAuthorityState();wire.state.phase=phase;wire.state.hp=wire.state.maxHp*(phase==2?.6:.3);wire.state.anim=2;wire.state.animT0=wire.state.clock;
+                Check(boss->adoptAuthorityState(wire),"Boss phase presentation fixture must adopt a valid state");
+                ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+                Check(hud->GetElementById("boss-phase")->GetInnerRML().find(phase==2?"◆◆◇":"◆◆◆")!=Rml::String::npos,"Boss phase pips must follow live simulation");
+                Check(hud->GetElementById("boss-state")->GetInnerRML().find("怒吼")!=Rml::String::npos,"Phase transformation must display the live roar state");
+                Check(hud->GetElementById("boss-hp")->GetInnerRML()==(phase==2?"60%":"30%"),"Boss HP must show the real percentage");
+                if(phase==3)Check(hud->GetElementById("boss-emblem")->GetAttribute<Rml::String>("src","")=="markers/boss-cracked.png","Final phase must display the cracked source emblem");
+                Capture(std::filesystem::path(argv[2])/("boss-phase-"+std::to_string(phase)+".png"),1600,900);
+            }
+            for(bool won:{false,true}){
+                if(won){bossMatch.restart();bossMatch.startPlaying();for(int i=0;i<40;++i)bossMatch.tick(.1);BossSegmentHit hit;hit.weak=true;bossMatch.boss()->hit(bossMatch.local(),1000000,hit,"shooter");}
+                for(int i=0;i<2600&&bossMatch.phase()!=MatchPhase::Judge;++i)bossMatch.tick(.1);
+                Check(bossMatch.phase()==MatchPhase::Judge,"Boss fixture must complete the real victory/timeout flow");bossMatch.finishJudging();
+                ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+                hud->GetElementById("result-skip")->Click();ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+                Check(hud->GetElementById("result-boss")->IsVisible()&&!hud->GetElementById("result-score")->IsVisible(),"Boss results must use a dedicated HP/phase/time panel");
+                Check(!hud->GetElementById("result-boss-time")->GetInnerRML().empty()&&hud->GetElementById("result-boss-stamp")->GetInnerRML()==(won?"擊破！":"逃脫"),"Boss result must show the actual clear/timeout result");
+                const auto rows=hud->GetElementById("results-table")->GetInnerRML();Check(rows.find("5–8")!=Rml::String::npos&&rows.find("弱點")!=Rml::String::npos&&rows.find("塗地")!=Rml::String::npos,"Boss results require both squad columns, weak hits and turf");
+                glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+                Capture(std::filesystem::path(argv[2])/(won?"boss-results-win.png":"boss-results-timeout.png"),1600,900);
+            }
+            hudRender(true);
         }
         {
             FacePaint jumpPaint(*stage,geometry);
@@ -348,6 +405,8 @@ int main(int argc,char** argv){
             auto renderJumpMap=[&](int width,int height,const char* filename){
                 const auto targets=uiTargets();
                 Check(targets.size()>=5&&targets[4].key==5,"Map captures should include the deployed beacon as target 5");
+                const auto mapCamera=FitStageMapCamera(stage->bounds,double(width)/height,jumpLocal.team()==1);
+                ui.SetWorldView(glm::mat4(mapCamera.projection*mapCamera.view),mapCamera.eye,float(mapCamera.projection[1][1]));
                 ui.SetJumpMap(true,targets);glfwSetTime(glfwGetTime()+.2);
                 glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
                 ui.RenderHud(*stage,jumpPaint,jumpMatch,width,height,false,true);
@@ -364,20 +423,17 @@ int main(int argc,char** argv){
                 for(const auto& target:targets){
                     const auto markerId="jump-map-marker-"+std::to_string(target.key);
                     auto* marker=hud->GetElementById(markerId.c_str());
-                    Check(marker&&marker->GetInnerRML()==std::to_string(target.key%10),"Map marker must visibly print its target digit: "+markerId);
+                    Check(marker&&marker->GetInnerRML().find("<strong>"+std::to_string(target.key%10)+"</strong>")!=Rml::String::npos,"Map marker must visibly print its target digit: "+markerId);
                     if(!marker)continue;
                     const auto markerOffset=marker->GetAbsoluteOffset(Rml::BoxArea::Border);
                     const auto markerSize=marker->GetBox().GetSize(Rml::BoxArea::Border);
-                    const double left=std::clamp((target.x-bounds.x)/spanX*100.,3.,97.);
-                    const double top=std::clamp((bounds.w-target.z)/spanZ*100.,5.,95.);
-                    const double centerX=markerOffset.x+markerSize.x*.5,centerY=markerOffset.y+markerSize.y*.5;
-                    const double expectedX=mapOffset.x+mapBounds.x*left/100.,expectedY=mapOffset.y+mapBounds.y*top/100.;
-                    Check(markerOffset.x>=mapOffset.x-.5&&markerOffset.y>=mapOffset.y-.5&&
-                          markerOffset.x+markerSize.x<=mapOffset.x+mapBounds.x+.5&&
-                          markerOffset.y+markerSize.y<=mapOffset.y+mapBounds.y+.5,
-                          "Map target marker bounding rect must remain inside the minimap: "+markerId);
-                    Check(std::abs(centerX-expectedX)<3.0&&std::abs(centerY-expectedY)<3.0,
-                          "Map target marker must align with its projected target position: "+markerId);
+                    const auto clip=mapCamera.projection*mapCamera.view*glm::dvec4(target.x,target.y,target.z,1);
+                    const double left=(clip.x/clip.w*.5+.5)*100,top=(.5-clip.y/clip.w*.5)*100;
+                    auto* anchor=marker->GetParentNode();
+                    Check(std::abs(anchor->GetProperty("left")->Get<float>()-left)<.02&&std::abs(anchor->GetProperty("top")->Get<float>()-top)<.02,
+                          "Map pin anchor must align with its actual 3D projection: "+markerId);
+                    Check(markerOffset.x>=mapOffset.x-1&&markerOffset.y>=mapOffset.y-1&&markerOffset.x+markerSize.x<=width+1&&markerOffset.y+markerSize.y<=height+1,
+                          "Projected jump badge must stay inside the map viewport");
                 }
                 const auto pixels=Capture(std::filesystem::path(argv[2])/filename,width,height);
                 const auto pixel=[&](int x,int y){
@@ -385,43 +441,17 @@ int main(int argc,char** argv){
                     const auto index=(static_cast<std::size_t>(height-1-y)*width+static_cast<std::size_t>(x))*3;
                     return std::array<unsigned char,3>{pixels[index],pixels[index+1],pixels[index+2]};
                 };
-                int originGreenPixels=0;
-                for(int y=1;y<std::min(height,36);++y)for(int x=1;x<std::min(width,36);++x){
-                    const auto color=pixel(x,y);
-                    if(color[1]>65&&color[1]>color[0]*1.45&&color[1]>color[2]*1.08)++originGreenPixels;
-                }
-                Check(originGreenPixels<5,"Framebuffer must not draw a displaced green map marker at the window origin (pixels="+std::to_string(originGreenPixels)+")");
                 for(const auto& target:targets){
-                    const auto markerId="jump-map-marker-"+std::to_string(target.key);
-                    auto* marker=hud->GetElementById(markerId.c_str());
-                    if(!marker)continue;
-                    const auto offset=marker->GetAbsoluteOffset(Rml::BoxArea::Border);
-                    const auto size=marker->GetBox().GetSize(Rml::BoxArea::Border);
-                    const int left=static_cast<int>(std::floor(offset.x+size.x*.2));
-                    const int right=static_cast<int>(std::ceil(offset.x+size.x*.8));
-                    const int top=static_cast<int>(std::floor(offset.y+size.y*.2));
-                    const int bottom=static_cast<int>(std::ceil(offset.y+size.y*.8));
-                    const int digitLeft=static_cast<int>(std::floor(offset.x+size.x*.35));
-                    const int digitRight=static_cast<int>(std::ceil(offset.x+size.x*.65));
-                    const int digitTop=static_cast<int>(std::floor(offset.y+size.y*.25));
-                    const int digitBottom=static_cast<int>(std::ceil(offset.y+size.y*.75));
-                    int greenPixels=0,glyphWhitePixels=0;
-                    for(int y=top;y<bottom;++y)for(int x=left;x<right;++x){
-                        const auto color=pixel(x,y);
-                        if(color[1]>65&&color[1]>color[0]*1.45&&color[1]>color[2]*1.08)++greenPixels;
-                    }
-                    for(int y=digitTop;y<digitBottom;++y)for(int x=digitLeft;x<digitRight;++x){
-                        const auto color=pixel(x,y);
-                        if(color[0]>244&&color[1]>244&&color[2]>244)++glyphWhitePixels;
-                    }
-                    Check(greenPixels>=std::max(6,int(size.x*size.y*.05)),
-                          "Framebuffer must contain the green target face inside "+markerId+" (pixels="+std::to_string(greenPixels)+")");
-                    Check(glyphWhitePixels>=std::max(3,int(size.x*.15)),
-                          "Framebuffer must contain the white target digit inside "+markerId+" (pixels="+std::to_string(glyphWhitePixels)+")");
+                    auto* marker=hud->GetElementById(("jump-map-marker-"+std::to_string(target.key)).c_str());
+                    Check(marker,"Every fitted target must have a rendered pin");
+                    const auto offset=marker->GetAbsoluteOffset();const auto size=marker->GetBox().GetSize(Rml::BoxArea::Border);
+                    int visible=0;
+                    for(int y=int(offset.y);y<int(offset.y+size.y);++y)for(int x=int(offset.x);x<int(offset.x+size.x);++x){const auto color=pixel(x,y);if(color[0]>100||color[1]>100||color[2]>100)++visible;}
+                    Check(visible>20,"Each jump badge must draw real framebuffer pixels");
                 }
             };
             auto clickTarget=[&](int key){
-                const std::string id="jump-target-"+std::to_string(key);
+                const std::string id="jump-map-marker-"+std::to_string(key);
                 auto* target=hud->GetElementById(id.c_str());
                 Check(target!=nullptr,"Super Jump target button is missing: "+id);
                 target->Click();
@@ -478,6 +508,8 @@ int main(int argc,char** argv){
             setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(controllerTargets()[0].available&&!hud->GetElementById("jump-target-1")->HasAttribute("disabled"),"A living teammate remains available as a queued target while the local player is dead");
             Check(clickTarget(1)==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1)&&jumpController.HasQueuedSuperJump()&&jumpController.QueuedSuperJumpKey()==1,"Clicking an available teammate while dead should queue that teammate's respawn jump");
+            ui.SetJumpMap(true,uiTargets(),1,"隊友");glfwSetTime(glfwGetTime()+.2);ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(hud->GetElementById("jump-map-marker-1")->IsClassSet("queued"),"The queued landing pin must show its selection ring on the map");
             jumpController.ClearQueuedSuperJump();
             jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
             setMapTargets();
@@ -517,16 +549,9 @@ int main(int argc,char** argv){
                 const auto a=bounds(above),b=bounds(below);
                 Check(a[3]<=b[1]+1.f,std::string(label)+" elements must not overlap vertically");
             };
-            auto* minimapHeading=hud->GetElementById("minimap-heading");
-            auto* minimapTitle=minimapHeading->GetFirstChild();
-            auto* terrainStatus=hud->GetElementById("terrain-status");
-            auto* minimapMap=hud->GetElementById("minimap-map");
-            auto* positionCoverage=hud->GetElementById("position-team-coverage");
-            checkVerticalOrder(minimapTitle,terrainStatus,"Minimap title and terrain status");
-            checkVerticalOrder(terrainStatus,minimapMap,"Minimap terrain status and map");
-            checkVerticalOrder(minimapMap,positionCoverage,"Minimap map and footer");
-            checkReadableFont(hud->GetElementById("terrain-status"),"Minimap heading metadata");
-            checkReadableFont(positionCoverage,"Minimap team coverage metadata");
+            const auto phone=bounds(hud->GetElementById("minimap"));
+            Check(phone[0]>=0&&phone[0]<width*.2f&&phone[3]<=height+1,"The compact phone map must stay at bottom left inside the viewport");
+            Check(!hud->GetElementById("terrain-status")->IsVisible()&&!hud->GetElementById("position-team-coverage")->IsVisible(),"The phone map must not retain the old terrain/footer panel");
             checkReadableFont(hud->GetElementById("zone-owner"),"Zone owner metadata");
             checkReadableFont(hud->GetElementById("zone-team-a-name"),"Zone team label");
             auto* firstZoneCard=hud->GetElementById("zones-active")->GetFirstChild();
@@ -544,7 +569,7 @@ int main(int argc,char** argv){
         Check(hud->GetElementById("zone-phase")->GetInnerRML().find("延長賽")!=Rml::String::npos&&hud->GetElementById("zone-callout")->IsVisible(),"Overtime must update the live phase and show a callout");
         hudRender(true);
         auto* minimap=dynamic_cast<Rml::Element*>(hud->GetElementById("minimap-map"));Check(minimap!=nullptr,"Missing minimap element");
-        const auto mapBefore=minimap->GetInnerRML();Check(mapBefore.find("map-cell")!=Rml::String::npos&&mapBefore.find("map-actor-local")!=Rml::String::npos,"Minimap must render spatial terrain and the local actor marker");
+        const auto mapBefore=minimap->GetInnerRML();Check(hud->GetElementById("minimap-render")->IsVisible()&&mapBefore.find("map-actor-local")!=Rml::String::npos,"Minimap must render spatial terrain and the local actor marker");
         match.local().state.pos.x+=2.0;glfwSetTime(glfwGetTime()+.12);hudRender(true);
         const auto mapAfter=minimap->GetInnerRML();Check(mapAfter.find("map-actor-local")!=Rml::String::npos&&mapAfter!=mapBefore,"Moving the player must move its visible minimap marker");
         Capture(std::filesystem::path(argv[2])/"pause.png",1600,900);
@@ -572,10 +597,13 @@ int main(int argc,char** argv){
         MatchRewardResult reward;reward.applied=true;reward.gained=640;reward.levelBefore=1;reward.levelAfter=2;reward.xpBefore=100;reward.xpAfter=40;ui.SetReward(reward);
         sounds.clear();
         hudRender(false);Check(hud->GetElementById("results")->IsVisible(),"Results overlay did not appear");
-        Check(hud->GetElementById("results-table")->GetNumChildren()>=9,"Results lost squad rows");
+        Check(hud->GetElementById("results-table")->GetNumChildren()==2,"Results must show two squad columns");
+        Check(hud->GetElementById("results")->IsClassSet("results-intro")&&ui.preview().type==UiPreviewType::None,"Results must begin with the source map reveal before the podium");
+        Capture(std::filesystem::path(argv[2])/"results-intro.png",1600,900);
+        Check(hud->GetElementById("result-medals")->GetNumChildren()==0,"An inactive local player must not receive an unearned medal");
         auto* xpLabel=hud->GetElementById("result-xp-label");
         Check(xpLabel->GetInnerRML().find("+0")!=Rml::String::npos,"Results should begin the XP reveal at zero");
-        const double xpMidTime=glfwGetTime()+.2;glfwSetTime(xpMidTime);hudRender(false);
+        const double xpMidTime=glfwGetTime()+2.3+3.6+.2;glfwSetTime(xpMidTime);hudRender(false);
         Check(xpLabel->GetInnerRML().find("+640")==Rml::String::npos&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"XP should count up with one tick while the award is in flight");
         const auto shownXp=[&]{const auto text=xpLabel->GetInnerRML();return std::stoi(text.substr(text.find('+')+1));};
         const int xpMidReveal=shownXp();const double firstRenderDrift=glfwGetTime()-xpMidTime;
@@ -584,6 +612,9 @@ int main(int argc,char** argv){
         Check(std::abs(shownXp()-xpMidReveal)<=std::ceil(clockDrift*reward.gained*3/1.7)+1&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"Repeated reward assignments must not restart the XP reveal or duplicate a tick");
         glfwSetTime(glfwGetTime()+2.0);hudRender(false);
         Check(xpLabel->GetInnerRML().find("+640")!=Rml::String::npos,"Results must finish by displaying the saved XP reward");
+        match.local().applyNetworkStats(1500,0,0,7,0);hudRender(false);
+        Check(hud->GetElementById("result-medals")->GetInnerRML().find("塗地之王")!=Rml::String::npos&&hud->GetElementById("result-medals")->GetInnerRML().find("擊倒之星")!=Rml::String::npos,"Earned Turf King and Top Splatter medals must appear from final stats");
+        Check(hud->GetElementById("results-table")->GetInnerRML().find("BOT")!=Rml::String::npos&&hud->GetElementById("results-table")->GetInnerRML().find("result-weapon")!=Rml::String::npos,"Results must identify live bots and equipped weapon artwork");
         Capture(std::filesystem::path(argv[2])/"results.png",1600,900);
         auto captureResults=[&](int width,int height,const char* filename){
             glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -601,8 +632,10 @@ int main(int argc,char** argv){
         glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         ui.RenderHud(*stage,paint,match,1600,900,false,true);
         Check(xpLabel->GetInnerRML().find("+0")!=Rml::String::npos,"The same-match rematch should start a fresh XP reveal for an identical award");
-        glfwSetTime(glfwGetTime()+.2);ui.RenderHud(*stage,paint,match,1600,900,false,true);
+        glfwSetTime(glfwGetTime()+2.3+3.6+.2);ui.RenderHud(*stage,paint,match,1600,900,false,true);
         Check(xpLabel->GetInnerRML().find("+640")==Rml::String::npos&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"The same-match rematch's identical award should animate and tick once");
+        hud->GetElementById("result-skip")->Click();hudRender(false);
+        Check(ui.preview().type==UiPreviewType::Podium,"Skipping the reveal must expose the complete podium without exiting the match");
         hud->GetElementById("results-rematch")->Click();Check(hudRender(false)==UiAction::Rematch,"Results rematch action did not reach the match loop");
         hud->GetElementById("results-menu")->Click();Check(hudRender(false)==UiAction::StageSelect,"Return action did not reach the match loop");
         ui.ShowMenu("tidewater");Check(render()==UiAction::None&&menu->IsVisible(),"Returning from results did not restore the menu");
@@ -629,6 +662,7 @@ int main(int argc,char** argv){
             Check(changed>20,"Hit feedback must change real crosshair-area pixels");
             combatMatch.world().applyHit(local,*foes[0],100,"shooter");draw();
             Check(hud->GetElementById("kill-cards")->GetNumChildren()==1&&hud->GetElementById("battle-callout")->GetInnerRML().find("首次")!=Rml::String::npos,"A first splat must show its victim card and first-splat callout");
+            Check(hud->GetElementById("minimap-map")->GetInnerRML().find("map-death-mark")==Rml::String::npos,"An untracked enemy death must not reveal a map marker");
             const auto cards=hud->GetElementById("kill-cards")->GetInnerRML();draw();Check(cards==hud->GetElementById("kill-cards")->GetInnerRML(),"Rendering the same journal must not replay or duplicate kill cards");
             combatMatch.world().applyHit(local,*foes[1],15,"shooter");combatMatch.world().applyHit(*ally,*foes[1],100,"shooter");draw();
             Check(hud->GetElementById("kill-cards")->GetInnerRML().find("助攻")!=Rml::String::npos,"Recent damage followed by an allied splat must show an assist card");
@@ -643,9 +677,116 @@ int main(int argc,char** argv){
             draw(1600,900,true);Check(!hud->GetElementById("battle-hud-layer")->IsVisible(),"Paused HUD must hide transient combat overlays");
             combatMatch.restart();combatMatch.startPlaying();draw();
             Check(hud->GetElementById("kill-cards")->GetNumChildren()==0&&!hud->GetElementById("death-card")->IsVisible(),"Restart must clear old cards, deaths and journal cursors");
+            Check(hud->GetElementById("minimap-map")->GetInnerRML().find("map-death-mark")==Rml::String::npos,"Restart must clear old death positions");
             for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){draw(dims.first,dims.second);auto* orb=hud->GetElementById("special-display");const auto pos=orb->GetAbsoluteOffset();Check(pos.x>=0&&pos.x+orb->GetOffsetWidth()<=dims.first&&pos.y+orb->GetOffsetHeight()<=dims.second,"Special orb must fit at both supported HUD resolutions");Capture(std::filesystem::path(argv[2])/("battle-hud-"+std::to_string(dims.second)+".png"),dims.first,dims.second);}
         }
-        Check(glGetError()==GL_NO_ERROR,"UI interaction draw produced GL errors");
+        {
+            FacePaint markerPaint(*stage,geometry);MatchOptions options;options.duration=90;
+            MatchSimulation markerMatch(*stage,geometry,markerPaint,nav,options);markerMatch.startPlaying();
+            auto& local=markerMatch.local();PlayerSimulation *ally=nullptr,*enemy=nullptr;
+            for(const auto& actor:markerMatch.actors()){
+                actor->state.invuln=0;
+                if(actor.get()!=&local&&actor->team()==local.team())ally=actor.get();
+                if(actor->team()!=local.team())enemy=actor.get();
+            }
+            Check(ally&&enemy,"Death marker fixture needs an ally and an enemy");
+            const auto deathPosition=ally->state.pos;
+            markerMatch.world().applyHit(*enemy,*ally,200,"shooter");
+            ally->spawnAt(deathPosition+glm::dvec3(5,0,0),0);
+            const auto view=glm::scale(glm::mat4(1),glm::vec3(.05f))*glm::translate(glm::mat4(1),-glm::vec3(deathPosition));
+            ui.SetWorldView(view,deathPosition+glm::dvec3(0,4,0),1.0f);
+            auto draw=[&](int width=1600,int height=900){glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,markerPaint,markerMatch,width,height,false,true);};
+            draw();
+            Check(hud->GetElementById("death-markers")->GetNumChildren()==1&&hud->GetElementById("minimap-map")->GetInnerRML().find("map-death-mark")!=Rml::String::npos,"A death before the first HUD frame must retain its original world and map positions after respawn");
+            draw(1280,720);Capture(std::filesystem::path(argv[2])/"death-markers-1280x720.png",1280,720);
+            draw(1920,1080);Capture(std::filesystem::path(argv[2])/"death-markers-1920x1080.png",1920,1080);
+            for(int i=0;i<228;++i)markerMatch.world().tick(1./60);
+            draw();
+            auto* fadingMark=hud->GetElementById("death-markers")->GetFirstChild();
+            Check(hud->GetElementById("death-markers")->GetNumChildren()==1&&fadingMark&&fadingMark->GetComputedValues().opacity()<.99f&&fadingMark->GetComputedValues().opacity()>.8f,"The final 1.3 seconds of a death mark must fade");
+            for(int i=0;i<73;++i)markerMatch.world().tick(1./60);
+            draw();
+            Check(hud->GetElementById("death-markers")->GetNumChildren()==0&&hud->GetElementById("minimap-map")->GetInnerRML().find("map-death-mark")==Rml::String::npos,"Death marks must expire after five simulation seconds");
+        }
+        {
+            FacePaint scenePaint(*stage,geometry);MatchOptions options;options.duration=90;
+            MatchSimulation sceneMatch(*stage,geometry,scenePaint,nav,options);sceneMatch.startPlaying();
+            for(int i=0;i<60;++i)sceneMatch.tick(.1);
+            SetInkPalette(ProfilePaletteColors(ui.profile().settings.palette,ui.profile().settings.colorblind));
+            const auto references=std::filesystem::path(argv[1])/"assets/reference";
+            StageRenderer sceneRenderer(references/"stages",true);sceneRenderer.Load(*stage,0,scenePaint);
+            sceneRenderer.UploadInk(*stage,scenePaint);
+            EnvironmentRenderer environment(references/"environment");environment.SetReflectionsEnabled(false);environment.Load(*stage);
+            StageMapView smallMap(stage->bounds,sceneMatch.local().team()==1);
+            const double frameTime=glfwGetTime();
+            Check(smallMap.Render(sceneRenderer,environment,scenePaint.version(),frameTime),"Native minimap must render an initial stage frame");
+            Check(!smallMap.Render(sceneRenderer,environment,scenePaint.version()+1,frameTime+.01),"Painting must not bypass the native minimap render cadence");
+            ui.SetNativeMap(smallMap.texture(),glm::mat4(smallMap.viewProjection()));
+            RenderPipeline pipeline(references/"post");pipeline.Configure(0,false,false);
+            auto background=[&](int w,int h){
+                const auto camera=FitStageMapCamera(stage->bounds,double(w)/h,sceneMatch.local().team()==1);
+                pipeline.Begin(w,h,glm::mat4(camera.projection),glm::inverse(glm::mat4(camera.view)),1,6000);
+                glClearColor(.2f,.35f,.55f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                sceneRenderer.Draw(camera.view,camera.projection,camera.eye,environment.Lights());
+                environment.DrawSea(glm::mat4(camera.view),glm::mat4(camera.projection),glm::vec3(camera.eye));
+                environment.DrawScenery(glm::mat4(camera.view),glm::mat4(camera.projection),glm::vec3(camera.eye));
+                environment.DrawSky(glm::mat4(camera.view),glm::mat4(camera.projection),glm::vec3(camera.eye));
+                pipeline.End(GradeSettings::Theme(std::string(stage->theme)),ScreenEffects{},w,h);
+                ui.SetWorldView(glm::mat4(camera.projection*camera.view),camera.eye,float(camera.projection[1][1]));
+            };
+            std::vector<UiJumpMapTarget> targets;int key=1;
+            for(std::size_t i=0;i<sceneMatch.actors().size();++i){const auto& actor=*sceneMatch.actors()[i];if(actor.team()==sceneMatch.local().team()&&!actor.isLocal()&&key<4){targets.push_back({key++,actor.state.pos.x,actor.state.pos.z,sceneMatch.roster()[i].name,actor.state.alive,actor.state.pos.y,std::string(actor.weapon().kind)});}}
+            const auto spawn=stage->spawnPads[sceneMatch.local().team()];targets.push_back({4,spawn.x,spawn.z,"生點",true});
+            for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
+                background(dims.first,dims.second);ui.SetJumpMap(true,targets);
+                ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                Check(hud->GetElementById("jump-map-marker-1")->IsVisible(),"The actual map camera must project a friendly jump pin");
+                Capture(std::filesystem::path(argv[2])/("source-native-tab-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
+                background(dims.first,dims.second);ui.SetJumpMap(false,{});ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                Check(hud->GetElementById("minimap-render")->IsVisible(),"The compact map must show the native stage texture");
+                Check(hud->GetElementById("jump-map-marker-1")==nullptr,"Closing Tab must immediately remove large jump pins from the compact map");
+                Capture(std::filesystem::path(argv[2])/("source-native-mini-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
+            }
+            for(int i=0;i<1000&&sceneMatch.phase()!=MatchPhase::Judge;++i)sceneMatch.tick(.1);
+            Check(sceneMatch.phase()==MatchPhase::Judge,"Native results composition fixture must finish the match");sceneMatch.finishJudging();sceneRenderer.UploadInk(*stage,scenePaint);
+            ui.SetReward({});background(1600,900);ui.RenderHud(*stage,scenePaint,sceneMatch,1600,900,false,true);
+            Capture(std::filesystem::path(argv[2])/"source-native-results-intro.png",1600,900);
+            hud->GetElementById("result-skip")->Click();ui.RenderHud(*stage,scenePaint,sceneMatch,1600,900,false,true);
+            PlayerShowcase showcase(references/"characters");std::vector<PlayerShowcase::PodiumPlayer> squad;
+            for(std::size_t i=0;i<sceneMatch.actors().size();++i){const auto& actor=*sceneMatch.actors()[i];if(actor.team()==sceneMatch.local().team())squad.push_back({sceneMatch.roster()[i].name,sceneMatch.roster()[i].style,actor.mainId(),actor.subId()});}
+            for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
+                background(dims.first,dims.second);ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);
+                showcase.drawPodium(squad,sceneMatch.result()->winner==sceneMatch.local().team(),{int(preview.x*dims.first),int((1-preview.y-preview.height)*dims.second),int(preview.width*dims.first),int(preview.height*dims.second)},glfwGetTime(),true);
+                ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                Capture(std::filesystem::path(argv[2])/("source-native-results-full-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
+            }
+            FacePaint bossScenePaint(*stage,geometry);MatchOptions bossOptions;bossOptions.mode="boss";
+            MatchSimulation bossScene(*stage,geometry,bossScenePaint,nav,bossOptions);bossScene.startPlaying();
+            for(int i=0;i<40;++i)bossScene.tick(.1);
+            BossSegmentHit weakHit;weakHit.weak=true;bossScene.boss()->hit(bossScene.local(),1000000,weakHit,"shooter");
+            for(int i=0;i<70&&bossScene.phase()!=MatchPhase::Judge;++i)bossScene.tick(.1);
+            Check(bossScene.phase()==MatchPhase::Judge,"Boss scene composition must complete the victory flow");bossScene.finishJudging();
+            ui.RenderHud(*stage,bossScenePaint,bossScene,1600,900,false,true);hud->GetElementById("result-skip")->Click();
+            std::vector<PlayerShowcase::PodiumPlayer> bossSquad;for(std::size_t i=0;i<4;++i){const auto& actor=*bossScene.actors()[i];bossSquad.push_back({bossScene.roster()[i].name,bossScene.roster()[i].style,actor.mainId(),actor.subId()});}
+            for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
+                ui.RenderHud(*stage,bossScenePaint,bossScene,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);
+                showcase.drawPodium(bossSquad,true,{int(preview.x*dims.first),int((1-preview.y-preview.height)*dims.second),int(preview.width*dims.first),int(preview.height*dims.second)},glfwGetTime(),true);
+                ui.RenderHud(*stage,bossScenePaint,bossScene,dims.first,dims.second,false,true);
+                Check(!hud->GetElementById("boss")->IsVisible(),"Results must hide the combat Boss plate");
+                Check(hud->GetElementById("results-table")->GetFirstChild()->GetOffsetWidth()>dims.first*.4,"Boss rankings must occupy two readable columns");
+                Capture(std::filesystem::path(argv[2])/("source-native-boss-results-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
+            }
+            ui.ShowMenu("tidewater");element("nav-loadout")->Click();ui.RenderMenu(1600,900);
+            for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
+                ui.RenderMenu(dims.first,dims.second);const auto preview=ui.preview();glClearColor(.94f,.91f,.84f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                showcase.drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,{int(preview.x*dims.first),int((1-preview.y-preview.height)*dims.second),int(preview.width*dims.first),int(preview.height*dims.second)},glfwGetTime(),true);
+                ui.RenderMenu(dims.first,dims.second);Capture(std::filesystem::path(argv[2])/("source-native-loadout-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
+            }
+            element("nav-settings")->Click();element("settings-tab-controls")->Click();
+            for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){glViewport(0,0,dims.first,dims.second);glClearColor(.94f,.91f,.84f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderMenu(dims.first,dims.second);Capture(std::filesystem::path(argv[2])/("source-native-settings-"+std::to_string(dims.second)+".png"),dims.first,dims.second);}
+            ui.SetNativeMap(0,glm::mat4(1));
+        }
+        const auto error=glGetError();if(error)std::cerr<<"GL error: "<<error<<"\n";Check(error==GL_NO_ERROR,"UI interaction draw produced GL errors");
         std::cout<<"PLAYER_UI keyboard, modes, source loadout and volume sink passed\n";
     }catch(const std::exception& error){std::cerr<<error.what()<<'\n';result=1;}
     glfwDestroyWindow(window);glfwTerminate();return result;

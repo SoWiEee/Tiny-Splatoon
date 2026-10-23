@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
     }
 
     int result = 0;
+    GLuint borrowedMapTexture = 0;
     {
         restoration::RmlRenderer renderer;
         Rml::SystemInterface system;
@@ -114,6 +116,14 @@ int main(int argc, char** argv) {
             check(Rml::LoadFontFace(inter.string()), "RmlUi could not load Inter.ttf");
             check(Rml::LoadFontFace(noto.string(), true), "RmlUi could not load NotoSansTC.ttf fallback");
 
+            const unsigned char mapPixel[] = {17, 231, 73, 255};
+            glGenTextures(1, &borrowedMapTexture);
+            glBindTexture(GL_TEXTURE_2D, borrowedMapTexture);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, mapPixel);
+            renderer.SetNativeMapTexture(borrowedMapTexture);
+
             Rml::Context* context = Rml::CreateContext("rml-renderer-smoke", {width, height}, &renderer);
             check(context != nullptr, "Could not create RmlUi context");
             const std::string documentSource = R"RML(<rml><head><style>
@@ -124,8 +134,12 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
 .label { position: absolute; left: 8px; width: 112px; height: 24px; font-family: Inter; font-size: 16px; color: #ffffff; }
 #latin { top: 42px; }
 #cjk { top: 68px; }
+#round { position: absolute; left: 104px; top: 8px; width: 24px; height: 24px; border-radius: 12px; overflow: hidden; }
+#round img { width: 24px; height: 24px; }
+#borrowed { position: absolute; left: 80px; top: 8px; width: 20px; height: 24px; }
 </style></head><body>
 <div id="red"></div><div id="clip"><div id="green"></div></div>
+<img id="borrowed" src="native-map"/><div id="round"><img src="native-map"/></div>
 <div id="latin" class="label">Inter Match UI</div>
 <div id="cjk" class="label">繁體中文 墨水</div>
 </body></rml>)RML";
@@ -168,6 +182,8 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
             glEnable(GL_CULL_FACE);
+            glEnable(GL_STENCIL_TEST);glStencilFuncSeparate(GL_FRONT,GL_NOTEQUAL,3,0x37);glStencilMaskSeparate(GL_FRONT,0x29);glStencilOpSeparate(GL_FRONT,GL_REPLACE,GL_INCR,GL_DECR);
+            glStencilFuncSeparate(GL_BACK,GL_LESS,7,0x17);glStencilMaskSeparate(GL_BACK,0x19);glStencilOpSeparate(GL_BACK,GL_INCR,GL_KEEP,GL_REPLACE);glClearStencil(5);
             glDisable(GL_BLEND);
             glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
             glBlendEquationSeparate(GL_FUNC_REVERSE_SUBTRACT, GL_FUNC_ADD);
@@ -177,7 +193,12 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
             check(context->Render(), "RmlUi context render failed");
             renderer.End();
 
+            check(glIsEnabled(GL_STENCIL_TEST),"Renderer did not restore the stencil test");
             GLint value = 0;
+            glGetIntegerv(GL_STENCIL_REF,&value);check(value==3,"Renderer did not restore front stencil reference");
+            glGetIntegerv(GL_STENCIL_BACK_REF,&value);check(value==7,"Renderer did not restore back stencil reference");
+            glGetIntegerv(GL_STENCIL_WRITEMASK,&value);check(value==0x29,"Renderer did not restore stencil write mask");
+            glGetIntegerv(GL_STENCIL_CLEAR_VALUE,&value);check(value==5,"Renderer did not restore stencil clear value");
             glGetIntegerv(GL_CURRENT_PROGRAM, &value);
             check(value == static_cast<GLint>(probeProgram), "Renderer did not restore the active program");
             glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &value);
@@ -223,9 +244,14 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
             const auto red = pixel(image, width, height, 12, 12);
             const auto green = pixel(image, width, height, 52, 12);
             const auto clipped = pixel(image, width, height, 68, 12);
+            const auto corner=pixel(image,width,height,104,8),roundCenter=pixel(image,width,height,116,20);
+            check(corner[0]<5&&corner[1]<5&&corner[2]<5&&roundCenter[1]>220,"Rounded overflow must clip texture corners while preserving its center");
+            const auto borrowed = pixel(image, width, height, 88, 16);
             check(red[0] > 240 && red[1] < 10 && red[2] < 10, "RmlUi red element did not reach the framebuffer");
             check(green[1] > 240 && green[0] < 10 && green[2] < 10, "RmlUi overflow clip did not draw its interior");
             check(clipped[0] < 5 && clipped[1] < 5 && clipped[2] < 5, "RmlUi overflow clip leaked pixels outside its scissor");
+            check(std::abs(int(borrowed[0])-17)<3 && std::abs(int(borrowed[1])-231)<3 && std::abs(int(borrowed[2])-73)<3,
+                  "RmlUi did not draw the borrowed native map texture");
             check(brightPixels(image, width, height, 8, 40, 120, 66) > 6,
                   "Inter glyph pixels were not rendered by the RmlUi document");
             check(brightPixels(image, width, height, 8, 66, 120, 95) > 6,
@@ -234,6 +260,8 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
 
             Rml::RemoveContext("rml-renderer-smoke");
             context = nullptr;
+            check(glIsTexture(borrowedMapTexture) == GL_TRUE,
+                  "RmlUi released a borrowed native map texture it does not own");
             Rml::Shutdown();
             initialized = false;
 
@@ -264,6 +292,10 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
                 Rml::Shutdown();
             }
         }
+    }
+    if(borrowedMapTexture){
+        if(glIsTexture(borrowedMapTexture)!=GL_TRUE){std::cerr<<"RmlRenderer destructor deleted the borrowed map texture\n";result=1;}
+        glDeleteTextures(1,&borrowedMapTexture);
     }
     glfwDestroyWindow(window);
     glfwTerminate();

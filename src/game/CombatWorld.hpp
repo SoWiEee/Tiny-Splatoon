@@ -127,6 +127,7 @@ struct CombatHudEvent {
     std::uint32_t attackerNid = std::numeric_limits<std::uint32_t>::max();
     std::uint32_t victimNid = std::numeric_limits<std::uint32_t>::max();
     int attackerTeam = -1, victimTeam = -1;
+    int victimTrackedTeam = -1; // Visibility at the instant of the splat.
     std::string attackerWeapon, victimWeapon, source;
     glm::dvec3 attackerPos{0.0}, victimPos{0.0};
     double damage = 0.0; // Applied HP loss on Hit; Denied uses 1 for low ink, 0 otherwise.

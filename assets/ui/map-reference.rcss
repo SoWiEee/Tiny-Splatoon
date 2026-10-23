@@ -1,0 +1,292 @@
+/* The map is always the live native stage texture; these rules only place
+   team markers and the frame used by the compact and jump-map views. */
+#hud .minimap {
+  top: auto;
+  right: auto;
+  left: 24dp;
+  bottom: 24dp;
+  width: 154dp;
+  box-sizing: border-box;
+  padding: 6dp;
+  background-color: #211d27;
+  border: 4dp #211d27;
+  border-radius: 26dp;
+  box-shadow: 0 4dp 0 #17141c;
+}
+#hud .minimap-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  z-index: 7;
+  top: -14dp;
+  left: 50%;
+  width: 104dp;
+  height: 28dp;
+  margin-left: -52dp;
+  padding: 2dp 6dp;
+  box-sizing: border-box;
+  border: 2dp #f4ecdc;
+  border-radius: 16dp;
+  color: #fffdf5;
+  background-color: #211d27;
+  font-size: 13dp;
+  font-weight: 800;
+}
+#hud .minimap-heading strong { margin: 0; color: #fffdf5; font-size: 14dp; }
+#hud .minimap-key {
+  display: inline-block;
+  margin-right: 5dp;
+  padding: 1dp 4dp;
+  border: 1dp #211d27;
+  border-radius: 5dp;
+  color: #211d27;
+  background-color: #f4ecdc;
+  font-size: 10dp;
+  font-weight: 900;
+}
+#hud #terrain-status,
+#hud #position-status { display: none; }
+#hud .map-surface {
+  position: relative;
+  width: 100%;
+  height: 248dp;
+  overflow: hidden;
+  background-color: #d8ddcf;
+  border: 3dp #f4ecdc;
+  border-radius: 20dp;
+}
+#hud #minimap-render {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleY(-1);
+}
+#hud .minimap-map {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  border-radius: 16dp;
+}
+#hud .map-zone-edge { height: 3dp; opacity: .85; }
+#hud .map-marker { position: absolute; z-index: 5; width: 0; height: 0; margin: 0; }
+#hud .map-pin-stem {
+  position: absolute;
+  z-index: 1;
+  left: -3dp;
+  top: -30dp;
+  width: 6dp;
+  height: 32dp;
+  border: 1dp #f4ecdc;
+  border-radius: 3dp;
+  background-color: #211d27;
+}
+#hud .map-pin-ground {
+  position: absolute;
+  z-index: 2;
+  left: -7dp;
+  top: -5dp;
+  width: 14dp;
+  height: 9dp;
+  box-sizing: border-box;
+  border: 2dp #211d27;
+  border-radius: 5dp;
+  box-shadow: 0 0 0 1dp #f4ecdc;
+}
+#hud .map-target {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  z-index: 3;
+  left: -31dp;
+  top: -91dp;
+  width: 62dp;
+  height: 62dp;
+  min-width: 62dp;
+  margin: 0;
+  padding: 4dp;
+  box-sizing: border-box;
+  border: 4dp #fffdf5;
+  border-radius: 31dp;
+  color: #fffdf5;
+  background-color: #22c8d9;
+  box-shadow: 0 0 0 2dp #211d27, 0 3dp 0 #211d27;
+}
+#hud .map-target img { width: 34dp; height: 34dp; }
+#hud .map-target strong {
+  display: block;
+  position: absolute;
+  z-index: 4;
+  right: -9dp;
+  top: -8dp;
+  min-width: 23dp;
+  height: 23dp;
+  padding: 0 2dp;
+  box-sizing: border-box;
+  border: 2dp #211d27;
+  border-radius: 7dp;
+  color: #211d27;
+  background-color: #fffdf5;
+  font-size: 16dp;
+  font-weight: 900;
+  line-height: 20dp;
+  text-align: center;
+}
+#hud .map-base-icon { display: block; position: relative; width: 34dp; height: 38dp; }
+#hud .map-base-icon i {
+  display: block; position: absolute; left: 2dp; bottom: 1dp; width: 30dp; height: 12dp;
+  box-sizing: border-box; border: 3dp #211d27; border-radius: 15dp;
+}
+#hud .map-base-icon b {
+  display: block; position: absolute; left: 5dp; bottom: 4dp; width: 24dp; height: 7dp;
+  box-sizing: border-box; border: 2dp #fffdf5; border-radius: 12dp;
+}
+#hud .map-base-icon em {
+  display: block; position: absolute; left: 15dp; top: 0; width: 4dp; height: 23dp;
+  box-sizing: border-box; border: 1dp #211d27; border-radius: 3dp; background-color: #fffdf5;
+}
+#hud .map-base-icon em u {
+  display: block; position: absolute; left: -5dp; top: 8dp; width: 11dp; height: 11dp;
+  box-sizing: border-box; border-right: 3dp #fffdf5; border-bottom: 3dp #fffdf5; transform: rotate(45deg);
+  box-shadow: 1dp 1dp 0 #211d27;
+}
+#hud .map-target-label {
+  display: block;
+  position: absolute;
+  z-index: 4;
+  left: -110dp;
+  top: -120dp;
+  width: 220dp;
+  color: #fffdf5;
+  font-size: 18dp;
+  font-weight: 900;
+  text-align: center;
+  font-effect: outline(2dp #211d27);
+}
+#hud .map-target.queued { border-color: #f28a24; box-shadow: 0 0 0 3dp #211d27, 0 0 0 6dp #f28a24; }
+#hud .map-target.unavailable { opacity: .52; }
+#hud .map-actor { position: absolute; z-index: 3; width: 8dp; height: 8dp; margin-left: -4dp; margin-top: -4dp; border: 1dp #211d27; border-radius: 4dp; }
+#hud .map-actor-ally { width: 16dp; height: 16dp; margin-left: -8dp; margin-top: -8dp; border: 2dp #fffdf5; border-radius: 8dp; box-shadow: 0 0 0 2dp #211d27; }
+#hud .map-actor-tracked { width: 10dp; height: 10dp; margin-left: -5dp; margin-top: -5dp; border: 2dp #211d27; border-radius: 5dp; }
+#hud .map-actor-local { width: 24dp; height: 24dp; margin-left: -12dp; margin-top: -12dp; border: 3dp #fffdf5; border-radius: 12dp; box-shadow: 0 0 0 3dp #211d27; }
+#hud .map-self-arrow { display: block; position: absolute; left: 0; top: -1dp; width: 100%; height: 100%; }
+#hud .map-self-arrow i {
+  display: block; position: absolute; left: 50%; top: 1dp; width: 0; height: 0; margin-left: -8dp;
+  border-left: 8dp transparent; border-right: 8dp transparent; border-bottom: 20dp #211d27;
+}
+#hud .map-self-arrow i b {
+  display: block; position: absolute; left: -5dp; top: 5dp; width: 0; height: 0;
+  border-left: 5dp transparent; border-right: 5dp transparent; border-bottom: 13dp #fffdf5;
+}
+#hud .map-you-label { display: none; }
+#hud .map-death-mark { position: absolute; z-index: 4; width: 18dp; height: 17dp; margin-left: -9dp; margin-top: -8dp; }
+#hud .map-death-mark img { width: 18dp; height: 17dp; }
+#hud .jump-map-help { display: none; }
+#hud .jump-map-queue { display: none; }
+#hud .jump-map-legend { display: none; }
+#hud .jump-target { display: flex; align-items: center; min-height: 34dp; margin: 3dp; padding: 4dp 7dp; border: 1dp #c8bca9; border-radius: 7dp; color: #211d27; background-color: #f4ecdc; }
+#hud .jump-target img { width: 22dp; height: 22dp; margin-right: 5dp; }
+#hud .jump-target strong { width: 20dp; font-size: 15dp; color: #211d27; }
+#hud .jump-target span { flex: 1; min-width: 0; font-size: 13dp; white-space: nowrap; overflow: hidden; }
+#hud .jump-target small { margin-left: 4dp; color: #625b53; font-size: 10dp; }
+
+#hud .minimap.jump-map-open {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  background-color: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+#hud .jump-map-open .minimap-heading,
+#hud .jump-map-open #position-status { display: none; }
+#hud .jump-map-open .map-surface {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+}
+#hud .jump-map-open #minimap-render { display: none; }
+#hud .jump-map-open .minimap-map { z-index: 2; border-radius: 0; }
+#hud .jump-map-open .map-target { left: -32dp; top: -94dp; width: 64dp; height: 64dp; min-width: 64dp; border-radius: 32dp; }
+#hud .jump-map-open .map-target img { width: 36dp; height: 36dp; }
+#hud .jump-map-open .map-target-label { left: -120dp; top: -125dp; width: 240dp; font-size: 20dp; }
+#hud .jump-map-open .map-pin-stem { top: -31dp; height: 33dp; }
+#hud .jump-map-open .map-actor-ally,
+#hud .jump-map-open .map-actor-tracked { display: none; }
+#hud .jump-map-open .map-actor-local { width: 44dp; height: 44dp; margin-left: -22dp; margin-top: -22dp; border: 4dp #fffdf5; border-radius: 22dp; }
+#hud .jump-map-open .map-self-arrow { top: 0; }
+#hud .jump-map-open .map-self-arrow i { top: 2dp; margin-left: -13dp; border-left-width: 13dp; border-right-width: 13dp; border-bottom-width: 32dp; }
+#hud .jump-map-open .map-self-arrow i b { left: -8dp; top: 7dp; border-left-width: 8dp; border-right-width: 8dp; border-bottom-width: 22dp; }
+#hud .jump-map-open .map-you-label { display: block; position: absolute; left: 50%; top: -37dp; width: 58dp; margin-left: -29dp; color: #fffdf5; font-size: 18dp; font-weight: 900; text-align: center; font-effect: outline(2dp #211d27); }
+#hud .jump-map-open .jump-map-help {
+  display: block;
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  bottom: 25dp;
+  width: 540dp;
+  margin-left: -270dp;
+  padding: 10dp 14dp;
+  border: 2dp #211d27;
+  border-radius: 20dp;
+  color: #f4ecdc;
+  background-color: #211d27ee;
+  font-size: 15dp;
+  font-weight: 700;
+  text-align: center;
+}
+#hud .jump-map-open .jump-map-queue {
+  display: block;
+  position: absolute;
+  z-index: 7;
+  right: 26dp;
+  bottom: 25dp;
+  max-width: 250dp;
+  margin: 0;
+  padding: 8dp 12dp;
+  border: 2dp #211d27;
+  border-radius: 12dp;
+  color: #211d27;
+  background-color: #f4ecdc;
+  font-size: 14dp;
+  font-weight: 700;
+}
+#hud .jump-map-open .jump-map-legend { display: none; }
+#hud #terrain-status, #hud #position-team-coverage { display: none; }
+
+/* Native renderer has no shadow-filter layers; use the existing solid borders. */
+#hud .minimap, #hud .map-target, #hud .map-pin-ground, #hud .map-actor-ally, #hud .map-actor-local, #hud .map-self-arrow em, #hud .map-base-icon em u { box-shadow: none; }
+#hud .minimap-heading { flex-direction: row; }
+
+#hud .map-actor-tracked { transform: rotate(45deg); border-radius: 3dp; border: 2dp #ffffff; width: 14dp; height: 14dp; margin-left: -7dp; margin-top: -7dp; }
+#hud .map-actor-local { width: 30dp; height: 34dp; margin-left: -15dp; margin-top: -17dp; border: 0; border-radius: 0; background-color: transparent; }
+#hud .map-actor-local.map-you { background-color: transparent; }
+#hud img.map-self-arrow { left: 0; top: 0; width: 100%; height: 100%; }
+#hud .jump-map-open .map-actor-local { width: 54dp; height: 60dp; margin-left: -27dp; margin-top: -30dp; background-color: #15121c; border: 4dp #ffffff; border-radius: 30dp; }
+#hud .jump-map-open img.map-self-arrow { left: 5dp; top: 3dp; width: 36dp; height: 45dp; }

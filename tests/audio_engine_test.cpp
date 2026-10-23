@@ -4,6 +4,7 @@
 #include "../src/game/CombatWorld.hpp"
 #include "../src/game/ArsenalData.hpp"
 #include "../src/game/NavGraph.hpp"
+#include "../src/network/AuthorityState.hpp"
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/ReferenceData.hpp"
 #include "../src/world/StageGeometry.hpp"
@@ -379,6 +380,142 @@ int main(int argc, char** argv) {
         require(directorEngine.ActiveVoices() > voicesBeforeFirstBarrel,
             "The first Barrage barrel cue must wait until approximately 950 ms after the first whistle");
         director.EndMatch();
+
+        boss->reset();
+        for (int i = 0; i < 55; ++i) boss->tick(0.1, false);
+        director.BeginMatch(bossMatch);
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        const auto updateBossSnapshot = [&](const auto& update) {
+            auto snapshot = boss->captureAuthorityState();
+            update(snapshot);
+            require(boss->applyAuthorityState(snapshot), "Boss audio timing snapshots must remain valid");
+        };
+        const auto updateBossState = [&](const auto& update) {
+            updateBossSnapshot([&](network::BossAuthorityState& snapshot) { update(snapshot.state); });
+        };
+        const auto advanceBossClock = [&](double step) {
+            updateBossState([&](BossState& state) { state.clock += step; });
+            director.Update(step, bossMatch, {}, listener, forward);
+        };
+        const auto localActor = std::find_if(bossMatch.actors().begin(), bossMatch.actors().end(),
+            [](const auto& candidate) { return candidate->isLocal(); });
+        const auto remoteActor = std::find_if(bossMatch.actors().begin(), bossMatch.actors().end(),
+            [](const auto& candidate) { return !candidate->isLocal(); });
+        require(localActor != bossMatch.actors().end() && remoteActor != bossMatch.actors().end(),
+            "Boss hit audio gates need local and remote actors");
+        const auto localIndex = static_cast<std::size_t>(std::distance(bossMatch.actors().begin(), localActor));
+        const auto remoteIndex = static_cast<std::size_t>(std::distance(bossMatch.actors().begin(), remoteActor));
+        updateBossSnapshot([&](network::BossAuthorityState& snapshot) { snapshot.damage[remoteIndex] += 20; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 0, "Remote non-weak Boss hits must stay silent per source gating");
+        updateBossSnapshot([&](network::BossAuthorityState& snapshot) {
+            snapshot.damage[remoteIndex] += 20; ++snapshot.weakHits[remoteIndex];
+        });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 1, "Remote weak Boss hits must route the source critical cue");
+        directorEngine.Clear();
+        const auto bossCritMetadata = directorEngine.Metadata("boss_crit");
+        require(bossCritMetadata && bossCritMetadata->sourceMinGapSeconds < 0.3,
+            "The remote critical throttle test must separate the source 300 ms gate from the clip minimum gap");
+        std::this_thread::sleep_for(std::chrono::duration<double>(bossCritMetadata->sourceMinGapSeconds + 0.03));
+        advanceBossClock(0.1);
+        updateBossSnapshot([&](network::BossAuthorityState& snapshot) {
+            snapshot.damage[remoteIndex] += 20; ++snapshot.weakHits[remoteIndex];
+        });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 0, "Remote critical cues must keep the source 300 ms gate after the clip minimum gap expires");
+        advanceBossClock(0.21);
+        updateBossSnapshot([&](network::BossAuthorityState& snapshot) {
+            snapshot.damage[remoteIndex] += 20; ++snapshot.weakHits[remoteIndex];
+        });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 1, "Remote weak Boss hits must sound again after the source gate");
+        directorEngine.Clear();
+        updateBossSnapshot([&](network::BossAuthorityState& snapshot) { snapshot.damage[localIndex] += 20; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 1, "Local non-weak Boss hits must use the source hit cue");
+        directorEngine.Clear();
+        std::this_thread::sleep_for(std::chrono::duration<double>(bossCritMetadata->sourceMinGapSeconds + 0.03));
+        advanceBossClock(0.08);
+        updateBossSnapshot([&](network::BossAuthorityState& snapshot) {
+            snapshot.damage[localIndex] += 20; ++snapshot.weakHits[localIndex];
+        });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 1, "Local weak Boss hits must use the source critical cue");
+        directorEngine.Clear();
+        updateBossState([](BossState& state) { state.phase = 2; state.hp = state.maxHp * 0.64; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() > 0, "A Boss phase transition must play its source phase sting immediately");
+        directorEngine.Clear();
+        advanceBossClock(0.15);
+        require(directorEngine.ActiveVoices() == 0, "A phase roar must wait for the source 300 ms delay");
+        updateBossState([](BossState& state) { state.stunned = true; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        const auto phaseMetadata = directorEngine.Metadata("boss_phase");
+        require(phaseMetadata.has_value(), "Boss phase cue metadata must exist");
+        std::this_thread::sleep_for(std::chrono::duration<double>(phaseMetadata->sourceMinGapSeconds + 0.03));
+        updateBossState([](BossState& state) { state.clock += 0.16; state.phase = 3; state.hp = state.maxHp * 0.30; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 1,
+            "A later phase arriving after the prior roar deadline must cancel it without replaying the stun crash");
+        directorEngine.Clear();
+        advanceBossClock(0.15);
+        require(directorEngine.ActiveVoices() == 0, "Phase change must cancel the pending dizzy loop and retain the new roar delay");
+        advanceBossClock(0.16);
+        require(directorEngine.ActiveVoices() > 0, "The latest Boss phase must play its roar after the source delay");
+        updateBossState([](BossState& state) { state.stunned = false; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+
+        director.EndMatch();
+        directorEngine.Clear();
+        bossMatch.restart();
+        boss = bossMatch.boss();
+        director.BeginMatch(bossMatch);
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        bossMatch.startPlaying();
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        updateBossState([](BossState& state) { state.phase = 2; state.hp = state.maxHp * 0.64; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        bossMatch.restart();
+        boss = bossMatch.boss();
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        advanceBossClock(0.4);
+        require(directorEngine.ActiveVoices() == 0, "Restarting a match in place must clear pending Boss audio before it leaks into the next match");
+
+        updateBossState([](BossState& state) { state.stunned = true; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() > 0, "Boss stun must play the crash cue immediately");
+        directorEngine.Clear();
+        advanceBossClock(0.2);
+        require(directorEngine.ActiveVoices() == 0, "The dizzy loop must wait for the source 350 ms stun delay");
+        advanceBossClock(0.16);
+        require(directorEngine.ActiveVoices() == 1, "Boss stun must start the dizzy loop after the source delay");
+        updateBossState([](BossState& state) { state.stunned = false; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        updateBossState([](BossState& state) { state.stunned = true; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        advanceBossClock(0.2);
+        updateBossState([](BossState& state) { state.stunned = false; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        advanceBossClock(0.2);
+        require(directorEngine.ActiveVoices() == 0, "Recovering before the delay must cancel the pending dizzy loop");
+        updateBossState([](BossState& state) { state.stunned = true; });
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        directorEngine.Clear();
+        advanceBossClock(0.1);
+        director.Pause();
+        director.Update(1.0 / 60.0, bossMatch, {}, listener, forward);
+        require(directorEngine.ActiveVoices() == 1, "Pause/resume must restore the dizzy loop immediately without replaying the crash cue");
+        director.EndMatch();
+        directorEngine.Clear();
 
         MatchOptions routeOptions; routeOptions.practice = true;
         MatchSimulation routeMatch(*stage, geometry, paint, nav, routeOptions);

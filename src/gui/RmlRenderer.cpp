@@ -130,6 +130,10 @@ struct RmlRenderer::Impl {
         GLint blendDestinationAlpha = GL_ZERO;
         GLint blendEquationRgb = GL_FUNC_ADD;
         GLint blendEquationAlpha = GL_FUNC_ADD;
+        struct StencilFace { GLint function=GL_ALWAYS,reference=0,valueMask=-1,writeMask=-1,fail=GL_KEEP,depthFail=GL_KEEP,pass=GL_KEEP; };
+        StencilFace stencilFront,stencilBack;
+        GLboolean stencil=GL_FALSE,colorMask[4]{};
+        GLint stencilClear=0;
         GLboolean blend = GL_FALSE;
         GLboolean depth = GL_FALSE;
         GLboolean depthWrite = GL_TRUE;
@@ -145,9 +149,12 @@ struct RmlRenderer::Impl {
     GLint hasTextureLocation = -1;
     Rml::Matrix4f transform;
     std::unordered_map<Rml::CompiledGeometryHandle, Geometry> geometries;
-    std::unordered_map<Rml::TextureHandle, GLuint> textures;
+    struct Texture { GLuint name=0; bool owned=false; };
+    std::unordered_map<Rml::TextureHandle, Texture> textures;
     Rml::CompiledGeometryHandle nextGeometry = 1;
     Rml::TextureHandle nextTexture = 1;
+    Rml::TextureHandle nativeMapHandle = 0;
+    GLuint nativeMapTexture = 0;
     SavedState saved;
     Rml::Rectanglei scissorRegion;
     int width = 0;
@@ -173,7 +180,7 @@ struct RmlRenderer::Impl {
         }
         for (const auto& [handle, texture] : textures) {
             (void)handle;
-            if (texture) glDeleteTextures(1, &texture);
+            if (texture.owned&&texture.name) glDeleteTextures(1, &texture.name);
         }
         if (program) glDeleteProgram(program);
     }
@@ -251,12 +258,20 @@ struct RmlRenderer::Impl {
 
         const Rml::TextureHandle handle = allocateTextureHandle();
         try {
-            textures.emplace(handle, name);
+            textures.emplace(handle, Texture{name,true});
         } catch (...) {
             glDeleteTextures(1, &name);
             throw;
         }
         return handle;
+    }
+
+    Rml::TextureHandle borrowedNativeMap() {
+        if(!nativeMapHandle){
+            nativeMapHandle=allocateTextureHandle();
+            textures.emplace(nativeMapHandle,Texture{nativeMapTexture,false});
+        }
+        return nativeMapHandle;
     }
 
     Rml::TextureHandle allocateTextureHandle() {
@@ -290,6 +305,12 @@ struct RmlRenderer::Impl {
                             static_cast<GLenum>(saved.blendDestinationAlpha));
         glBlendEquationSeparate(static_cast<GLenum>(saved.blendEquationRgb),
                                 static_cast<GLenum>(saved.blendEquationAlpha));
+        for(const auto face:{GL_FRONT,GL_BACK}){
+            const auto& s=face==GL_FRONT?saved.stencilFront:saved.stencilBack;
+            glStencilFuncSeparate(face,s.function,s.reference,s.valueMask);glStencilMaskSeparate(face,s.writeMask);glStencilOpSeparate(face,s.fail,s.depthFail,s.pass);
+        }
+        glClearStencil(saved.stencilClear);glColorMask(saved.colorMask[0],saved.colorMask[1],saved.colorMask[2],saved.colorMask[3]);
+        if(saved.stencil)glEnable(GL_STENCIL_TEST);else glDisable(GL_STENCIL_TEST);
         glDepthMask(saved.depthWrite);
         if (saved.blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
         if (saved.depth) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
@@ -321,6 +342,14 @@ bool RmlRenderer::Begin(int width, int height) {
     glGetIntegerv(GL_BLEND_DST_ALPHA, &state.blendDestinationAlpha);
     glGetIntegerv(GL_BLEND_EQUATION_RGB, &state.blendEquationRgb);
     glGetIntegerv(GL_BLEND_EQUATION_ALPHA, &state.blendEquationAlpha);
+    state.stencil=glIsEnabled(GL_STENCIL_TEST);glGetIntegerv(GL_STENCIL_CLEAR_VALUE,&state.stencilClear);glGetBooleanv(GL_COLOR_WRITEMASK,state.colorMask);
+    for(const auto face:{GL_FRONT,GL_BACK}){
+        auto& s=face==GL_FRONT?state.stencilFront:state.stencilBack;const bool back=face==GL_BACK;
+        glGetIntegerv(back?GL_STENCIL_BACK_FUNC:GL_STENCIL_FUNC,&s.function);glGetIntegerv(back?GL_STENCIL_BACK_REF:GL_STENCIL_REF,&s.reference);
+        glGetIntegerv(back?GL_STENCIL_BACK_VALUE_MASK:GL_STENCIL_VALUE_MASK,&s.valueMask);glGetIntegerv(back?GL_STENCIL_BACK_WRITEMASK:GL_STENCIL_WRITEMASK,&s.writeMask);
+        glGetIntegerv(back?GL_STENCIL_BACK_FAIL:GL_STENCIL_FAIL,&s.fail);glGetIntegerv(back?GL_STENCIL_BACK_PASS_DEPTH_FAIL:GL_STENCIL_PASS_DEPTH_FAIL,&s.depthFail);glGetIntegerv(back?GL_STENCIL_BACK_PASS_DEPTH_PASS:GL_STENCIL_PASS_DEPTH_PASS,&s.pass);
+    }
+    glDisable(GL_STENCIL_TEST);glStencilMask(~0u);glClearStencil(0);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
     state.blend = glIsEnabled(GL_BLEND);
     state.depth = glIsEnabled(GL_DEPTH_TEST);
     state.depthWrite = GL_TRUE;
@@ -438,7 +467,7 @@ void RmlRenderer::RenderGeometry(Rml::CompiledGeometryHandle geometryHandle, Rml
     if (textureHandle) {
         const auto foundTexture = impl_->textures.find(textureHandle);
         if (foundTexture == impl_->textures.end()) return;
-        texture = foundTexture->second;
+        texture = foundTexture->second.name;
     }
 
     std::array<GLfloat, 16> transform{};
@@ -456,6 +485,21 @@ void RmlRenderer::RenderGeometry(Rml::CompiledGeometryHandle geometryHandle, Rml
     glDrawElements(GL_TRIANGLES, geometry->second.indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
+void RmlRenderer::EnableClipMask(bool enable) {
+    if(enable)glEnable(GL_STENCIL_TEST);else glDisable(GL_STENCIL_TEST);
+}
+
+void RmlRenderer::RenderToClipMask(Rml::ClipMaskOperation operation,Rml::CompiledGeometryHandle geometry,Rml::Vector2f translation) {
+    if(!impl_||!impl_->active)return;
+    GLint reference=0;glGetIntegerv(GL_STENCIL_REF,&reference);glStencilMask(~0u);
+    if(operation!=Rml::ClipMaskOperation::Intersect)glClear(GL_STENCIL_BUFFER_BIT);
+    glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);glStencilFunc(GL_ALWAYS,1,~0u);
+    if(operation==Rml::ClipMaskOperation::Intersect){glStencilOp(GL_KEEP,GL_KEEP,GL_INCR);++reference;}
+    else {glStencilOp(GL_KEEP,GL_KEEP,GL_REPLACE);reference=operation==Rml::ClipMaskOperation::Set?1:0;}
+    RenderGeometry(geometry,translation,0);
+    glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);glStencilOp(GL_KEEP,GL_KEEP,GL_KEEP);glStencilFunc(GL_EQUAL,reference,~0u);
+}
+
 void RmlRenderer::ReleaseGeometry(Rml::CompiledGeometryHandle geometryHandle) {
     if (!impl_) return;
     const auto found = impl_->geometries.find(geometryHandle);
@@ -470,6 +514,10 @@ Rml::TextureHandle RmlRenderer::LoadTexture(Rml::Vector2i& textureDimensions, co
     textureDimensions = {0, 0};
     try {
         const auto path = std::filesystem::u8path(source.begin(), source.end());
+        if(path.lexically_normal().filename()=="native-map"){
+            textureDimensions={256,384};
+            return impl_->borrowedNativeMap();
+        }
         std::ifstream file(path, std::ios::binary);
         if (!file) return 0;
         std::vector<unsigned char> encoded((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -511,8 +559,16 @@ void RmlRenderer::ReleaseTexture(Rml::TextureHandle textureHandle) {
     if (!impl_) return;
     const auto found = impl_->textures.find(textureHandle);
     if (found == impl_->textures.end()) return;
-    if (found->second) glDeleteTextures(1, &found->second);
+    if (found->second.owned&&found->second.name) glDeleteTextures(1, &found->second.name);
+    if (textureHandle==impl_->nativeMapHandle) impl_->nativeMapHandle=0;
     impl_->textures.erase(found);
+}
+
+void RmlRenderer::SetNativeMapTexture(GLuint texture) {
+    if(!impl_)return;
+    impl_->nativeMapTexture=texture;
+    const auto found=impl_->textures.find(impl_->nativeMapHandle);
+    if(found!=impl_->textures.end())found->second.name=texture;
 }
 
 void RmlRenderer::EnableScissorRegion(bool enable) {
