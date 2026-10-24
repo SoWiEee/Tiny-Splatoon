@@ -113,3 +113,11 @@
 - UI 首次因新加 Kelpline 選單測試誤讀 select 本體的 InnerRML 失敗，改讀實際 option 後繼續；其後舊復活 fixture 未進入 Playing，再隔離調整。最新執行仍在結果獎章 `塗地之王／擊倒之星` 斷言失敗（`v086-ui-phase-confirm.log`，15.18 秒）；暫停全按鈕測試位於後段，尚未完成執行。程式已移除局內設定、操作說明隱藏整份 HUD、返回主選單清除暫停／確認層，仍需下一輪完整補驗。
 - 玩家 Shift 回歸尚未通過（`v086-player-override-confirm.log`，2.85 秒）：格柵測試、chargerDive 墨量及己墨牆面落地斷言仍存在差異。乾地／敵墨維持人形為使用者明確指定的來源差異，但目前未完成相關 fixture 與實作的最終判定。
 - 未重跑完整測試套件；Bot 自主隊友超級跳躍仍保留待辦，Kelpline／海帶線貨運站已提供三模式。未修改鎖定的 splat-ref 或 baseline。發布後不追蹤 GitHub CI 進度。
+
+
+## v0.8.6 發布後補驗（2026-10-25）
+
+- UI 原失敗已重現（`v086-ui-resume-red.log`）；結果獎章測試原以 1500／7 假設最高分，實際 Bot 可超過。改以所有演員當前最高塗地／擊倒加值建立獎章資格，不改生產規則。完整 `reference_player_ui_interactions` 通過，15.28 秒（`v086-ui-resume-confirm.log`），包含真實點擊暫停操作說明、Back／Esc、返回取消／確認、Resume、清除主選單殘留層及復活 Intro／Playing／Finish／Results。
+- 玩家來源 fixture 原允許乾地變魷魚，與使用者指定規則不同。保留所有不受影響的來源斷言；乾地移動對 run oracle、格柵獨立驗證健康站立人形、charger／spinner／roller 對同武器無 Shift 控制組檢查耗墨／姿態／發射，另檢查 roller windup、己墨牆面攀爬／空中魷魚／乾地落地及強制彈射。`reference_player_simulation` 通過，0.76 秒（`v086-player-resume2-confirm.log`）。
+- Boss 的來源出生朝向不保證符合衝撞導航；一般目標也不保證 chargeLane 非空。GPU fixture 掃描實際 Tidewater plan cells／完整朝向，要求 poseOk／turnOk／cast >= 6 m，經權威狀態入口採用合法位置並放置存活目標，再經真實 forceMove／tick 到前兆與活動期。六招式與小螃蟹含死亡延遲通過，3.90 秒（`v086-boss-resume2-confirm.log`）；不是 AI 自然選招統計。
+- 本批僅修改測試與驗收文件，未修改生產玩法、來源樹或固定 fixture；既有未受影響的完整測試集不重跑。

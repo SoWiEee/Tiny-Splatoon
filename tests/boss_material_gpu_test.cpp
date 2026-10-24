@@ -1,6 +1,7 @@
 #include "BossRenderer.hpp"
 #include "MatchSimulation.hpp"
 #include "ReferenceData.hpp"
+#include "../src/network/AuthorityState.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -98,17 +99,45 @@ int main(int argc,char** argv){
             require(moveMatch.boss()->state().anim==0,(std::string("Fresh Boss intro did not finish for ")+name).c_str());
             moveRenderer.Update(*moveMatch.boss());
             require(moveMatch.local().state.alive,(std::string("Fresh Boss owner is not alive for ")+name).c_str());
-            require(placeTarget(moveMatch),(std::string("Could not place Boss target for ")+name+" hazard test").c_str());
             auto& boss=*moveMatch.boss();BossMove move;bool found=false;
             const double requestedAt=boss.state().clock;
             if(id==BossMoveId::Charge){
-                moveMatch.local().state.invuln=1.0e6;
-                for(int step=0;step<2400&&!found;++step){
-                    boss.tick(.05,true);moveRenderer.Update(boss);
+                const auto& nav=boss.nav();double length=0,bossX=0,bossZ=0,bossYaw=0;
+                for(const int cell:nav.planIds()){
+                    const auto [x,z]=nav.xz(cell);
+                    for(int heading=0;heading<360;heading+=5){
+                        const double yaw=glm::radians(static_cast<double>(heading));
+                        if(!nav.poseOk(x,z,yaw)||!nav.turnOk(x,z,yaw))continue;
+                        const auto cast=nav.cast(x,z,yaw,34);
+                        if(cast.dist>=6&&cast.dist>length){length=cast.dist;bossX=x;bossZ=z;bossYaw=yaw;}
+                    }
+                }
+                require(length>=6,"Boss stage has no legal full-circle Charge origin");
+                auto snapshot=boss.captureAuthorityState();
+                snapshot.state.pos={bossX,nav.floorAt(bossX,bossZ),bossZ};snapshot.state.vel=glm::dvec3(0);snapshot.state.yaw=bossYaw;snapshot.state.turn=0;
+                snapshot.state.target=-1;snapshot.state.anim=0;snapshot.state.stunned=false;snapshot.state.invulnerable=false;
+                snapshot.move.reset();snapshot.moves.clear();snapshot.crablets.clear();
+                require(boss.adoptAuthorityState(snapshot),"Boss rejected its validated Charge origin");
+                const auto chargeCast=nav.cast(bossX,bossZ,bossYaw,34);
+                require(nav.isPlan(bossX,bossZ)&&nav.poseOk(bossX,bossZ,bossYaw)&&nav.turnOk(bossX,bossZ,bossYaw)&&chargeCast.dist>=6,
+                        "Adopted Boss Charge origin failed source navigation checks");
+                moveRenderer.Update(boss);moveMatch.local().state.invuln=1.0e6;
+                bool targetPlaced=false;
+                for(double distance=std::min(10.0,chargeCast.dist-.5);distance>=2.5&&!targetPlaced;distance-=.25){
+                    const double x=bossX+std::sin(bossYaw)*distance,z=bossZ+std::cos(bossYaw)*distance;
+                    if(!nav.isPlan(x,z)||nav.inPad(x,z,3.4))continue;
+                    const double ground=geometry.groundHeight(x,z,boss.state().pos.y+10);
+                    if(!std::isfinite(ground)||geometry.pointInside({x,ground+.3,z}))continue;
+                    moveMatch.local().state.pos={x,ground,z};moveMatch.local().state.vel=glm::dvec3(0);targetPlaced=true;
+                }
+                require(targetPlaced,"Could not place a living Boss target down the validated Charge lane");
+                for(int step=0;step<600&&!found;++step){
+                    boss.forceMove(id);boss.tick(.05,true);moveRenderer.Update(boss);
                     for(auto it=boss.moves().rbegin();it!=boss.moves().rend();++it)
                         if(it->id==id&&it->t0>=requestedAt-.001){move=*it;found=true;break;}
                 }
             }else{
+                require(placeTarget(moveMatch),(std::string("Could not place Boss target for ")+name+" hazard test").c_str());
                 boss.forceMove(id);
                 for(int step=0;step<600&&!found;++step){
                     boss.tick(.05,true);moveRenderer.Update(boss);
@@ -116,7 +145,7 @@ int main(int argc,char** argv){
                         if(it->id==id&&it->t0>=requestedAt-.001){move=*it;found=true;break;}
                 }
             }
-            require(found,(std::string(id==BossMoveId::Charge?"Boss naturally selected a source-valid ":"Forced Boss ")+name+" move did not start (alive="+std::to_string(moveMatch.local().state.alive)+", target="+std::to_string(boss.state().target)+", clock="+std::to_string(boss.state().clock)+", moves="+std::to_string(boss.moves().size())+")").c_str());
+            require(found,(std::string("Forced source-valid Boss ")+name+" move did not start (alive="+std::to_string(moveMatch.local().state.alive)+", target="+std::to_string(boss.state().target)+", clock="+std::to_string(boss.state().clock)+", moves="+std::to_string(boss.moves().size())+")").c_str());
             const auto advanceTo=[&](double u){
                 int step=0;while(moveMatch.boss()->state().clock-move.t0<u&&step++<200){moveMatch.boss()->tick(.05,true);moveRenderer.Update(*moveMatch.boss());}
                 require(moveMatch.boss()->state().clock-move.t0>=u-.001,(std::string("Boss ")+name+" move did not reach requested phase").c_str());

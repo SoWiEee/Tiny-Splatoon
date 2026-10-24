@@ -840,7 +840,9 @@ int main(int argc,char** argv){
         Check(std::abs(shownXp()-xpMidReveal)<=std::ceil(clockDrift*reward.gained*3/1.7)+1&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"Repeated reward assignments must not restart the XP reveal or duplicate a tick");
         glfwSetTime(glfwGetTime()+2.0);hudRender(false);
         Check(xpLabel->GetInnerRML().find("+640")!=Rml::String::npos,"Results must finish by displaying the saved XP reward");
-        match.local().applyNetworkStats(1500,0,0,7,0);hudRender(false);
+        double topTurf=0;int topSplats=0;
+        for(const auto& actor:match.actors()){topTurf=std::max(topTurf,actor->turfPainted());topSplats=std::max(topSplats,actor->splats());}
+        match.local().applyNetworkStats(topTurf+100,0,0,topSplats+1,0);hudRender(false);
         Check(hud->GetElementById("result-medals")->GetInnerRML().find("塗地之王")!=Rml::String::npos&&hud->GetElementById("result-medals")->GetInnerRML().find("擊倒之星")!=Rml::String::npos,"Earned Turf King and Top Splatter medals must appear from final stats");
         Check(hud->GetElementById("results-table")->GetInnerRML().find("BOT")!=Rml::String::npos&&hud->GetElementById("results-table")->GetInnerRML().find("result-weapon")!=Rml::String::npos,"Results must identify live bots and equipped weapon artwork");
         Capture(std::filesystem::path(argv[2])/"results.png",1600,900);

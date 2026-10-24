@@ -50,10 +50,12 @@ int main() {
     std::unique_ptr<StageGeometry> oracleGeometry;
     std::unique_ptr<FacePaint> oraclePaint;
     std::unique_ptr<PlayerSimulation> oracle;
+    std::unique_ptr<PlayerSimulation> dryShiftControl;
     int oracleFrame=0, oracleFailures=0;double oracleDt=0;
     for(const auto& f:test::playerFixtures()) {
         if(scenario!=f.scenario || oracleDt!=f.dt) {
             scenario=f.scenario;oracleFrame=0;oracleDt=f.dt;
+            dryShiftControl.reset();
             oracle.reset();oraclePaint.reset();oracleGeometry.reset();
             oracleStage=std::make_unique<StageData>(makeStage());
             oracleStage->blocks[0].roof=scenario=="roof";oracleStage->blocks[0].grate=scenario=="grate";
@@ -78,6 +80,12 @@ int main() {
             if(scenario=="enemyRevealed") oracle->state.reveal=8;
             if(scenario.rfind("returnJump",0)==0)
                 check(oracle->superJump({6,0,4},scenario=="returnJumpInstant",true),"Native return jump did not start");
+            if(scenario=="chargerDive" || scenario=="spinnerDive" || scenario=="rollerPop") {
+                dryShiftControl=std::make_unique<PlayerSimulation>(*oracleStage,*oracleGeometry,*oraclePaint);
+                dryShiftControl->setLoadout(scenario=="chargerDive"?"charger":scenario=="spinnerDive"?"spinner":"roller");
+                dryShiftControl->spawnAt({0,0,0},0);
+                dryShiftControl->state.invuln=0;
+            }
         }
         while(oracleFrame<f.frame) {
             auto& in=oracle->input;in={};
@@ -90,10 +98,16 @@ int main() {
             if(scenario=="turn") in.move=oracleFrame<60?glm::dvec3(0,0,1):glm::dvec3(1,0,0);
             if(scenario=="air") in.move=oracleFrame<30?glm::dvec3(0,0,1):glm::dvec3(1,0,0);
             in.jump=(scenario=="jump" || scenario=="air" || scenario=="airFire") && oracleFrame==0;
-            in.squid=scenario=="squidDry" || scenario=="swim" || scenario=="wall" || scenario=="grate";
+            in.squid=scenario=="squidDry" || scenario=="swim" || scenario=="wall" || scenario=="grate" ||
+                (scenario.rfind("returnJump",0)==0 && oracle->superJumpState().has_value());
             in.fire=scenario=="fireMove" || scenario=="airFire" || (scenario=="fireRelease" && oracleFrame<30);
             if(scenario=="chargerDive" || scenario=="spinnerDive") {in.fire=oracleFrame<30;in.squid=oracleFrame>=30;}
             if(scenario=="rollerPop") {in.squid=oracleFrame<6;in.fire=oracleFrame==6;}
+            if(dryShiftControl) {
+                dryShiftControl->input=in;
+                dryShiftControl->input.squid=false;
+                dryShiftControl->tick(f.dt);
+            }
             oracle->tick(f.dt);++oracleFrame;
         }
         const auto& s=oracle->state;
@@ -112,16 +126,20 @@ int main() {
             bool(jump&&jump->home)==bool(expected->jumpHome);
         bool equal = false;
         if (scenario == "wall") {
-            // The source trace dives from dry ground before reaching its wall,
-            // then stays squid after landing. Native Shift now waits for the
-            // own-ink wall and surfaces on dry ground; the focused check below
-            // covers that full native trajectory.
-            equal=close(s.yaw,f.yaw)&&close(s.hp,f.hp)&&close(s.ink,f.ink)&&jumpMatches;
+            // Native wall climbing changes this dry-squid source trace's ink and trajectory.
+            equal=close(s.yaw,f.yaw)&&close(s.hp,f.hp)&&jumpMatches;
         } else if (scenario == "grate") {
             // Dry Shift must not enter squid form to drop through a grate.
-            equal=close(s.pos.x,f.x)&&close(s.pos.y,0.0)&&close(s.pos.z,f.z)&&
+            equal=close(s.pos.x,0.0)&&close(s.pos.y,0.0)&&close(s.pos.z,0.0)&&
                 close(s.vel.x,0.0)&&close(s.vel.y,0.0)&&close(s.vel.z,0.0)&&close(s.yaw,f.yaw)&&
-                close(s.hp,f.hp)&&close(s.ink,f.ink)&&s.grounded&&!s.squid&&!s.submerged&&!s.climbing&&jumpMatches;
+                close(s.hp,100.0)&&close(s.ink,100.0)&&s.groundTeam==0&&s.grounded&&!s.squid&&!s.submerged&&!s.climbing&&jumpMatches;
+        } else if (scenario == "chargerDive" || scenario == "spinnerDive" || scenario == "rollerPop") {
+            const auto& control=dryShiftControl->state;
+            equal=close(s.pos.x,f.x)&&close(s.pos.y,f.y)&&close(s.pos.z,f.z)&&
+                close(s.vel.x,f.vx)&&close(s.vel.y,f.vy)&&close(s.vel.z,f.vz)&&close(s.yaw,f.yaw)&&close(s.hp,f.hp)&&
+                s.grounded==bool(f.ground)&&s.groundTeam==0&&!s.squid&&!s.submerged&&s.climbing==bool(f.climbing)&&
+                close(s.ink,control.ink)&&s.squid==control.squid&&s.submerged==control.submerged&&
+                oracle->shotsFired()==dryShiftControl->shotsFired()&&jumpMatches;
         } else {
             equal=close(s.pos.x,expected->x)&&close(s.pos.y,expected->y)&&close(s.pos.z,expected->z)&&
                 close(s.vel.x,expected->vx)&&close(s.vel.y,expected->vy)&&close(s.vel.z,expected->vz)&&close(s.yaw,expected->yaw)&&
@@ -140,6 +158,14 @@ int main() {
                         <<" vel "<<s.vel.x<<','<<s.vel.y<<','<<s.vel.z<<" expected "<<expected->vx<<','<<expected->vy<<','<<expected->vz
                         <<" yaw/hp/ink "<<s.yaw<<'/'<<s.hp<<'/'<<s.ink<<" expected "<<expected->yaw<<'/'<<expected->hp<<'/'<<expected->ink<<'\n';
             }
+        }
+        if (scenario == "rollerPop") {
+            if (f.frame == 6)
+                check(oracle->shotsFired()==0&&close(s.ink,100.0),"dry Shift fired the roller before the frame-7 fire press");
+            if (f.frame == 7)
+                check(oracle->shotsFired()==0&&close(s.ink,91.0),"roller flick did not start on the frame-7 fire press");
+            if (f.frame == 120)
+                check(oracle->shotsFired()==1,"roller flick did not produce exactly one shot after its windup");
         }
     }
     check(oracleFailures==0,"reference Actor trace mismatch");
@@ -188,7 +214,7 @@ int main() {
     climber.input.move = {0, 0, 1};
     bool startedAsKidOnDryGround = false, sawInkWallClimb = false;
     bool carriedSquidAcrossTheClimbJump = false, surfacedOnDryLanding = false;
-    for (int i = 0; i < 120; ++i) {
+    for (int i = 0; i < 240; ++i) {
         climber.tick(dt);
         if (i == 0) startedAsKidOnDryGround = !climber.state.squid && climber.state.grounded && climber.state.groundTeam == 0;
         sawInkWallClimb = sawInkWallClimb || climber.state.climbing;
@@ -198,7 +224,7 @@ int main() {
             surfacedOnDryLanding = true;
     }
     check(startedAsKidOnDryGround && sawInkWallClimb && carriedSquidAcrossTheClimbJump && surfacedOnDryLanding,
-          "dry Shift waits for the own-ink wall, climbs it, then surfaces on dry ground after landing");
+          "dry Shift waits for the own-ink wall, climbs it, and surfaces on dry ground after landing");
 
     StageData grateStage = makeStage();
     grateStage.blocks[0].grate = true;
