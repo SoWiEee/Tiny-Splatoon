@@ -43,7 +43,7 @@
             if(auto* gauge=dynamic_cast<SpecialGaugeElement*>(Find(hud,"special-orb")))gauge->Reset();
         }
         const double dt=battle.time>=0?std::clamp(now-battle.time,0.,.1):0;battle.time=now;
-        const bool obscured=paused||results||jumpMapOpen||hudOverlay||practiceGear;
+        const bool obscured=paused||results||mapInteraction.open()||hudOverlay||practiceGear;
         Hidden(hud,"battle-hud-layer",obscured);
         bool deniedThisFrame=false;
         for(const auto& event:world.hudEvents()){
@@ -120,7 +120,7 @@
         if(state.alive&&!battle.alive){battle.deathName.clear();battle.deathWeapon.clear();battle.deathCause.clear();battle.directions.clear();}
         battle.alive=state.alive;
         Hidden(hud,"death-card",state.alive);Text(hud,"death-by",battle.deathName.empty()?"遭到擊倒":battle.deathName+" 擊倒了你");Text(hud,"death-cause",battle.deathCause);
-        Text(hud,"respawn-seconds",Integer(std::ceil(state.respawnTimer)));Text(hud,"respawn-hint",jumpMapQueuedKey>=0?"已安排復活彈射："+jumpMapQueuedLabel:"按住 Tab／M 規劃復活彈射");
+        Text(hud,"respawn-seconds",Integer(std::ceil(state.respawnTimer)));Text(hud,"respawn-hint",mapInteraction.queuedKey()>=0?"已安排復活彈射："+mapInteraction.queuedLabel():"按住 Tab／M 規劃復活彈射");
         dynamic_cast<HudRingElement*>(Find(hud,"death-ring"))->Update(std::clamp(1-state.respawnTimer/5.5,0.,1.),HudColor(battle.deathColor),Rml::Colourb(255,255,255,45));
         const auto causeMain=EquipmentLabel(EquipmentCategory::Main,battle.deathWeapon);const auto causeSub=EquipmentLabel(EquipmentCategory::Sub,battle.deathWeapon);const auto causeSpecial=EquipmentLabel(EquipmentCategory::Special,battle.deathWeapon);
         auto* deathArt=Find(hud,"death-weapon");const std::string art=!causeMain.empty()?"weapons/"+battle.deathWeapon+".png":!causeSub.empty()?"equipment/sub-"+battle.deathWeapon+".png":!causeSpecial.empty()?"equipment/special-"+battle.deathWeapon+".png":"weapons/squid.png";deathArt->SetAttribute("src",art);

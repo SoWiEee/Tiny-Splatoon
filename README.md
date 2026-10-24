@@ -41,7 +41,7 @@
 
 直接遊玩：下載 [Windows x64 Release](https://github.com/SoWiEee/Tiny-Splatoon/releases/latest)，完整解壓後執行 `Tiny-Splatoon.exe`。
 
-原始碼建置需要 Windows、OpenGL 4.5、Visual Studio C++ 工具、CMake、Ninja 與 vcpkg。在 **x64 Native Tools** 終端執行：
+原始碼建置需要 Windows、OpenGL 4.5、Visual Studio C++ 工具、CMake 3.20+、Ninja 與 vcpkg。在 **x64 Native Tools** 終端執行：
 
 ```powershell
 $env:VCPKG_ROOT = 'C:\path\to\vcpkg'

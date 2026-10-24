@@ -115,6 +115,15 @@ int main() {
         check(near(camera.yaw,.479),"Playing accepts fresh mouse motion after the intro lock");
     }
     {
+        Harness harness(true);FollowCamera camera;PlayerController controller;PlayerSettings settings;
+        ControllerInput input;input.gamepadConnected=true;input.rightStickX=1;input.rightStickY=.7;
+        for(int i=0;i<30;++i)controller.Update(dt,input,settings,harness.match,camera,harness.geometry);
+        const auto yaw=camera.yaw,pitch=camera.pitch;
+        controller.ResetLook();input.rightStickX=input.rightStickY=0;
+        controller.Update(dt,input,settings,harness.match,camera,harness.geometry);
+        check(near(camera.yaw,yaw)&&near(camera.pitch,pitch),"Interaction transitions clear stick smoothing so neutral resume cannot turn the camera");
+    }
+    {
         Harness harness(true);
         auto& actor = harness.match.local();
         FollowCamera camera;

@@ -1,18 +1,95 @@
 #include "EnvironmentRenderer.hpp"
 #include "EnvironmentScene.hpp"
 #include "DirectionalShadow.hpp"
+#include "EnvironmentTextureCatalog.hpp"
 #include "ReferenceData.hpp"
+#include "../data/Json.hpp"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <variant>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <zlib.h>
 
 namespace restoration {
+namespace environment_detail {
+namespace {
+constexpr std::uint32_t MaxTextureDimension=16384;
+constexpr std::uint64_t MaxTextureBytes=512ull*1024*1024;
+constexpr std::array<std::string_view,7> RequiredTextures{{
+    "wave.rgba8.z","cloud-day.rgba16f.z","cloud-sunset.rgba16f.z","cloud-golden.rgba16f.z",
+    "pmrem-day.rgba16f.z","pmrem-sunset.rgba16f.z","pmrem-golden.rgba16f.z"}};
+
+std::uint32_t field(const data::JsonValue& object,const char* name,const std::string& file){
+    const auto* value=object.get(name);
+    const auto* number=value?std::get_if<double>(&value->value):nullptr;
+    if(!number||!std::isfinite(*number)||*number<0||std::floor(*number)!=*number||*number>MaxTextureDimension)
+        throw std::runtime_error("Invalid environment texture "+file+" "+name);
+    return static_cast<std::uint32_t>(*number);
+}
+
+std::size_t pixelBytes(const TextureDescriptor& descriptor,const std::string& label){
+    if(!descriptor.width||!descriptor.height||descriptor.width>MaxTextureDimension||descriptor.height>MaxTextureDimension||
+       (descriptor.bits!=8&&descriptor.bits!=16))throw std::runtime_error("Invalid environment texture dimensions or bit depth: "+label);
+    const std::uint64_t bytes=std::uint64_t(descriptor.width)*descriptor.height*4*(descriptor.bits/8);
+    if(bytes>MaxTextureBytes)throw std::runtime_error("Environment texture is too large: "+label);
+    return static_cast<std::size_t>(bytes);
+}
+
+unsigned word(const std::vector<unsigned char>& bytes,std::size_t offset){
+    return static_cast<unsigned>(bytes[offset])|(static_cast<unsigned>(bytes[offset+1])<<8)|
+        (static_cast<unsigned>(bytes[offset+2])<<16)|(static_cast<unsigned>(bytes[offset+3])<<24);
+}
+}
+
+TextureCatalog parseTextureCatalog(std::string_view json){
+    if(json.size()>1024*1024)throw std::runtime_error("Environment texture catalog is too large");
+    const auto root=data::JsonParser(json).parse();const auto* files=root.object();
+    if(!files)throw std::runtime_error("Invalid environment texture catalog");
+    TextureCatalog result;
+    for(const auto name:RequiredTextures){
+        const auto found=files->find(name);
+        if(found==files->end()||!found->second.object())throw std::runtime_error("Missing environment texture descriptor: "+std::string(name));
+        TextureDescriptor descriptor;
+        descriptor.width=field(found->second,"width",std::string(name));
+        descriptor.height=field(found->second,"height",std::string(name));
+        descriptor.bits=field(found->second,"bits",std::string(name));
+        pixelBytes(descriptor,std::string(name));
+        result.emplace(std::string(name),descriptor);
+    }
+    return result;
+}
+
+TextureCatalog readTextureCatalog(const std::filesystem::path& directory){
+    const auto path=directory/"textures.json";std::ifstream file(path,std::ios::binary);
+    if(!file)throw std::runtime_error("Missing source environment texture catalog: "+path.string());
+    const std::string json((std::istreambuf_iterator<char>(file)),{});
+    return parseTextureCatalog(json);
+}
+
+std::vector<unsigned char> decodeTextureBlob(const std::vector<unsigned char>& compressed,const TextureDescriptor& descriptor,const std::string& label){
+    const auto expected=pixelBytes(descriptor,label);std::vector<unsigned char> raw(20+expected);
+    if(compressed.empty()||compressed.size()>std::numeric_limits<uLong>::max())throw std::runtime_error("Invalid source environment texture: "+label);
+    uLongf size=static_cast<uLongf>(raw.size());
+    if(uncompress(raw.data(),&size,compressed.data(),static_cast<uLong>(compressed.size()))!=Z_OK||size!=raw.size()||
+       std::string(raw.begin(),raw.begin()+8)!="TSENV001")throw std::runtime_error("Invalid source environment texture: "+label);
+    if(word(raw,8)!=descriptor.width||word(raw,12)!=descriptor.height||word(raw,16)!=descriptor.bits)
+        throw std::runtime_error("Source environment texture dimension mismatch: "+label);
+    return {raw.begin()+20,raw.end()};
+}
+
+std::vector<unsigned char> readTextureBlob(const std::filesystem::path& path,const TextureDescriptor& descriptor){
+    std::ifstream file(path,std::ios::binary);if(!file)throw std::runtime_error("Missing source environment texture: "+path.string());
+    const std::vector<unsigned char> compressed((std::istreambuf_iterator<char>(file)),{});
+    return decodeTextureBlob(compressed,descriptor,path.string());
+}
+}
 namespace {
 std::string readText(const std::filesystem::path& path) {
     std::ifstream stream(path,std::ios::binary);
@@ -34,17 +111,10 @@ GLuint program(std::string vertex,std::string fragment,bool marina=false) {
     if(!okay){GLint length=0;glGetProgramiv(id,GL_INFO_LOG_LENGTH,&length);std::string log(length,'\0');glGetProgramInfoLog(id,length,nullptr,log.data());glDeleteProgram(id);throw std::runtime_error("Source environment program: "+log);}
     return id;
 }
-GLuint texture(const std::filesystem::path& path,int width,int height,int bits,bool repeat=false) {
-    std::ifstream file(path,std::ios::binary);if(!file)throw std::runtime_error("Missing source environment texture: "+path.string());
-    const std::vector<unsigned char> zipped((std::istreambuf_iterator<char>(file)),{});
-    std::vector<unsigned char> raw(20+static_cast<std::size_t>(width)*height*4*bits/8);
-    uLongf size=static_cast<uLongf>(raw.size());
-    if(uncompress(raw.data(),&size,zipped.data(),static_cast<uLong>(zipped.size()))!=Z_OK||size!=raw.size()||
-       std::string(raw.begin(),raw.begin()+8)!="TSENV001")throw std::runtime_error("Invalid source environment texture: "+path.string());
-    auto word=[&](int p){return static_cast<unsigned>(raw[p])|(static_cast<unsigned>(raw[p+1])<<8)|(static_cast<unsigned>(raw[p+2])<<16)|(static_cast<unsigned>(raw[p+3])<<24);};
-    if(word(8)!=static_cast<unsigned>(width)||word(12)!=static_cast<unsigned>(height)||word(16)!=static_cast<unsigned>(bits))throw std::runtime_error("Source environment texture dimension mismatch: "+path.string());
+GLuint texture(const std::filesystem::path& path,const environment_detail::TextureDescriptor& descriptor,bool repeat=false) {
+    const auto pixels=environment_detail::readTextureBlob(path,descriptor);
     GLuint id=0;glGenTextures(1,&id);glBindTexture(GL_TEXTURE_2D,id);
-    glTexImage2D(GL_TEXTURE_2D,0,bits==16?GL_RGBA16F:GL_RGBA8,width,height,0,GL_RGBA,bits==16?GL_HALF_FLOAT:GL_UNSIGNED_BYTE,raw.data()+20);
+    glTexImage2D(GL_TEXTURE_2D,0,descriptor.bits==16?GL_RGBA16F:GL_RGBA8,descriptor.width,descriptor.height,0,GL_RGBA,descriptor.bits==16?GL_HALF_FLOAT:GL_UNSIGNED_BYTE,pixels.data());
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,repeat?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,repeat?GL_REPEAT:GL_CLAMP_TO_EDGE);
@@ -89,20 +159,22 @@ EnvironmentRenderer::~EnvironmentRenderer(){
 
 void EnvironmentRenderer::Load(const StageData& stage){
     State state;
+    const auto textureCatalog=environment_detail::readTextureCatalog(assets_);
     marina_=stage.water=="marina";time_=0;
     bounds_={stage.bounds.x,stage.bounds.z,stage.bounds.y,stage.bounds.w};
     const std::string name=stage.theme=="sunset"?"sunset":stage.theme=="golden"?"golden":"day";
     theme_.clear();std::istringstream lines(readText(assets_/("theme-"+name+".txt")));std::string line;
     while(std::getline(lines,line)){std::istringstream row(line);std::string key;row>>key;float n;std::vector<float> values;while(row>>n)values.push_back(n);if(!values.empty())theme_[key]=std::move(values);}
     glDeleteTextures(1,&cloud_);glDeleteTextures(1,&pmrem_);
-    cloud_=texture(assets_/("cloud-"+name+".rgba16f.z"),2048,640,16);
-    pmrem_=texture(assets_/("pmrem-"+name+".rgba16f.z"),768,1024,16);
-    if(!wave_)wave_=texture(assets_/"wave.rgba8.z",256,256,8,true);
+    const std::string cloudFile="cloud-"+name+".rgba16f.z",pmremFile="pmrem-"+name+".rgba16f.z",waveFile="wave.rgba8.z";
+    cloud_=texture(assets_/cloudFile,textureCatalog.at(cloudFile));
+    pmrem_=texture(assets_/pmremFile,textureCatalog.at(pmremFile));
+    if(!wave_)wave_=texture(assets_/waveFile,textureCatalog.at(waveFile),true);
     glDeleteTextures(1,&foam_);
     std::ifstream foamInfo(assets_/("foam-"+std::string(stage.id)+".txt"));int foamWidth=0,foamHeight=0;
     if(!(foamInfo>>foamWidth>>foamHeight>>foamRect_.x>>foamRect_.y>>foamRect_.z>>foamRect_.w>>foamRange_))throw std::runtime_error("Missing source environment foam field metadata");
     if(foamWidth<=0||foamHeight<=0||foamWidth>4096||foamHeight>4096)throw std::runtime_error("Invalid source foam field dimensions");
-    foam_=texture(assets_/("foam-"+std::string(stage.id)+".rgba8.z"),foamWidth,foamHeight,8);
+    foam_=texture(assets_/("foam-"+std::string(stage.id)+".rgba8.z"),{static_cast<std::uint32_t>(foamWidth),static_cast<std::uint32_t>(foamHeight),8});
     glBindTexture(GL_TEXTURE_2D,cloud_);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
     glDeleteProgram(skyProgram_);auto skyFragment=readText(assets_/"sky.frag");if(value(theme_,"skyShafts")[0]>0)skyFragment.insert(skyFragment.find('\n')+1,"#define SKY_SHAFTS\n");skyProgram_=program(readText(assets_/"sky.vert"),skyFragment);
     glDeleteProgram(seaProgram_);seaProgram_=program(readText(assets_/"sea.vert"),readText(assets_/"sea.frag"),marina_);

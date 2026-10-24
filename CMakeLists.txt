@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 
 project(Tiny-Splatoon VERSION 0.8.5 LANGUAGES CXX C)
 
@@ -76,7 +76,7 @@ add_dependencies(Tiny-Splatoon Tiny-Splatoon-Server)
 if(MSVC)
     target_compile_options(restoration_core PRIVATE /utf-8)
 endif()
-add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/InkTankElement.cpp src/gui/WeaponReticleElement.cpp src/gui/SpecialGaugeElement.cpp src/gui/BattleFeedbackElement.cpp src/gui/RmlRenderer.cpp src/gui/UiText.cpp)
+add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/MapInteraction.cpp src/gui/InkTankElement.cpp src/gui/WeaponReticleElement.cpp src/gui/SpecialGaugeElement.cpp src/gui/BattleFeedbackElement.cpp src/gui/RmlRenderer.cpp src/gui/UiText.cpp)
 target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
 add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp src/audio/ZoneHum.cpp src/audio/NativeReverb.cpp)
 target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
@@ -84,7 +84,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(game_audio PUBLIC restoration_core Threads::Threads ${CMAKE_DL_LIBS})
 add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp)
 target_link_libraries(projectile_visuals PUBLIC restoration_core)
-target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/OnlinePlay.cpp
+target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/MatchInputState.cpp src/app/OnlinePlay.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp src/render/StageMapView.cpp src/render/StageMapCamera.cpp
@@ -99,17 +99,18 @@ target_link_libraries(Tiny-Splatoon PRIVATE
     ZLIB::ZLIB
 )
 
-add_custom_command(TARGET Tiny-Splatoon POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-    "$<TARGET_FILE_DIR:Tiny-Splatoon>/assets"
-)
-# Asset edits must deploy even when only RML, RCSS, fonts or sound data changed.
-file(GLOB_RECURSE TINY_RUNTIME_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
-set_property(TARGET Tiny-Splatoon APPEND PROPERTY LINK_DEPENDS ${TINY_RUNTIME_ASSETS})
+include(cmake/RuntimeAssets.cmake)
+tiny_stage_runtime_assets(Tiny-Splatoon "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME native_runtime_asset_staging COMMAND "${CMAKE_COMMAND}"
+        "-DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-staging-fixtures"
+        "-DASSET_MODULE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/RuntimeAssets.cmake"
+        "-DGENERATOR=${CMAKE_GENERATOR}"
+        "-DC_COMPILER=${CMAKE_C_COMPILER}"
+        "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime_assets_test.cmake")
     add_executable(network_transport_test tests/network_transport_test.cpp)
     target_link_libraries(network_transport_test PRIVATE game_network)
     foreach(NETWORK_CLIENTS 2 3 8)
@@ -160,6 +161,9 @@ if(BUILD_TESTING)
     add_executable(team_palette_test tests/team_palette_test.cpp)
     target_link_libraries(team_palette_test PRIVATE glm::glm)
     add_test(NAME native_team_palette COMMAND team_palette_test)
+    add_executable(match_input_state_test tests/match_input_state_test.cpp src/app/MatchInputState.cpp)
+    target_link_libraries(match_input_state_test PRIVATE restoration_core)
+    add_test(NAME native_match_input COMMAND match_input_state_test)
     add_executable(player_controller_test tests/player_controller_test.cpp)
     target_link_libraries(player_controller_test PRIVATE restoration_core)
     add_test(NAME native_player_controller COMMAND player_controller_test)

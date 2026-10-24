@@ -49,6 +49,7 @@ struct ControllerInput {
 // camera yaw/pitch are updated.
 class PlayerController {
 public:
+    void ResetLook() { assist_={};edgeTime_=padLookX_=padLookY_=0.0; }
     void Update(double dt, const ControllerInput& input, const PlayerSettings& settings,
                 MatchSimulation& match, FollowCamera& camera, const StageGeometry& geometry);
     std::vector<SuperJumpMapTarget> SuperJumpMapTargets(MatchSimulation& match) const;

@@ -1,5 +1,5 @@
 #include "GameUi.hpp"
-#include "MapPinLayout.hpp"
+#include "MapInteraction.hpp"
 #include "InkTankElement.hpp"
 #include "WeaponReticleElement.hpp"
 #include "SpecialGaugeElement.hpp"
@@ -125,11 +125,7 @@ struct GameUi::Impl : Rml::EventListener {
     std::function<void(float,float,float)> volumes;
     bool menuVisible=true,interactive=true,practiceGear=false,hudOverlay=false;
     bool activePractice=false;
-    bool jumpMapOpen=false;
-    int mapHoverKey=-1;
-    int jumpMapSelection=-1,jumpMapQueuedKey=-1;
-    std::string jumpMapQueuedLabel;
-    std::vector<UiJumpMapTarget> jumpMapTargets;
+    MapInteraction mapInteraction;
     network::RoomView online;
     std::vector<UiOnlineRequest> onlineRequests;
     bool onlineServerSettings=false,onlineRoomSettings=false;
@@ -149,13 +145,10 @@ struct GameUi::Impl : Rml::EventListener {
     const MatchSimulation* inkMatch=nullptr;
     const PlayerSimulation* inkActor=nullptr;
     glm::mat4 worldView{1.f};
-    glm::mat4 nativeMapView{1.f};
     float projectionY=1.78f;
     glm::dvec3 worldEye{0};
-    bool haveWorldView=false,haveNativeMapView=false;
-    double nextMinimapUpdate=0;
+    bool haveWorldView=false;
     int hudFps=0;
-    std::string minimapCache;
     std::string stageOptionMode,durationOptionMode;
     const ZoneControl* displayedZones=nullptr;
     std::size_t zoneEventCursor=0;
@@ -163,10 +156,9 @@ struct GameUi::Impl : Rml::EventListener {
     const MatchSimulation* resultXpMatch=nullptr;
     double resultXpStartedAt=0.0,resultXpNextTick=0.0;
     bool resultIntro=false,resultSkipped=false,resultDone=false,resultFocused=false;
-    struct DeathMark { glm::dvec3 pos; std::string name; int team=0; double born=0; std::uint64_t serial=0; };
     const MatchSimulation* deathMatch=nullptr;
     std::uint64_t deathEpoch=0,deathSeenSerial=0;
-    std::vector<DeathMark> deathMarks;
+    std::vector<MapDeathMark> deathMarks;
     double deathClock=0.0;
     std::uint64_t deathSerial=0;
 
@@ -544,8 +536,9 @@ struct GameUi::Impl : Rml::EventListener {
         if(type=="mouseover"||type=="focus"){
             if((element->GetTagName()=="button"||element->GetTagName()=="select")&&hovered!=id){hovered=id;Play("ui_hover");}return;
         }
-        if(type=="click"&&jumpMapOpen&&mapHoverKey>=0&&element->GetTagName()!="button"){
-            jumpMapSelection=mapHoverKey;Play("ui_confirm");return;
+        if(type=="click"&&mapInteraction.open()&&element->GetTagName()!="button"){
+            if(mapInteraction.SelectHoveredTarget())Play("ui_confirm");
+            return;
         }
         if(type=="input"||type=="change"){
             if(syncingControls)return;
@@ -613,12 +606,9 @@ struct GameUi::Impl : Rml::EventListener {
         }
         if(id.rfind("jump-target-",0)==0||id.rfind("jump-map-marker-",0)==0){
             const auto dash=id.find_last_of('-');
-            if(jumpMapOpen&&dash!=std::string::npos){
-                try{
-                    const int key=std::stoi(id.substr(dash+1));
-                    const auto target=std::find_if(jumpMapTargets.begin(),jumpMapTargets.end(),[&](const auto& item){return item.key==key;});
-                    if(target!=jumpMapTargets.end()&&target->available){jumpMapSelection=key;Play("ui_confirm");}
-                }catch(const std::exception&){}
+            if(mapInteraction.open()&&dash!=std::string::npos){
+                try{if(mapInteraction.SelectTarget(std::stoi(id.substr(dash+1))))Play("ui_confirm");}
+                catch(const std::exception&){}
             }
             return;
         }
@@ -685,7 +675,7 @@ struct GameUi::Impl : Rml::EventListener {
             const int nativeKeys[]={GLFW_KEY_TAB,GLFW_KEY_ENTER,GLFW_KEY_SPACE,GLFW_KEY_LEFT,GLFW_KEY_RIGHT,GLFW_KEY_UP,GLFW_KEY_DOWN,GLFW_KEY_ESCAPE,GLFW_KEY_BACKSPACE,GLFW_KEY_DELETE,GLFW_KEY_HOME,GLFW_KEY_END};
             const Rml::Input::KeyIdentifier uiKeys[]={Rml::Input::KI_TAB,Rml::Input::KI_RETURN,Rml::Input::KI_SPACE,Rml::Input::KI_LEFT,Rml::Input::KI_RIGHT,Rml::Input::KI_UP,Rml::Input::KI_DOWN,Rml::Input::KI_ESCAPE,Rml::Input::KI_BACK,Rml::Input::KI_DELETE,Rml::Input::KI_HOME,Rml::Input::KI_END};
             for(std::size_t i=0;i<keys.size();++i){
-                if(jumpMapOpen&&nativeKeys[i]==GLFW_KEY_TAB)continue;
+                if(mapInteraction.open()&&nativeKeys[i]==GLFW_KEY_TAB)continue;
                 const bool held=glfwGetKey(window,nativeKeys[i])==GLFW_PRESS;
                 if(held!=keys[i]){
                     if(held&&hud->IsVisible()&&Find(hud,"results")->IsVisible()){
@@ -701,17 +691,7 @@ struct GameUi::Impl : Rml::EventListener {
                 }
             }
         }
-        if(jumpMapOpen)context->Update(); // Newly rebuilt pins need layout before cursor hit testing.
-        if(jumpMapOpen)if(auto* cursor=hud->GetElementById("map-cursor")){
-            const double x=pointerPosition.x,y=pointerPosition.y;
-            mapHoverKey=-1;double nearest=60*scale;glm::dvec2 snap(x,y);
-            for(const auto& target:jumpMapTargets)if(target.available)if(auto* pin=hud->GetElementById("jump-map-marker-"+std::to_string(target.key))){
-                const auto offset=pin->GetAbsoluteOffset(Rml::BoxArea::Border);const auto size=pin->GetBox().GetSize(Rml::BoxArea::Border);const glm::dvec2 center(offset.x+size.x*.5,offset.y+size.y*.5);const double distance=glm::length(center-glm::dvec2(x,y));
-                pin->SetClass("cursor-snap",false);if(distance<nearest){nearest=distance;mapHoverKey=target.key;snap=center;}
-            }
-            if(mapHoverKey>=0)Find(hud,"jump-map-marker-"+std::to_string(mapHoverKey))->SetClass("cursor-snap",true);
-            cursor->SetClass("snapped",mapHoverKey>=0);cursor->SetProperty("left",Number(snap.x)+"px");cursor->SetProperty("top",Number(snap.y)+"px");
-        }
+        mapInteraction.LayoutAndHitTest(context,hud,pointerPosition,scale);
         context->Update();renderer.Begin(width,height);
         if((renderHud&&hud->IsVisible())||(menuVisible&&menu->IsVisible()))context->Render();
         renderer.End();return std::exchange(action,UiAction::None);
@@ -740,119 +720,6 @@ struct GameUi::Impl : Rml::EventListener {
         result.x=offset.x/width;result.y=offset.y/height;result.width=element->GetClientWidth()/width;result.height=element->GetClientHeight()/height;
         if(result.width<=0||result.height<=0){result.type=UiPreviewType::None;result.x=result.y=result.width=result.height=0;}
         return result;
-    }
-    void UpdateMinimap(const StageData& stage,const FacePaint& paint,MatchSimulation& match){
-        if(!player.settings.minimap&&!jumpMapOpen){Hidden(hud,"minimap",true);return;}Hidden(hud,"minimap",false);
-        Find(hud,"minimap")->SetClass("jump-map-open",jumpMapOpen);
-        const auto& state=match.local().state;const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
-        const double now=glfwGetTime();
-        const std::string stageKey=std::string(stage.id)+":"+std::string(stage.mode);
-        std::string cache=stageKey+":"+std::to_string(paint.version())+":"+std::to_string(player.settings.palette)+":"+Bool(player.settings.colorblind)+":"+std::to_string(context->GetDimensions().x);
-        cache+=jumpMapOpen?":jump-map-open:"+std::to_string(static_cast<int>(match.world().time()*10)):std::string(":jump-map-closed");
-        cache+=":"+std::to_string(jumpMapQueuedKey)+":"+std::to_string(mapHoverKey);
-        for(const auto& target:jumpMapTargets)cache+=":"+std::to_string(target.key)+","+std::to_string(static_cast<int>(std::round(target.x*4)))+","+std::to_string(static_cast<int>(std::round(target.y*4)))+","+std::to_string(static_cast<int>(std::round(target.z*4)))+","+Bool(target.available)+","+target.label+","+target.weapon;
-        if(const auto* zones=match.zones()){cache+=":"+zones->objective().id;for(const int id:zones->activeIndices())cache+=":"+std::to_string(zones->zones()[id].owner);}
-        for(const auto& actor:match.actors())cache+=":"+std::to_string(static_cast<int>(std::round(actor->state.pos.x*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.y*4)))+","+std::to_string(static_cast<int>(std::round(actor->state.pos.z*4)))+","+std::to_string(actor->state.alive)+","+std::to_string(actor->state.track>0&&actor->state.trackTeam==match.local().team());
-        cache+=":"+std::to_string(deathMarks.size())+","+std::to_string(deathSerial)+","+std::to_string(static_cast<int>(deathClock*10));
-        const glm::mat4& mapView=jumpMapOpen||!haveNativeMapView?worldView:nativeMapView;
-        for(int column=0;column<4;++column)for(int row=0;row<4;++row)
-            cache+=":"+std::to_string(static_cast<int>(std::round(mapView[column][row]*1000.0f)));
-        const auto project=[&](glm::dvec3 point,double& left,double& top){
-            const glm::vec4 clip=mapView*glm::vec4(glm::vec3(point),1.0f);
-            if(clip.w<=1e-4f)return false;
-            const double x=clip.x/clip.w,y=clip.y/clip.w;
-            if(std::abs(x)>1.04||std::abs(y)>1.04)return false;
-            left=(x*.5+.5)*100.0;top=(.5-y*.5)*100.0;return true;
-        };
-        if(minimapCache!=cache&&now>=nextMinimapUpdate){
-            auto* map=Find(hud,"minimap-map");const double mapWidth=jumpMapOpen?context->GetDimensions().x:map->GetClientWidth(),mapHeight=jumpMapOpen?context->GetDimensions().y:map->GetClientHeight();
-            std::string markup,targetLegend;
-            if(const auto* zones=match.zones()){
-                for(const int id:zones->activeIndices()){
-                    const auto& zone=zones->zones()[id];const std::string color=zone.owner>=0?std::string(palette[zone.owner]):"#f4cb62";
-                    for(const auto& polygon:zone.region.polygons)for(std::size_t i=0;i<polygon.size();++i){
-                        const auto& a=polygon[i];const auto& b=polygon[(i+1)%polygon.size()];double x0=0,y0=0,x1=0,y1=0;
-                        if(!project({a.x,.15,a.y},x0,y0)||!project({b.x,.15,b.y},x1,y1))continue;
-                        const double dx=(x1-x0)*mapWidth/100.0,dy=(y1-y0)*mapHeight/100.0;
-                        markup+="<div class=\"map-zone-edge\" style=\"left:"+Number(x0,3)+"%;top:"+Number(y0,3)+"%;width:"+Number(std::hypot(dx,dy),3)+"px;background-color:"+color+";transform:rotate("+Number(std::atan2(dy,dx)*180/3.141592653589793,3)+"deg);\"></div>";
-                    }
-                }
-            }
-            for(std::size_t i=0;i<match.actors().size();++i){
-                const auto& actor=match.actors()[i];if(!match.roster()[i].active||!actor->state.alive)continue;
-                const bool local=actor->isLocal(),ally=actor->team()==match.local().team();
-                const bool tracked=!ally&&actor->state.track>0&&actor->state.trackTeam==match.local().team();
-                if(!local&&!ally&&!tracked)continue;
-                if(jumpMapOpen&&!local)continue;
-                const auto position=actor->visualPos();double left=0,top=0;if(!project(position,left,top))continue;
-                const std::string color(actor->team()==0?palette[0]:palette[1]);
-                std::string contents;
-                if(local){
-                    double facingX=0,facingY=0,rotation=0;
-                    const auto facing=position+glm::dvec3(std::sin(actor->state.yaw),0,std::cos(actor->state.yaw))*2.0;
-                    if(mapWidth>0&&mapHeight>0&&project(facing,facingX,facingY)){
-                        const double dx=(facingX-left)*mapWidth/100.0,dy=(facingY-top)*mapHeight/100.0;
-                        if(dx*dx+dy*dy>1e-8)rotation=std::atan2(dx,-dy)*180.0/3.141592653589793;
-                    }
-                    contents="<img class=\"map-self-arrow\" src=\"markers/arrow-"+std::to_string(player.settings.colorblind?5:std::clamp(player.settings.palette,0,4))+"-"+std::to_string(actor->team())+".png\" style=\"transform:rotate("+Number(rotation,2)+"deg);\"/>";
-                    if(jumpMapOpen)contents+="<span class=\"map-you-label\">自己</span>";
-                }
-                const std::string actorClass=local?"map-actor-local map-you ":ally?"map-actor-ally ":"map-actor-tracked ";
-                markup+="<div class=\"map-actor "+actorClass+"map-actor-"+(actor->team()==0?"a":"b")+"\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;background-color:"+(local&&!jumpMapOpen?"transparent":color)+";\">"+contents+"</div>";
-            }
-            for(const auto& mark:deathMarks){
-                double left=0,top=0;if(!project(mark.pos,left,top))continue;
-                const double alpha=std::clamp((mark.born+5.0-deathClock)/1.3,0.0,1.0);
-                markup+="<div class=\"map-death-mark\" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;opacity:"+Number(alpha)+";\"><img src=\""+DeathMarkIcon(player,mark.team)+"\"/></div>";
-            }
-            std::vector<glm::dvec2> pinAnchors;std::vector<int> pinKeys;
-            if(jumpMapOpen)for(const auto& target:jumpMapTargets){double x=0,y=0;if(project({target.x,target.y,target.z},x,y)){pinAnchors.push_back({x*mapWidth/100,y*mapHeight/100});pinKeys.push_back(target.key);}}
-            const auto pinPositions=SpreadMapPins(pinAnchors,84*context->GetDensityIndependentPixelRatio());
-            for(const auto& target:jumpMapTargets){
-                const std::string stateClass=target.available?"available":"unavailable";
-                const std::string disabled=target.available&&jumpMapOpen?"":" disabled=\"disabled\"";
-                const std::string icon=!target.weapon.empty()?"<img src=\"weapons/"+Escape(target.weapon)+".png\"/>":target.key==4?"<span class=\"map-base-icon\"><i></i><b></b><em><u></u></em></span>":(target.key==0||target.key>4)?"<img src=\"equipment/sub-beacon.png\"/>":std::string();
-                targetLegend+="<button id=\"jump-target-"+std::to_string(target.key)+"\" class=\"jump-target "+stateClass+"\""+disabled+">"+icon+"<strong>"+std::to_string(target.key%10)+"</strong><span>"+Escape(target.label)+"</span><small>"+(target.available?"可用":"暫不可用")+"</small></button>";
-                if(!jumpMapOpen)continue;
-                double left=0,top=0;if(!project({target.x,target.y,target.z},left,top))continue;
-                const double anchorLeft=left,anchorTop=top;
-                const auto pin=std::find(pinKeys.begin(),pinKeys.end(),target.key);
-                if(pin!=pinKeys.end()&&mapWidth>0&&mapHeight>0){const auto point=pinPositions[static_cast<std::size_t>(pin-pinKeys.begin())];left=std::clamp(point.x,48.,mapWidth-48)*100/mapWidth;top=std::clamp(point.y,135.,mapHeight-25)*100/mapHeight;}
-                const double linkX=(anchorLeft-left)*mapWidth/100,linkY=(anchorTop-top)*mapHeight/100;
-                const std::string link=std::hypot(linkX,linkY)>3?"<i class=\"map-pin-link\" style=\"width:"+Number(std::hypot(linkX,linkY))+"px;transform:rotate("+Number(std::atan2(linkY,linkX)*180/3.141592653589793)+"deg);\"></i>":"";
-                std::string displayLabel=target.label;
-                std::string mapIcon=icon;
-                if(target.key==4){displayLabel="BASE";mapIcon="<span class=\"map-base-icon\"><i></i><b></b><em><u></u></em></span>";}
-                else if(target.key==0||target.key>4){displayLabel="訊標 "+std::to_string(target.key==0?6:target.key-4);mapIcon="<img src=\"equipment/sub-beacon.png\"/>";}
-                else if(displayLabel.rfind("隊友 ",0)==0)displayLabel.erase(0,std::string("隊友 ").size());
-                const std::string teamColor(palette[static_cast<std::size_t>(match.local().team())]);
-                const std::string style=" style=\"left:"+Number(left,3)+"%;top:"+Number(top,3)+"%;\"";
-                markup+="<div class=\"map-marker\" data-anchor-left=\""+Number(anchorLeft,3)+"\" data-anchor-top=\""+Number(anchorTop,3)+"\""+style+">"+link+"<div class=\"map-pin-stem\"></div><div class=\"map-pin-ground\" style=\"background-color:"+teamColor+";\"></div><button id=\"jump-map-marker-"+std::to_string(target.key)+"\" class=\"map-target "+stateClass+(jumpMapQueuedKey==target.key?" queued":"")+"\" style=\"background-color:"+teamColor+";\""+disabled+" title=\""+Escape(target.label)+"\">"+mapIcon+"<strong>"+std::to_string(target.key%10)+"</strong></button><span class=\"map-target-label\">"+Escape(displayLabel)+"</span></div>";
-            }
-            if(jumpMapOpen){
-                const auto arc=[&](glm::dvec3 from,glm::dvec3 to,double start,double end,bool self){
-                    double x0,y0,x1,y1;if(!project(from,x0,y0)||!project(to,x1,y1))return;
-                    const glm::dvec2 a(x0*mapWidth/100,y0*mapHeight/100),b(x1*mapWidth/100,y1*mapHeight/100),control=MapArcControl(a,b);
-                    auto previous=MapArcPoint(a,control,b,start);
-                    for(int i=1;i<=24;++i){const auto next=MapArcPoint(a,control,b,start+(end-start)*i/24);const auto delta=next-previous;
-                        markup+="<i class=\"map-jump-arc\" style=\"left:"+Number(previous.x)+"px;top:"+Number(previous.y)+"px;width:"+Number(glm::length(delta)+1)+"px;background-color:"+std::string(palette[match.local().team()])+";opacity:"+(self?"1":".55")+";transform:rotate("+Number(std::atan2(delta.y,delta.x)*180/3.141592653589793)+"deg);\"></i>";previous=next;}
-                    markup+="<i class=\"map-landing-ring\" style=\"left:"+Number(b.x)+"px;top:"+Number(b.y)+"px;border-color:"+std::string(palette[match.local().team()])+";\"></i>";
-                };
-                const int previewKey=mapHoverKey>=0?mapHoverKey:jumpMapQueuedKey;
-                for(const auto& target:jumpMapTargets)if(target.key==previewKey&&target.available)arc(match.local().state.alive?match.local().state.pos:stage.spawnPads[match.local().team()],{target.x,target.y,target.z},0,1,true);
-                for(const auto& actor:match.actors())if(actor->team()==match.local().team()&&actor->superJumpState()){
-                    const auto& jump=*actor->superJumpState();const double done=jump.flight?std::clamp(jump.elapsed/std::max(.01,jump.duration),0.,1.):0;
-                    const double reach=jump.flight?1:1-std::pow(1-std::clamp(jump.elapsed/.75,0.,1.),3);
-                    arc(jump.flight?jump.from:actor->state.pos,jump.flight?jump.to:jump.target,done,reach,actor->isLocal());
-                }
-            }
-            if(jumpMapOpen)markup+="<div id=\"map-cursor\" class=\"map-cursor\"><i></i></div>";
-            const auto legendKey=std::string("hud/jump-map-legend");if(textCache[legendKey]!=targetLegend){Find(hud,"jump-map-legend")->SetInnerRML(targetLegend);textCache[legendKey]=targetLegend;}
-            const auto key=std::string("hud/minimap-map");if(textCache[key]!=markup){Find(hud,"minimap-map")->SetInnerRML(markup);textCache[key]=markup;}
-            minimapCache=cache;nextMinimapUpdate=now+.1;
-        }
-        Text(hud,"jump-map-help",jumpMapOpen?"點擊地圖上的隊友，或按 1–0 選擇跳躍目標　·　Tab / M 關閉":"");
-        Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"");
     }
     void UpdateAllyMarkers(MatchSimulation& match,bool hidden){
         Hidden(hud,"ally-markers",hidden||!haveWorldView);
@@ -888,7 +755,7 @@ struct GameUi::Impl : Rml::EventListener {
         (void)paused;
         auto& world=match.world();deathClock=world.time();
         if(deathMatch!=&match||deathEpoch!=world.hudEventEpoch()){
-            deathMatch=&match;deathEpoch=world.hudEventEpoch();deathSeenSerial=0;deathMarks.clear();nextMinimapUpdate=0;
+            deathMatch=&match;deathEpoch=world.hudEventEpoch();deathSeenSerial=0;deathMarks.clear();mapInteraction.Invalidate();
         }
         for(const auto& event:world.hudEvents()){
             if(event.serial<=deathSeenSerial)continue;
@@ -900,12 +767,12 @@ struct GameUi::Impl : Rml::EventListener {
                 if(match.actors()[i].get()==event.victim){name=match.roster()[i].name;break;}
             }
             if(deathMarks.size()==12)deathMarks.erase(deathMarks.begin());
-            deathMarks.push_back({event.victimPos,std::move(name),event.victimTeam,event.time,++deathSerial});nextMinimapUpdate=0;
+            deathMarks.push_back({event.victimPos,std::move(name),event.victimTeam,event.time,++deathSerial});mapInteraction.Invalidate();
         }
-        if(match.phase()==MatchPhase::Results&&!deathMarks.empty()){deathMarks.clear();nextMinimapUpdate=0;}
+        if(match.phase()==MatchPhase::Results&&!deathMarks.empty()){deathMarks.clear();mapInteraction.Invalidate();}
         const auto beforeExpiry=deathMarks.size();
-        deathMarks.erase(std::remove_if(deathMarks.begin(),deathMarks.end(),[&](const DeathMark& mark){return deathClock-mark.born>=5.0;}),deathMarks.end());
-        if(beforeExpiry!=deathMarks.size())nextMinimapUpdate=0;
+        deathMarks.erase(std::remove_if(deathMarks.begin(),deathMarks.end(),[&](const MapDeathMark& mark){return deathClock-mark.born>=5.0;}),deathMarks.end());
+        if(beforeExpiry!=deathMarks.size())mapInteraction.Invalidate();
         Hidden(hud,"death-markers",hidden||!haveWorldView);
         if(hidden||!haveWorldView)return;
         const auto size=context->GetDimensions();if(size.x<=0||size.y<=0)return;
@@ -940,7 +807,7 @@ struct GameUi::Impl : Rml::EventListener {
         const auto kind=actor.weapon().kind;
         gauge->SetClass("roller",kind=="roller"||kind=="brush");gauge->SetClass("charger",kind=="charger");
         gauge->SetAttribute("aria-valuenow",Integer(std::clamp(state.ink,0.,100.)));
-        Hidden(hud,"ink-gauge",paused||results||!state.alive||jumpMapOpen||hudOverlay||practiceGear);
+        Hidden(hud,"ink-gauge",paused||results||!state.alive||mapInteraction.open()||hudOverlay||practiceGear);
         Hidden(hud,"ink-low",!low);
         const auto hex=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr)[actor.team()];
         const auto rgb=std::stoul(std::string(hex.substr(1)),nullptr,16);
@@ -1121,9 +988,9 @@ struct GameUi::Impl : Rml::EventListener {
         hud->SetClass("results-active",results);
         activePractice=practice;
         interactive=paused||results||practiceGear||hudOverlay;
-        interactive=interactive||jumpMapOpen;
+        interactive=interactive||mapInteraction.open();
         Hidden(hud,"pause",!paused||results);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
-        Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results||!match.local().state.alive||match.local().state.squid||jumpMapOpen||hudOverlay||practiceGear);
+        Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results||!match.local().state.alive||match.local().state.squid||mapInteraction.open()||hudOverlay||practiceGear);
         Text(hud,"pause-title",onlineMatch?"對戰選單":practice?"練習暫停":"已暫停");Text(hud,"pause-description",onlineMatch?"線上對戰會持續進行。關閉選單即可繼續操作。":practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
         Text(hud,"pause-hint",onlineMatch?"Esc 選單":"Esc 暫停");Text(hud,"results-menu-label",onlineMatch?"返回房間":"返回選單");Hidden(hud,"results-rematch",onlineMatch);
         const auto stageLabel=StageLabel(stage.id);Text(hud,"stage-name",stageLabel.empty()?std::string(stage.name):std::string(stageLabel));
@@ -1135,12 +1002,9 @@ struct GameUi::Impl : Rml::EventListener {
         UpdateInkGauge(match,paused,results);
         UpdateBattleHud(match,paused,results,practice);
         UpdateBossFeedback(match,paused,results);
-        UpdateAllyMarkers(match,paused||results||jumpMapOpen||hudOverlay||practiceGear);
-        UpdateDeathMarks(match,paused,paused||results||jumpMapOpen||hudOverlay||practiceGear);
+        UpdateAllyMarkers(match,paused||results||mapInteraction.open()||hudOverlay||practiceGear);
+        UpdateDeathMarks(match,paused,paused||results||mapInteraction.open()||hudOverlay||practiceGear);
         Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
-        Text(hud,"jump-map-help",state.alive?"按 1–3 選隊友　4 回生點　5–0 選隊伍訊標":"復活規劃：按數字選擇隊友或隊伍訊標，4 清除規劃");
-        Text(hud,"jump-map-queue",jumpMapQueuedKey>=0?"復活彈射："+std::to_string(jumpMapQueuedKey%10)+"　"+jumpMapQueuedLabel:"尚未安排復活彈射");
-        Find(hud,"jump-map-queue")->SetClass("queued",jumpMapQueuedKey>=0);
         Hidden(hud,"boss",!match.boss());
         if(const auto* boss=match.boss()){
             const auto& state=boss->state();
@@ -1153,7 +1017,7 @@ struct GameUi::Impl : Rml::EventListener {
             std::string move;if(boss->move()){const char* names[]={"重鉗衝擊","貨櫃彈幕","墨砲掃射","船殼衝撞","小蟹群","狂亂攻勢"};move=names[static_cast<int>(boss->move()->id)];switch(boss->move()->phase(state.clock)){case BossMovePhase::Telegraph:move+="  ·  注意預兆";break;case BossMovePhase::Active:move+="  ·  攻擊中";break;case BossMovePhase::Recovery:move+="  ·  恢復中";break;default:break;}}Text(hud,"boss-move",move);
         }
         UpdateZonesHud(match);
-        UpdateMinimap(stage,paint,match);
+        mapInteraction.Update(context,hud,stage,paint,match,player,deathMarks,deathClock);
         const double now=glfwGetTime();if(lastHudTime>0&&now>lastHudTime)hudFps=static_cast<int>(std::round(1./(now-lastHudTime)));lastHudTime=now;
         Hidden(hud,"fps",!player.settings.showFps);if(player.settings.showFps)Text(hud,"fps-value",std::to_string(hudFps));
         if(results)UpdateResults(match,paint.coverage());
@@ -1179,17 +1043,15 @@ void GameUi::SetSaveError(std::string error){impl_->SetSaveError(error);}
 void GameUi::SetReward(MatchRewardResult reward){impl_->reward=reward;}
 void GameUi::SetDetailedSoundSink(std::function<void(const std::string&,double,double)> value){impl_->detailedSound=std::move(value);}
 void GameUi::SetSoundSink(std::function<void(const std::string&)> value){impl_->sound=std::move(value);}
-void GameUi::SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY){impl_->projectionY=projectionY;impl_->worldView=viewProjection;impl_->worldEye=eye;impl_->haveWorldView=true;}
-void GameUi::SetNativeMap(unsigned int texture,const glm::mat4& viewProjection){auto& p=*impl_;p.renderer.SetNativeMapTexture(static_cast<GLuint>(texture));p.nativeMapView=viewProjection;p.haveNativeMapView=true;}
+void GameUi::SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY){auto& p=*impl_;p.projectionY=projectionY;p.worldView=viewProjection;p.worldEye=eye;p.haveWorldView=true;p.mapInteraction.SetWorldView(viewProjection);}
 void GameUi::SetVolumeSink(std::function<void(float,float,float)> value){impl_->volumes=std::move(value);if(impl_->volumes)impl_->volumes(static_cast<float>(impl_->player.settings.master),static_cast<float>(impl_->player.settings.music),static_cast<float>(impl_->player.settings.sfx));}
-void GameUi::SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey,std::string queuedLabel){
+void GameUi::SetMapFrame(UiMapFrame frame){
     auto& p=*impl_;
-    if(p.jumpMapOpen!=open){p.minimapCache.clear();p.nextMinimapUpdate=0;}
-    p.jumpMapOpen=open;p.jumpMapTargets=std::move(targets);p.jumpMapQueuedKey=queuedKey;p.jumpMapQueuedLabel=std::move(queuedLabel);
-    if(!open)p.jumpMapSelection=-1;
+    if(frame.haveWorldViewProjection){p.worldView=frame.worldViewProjection;p.worldEye=frame.eye;p.projectionY=frame.projectionY;p.haveWorldView=true;}
+    p.mapInteraction.SetFrame(std::move(frame),p.renderer);
 }
-void GameUi::ConfirmJumpMapCursor(){auto& p=*impl_;if(p.jumpMapOpen&&p.mapHoverKey>=0)p.jumpMapSelection=p.mapHoverKey;}
-int GameUi::TakeJumpMapSelection(){return std::exchange(impl_->jumpMapSelection,-1);}
+void GameUi::ConfirmJumpMapCursor(){impl_->mapInteraction.SelectHoveredTarget();}
+int GameUi::TakeJumpMapSelection(){return impl_->mapInteraction.TakeSelection();}
 void GameUi::ShowMenu(const std::string& initialStage){
     auto& p=*impl_;p.resultXpMatch=nullptr;p.resultIntro=false;p.resultSkipped=false;p.resultDone=false;p.resultFocused=false;p.inkMatch=nullptr;p.inkActor=nullptr;p.inkFullIdle=0;p.lastHudTime=0;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;

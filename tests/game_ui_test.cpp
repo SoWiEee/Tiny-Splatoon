@@ -426,12 +426,16 @@ int main(int argc,char** argv){
                 for(const auto& target:controllerTargets())targets.push_back({target.key,target.x,target.z,target.label,target.available});
                 return targets;
             };
+            auto setMapFrame=[&](bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel=std::string()){
+                UiMapFrame frame;frame.open=open;frame.targets=std::move(targets);frame.queuedKey=queuedKey;frame.queuedLabel=std::move(queuedLabel);
+                ui.SetMapFrame(std::move(frame));glfwSetTime(glfwGetTime()+.2);
+            };
             auto renderJumpMap=[&](int width,int height,const char* filename){
                 const auto targets=uiTargets();
                 Check(targets.size()>=5&&targets[4].key==5,"Map captures should include the deployed beacon as target 5");
                 const auto mapCamera=FitStageMapCamera(stage->bounds,double(width)/height,jumpLocal.team()==1);
                 ui.SetWorldView(glm::mat4(mapCamera.projection*mapCamera.view),mapCamera.eye,float(mapCamera.projection[1][1]));
-                ui.SetJumpMap(true,targets);glfwSetTime(glfwGetTime()+.2);
+                setMapFrame(true,targets);
                 glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
                 ui.RenderHud(*stage,jumpPaint,jumpMatch,width,height,false,true);
                 auto* panel=hud->GetElementById("minimap");
@@ -481,7 +485,7 @@ int main(int argc,char** argv){
                 target->Click();
                 return ui.TakeJumpMapSelection();
             };
-            auto setMapTargets=[&]{ui.SetJumpMap(true,uiTargets());glfwSetTime(glfwGetTime()+.2);};
+            auto setMapTargets=[&]{setMapFrame(true,uiTargets());};
             auto* minimapPanel=hud->GetElementById("minimap");
             renderJumpMap(1280,720,"jump-map-1280x720.png");
             renderJumpMap(1920,1080,"jump-map-1920x1080.png");
@@ -532,15 +536,49 @@ int main(int argc,char** argv){
             setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(controllerTargets()[0].available&&!hud->GetElementById("jump-target-1")->HasAttribute("disabled"),"A living teammate remains available as a queued target while the local player is dead");
             Check(clickTarget(1)==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1)&&jumpController.HasQueuedSuperJump()&&jumpController.QueuedSuperJumpKey()==1,"Clicking an available teammate while dead should queue that teammate's respawn jump");
-            ui.SetJumpMap(true,uiTargets(),1,"隊友");glfwSetTime(glfwGetTime()+.2);ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapFrame(true,uiTargets(),1,"隊友");ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(hud->GetElementById("jump-map-marker-1")->IsClassSet("queued"),"The queued landing pin must show its selection ring on the map");
             jumpController.ClearQueuedSuperJump();
             jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
             setMapTargets();
             hud->GetElementById("jump-target-1")->Click();
-            ui.SetJumpMap(false,{});
+            setMapFrame(false,{});
             glfwSetTime(glfwGetTime()+.2);ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(!minimapPanel->IsClassSet("jump-map-open")&&ui.TakeJumpMapSelection()==-1,"Closing the map must collapse it and discard any pending target click");
+            Check(hud->GetElementById("jump-map-marker-1")==nullptr,"Closing the map must remove its large pins from the compact map immediately");
+            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(minimapPanel->IsClassSet("jump-map-open")&&hud->GetElementById("jump-map-marker-1")!=nullptr,"Reopening the map must rebuild pins in the same frame");
+
+            const auto mapHelp=hud->GetElementById("jump-map-help")->GetInnerRML();
+            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(!mapHelp.empty()&&hud->GetElementById("jump-map-help")->GetInnerRML()==mapHelp,"Repeated map frames must retain the module-owned help text");
+            const auto mapProfile=ui.profile();auto noMinimapProfile=mapProfile;noMinimapProfile.settings.minimap=false;ui.SetProfile(noMinimapProfile);
+            ui.SetMapFrame(UiMapFrame{});ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(!minimapPanel->IsClassSet("jump-map-open")&&hud->GetElementById("jump-map-marker-1")==nullptr,"Closing with the minimap disabled must clear its open class and pins without waiting for a cache tick");
+            Check(hud->GetElementById("jump-map-help")->GetInnerRML().empty(),"Closing with the minimap disabled must clear map help");
+            ui.SetProfile(mapProfile);UiMapFrame reopened;reopened.open=true;reopened.targets=uiTargets();ui.SetMapFrame(std::move(reopened));
+            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(hud->GetElementById("jump-map-marker-1")!=nullptr,"Immediate reopen must rebuild pins without advancing the clock");
+
+            auto removedFirstTarget=uiTargets();removedFirstTarget.erase(std::remove_if(removedFirstTarget.begin(),removedFirstTarget.end(),[](const auto& target){return target.key==1;}),removedFirstTarget.end());
+            hud->GetElementById("jump-map-marker-1")->Click();setMapFrame(true,removedFirstTarget);
+            Check(ui.TakeJumpMapSelection()==-1,"A selected target removed from the current frame must be discarded");
+            auto unavailableFirstTarget=uiTargets();for(auto& target:unavailableFirstTarget)if(target.key==1)target.available=false;
+            setMapTargets();hud->GetElementById("jump-map-marker-1")->Click();setMapFrame(true,unavailableFirstTarget);
+            Check(ui.TakeJumpMapSelection()==-1,"A selected target that becomes unavailable must be discarded");
+
+            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            auto* hoverPin=hud->GetElementById("jump-map-marker-1");const auto hoverOffset=hoverPin->GetAbsoluteOffset(Rml::BoxArea::Border);const auto hoverSize=hoverPin->GetBox().GetSize(Rml::BoxArea::Border);
+            context->ProcessMouseMove(static_cast<int>(hoverOffset.x+hoverSize.x*.5),static_cast<int>(hoverOffset.y+hoverSize.y*.5),0);
+            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            auto noHoveredTarget=uiTargets();noHoveredTarget.erase(std::remove_if(noHoveredTarget.begin(),noHoveredTarget.end(),[](const auto& target){return target.key==1;}),noHoveredTarget.end());
+            setMapFrame(true,noHoveredTarget);ui.ConfirmJumpMapCursor();
+            Check(ui.TakeJumpMapSelection()==-1,"Confirming a stale cursor hover after its target disappears must not select it");
+
+            setMapTargets();hud->GetElementById("jump-map-marker-1")->Click();jumpMatch.restart();jumpMatch.startPlaying();
+            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(ui.TakeJumpMapSelection()==-1,"Restarting a match must clear a pending map selection even when the MatchSimulation address is unchanged");
+            setMapFrame(false,{});ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
         }
         StageGeometry zonesGeometry(*zonesStage);FacePaint zonesPaint(*zonesStage,zonesGeometry);NavGraph zonesNav(*zonesStage,zonesGeometry);
         MatchOptions zonesOptions;zonesOptions.mode="zones";zonesOptions.duration=300;zonesOptions.seed=41;
@@ -755,7 +793,6 @@ int main(int argc,char** argv){
             const double frameTime=glfwGetTime();
             Check(smallMap.Render(sceneRenderer,environment,scenePaint.version(),frameTime),"Native minimap must render an initial stage frame");
             Check(!smallMap.Render(sceneRenderer,environment,scenePaint.version()+1,frameTime+.01),"Painting must not bypass the native minimap render cadence");
-            ui.SetNativeMap(smallMap.texture(),glm::mat4(smallMap.viewProjection()));
             RenderPipeline pipeline(references/"post");pipeline.Configure(0,false,false);
             auto background=[&](int w,int h){
                 const auto camera=FitStageMapCamera(stage->bounds,double(w)/h,sceneMatch.local().team()==1);
@@ -771,15 +808,22 @@ int main(int argc,char** argv){
             std::vector<UiJumpMapTarget> targets;int key=1;
             for(std::size_t i=0;i<sceneMatch.actors().size();++i){const auto& actor=*sceneMatch.actors()[i];if(actor.team()==sceneMatch.local().team()&&!actor.isLocal()&&key<4){targets.push_back({key++,actor.state.pos.x,actor.state.pos.z,sceneMatch.roster()[i].name,actor.state.alive,actor.state.pos.y,std::string(actor.weapon().kind)});}}
             const auto spawn=stage->spawnPads[sceneMatch.local().team()];targets.push_back({4,spawn.x,spawn.z,"生點",true});
+            auto setSceneMapFrame=[&](bool open,int w,int h){
+                const auto camera=FitStageMapCamera(stage->bounds,double(w)/h,sceneMatch.local().team()==1);
+                UiMapFrame frame;frame.open=open;frame.targets=targets;
+                frame.worldViewProjection=glm::mat4(camera.projection*camera.view);frame.eye=camera.eye;frame.projectionY=float(camera.projection[1][1]);frame.haveWorldViewProjection=true;
+                frame.nativeMapTexture=smallMap.texture();frame.nativeMapViewProjection=glm::mat4(smallMap.viewProjection());frame.haveNativeMapView=true;
+                ui.SetMapFrame(std::move(frame));
+            };
             for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
-                background(dims.first,dims.second);ui.SetJumpMap(true,targets);
+                background(dims.first,dims.second);setSceneMapFrame(true,dims.first,dims.second);
                 ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
                 Check(hud->GetElementById("jump-map-marker-1")->IsVisible(),"The actual map camera must project a friendly jump pin");
                 auto* pin=hud->GetElementById("jump-map-marker-1");const auto pinOffset=pin->GetAbsoluteOffset(Rml::BoxArea::Border);const auto pinSize=pin->GetBox().GetSize(Rml::BoxArea::Border);
                 context->ProcessMouseMove(static_cast<int>(pinOffset.x+pinSize.x*.5),static_cast<int>(pinOffset.y+pinSize.y*.5),0);
                 ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);ui.ConfirmJumpMapCursor();Check(ui.TakeJumpMapSelection()>=1,"The map cursor must snap and confirm a nearby live teammate pin");
                 Capture(std::filesystem::path(argv[2])/("source-native-tab-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
-                background(dims.first,dims.second);ui.SetJumpMap(false,{});ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                background(dims.first,dims.second);setSceneMapFrame(false,dims.first,dims.second);ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
                 Check(hud->GetElementById("minimap-render")->IsVisible(),"The compact map must show the native stage texture");
                 Check(hud->GetElementById("jump-map-marker-1")==nullptr,"Closing Tab must immediately remove large jump pins from the compact map");
                 Capture(std::filesystem::path(argv[2])/("source-native-mini-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
@@ -822,7 +866,7 @@ int main(int argc,char** argv){
             }
             element("nav-settings")->Click();element("settings-tab-controls")->Click();
             for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){glViewport(0,0,dims.first,dims.second);glClearColor(.94f,.91f,.84f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderMenu(dims.first,dims.second);Capture(std::filesystem::path(argv[2])/("source-native-settings-"+std::to_string(dims.second)+".png"),dims.first,dims.second);}
-            ui.SetNativeMap(0,glm::mat4(1));
+            {UiMapFrame frame;frame.nativeMapTexture=0;frame.nativeMapViewProjection=glm::mat4(1);frame.haveNativeMapView=true;ui.SetMapFrame(std::move(frame));}
         }
         const auto error=glGetError();if(error)std::cerr<<"GL error: "<<error<<"\n";Check(error==GL_NO_ERROR,"UI interaction draw produced GL errors");
         std::cout<<"PLAYER_UI keyboard, modes, source loadout and volume sink passed\n";

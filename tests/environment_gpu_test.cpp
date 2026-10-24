@@ -1,19 +1,84 @@
 #include "EnvironmentRenderer.hpp"
+#include "EnvironmentTextureCatalog.hpp"
 #include "ReferenceData.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
+#include <array>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <set>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <vector>
+#include <zlib.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
+
+namespace {
+using restoration::environment_detail::TextureDescriptor;
+using restoration::environment_detail::decodeTextureBlob;
+using restoration::environment_detail::parseTextureCatalog;
+using restoration::environment_detail::readTextureBlob;
+using restoration::environment_detail::readTextureCatalog;
+
+void require(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
+template<class F>void requireFailure(F&& action,const char* message){try{action();}catch(const std::exception&){return;}throw std::runtime_error(message);}
+
+std::string catalogFixture(std::string_view waveEntry=R"({"width":1,"height":1,"bits":8})",std::string_view omit={}){
+    constexpr std::array<std::string_view,7> files{{"wave.rgba8.z","cloud-day.rgba16f.z","cloud-sunset.rgba16f.z","cloud-golden.rgba16f.z","pmrem-day.rgba16f.z","pmrem-sunset.rgba16f.z","pmrem-golden.rgba16f.z"}};
+    std::string json="{";bool first=true;
+    for(const auto file:files){if(file==omit)continue;if(!first)json+=',';first=false;json+='\"';json+=file;json+="\":";json+=file=="wave.rgba8.z"?waveEntry:(file.find("rgba16f")!=std::string_view::npos?R"({"width":1,"height":1,"bits":16})":R"({"width":1,"height":1,"bits":8})");}
+    return json+"}";
+}
+
+void writeWord(std::vector<unsigned char>& bytes,std::size_t offset,std::uint32_t value){for(unsigned i=0;i<4;i++)bytes[offset+i]=static_cast<unsigned char>(value>>(i*8));}
+std::vector<unsigned char> compressedTexture(unsigned width,unsigned height,unsigned bits,std::size_t payloadBytes,std::string_view magic="TSENV001"){
+    std::vector<unsigned char> raw(20+payloadBytes,0x5a);std::copy_n(magic.data(),8,raw.begin());
+    writeWord(raw,8,width);writeWord(raw,12,height);writeWord(raw,16,bits);
+    uLongf size=compressBound(static_cast<uLong>(raw.size()));std::vector<unsigned char> result(size);
+    if(compress2(result.data(),&size,raw.data(),static_cast<uLong>(raw.size()),Z_BEST_SPEED)!=Z_OK)throw std::runtime_error("Could not build test environment texture");
+    result.resize(size);return result;
+}
+
+void testTextureCatalog(const std::filesystem::path& assets){
+    const auto catalog=readTextureCatalog(assets);const auto wave=catalog.at("wave.rgba8.z");
+    require(wave.width==256&&wave.height==256&&wave.bits==8,"Environment texture catalog dimensions changed");
+    const auto pixels=readTextureBlob(assets/"wave.rgba8.z",wave);
+    require(pixels.size()==256u*256u*4u,"Environment texture payload size changed");
+
+    requireFailure([]{parseTextureCatalog(catalogFixture(R"({"width":1,"height":1,"bits":8})","cloud-golden.rgba16f.z"));},"Missing environment texture descriptor was accepted");
+    requireFailure([]{parseTextureCatalog("{");},"Malformed environment texture JSON was accepted");
+    for(const auto invalid:{
+        std::string_view(R"({"width":"1","height":1,"bits":8})"),
+        std::string_view(R"({"width":1.5,"height":1,"bits":8})"),
+        std::string_view(R"({"width":0,"height":1,"bits":8})"),
+        std::string_view(R"({"width":1,"height":1,"bits":"8"})"),
+        std::string_view(R"({"width":1,"height":1,"bits":32})")})
+        requireFailure([&]{parseTextureCatalog(catalogFixture(invalid));},"Malformed environment texture descriptor was accepted");
+
+    const TextureDescriptor tiny{3,2,8};
+    const auto blob=compressedTexture(3,2,8,24);
+    require(decodeTextureBlob(blob,tiny,"fixture").size()==24,"Valid environment texture blob was rejected");
+    requireFailure([&]{decodeTextureBlob(compressedTexture(3,2,8,23),tiny,"short fixture");},"Short environment texture payload was accepted");
+    requireFailure([&]{decodeTextureBlob(compressedTexture(3,2,8,25),tiny,"long fixture");},"Long environment texture payload was accepted");
+    requireFailure([&]{decodeTextureBlob(compressedTexture(2,3,8,24),tiny,"mismatched fixture");},"Mismatched environment texture header was accepted");
+    requireFailure([&]{decodeTextureBlob(compressedTexture(3,2,8,24,"BADMAGIC"),tiny,"invalid magic fixture");},"Invalid environment texture magic was accepted");
+    requireFailure([&]{decodeTextureBlob(compressedTexture(3,2,16,24),tiny,"mismatched bit depth fixture");},"Mismatched environment texture bit depth was accepted");
+    requireFailure([&]{readTextureBlob(assets/"missing-texture-for-test.z",wave);},"Missing environment texture blob was accepted");
+}
+}
+
 int main(int argc,char** argv){
+    const std::filesystem::path assets=argc>1?argv[1]:"assets/reference/environment";
+    try{testTextureCatalog(assets);}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
     if(!glfwInit())return 1;glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
     auto* window=glfwCreateWindow(384,256,"Source environment pixels",nullptr,nullptr);if(!window)return 1;glfwMakeContextCurrent(window);if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))return 1;int result=0;
     try{
-        using namespace restoration;const std::filesystem::path assets=argc>1?argv[1]:"assets/reference/environment",output=argc>2?argv[2]:"build/captures/environment";std::filesystem::create_directories(output);
+        using namespace restoration;const std::filesystem::path output=argc>2?argv[2]:"build/captures/environment";std::filesystem::create_directories(output);
         EnvironmentRenderer env(assets);std::set<std::string> stages;std::size_t motionPixels=0;
         GLuint sentinel=0;glGenRenderbuffers(1,&sentinel);glBindRenderbuffer(GL_RENDERBUFFER,sentinel);
         for(const auto& stage:ReferenceStages()){

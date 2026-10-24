@@ -101,7 +101,7 @@
         if(!boss){if(bossFeedback.match){bossFeedback={};Find(hud,"boss-feedback-numbers")->SetInnerRML("");}Hidden(hud,"boss-feedback-layer",true);return;}
         const auto& state=boss->state();const double now=state.clock;auto& s=bossFeedback;
         if(s.match!=&match||s.boss!=boss||s.epoch!=match.world().hudEventEpoch()||(s.clock>=0&&now<s.clock))ResetBossFeedback(match,*boss);
-        s.clock=now;const bool reduced=player.settings.reducedMotion,obscured=paused||results||jumpMapOpen||hudOverlay||practiceGear;
+        s.clock=now;const bool reduced=player.settings.reducedMotion,obscured=paused||results||mapInteraction.open()||hudOverlay||practiceGear;
         layer->SetClass("reduced-motion",reduced);Hidden(hud,"boss-feedback-layer",obscured);
         if(state.anim==1&&!s.introSeen){s.introSeen=true;s.titleUntil=now+(reduced?1.5:2.75);}
         if(state.phase>s.phase){s.phase=state.phase;if(!obscured)s.phaseUntil=now+(reduced?1.5:2.9);}

@@ -38,6 +38,18 @@ struct UiJumpMapTarget {
     double y=0.0;
     std::string weapon;
 };
+struct UiMapFrame {
+    bool open=false;
+    std::vector<UiJumpMapTarget> targets;
+    int queuedKey=-1;
+    std::string queuedLabel;
+    glm::mat4 worldViewProjection{1.0f},nativeMapViewProjection{1.0f};
+    glm::dvec3 eye{0.0};
+    float projectionY=1.78f;
+    bool haveWorldViewProjection=false;
+    unsigned int nativeMapTexture=0; // Borrowed from StageMapView; RmlRenderer only borrows it.
+    bool haveNativeMapView=false;
+};
 struct UiOnlineRequest {
     enum class Kind { Create, Join, Leave, Ready, Team, Settings, Start, Emote, LocalService };
     Kind kind=Kind::Create;
@@ -71,9 +83,8 @@ public:
     void SetSoundSink(std::function<void(const std::string&)> sink);
     void SetDetailedSoundSink(std::function<void(const std::string&,double,double)> sink);
     void SetVolumeSink(std::function<void(float,float,float)> sink);
-    void SetJumpMap(bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel={});
+    void SetMapFrame(UiMapFrame frame);
     void SetWorldView(const glm::mat4& viewProjection,const glm::dvec3& eye,float projectionY=1.78f);
-    void SetNativeMap(unsigned int texture,const glm::mat4& viewProjection);
     int TakeJumpMapSelection();
     void ConfirmJumpMapCursor();
     void ShowOnline();

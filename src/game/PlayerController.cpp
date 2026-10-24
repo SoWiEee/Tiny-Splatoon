@@ -71,7 +71,7 @@ void PlayerController::Update(double dt, const ControllerInput& input, const Pla
 
     auto& actor = match.local();
     if (match.phase() == MatchPhase::Intro) {
-        assist_ = {}; edgeTime_ = padLookX_ = padLookY_ = 0.0;
+        ResetLook();
         actor.input.move = glm::dvec3(0.0);
         actor.input.aimYaw = camera.yaw; actor.input.aimPitch = camera.pitch;
         return;
