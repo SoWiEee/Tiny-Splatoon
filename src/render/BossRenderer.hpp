@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <vector>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
@@ -22,6 +23,8 @@ public:
     BossRenderer(const BossRenderer&)=delete;
     BossRenderer& operator=(const BossRenderer&)=delete;
     void Update(BossSimulation& boss);
+    // One-shot ground-root positions for source BossFX crablet pop bursts.
+    std::vector<glm::dvec3> TakeCrabletPopEvents();
     void SetAudioEventSink(std::function<void(const BossPoseAudioEvent&)> sink);
     int DrawShadow(const BossSimulation& boss,const glm::mat4& lightViewProjection);
     int Draw(const BossSimulation& boss,const glm::mat4& view,const glm::mat4& projection,

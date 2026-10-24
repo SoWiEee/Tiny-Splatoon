@@ -2,6 +2,8 @@
   "version": 1,
   "source": {
     "splat-ref/src/boss/bossMats.js": "c20add43b9744f70b4cbf3c53d07968156821e370b956e7c1ba14931c0daa982",
+    "splat-ref/src/boss/bossModel.js": "2b6da652e8aaac4ac55b4e061a0392301fb829b3db6c13521e1d15eec1c3c0db",
+    "splat-ref/src/boss/bossModelFx.js": "59952bc2696b4db998a0b072ede2306f0bba23a9a86ff85e002609ae1f7260f2",
     "tools/export-character-shaders.mjs": "d45c5c4012c9bcbd270fb1da7c2aa8e542bbfe8f532ef5f8c50d66e56d24884f"
   },
   "stencil": {
@@ -59,5 +61,37 @@
       "fragment": "crablet.frag",
       "uniforms": "crablet.uniforms"
     }
-  ]
+  ],
+  "crabletPopBlob": {
+    "sourceBehavior": "BossCrablet.update pop -> BossFX.ink, quality low",
+    "geometry": {
+      "type": "THREE.IcosahedronGeometry",
+      "radius": 1,
+      "detail": 0,
+      "vertices": 60,
+      "indices": 60,
+      "file": "crablet-pop-blob.mesh",
+      "sha256": "033aa4725bc4bf867cf71d1ef38cdf37054ad7151bea6010462102def9c385ce"
+    },
+    "material": {
+      "type": "THREE.MeshPhysicalMaterial",
+      "roughness": 0.12,
+      "metalness": 0,
+      "clearcoat": 1,
+      "clearcoatRoughness": 0.04,
+      "vertex": "crablet-pop-blob.vert",
+      "fragment": "crablet-pop-blob.frag",
+      "uniforms": "crablet-pop-blob.uniforms",
+      "digest": "31d1fe3d5a4eb441cf012c107635070fdc0d1c398fd0ed87140620e030324935"
+    },
+    "particles": {
+      "quality": "low",
+      "sourceRandomSeed": 9001,
+      "count": 10,
+      "speed": 4.2,
+      "spread": 1,
+      "size": 0.09,
+      "life": 1.2
+    }
+  }
 }

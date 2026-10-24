@@ -185,7 +185,9 @@ void MapInteraction::Update(Rml::Context* context,Rml::ElementDocument* hud,
         for(const auto& target:p.frame.targets){
             const std::string stateClass=target.available?"available":"unavailable";
             const std::string disabled=target.available&&p.frame.open?"":" disabled=\"disabled\"";
-            const std::string icon=!target.weapon.empty()?"<img src=\"weapons/"+Escape(target.weapon)+".png\"/>":target.key==4?"<span class=\"map-base-icon\"><i></i><b></b><em><u></u></em></span>":(target.key==0||target.key>4)?"<img src=\"equipment/sub-beacon.png\"/>":std::string();
+            // The source Tabmap's weaponIcon() falls back to the shooter art for teammates without metadata.
+            const std::string weapon=target.weapon.empty()&&target.key>=1&&target.key<=3?"shooter":target.weapon;
+            const std::string icon=!weapon.empty()?"<img src=\"weapons/"+Escape(weapon)+".png\"/>":target.key==4?"<span class=\"map-base-icon\"><i></i><b></b><em><u></u></em></span>":(target.key==0||target.key>4)?"<img src=\"equipment/sub-beacon.png\"/>":std::string();
             targetLegend+="<button id=\"jump-target-"+std::to_string(target.key)+"\" class=\"jump-target "+stateClass+"\""+disabled+">"+icon+"<strong>"+std::to_string(target.key%10)+"</strong><span>"+Escape(target.label)+"</span><small>"+(target.available?"可用":"暫不可用")+"</small></button>";
             if(!p.frame.open)continue;
             double left=0,top=0;if(!project({target.x,target.y,target.z},left,top))continue;

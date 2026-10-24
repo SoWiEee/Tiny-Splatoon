@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(Tiny-Splatoon VERSION 0.8.5 LANGUAGES CXX C)
+project(Tiny-Splatoon VERSION 0.8.6 LANGUAGES CXX C)
 
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # MSVC emits UTF-8 here; a system-codepage probe can corrupt Ninja's include prefix.
@@ -61,6 +61,7 @@ add_library(restoration_core STATIC
     src/game/BossModelData.cpp
     src/game/BossPose.cpp
     src/game/BossSimulation.cpp
+    src/game/LobbyPresentation.cpp
     src/game/MatchSimulation.cpp
     src/game/ZoneControl.cpp
     src/game/ZoneData.cpp
@@ -86,9 +87,9 @@ add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp)
 target_link_libraries(projectile_visuals PUBLIC restoration_core)
 target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/MatchInputState.cpp src/app/OnlinePlay.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
-    src/render/WorldEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
+    src/render/WorldEffects.cpp src/render/LobbyEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp src/render/StageMapView.cpp src/render/StageMapCamera.cpp
-    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp src/render/ZoneRenderer.cpp)
+    src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/LobbyRenderer.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp src/render/ZoneRenderer.cpp)
 target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals game_network)
 
 target_link_libraries(Tiny-Splatoon PRIVATE
@@ -161,6 +162,20 @@ if(BUILD_TESTING)
     add_executable(team_palette_test tests/team_palette_test.cpp)
     target_link_libraries(team_palette_test PRIVATE glm::glm)
     add_test(NAME native_team_palette COMMAND team_palette_test)
+    add_executable(lobby_effects_test tests/lobby_effects_test.cpp src/render/LobbyEffects.cpp
+        src/render/WorldFxRecipes.cpp src/render/WorldFxParticleRenderer.cpp src/render/CharacterShader.cpp)
+    target_link_libraries(lobby_effects_test PRIVATE restoration_core glad::glad OpenGL::GL)
+    add_test(NAME native_lobby_effects COMMAND lobby_effects_test)
+    add_executable(lobby_visual_gpu_test tests/lobby_visual_gpu_test.cpp src/render/LobbyRenderer.cpp
+        src/render/LobbyEffects.cpp src/render/WorldFxRecipes.cpp src/render/WorldFxParticleRenderer.cpp
+        src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp
+        src/render/PlayerShowcase.cpp src/render/CharacterArt.cpp src/render/CharacterShader.cpp
+        src/render/RenderPipeline.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(lobby_visual_gpu_test PRIVATE player_ui restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
+    add_test(NAME native_lobby_visual_gpu COMMAND lobby_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/captures/lobby")
+    add_executable(lobby_presentation_test tests/lobby_presentation_test.cpp)
+    target_link_libraries(lobby_presentation_test PRIVATE restoration_core)
+    add_test(NAME native_lobby_presentation COMMAND lobby_presentation_test)
     add_executable(match_input_state_test tests/match_input_state_test.cpp src/app/MatchInputState.cpp)
     target_link_libraries(match_input_state_test PRIVATE restoration_core)
     add_test(NAME native_match_input COMMAND match_input_state_test)
@@ -353,8 +368,8 @@ if(BUILD_TESTING)
     add_executable(worldfx_eval tests/worldfx_eval.cpp src/render/WorldFxRecipes.cpp)
     target_link_libraries(worldfx_eval PRIVATE glm::glm)
 
-    add_executable(worldfx_gpu_test tests/worldfx_gpu_test.cpp src/render/WorldEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/WorldFxRecipes.cpp src/render/DeviceRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
-    target_link_libraries(worldfx_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
+    add_executable(worldfx_gpu_test tests/worldfx_gpu_test.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/RenderPipeline.cpp src/render/WorldEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/WorldFxRecipes.cpp src/render/DeviceRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
+    target_link_libraries(worldfx_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
     add_test(NAME reference_worldfx_gpu COMMAND worldfx_gpu_test)
     set_tests_properties(reference_worldfx_gpu PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 

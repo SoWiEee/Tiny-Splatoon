@@ -1,6 +1,8 @@
 <rml>
 <head><title>Tiny Splatoon</title><link type="text/rcss" href="game.rcss" /><link type="text/rcss" href="menu-reference.rcss" /></head>
 <body id="menu" class="menu">
+  <div id="lobby-plates" class="lobby-plates hidden"></div>
+  <div id="lobby-countdown" class="lobby-countdown hidden" role="status" aria-live="polite"><strong id="lobby-countdown-number"></strong><span id="lobby-countdown-label">準備出發</span></div>
   <div class="menu-shell">
     <div class="menu-left">
       <div class="menu-header">
@@ -48,6 +50,7 @@
           <div id="panel-online" class="panel hidden">
             <h1>私人房間</h1><p id="online-status" class="intro" role="status" aria-live="polite">建立房間，或輸入朋友分享的房碼。</p>
             <div id="online-error" class="save-error hidden" role="status" aria-live="polite"></div>
+            <div class="online-actions"><button id="online-loadout" class="quiet">更換裝備</button><button id="online-locker" class="quiet">更換造型</button></div>
             <div id="online-connect">
               <div class="field"><label for="online-code">房間代碼</label><input id="online-code" class="text-input room-code-input" type="text" maxlength="8" value="" /></div>
               <div class="online-actions"><button id="online-create" class="primary">建立房間</button><button id="online-join" class="secondary">加入房間</button><button id="online-cancel" class="quiet hidden">取消連線</button></div>

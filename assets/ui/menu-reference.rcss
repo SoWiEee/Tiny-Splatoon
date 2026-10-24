@@ -189,3 +189,30 @@
 #menu .nav.selected:hover, #menu .settings-tab.selected:hover { background-color: #f28a24; }
 
 #menu .kit-copy p { word-break: break-all; overflow: hidden; }
+
+/* The online alley is full frame; other menu screens retain the paper background. */
+#menu.online-world .menu-left { width: 34%; min-width: 390dp; padding: 0 22dp; background-color: #f8f1e4eb; border-right: 3dp #211d27; }
+#menu.online-world #navigation { display: none; }
+#menu.online-world .menu-layout { left: 20dp; right: 20dp; }
+#menu.online-world .content { padding-left: 0; width: 100%; }
+#menu.online-world .wordmark { font-size: 23dp; }
+#menu.online-world .profile-header { display: none; }
+#menu.online-world #panel-online h1 { font-size: 32dp; }
+#menu.online-world .online-roster { display: none; }
+#menu.online-world .online-member { margin-bottom: 5dp; padding: 7dp; }
+#menu.online-world .online-actions { flex-wrap: wrap; gap: 7dp; }
+#menu.online-world .field { flex-direction: column; align-items: stretch; gap: 4dp; }
+#menu.online-world .field label { width: auto; }
+#menu.online-world .text-input, #menu.online-world select { width: 100%; }
+#menu.online-world .menu-footer { left: 18dp; right: 18dp; }
+#menu.online-world #menu-footer-hint { display: none; }
+#menu.online-world.lobby-launching .menu-left { opacity: .4; }
+.lobby-plates { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.lobby-plate { position: absolute; width: 180dp; margin-left: -90dp; padding: 6dp 9dp; border: 3dp #211d27; border-radius: 12dp; background-color: #fff9e9f0; color: #211d27; text-align: center; }
+.lobby-plate strong { display: block; font-size: 18dp; }
+.lobby-plate span { display: block; font-size: 12dp; }
+.lobby-plate.ready { border-color: #317f5c; }
+.lobby-countdown { position: absolute; left: 57%; top: 20%; width: 280dp; margin-left: -140dp; color: #fff9e9; text-align: center; z-index: 20; pointer-events: none; }
+#lobby-countdown-number { display: block; font-size: 120dp; font-weight: 700; font-effect: outline(5dp #211d27); }
+#lobby-countdown-label { display: block; padding: 6dp; font-size: 24dp; font-weight: 700; background-color: #211d27; border-radius: 9dp; }
+@media (max-width: 1100px) { #menu.online-world .menu-left { min-width: 340dp; width: 36%; } }

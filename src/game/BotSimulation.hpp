@@ -129,7 +129,7 @@ private:
     std::unordered_map<std::uint64_t, double> threatMemory_;
     bool needJump_ = false, skipped_ = false, wasDead_ = false, firing_ = false, threatFiring_ = false, threatAiming_ = false;
     bool bombAim_ = false, releaseBomb_ = false, threatLos_ = false, threatPulse_ = false;
-    void tickBoss(double dt,bool playing);
+    void tickBoss(double dt,bool playing,const std::vector<BotSimulation*>& bots);
     BossSimulation* boss_ = nullptr;
     ZonePlan* zonePlan_ = nullptr;
     int bossShape_ = -1, bossCrab_ = -1;

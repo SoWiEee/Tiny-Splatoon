@@ -1203,7 +1203,7 @@ void BotSimulation::finish(double dt, glm::dvec3 move, double wantYaw, double wa
 }
 
 void BotSimulation::tick(double dt, bool playing, const std::vector<BotSimulation*>& bots) {
-    if(boss_){tickBoss(dt,playing);return;}
+    if(boss_){tickBoss(dt,playing,bots);return;}
     auto& a = actor_.state;
     auto& input = actor_.input;
     if (!a.alive || !playing) {
@@ -1300,7 +1300,7 @@ void BotSimulation::tick(double dt, bool playing, const std::vector<BotSimulatio
     finish(dt, move, wantYaw, wantPitch, aimDistance, mode_ == BotMode::Fight);
 }
 
-void BotSimulation::tickBoss(double dt,bool playing){
+void BotSimulation::tickBoss(double dt,bool playing,const std::vector<BotSimulation*>& bots){
     auto& state=actor_.state;auto& input=actor_.input;
     if(!state.alive||!playing){
         input.move={0,0,0};input.fire=input.squid=input.sub=input.jump=input.special=false;
@@ -1385,6 +1385,11 @@ void BotSimulation::tickBoss(double dt,bool playing){
                 double score=-std::hypot(n.x-state.pos.x,n.z-state.pos.z)*.08+random();
                 if(boss_->threat(n.x,n.y,n.z,1.5).level>0)score-=6;
                 if(geometry_.los({n.x,n.y+1.3,n.z},boss.pos+glm::dvec3(0,2.5,0)))score+=3;
+                for(const auto* mate:bots){
+                    if(!mate||mate==this||!mate->actor_.state.alive||mate->goal_<0)continue;
+                    const auto& mateGoal=nav_.nodes()[mate->goal_];
+                    if(std::hypot(mateGoal.x-n.x,mateGoal.z-n.z)<4)score-=2.5;
+                }
                 if(score>best){best=score;goal=id;}
             }
             if(goal>=0){const auto& n=nav_.nodes()[goal];pathTo({n.x,n.y,n.z},1.0);}else path_.clear();

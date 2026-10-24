@@ -1,5 +1,6 @@
 #include "PlayerShowcase.hpp"
 #include "TeamPalette.hpp"
+#include "../game/LobbyPresentation.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
@@ -80,7 +81,7 @@ private:
     GLboolean depthMask_=GL_TRUE,depth_=GL_FALSE,scissorEnabled_=GL_FALSE,blend_=GL_FALSE,cull_=GL_FALSE,programPointSize_=GL_FALSE;
     GLdouble depthClear_=1.0;
     std::array<GLint,4> viewport_{},scissor_{};
-    std::array<GLint,2> textures_{};
+    std::array<GLint,3> textures_{};
 };
 
 void beginViewport(PlayerShowcase::Viewport viewport) {
@@ -308,6 +309,57 @@ void PlayerShowcase::drawPlayer(const PlayerProfile& profile,const std::string& 
     const auto view=glm::lookAt(eye,target,glm::dvec3(0.0,1.0,0.0));
     const auto projection=glm::perspective(glm::radians(fov),aspect,0.05,90.0);
     art_.draw(actor.pose->frame(),profile.style,weaponId,subId,"hero",view,projection,eye,showcaseLighting());
+}
+
+void PlayerShowcase::updateLobby(const std::vector<LobbyActorState>& roster,double time,glm::dvec3 eye,
+                                 bool reducedMotion,const std::vector<LobbyPresentationEvent>& events){
+    if(!std::isfinite(time))throw std::invalid_argument("Lobby time must be finite");
+    if(!lobbyArt_)lobbyArt_=std::make_unique<CharacterArt>(directory_,true,true);
+    actors_.resize(roster.size());
+    for(std::size_t i=0;i<roster.size();++i){
+        const auto& player=roster[i];if(!player.visible)continue;
+        if(!actors_[i])actors_[i]=std::make_unique<Actor>();auto& actor=*actors_[i];
+        actor.configure(*lobbyArt_,"lobby-"+std::to_string(player.id),player.style,player.main,player.sub,player.dance);
+        for(const auto& event:events)if(event.id==player.id){
+            if(event.kind=="land"||event.kind=="switch_land"||event.kind=="ready_land"){
+                actor.pose->trigger({"land",event.kind=="land"?10.:6.});
+                if(event.kind=="ready_land")actor.pose->setDance("victory",0);
+            }
+            else if(event.kind=="leap"||event.kind=="pop"||event.kind=="superjump")actor.pose->trigger({"jump"});
+            else if(event.kind.rfind("emote_",0)==0){
+                const auto emote=event.kind.substr(6);const int variant=emote=="wave"?2:emote=="dance"?1:0;
+                actor.pose->setDance({});actor.pose->setDance(player.dance,variant,emote=="flex"?2.86:0.);
+                actor.pose->trigger({emote=="flex"?"hairflip":"jump"});
+            }
+        }
+        actor.pose->setColor(InkColors[static_cast<std::size_t>(player.team==1?1:0)]);
+        const double dt=actor.hasTime?std::clamp(time-actor.lastTime,0.,.1):1./60.;actor.lastTime=time;actor.hasTime=true;
+        CharacterAnimState state;state.position=player.position;state.yaw=player.yaw;state.speed=player.speed;state.vy=player.velocityY;
+        state.form=player.form=="swim"?CharacterForm::Swim:player.form=="squid"?CharacterForm::Squid:CharacterForm::Kid;
+        state.grounded=player.form=="swim"||std::abs(player.velocityY)<.01;state.visible=player.visible;
+        const double sy=std::sin(player.yaw),cy=std::cos(player.yaw),speed=std::max(1.,player.speed);
+        state.localMove={(-cy*player.velocityWorld.x+sy*player.velocityWorld.z)/speed,(sy*player.velocityWorld.x+cy*player.velocityWorld.z)/speed};
+        CharacterSceneInput scene;scene.cameraPosition=eye;scene.isLocal=true;scene.team=player.team;
+        actor.pose->update(reducedMotion?0:dt,state,scene);
+    }
+}
+
+void PlayerShowcase::drawLobby(const std::vector<LobbyActorState>& roster,Viewport viewport,
+                               const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,
+                               const CharacterLightState& lights,const std::function<CharacterLightState(glm::dvec3)>& lightingAt,const CharacterShadowState* shadow){
+    validate(viewport,0);
+    if(!lobbyArt_||actors_.size()!=roster.size())throw std::logic_error("Lobby actors must be updated before drawing");
+    GlState saved;glViewport(viewport.x,viewport.y,viewport.width,viewport.height);
+    glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDepthMask(GL_TRUE);glDisable(GL_SCISSOR_TEST);
+    for(std::size_t i=0;i<roster.size();++i){
+        const auto& player=roster[i];if(!player.visible)continue;
+        auto& actor=*actors_[i];
+        auto frame=actor.pose->frame();const double squash=std::max(.05,player.squash);
+        frame.root.scale*=glm::dvec3(1/std::sqrt(squash),squash,1/std::sqrt(squash));
+        frame.root.rotation=glm::angleAxis(player.pitch,glm::dvec3(1,0,0))*glm::angleAxis(player.yaw+player.twirl,glm::dvec3(0,1,0));
+        const auto localLights=lightingAt?lightingAt(player.position+glm::dvec3(0,.8,0)):lights;
+        lobbyArt_->draw(frame,player.style,player.main,player.sub,"hero",view,projection,eye,localLights,{},shadow);
+    }
 }
 
 void PlayerShowcase::beginResults(double startTime) {

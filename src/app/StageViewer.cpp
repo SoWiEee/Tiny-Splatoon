@@ -26,6 +26,10 @@
 #include "PlayerController.hpp"
 #include "MatchInputState.hpp"
 #include "PlayerShowcase.hpp"
+#include "LobbyRenderer.hpp"
+#include "LobbyEffects.hpp"
+#include "LobbyView.hpp"
+#include "LobbyPresentation.hpp"
 #include "TeamPalette.hpp"
 #include "AudioEngine.hpp"
 #include "GameAudio.hpp"
@@ -457,6 +461,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         }
         if(!benchmark||options.benchmarkPlayer) camera.tick(dt,CameraActor(local),geometry);
         const auto fxCamera=benchmark&&!options.benchmarkPlayer?overviewEye:camera.pose().eye;
+        if(bossRenderer)for(const auto& position:bossRenderer->TakeCrabletPopEvents())worldEffects.BossCrabletPop(position);
         worldEffects.Update(dt,match.world(),fxCamera);
         deviceRenderer.Update(dt,match.world(),fxCamera);
         const auto& events=worldEffects.lastEvents();
@@ -661,6 +666,7 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
         GLboolean colorMask[4]{};glGetBooleanv(GL_COLOR_WRITEMASK,colorMask);glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
         shadowDraws=renderer.DrawShadow(glm::mat4(directionalShadow.matrix()));
         shadowDraws+=environment.DrawShadow(directionalShadow.matrix());
+        if(!hideWorldActors)shadowDraws+=projectileRenderer.DrawShadow(directionalShadow.matrix(),lighting);
         const CharacterShadowState shadowCaster{true,0,directionalShadow.matrix(),0.0,
             directionalShadow.bias(),directionalShadow.normalBias(),directionalShadow.radius(),directionalShadow.size()};
         if(!hideWorldActors)for(std::size_t i=0;i<characters.size();++i){
@@ -857,9 +863,17 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
     }
     PlayerShowcase showcase(characterAssets);
     gameAudio.Menu(true);
+    std::unique_ptr<LobbyRenderer> lobbyScene;
+    std::unique_ptr<LobbyPresentation> lobby;
+    std::unique_ptr<LobbyEffects> lobbyEffects;
+    std::unique_ptr<RenderPipeline> lobbyPipeline;
+    bool lobbyLoadFailed=false;
+    LobbyCameraMotion lobbyCamera;
+    double previousFrame=glfwGetTime();
     int frame=0;
     while(!glfwWindowShouldClose(window)) {
         const double frameStart=glfwGetTime();
+        const double menuDt=std::clamp(frameStart-previousFrame,0.0,.1);previousFrame=frameStart;
         SetInkPalette(ProfilePaletteColors(ui.profile().settings.palette,ui.profile().settings.colorblind));
         glfwPollEvents();
         audio.Update();
@@ -869,8 +883,74 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
         if(width<=0||height<=0) {glfwWaitEventsTimeout(0.05);continue;}
         glViewport(0,0,width,height);
         glClearColor(.94f,.91f,.84f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        const auto preview=ui.preview();
-        if(preview.type!=UiPreviewType::None&&preview.type!=UiPreviewType::Podium&&preview.width>0&&preview.height>0)
+        const auto& roomView=online.view();
+        const bool starting=online.session()&&(roomView.phase==network::RoomPhase::Starting||roomView.phase==network::RoomPhase::Match);
+        const auto currentMatch=roomView.code+"-"+std::to_string(roomView.matchEpoch)+"-"+std::to_string(roomView.seed);
+        if(starting&&currentMatch!=handledMatch)ui.ShowOnline();
+        auto preview=ui.preview();
+        if(preview.screen==UiScreen::Online&&!lobbyScene&&!lobbyLoadFailed){
+            try{
+                lobbyScene=std::make_unique<LobbyRenderer>(characterAssets.parent_path()/"lobby");
+                lobby=std::make_unique<LobbyPresentation>(lobbyScene->Layout());
+                lobbyEffects=std::make_unique<LobbyEffects>(characterAssets.parent_path());
+                lobbyPipeline=std::make_unique<RenderPipeline>(characterAssets.parent_path()/"post");
+            }catch(const std::exception& error){
+                lobby.reset();lobbyEffects.reset();lobbyScene.reset();lobbyPipeline.reset();lobbyLoadFailed=true;
+                online.Fail("無法載入大廳場景："+std::string(error.what()));ui.SetOnlineState(online.view());
+            }
+        }
+        std::vector<LobbyPresentationEvent> lobbyEvents;
+        if(lobby){lobby->Update(online.view(),ui.profile(),menuDt);lobbyEvents=lobby->takeEvents();}
+        if(lobby&&!lobby->hubMode())SetInkPalette(ProfilePaletteColors(static_cast<int>(roomView.settings.palette),ui.profile().settings.colorblind));
+        if(lobbyEffects)lobbyEffects->Update(ui.profile().settings.reducedMotion?std::vector<LobbyActorState>{}:lobby->actors(),
+            ui.profile().settings.reducedMotion?std::vector<LobbyPresentationEvent>{}:lobbyEvents,menuDt,frameStart);
+        const bool drawLobby=lobby&&preview.screen==UiScreen::Online;
+        std::vector<UiLobbyPlate> lobbyPlates;
+        if(drawLobby){
+            const auto graphics=ui.graphicsSettings();
+            const int rw=std::max(1,int(std::round(width*graphics.renderScale))),rh=std::max(1,int(std::round(height*graphics.renderScale)));
+            const auto camera=lobbyCamera.Update(lobbyScene->Layout(),lobby->hubMode(),width,height,menuDt,frameStart,
+                lobby->launching(),lobby->countdown(),ui.profile().settings.reducedMotion);
+            const auto& shot=lobby->camera();
+            lobbyPipeline->Configure(graphics.renderScale>.99f?4:0,graphics.postEffects,graphics.postEffects&&ui.profile().settings.bloom,graphics.antialiasing);
+            lobbyPipeline->Begin(rw,rh,glm::mat4(camera.projection),glm::mat4(glm::inverse(camera.view)),float(shot.nearPlane),float(shot.farPlane));
+            glClearColor(.025f,.035f,.06f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            showcase.updateLobby(lobby->actors(),frameStart,camera.eye,ui.profile().settings.reducedMotion,lobbyEvents);
+            lobbyScene->SetReflectionsEnabled(graphics.reflections);
+            lobbyScene->SetKeyShadowEnabled(graphics.shadows);
+            lobbyScene->Draw(camera.view,camera.projection,camera.eye,frameStart,InkColors[0],InkColors[1],
+                [&](const glm::dmat4& reflectedView,const glm::dmat4& reflectedProjection,glm::dvec3 reflectedEye){
+                    GLint viewport[4]{};glGetIntegerv(GL_VIEWPORT,viewport);
+                    const auto shadow=lobbyScene->KeyShadowState();
+                    showcase.drawLobby(lobby->actors(),{viewport[0],viewport[1],viewport[2],viewport[3]},reflectedView,reflectedProjection,reflectedEye,lobbyScene->Lights(),[&](glm::dvec3 p){return lobbyScene->LightingAt(p);},graphics.shadows?&shadow:nullptr);
+                    if(!ui.profile().settings.reducedMotion)lobbyEffects->Draw(reflectedView,reflectedProjection,reflectedEye,lobbyScene->Lights(),frameStart);
+                },[&](const glm::dmat4& lightView,const glm::dmat4& lightProjection,glm::dvec3 lightEye,const CharacterShadowState& shadow){
+                    GLint viewport[4]{};glGetIntegerv(GL_VIEWPORT,viewport);
+                    showcase.drawLobby(lobby->actors(),{viewport[0],viewport[1],viewport[2],viewport[3]},lightView,lightProjection,lightEye,lobbyScene->Lights(),{},&shadow);
+                });
+            const auto lobbyShadow=lobbyScene->KeyShadowState();
+            showcase.drawLobby(lobby->actors(),{0,0,rw,rh},camera.view,camera.projection,camera.eye,lobbyScene->Lights(),[&](glm::dvec3 p){return lobbyScene->LightingAt(p);},graphics.shadows?&lobbyShadow:nullptr);
+            if(!ui.profile().settings.reducedMotion)lobbyEffects->Draw(camera.view,camera.projection,camera.eye,lobbyScene->Lights(),frameStart);
+            lobbyPipeline->End(GradeSettings{},ScreenEffects{},width,height);
+            for(const auto& actor:lobby->actors()){
+                const auto clip=camera.projection*camera.view*glm::dvec4(actor.position+glm::dvec3(0,actor.form=="kid"?1.8:.65,0),1);
+                if(clip.w>0)lobbyPlates.push_back({actor.id,float((clip.x/clip.w+1)*.5),float((1-clip.y/clip.w)*.5),actor.visible});
+            }
+        }
+        if(lobby){
+            for(const auto& event:lobbyEvents){
+                if(event.kind=="countdown_start"){audio.Duck(.6,4);audio.Play("ui_confirm");}
+                else if(event.kind=="countdown_3"||event.kind=="countdown_2"||event.kind=="countdown_1")audio.Play("countdown_tick");
+                else if(event.kind=="go")audio.Play("go_horn");
+                else if(event.kind=="superjump")audio.Play("super_jump",.4);
+                else if(event.kind=="land")audio.Play("splat_small",.35);
+                else if(event.kind=="pop")audio.Play("squid_out",.5);
+                else if(event.kind=="dive"||event.kind=="switch"||event.kind=="leave")audio.Play("squid_in",.35);
+                if(event.kind=="land"||event.kind=="pop"||event.kind=="dive"||event.kind=="superjump")lobbyScene->AddRipple(event.position,frameStart,event.strength);
+            }
+        }
+        ui.SetLobbyPresentation(drawLobby,lobby?lobby->countdown():-1,drawLobby&&lobby->launching(),lobbyPlates);
+        if(!drawLobby&&preview.type!=UiPreviewType::None&&preview.type!=UiPreviewType::Podium&&preview.width>0&&preview.height>0)
             showcase.drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,
                 {int(preview.x*width),int((1-preview.y-preview.height)*height),int(preview.width*width),int(preview.height*height)},frameStart,ui.profile().settings.reducedMotion);
         const auto action=ui.RenderMenu(width,height);
@@ -885,7 +965,7 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
         }
         glfwSwapBuffers(window);
         const auto roomMatch=online.view().code+"-"+std::to_string(online.view().matchEpoch)+"-"+std::to_string(online.view().seed);
-        if(online.session()&&(online.view().phase==network::RoomPhase::Starting||online.view().phase==network::RoomPhase::Match)&&roomMatch!=handledMatch){
+        if(online.session()&&lobby&&lobby->launchComplete()&&(online.view().phase==network::RoomPhase::Starting||online.view().phase==network::RoomPhase::Match)&&roomMatch!=handledMatch){
             const auto& room=online.view();handledMatch=roomMatch;
             const StageData* onlineStage=nullptr;
             for(const auto& candidate:ReferenceStages())if(candidate.id==room.settings.map&&candidate.mode==(room.settings.mode=="zones"?"zones":"turf")){onlineStage=&candidate;break;}
@@ -900,7 +980,7 @@ void NativeMenu(GLFWwindow* window,const Options& options,const StageData& initi
                 }catch(const std::exception& error){online.Fail("無法進入線上對戰："+std::string(error.what()));}
                 gameAudio.Menu(true);
             }
-            ui.ShowMenu(std::string(selected->id));ui.ShowOnline();ui.SetOnlineState(online.view());frame=0;
+            ui.ShowMenu(std::string(selected->id));ui.ShowOnline();ui.SetOnlineState(online.view());frame=0;previousFrame=glfwGetTime();
         }
         if(action==UiAction::Start||action==UiAction::Practice) {
             online.Leave();ui.SetOnlineState(online.view());

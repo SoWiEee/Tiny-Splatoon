@@ -6,9 +6,16 @@
 namespace restoration {
 namespace {
 constexpr double pi=3.1415926535897932384626433832795, tau=2*pi;
-constexpr int F_PAINT=1,F_RING=2,F_NOCOL=4,F_QUIET=8,F_MATTE=16;
+constexpr int F_PAINT=1,F_RING=2,F_NOCOL=4,F_QUIET=8,F_MATTE=16,F_BOSS_SPLAT=64;
 float f32(double x){return static_cast<float>(x);}
 double rand01(std::uint32_t& state){state^=state<<13;state^=state>>17;state^=state<<5;return double(state)/4294967296.0;}
+double bossFxRand01(std::uint32_t& state){
+    state+=0x6d2b79f5u;
+    std::uint32_t value=(state^(state>>15))*(1u|state);
+    value=(value+(value^(value>>7))*(61u|value))^value;
+    value^=value>>14;
+    return double(value)/4294967296.0;
+}
 double easeOut(double t){return 1.0-(1.0-t)*(1.0-t)*(1.0-t);}
 glm::dvec3 mix(glm::dvec3 a,glm::dvec3 b,double t){return a+(b-a)*t;}
 glm::dvec3 normalized(glm::dvec3 n){const double l=glm::length(n);return l>0?n/l:glm::dvec3(0,1,0);}
@@ -52,7 +59,41 @@ std::size_t countShape(const std::vector<WorldFxParticle>& items,WorldFxShape sh
 std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3 pos,glm::dvec3 normal,glm::dvec3 color,double radius,std::uint32_t& rng,double waterY,glm::dvec3 camera,const WorldFxRippleSink& ripple,const WorldFxRecipeContext& context,glm::dvec3 direction,double time,double dt){
     // Weapon recipes receive aim direction separately from a recipe's surface normal.
     std::vector<WorldFxParticle> out;const glm::dvec3 sourceVector=normal;normal=normalized(normal);const glm::dvec3 up(0,1,0),white(1);
-    if(name=="muzzleBlaster"){
+    if(name=="bossCrabletPop"){
+        // bossModel.js creates a fresh low-quality BossFX at pop time. Keep its
+        // Mulberry32 seed and the source's 26 * 0.4 particle count and motion.
+        constexpr int count=10;
+        std::uint32_t sourceRng=9001;
+        const glm::dvec3 at=pos+up*0.3;
+        for(int i=0;i<count;i++){
+            const glm::dvec3 particlePos{
+                at.x+(bossFxRand01(sourceRng)-0.5)*0.2,
+                at.y+(bossFxRand01(sourceRng)-0.5)*0.2,
+                at.z+(bossFxRand01(sourceRng)-0.5)*0.2};
+            const glm::dvec3 velocityDirection=normalized(glm::dvec3{
+                (bossFxRand01(sourceRng)-0.5)*2.0,
+                1.0+(bossFxRand01(sourceRng)-0.5)*2.0,
+                (bossFxRand01(sourceRng)-0.5)*2.0});
+            const double speed=4.2*(0.55+bossFxRand01(sourceRng)*0.6);
+            const double life=1.2*(0.7+bossFxRand01(sourceRng)*0.5);
+            const double sizeRandom=bossFxRand01(sourceRng);
+            const double size=0.09*(0.3+sizeRandom*sizeRandom*1.3);
+            WorldFxParticle item;
+            item.shape=WorldFxShape::BossBlob;
+            item.pos=store(particlePos);
+            item.vel=store(velocityDirection*speed);
+            item.color=store(color);
+            item.radius=f32(size);
+            item.life=f32(life);
+            item.flags=0;
+            item.seed=f32(sizeRandom);
+            const double stretch=1.0+std::min(2.6,glm::length(velocityDirection*speed)*0.16);
+            const float crossSection=f32(size/std::sqrt(stretch));
+            item.renderScale={crossSection,crossSection,f32(size*stretch)};
+            item.sourceGroundY=f32(pos.y);
+            out.push_back(item);
+        }
+    }else if(name=="muzzleBlaster"){
         const auto dir=normalized(direction);
         sprite(out,WorldFxShape::Glow,pos+dir*0.1,dir*2.0,color*4.5,0.35,0.7,0.09,1,rng,2.2,0,4,0);
         ring(out,pos+dir*0.25,dir,mix(color,white,0.3),0.55,0.16,7,0.9,1.2,rng,dir*3.0);
@@ -333,6 +374,29 @@ void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& p,double seconds,std::uin
             eraseAt(p,i,WorldFxShape::Drop);continue;
         }}else if(int(x.flags)&F_NOCOL){ /* the source advances last-check position only for non-colliding drops */ }
         if(old.y>=waterY&&next.y<waterY){eraseAt(p,i,WorldFxShape::Drop);continue;}++i;
+    }
+    for(std::size_t i=0;i<p.size();){auto& x=p[i];if(x.shape!=WorldFxShape::BossBlob){++i;continue;}
+        x.age=f32(double(x.age)+dt);if(x.age>=x.life){eraseAt(p,i,WorldFxShape::BossBlob);continue;}
+        if(!(int(x.flags)&F_BOSS_SPLAT)){
+            x.vel.y=f32(double(x.vel.y)-16.0*dt);
+            const double drag=1-0.4*dt;x.vel.x=f32(x.vel.x*drag);x.vel.z=f32(x.vel.z*drag);
+            x.pos={f32(double(x.pos.x)+x.vel.x*dt),f32(double(x.pos.y)+x.vel.y*dt),f32(double(x.pos.z)+x.vel.z*dt)};
+            if(x.pos.y<x.sourceGroundY+0.02f&&x.vel.y<0){
+                x.pos.y=x.sourceGroundY+0.02f;
+                x.flags=f32(int(x.flags)|F_BOSS_SPLAT);
+                x.life=f32(std::min(double(x.life),double(x.age)+0.7));
+            }
+        }
+        const double age=double(x.age)/std::max(double(x.life),1e-6);
+        const double size=double(x.radius)*(age>0.8?1.0-(age-0.8)/0.2:1.0);
+        if(int(x.flags)&F_BOSS_SPLAT)x.renderScale={f32(size*1.9),f32(size*0.18),f32(size*1.9)};
+        else {
+            const double speed=glm::length(glm::dvec3(x.vel));
+            const double stretch=1.0+std::min(2.6,speed*0.16);
+            const float crossSection=f32(size/std::sqrt(stretch));
+            x.renderScale={crossSection,crossSection,f32(size*stretch)};
+        }
+        ++i;
     }
     for(auto shape:{WorldFxShape::Puff,WorldFxShape::Glow})for(std::size_t i=0;i<p.size();){auto& x=p[i];if(x.shape!=shape){++i;continue;}
         x.age=f32(double(x.age)+dt);if(x.age>=x.life){eraseAt(p,i,shape);continue;}

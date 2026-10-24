@@ -119,8 +119,9 @@
         if(!state.alive&&battle.alive&&battle.deathCause.empty()){battle.deathName="";battle.deathCause="場地危險";}
         if(state.alive&&!battle.alive){battle.deathName.clear();battle.deathWeapon.clear();battle.deathCause.clear();battle.directions.clear();}
         battle.alive=state.alive;
-        Hidden(hud,"death-card",state.alive);Text(hud,"death-by",battle.deathName.empty()?"遭到擊倒":battle.deathName+" 擊倒了你");Text(hud,"death-cause",battle.deathCause);
-        Text(hud,"respawn-seconds",Integer(std::ceil(state.respawnTimer)));Text(hud,"respawn-hint",mapInteraction.queuedKey()>=0?"已安排復活彈射："+mapInteraction.queuedLabel():"按住 Tab／M 規劃復活彈射");
+        const bool respawning=match.phase()==MatchPhase::Playing&&!state.alive;
+        Hidden(hud,"death-card",!respawning);Text(hud,"death-by",battle.deathName.empty()?"遭到擊倒":battle.deathName+" 擊倒了你");Text(hud,"death-cause",battle.deathCause);
+        Text(hud,"respawn-seconds",Integer(std::ceil(std::max(0.,state.respawnTimer))));Hidden(hud,"respawn-hint",!respawning);Text(hud,"respawn-hint",mapInteraction.queuedKey()>=0?"已安排復活彈射："+mapInteraction.queuedLabel():"按住 Tab／M 規劃復活彈射");
         dynamic_cast<HudRingElement*>(Find(hud,"death-ring"))->Update(std::clamp(1-state.respawnTimer/5.5,0.,1.),HudColor(battle.deathColor),Rml::Colourb(255,255,255,45));
         const auto causeMain=EquipmentLabel(EquipmentCategory::Main,battle.deathWeapon);const auto causeSub=EquipmentLabel(EquipmentCategory::Sub,battle.deathWeapon);const auto causeSpecial=EquipmentLabel(EquipmentCategory::Special,battle.deathWeapon);
         auto* deathArt=Find(hud,"death-weapon");const std::string art=!causeMain.empty()?"weapons/"+battle.deathWeapon+".png":!causeSub.empty()?"equipment/sub-"+battle.deathWeapon+".png":!causeSpecial.empty()?"equipment/special-"+battle.deathWeapon+".png":"weapons/squid.png";deathArt->SetAttribute("src",art);

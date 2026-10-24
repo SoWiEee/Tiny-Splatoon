@@ -22,6 +22,7 @@ struct Member {
     CharacterStyle style{};
     std::uint32_t ping = 0;
     std::string emote;
+    std::uint64_t emoteSerial=0; // Local presentation sequence; not part of the wire profile.
 };
 
 struct RoomSettings {

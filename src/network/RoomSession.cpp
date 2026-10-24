@@ -136,6 +136,10 @@ struct RoomSession::Impl {
         bool hasSelf = false, hasHost = false;
         for (std::uint8_t i = 0; i < count; ++i) {
             auto member = ReadMember(reader);
+            if(room.code==updated.code&&room.selfId==updated.selfId){
+                const auto previous=std::find_if(room.members.begin(),room.members.end(),[&](const Member& value){return value.id==member.id;});
+                if(previous!=room.members.end())member.emoteSerial=previous->emoteSerial;
+            }
             hasSelf |= member.id == updated.selfId;
             hasHost |= member.id == updated.hostId;
             updated.members.push_back(std::move(member));
@@ -243,7 +247,7 @@ struct RoomSession::Impl {
                 const auto found = std::find_if(room.members.begin(), room.members.end(), [id](const Member& member) {
                     return member.id == id;
                 });
-                if (found != room.members.end()) found->emote = emote;
+                if (found != room.members.end()) { found->emote = emote; ++found->emoteSerial; }
                 break;
             }
             default: throw WireError("unexpected server room packet");

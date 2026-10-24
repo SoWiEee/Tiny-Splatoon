@@ -101,6 +101,13 @@ void testTwoPlayerFlow(GnsRuntime& runtime, RoomServer* server, const SteamNetwo
     require(host.view().members.size() == 2 && host.view().members[0].team != host.view().members[1].team,
             "automatic teams must balance two players");
 
+    const auto emoteSerial=[&] {
+        const auto found=std::find_if(host.view().members.begin(),host.view().members.end(),[&](const Member& member){return member.id==guestId;});
+        return found==host.view().members.end()?std::uint64_t(0):found->emoteSerial;
+    };
+    guest.Emote("wave");require(pump(runtime,server,{&host,&guest},[&]{return emoteSerial()>0;}),"The first lobby emote must reach presentation");
+    const auto firstEmote=emoteSerial();guest.Emote("wave");
+    require(pump(runtime,server,{&host,&guest},[&]{return emoteSerial()>firstEmote;}),"Repeating the same emote must produce a fresh presentation event across snapshots");
     guest.SetReady(true);
     require(pump(runtime, server, {&host, &guest}, [&] { return guest.view().members[1].ready; }),
             "guest ready state must reach the lobby");

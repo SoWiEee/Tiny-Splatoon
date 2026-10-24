@@ -4,7 +4,10 @@
 #include "../src/game/PlayerSimulation.hpp"
 #include "../src/render/WorldEffects.hpp"
 #include "../src/render/WorldFxParticleRenderer.hpp"
+#include "../src/render/RenderPipeline.hpp"
+#include "../src/render/EnvironmentRenderer.hpp"
 #include "../src/render/DeviceRenderer.hpp"
+#include "../src/render/TeamPalette.hpp"
 #include "../src/world/FacePaint.hpp"
 #include "../src/world/StageGeometry.hpp"
 
@@ -15,9 +18,14 @@
 #include <stb_image_write.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -129,21 +137,141 @@ int main() {
 
         CharacterData characterData;
         {
+            FacePaint popPaint(*stage,geometry);
+            CombatWorld popWorld(*stage,geometry,popPaint);
+            WorldEffects popEffects(characterData);
+            popEffects.BossCrabletPop(anchor,1);
+            const auto before=countShape(popEffects.liveItems(),WorldFxShape::BossBlob);
+            check(before==10,"A low-quality source crablet pop must create round(26*0.4) ink blobs");
+            check(countShape(popEffects.liveItems(),WorldFxShape::Drop)==0,"BossFX blobs must use their own source mesh/material pool, not the fx.js Drop pool");
+            const auto sourceInk=glm::vec3(InkColors[1]);
+            for(const auto& item:popEffects.liveItems())if(item.shape==WorldFxShape::BossBlob){
+                check(glm::distance(item.color,sourceInk)<1e-6f,"Boss pop blobs must use the live team palette");
+                const float speed=glm::length(item.vel);
+                check(speed>=4.2f*0.55f-1e-5f&&speed<=4.2f*1.15f+1e-5f,"Boss pop blob velocities must follow source speed range");
+                check(item.life>=0.84f&&item.life<=1.44f,"Boss pop blob lifetimes must follow source life range");
+                check(std::abs(item.pos.y-(anchor.y+0.3))<0.11,"Boss pop blobs must spawn at the source root offset");
+                check(std::abs(item.sourceGroundY-float(anchor.y))<1e-5f,"Boss pop blobs must retain their source ground plane");
+                const float stretch=1.0f+std::min(2.6f,speed*0.16f);
+                check(std::abs(item.renderScale.x-item.radius/std::sqrt(stretch))<1e-6f&&
+                      std::abs(item.renderScale.z-item.radius*stretch)<1e-6f,
+                      "Airborne BossFX blobs must keep the source velocity-aligned stretch");
+            }
+            {
+                std::ifstream defaults("assets/reference/boss/shaders/crablet-pop-blob.uniforms");
+                check(static_cast<bool>(defaults),"Missing exported source BossFX physical-material fixture");
+                std::map<std::string,std::vector<double>> values;std::string name;std::size_t count=0;
+                while(defaults>>name>>count){std::vector<double> v(count);for(auto& component:v)defaults>>component;values.emplace(name,std::move(v));}
+                const auto scalar=[&](const char* key){const auto it=values.find(key);check(it!=values.end()&&it->second.size()==1,"Missing BossFX material fixture value");return it->second[0];};
+                check(std::abs(scalar("roughness")-0.12)<1e-8&&std::abs(scalar("metalness"))<1e-8&&
+                      std::abs(scalar("clearcoat")-1.0)<1e-8&&std::abs(scalar("clearcoatRoughness")-0.04)<1e-8,
+                      "Exported BossFX material must preserve source roughness, metalness, and clearcoat");
+            }
+            {
+                std::ifstream mesh("assets/reference/boss/shaders/crablet-pop-blob.mesh",std::ios::binary);
+                char magic[8]{};std::array<unsigned char,8> sizes{};mesh.read(magic,8);mesh.read(reinterpret_cast<char*>(sizes.data()),8);
+                const auto readU32=[&](std::size_t offset){return std::uint32_t(sizes[offset])|(std::uint32_t(sizes[offset+1])<<8)|(std::uint32_t(sizes[offset+2])<<16)|(std::uint32_t(sizes[offset+3])<<24);};
+                check(mesh&&std::string(magic,8)=="TSBOSSFX"&&readU32(0)==60&&readU32(4)==60,
+                      "BossFX low-quality source IcosahedronGeometry must retain its 20 triangular faces");
+                std::array<char,60*32+60*4> payload{};mesh.read(payload.data(),static_cast<std::streamsize>(payload.size()));
+                check(static_cast<bool>(mesh),"Truncated exported source BossFX mesh fixture");
+                const auto readFloat=[&](std::size_t offset){std::uint32_t bits=0;for(int b=0;b<4;++b)bits|=std::uint32_t(static_cast<unsigned char>(payload[offset+b]))<<(8*b);float value=0;std::memcpy(&value,&bits,sizeof(value));return value;};
+                std::map<std::array<int,3>,bool> uniqueVertices;
+                std::array<glm::vec3,60> positions{},normals{};
+                for(std::size_t vertex=0;vertex<60;++vertex){
+                    const auto offset=vertex*32;const glm::vec3 p(readFloat(offset),readFloat(offset+4),readFloat(offset+8));
+                    check(std::abs(glm::length(p)-1.0f)<1e-5f,"BossFX source icosahedron vertices must lie on its unit sphere");
+                    const glm::vec3 normal(readFloat(offset+12),readFloat(offset+16),readFloat(offset+20));
+                    const glm::vec2 uv(readFloat(offset+24),readFloat(offset+28));
+                    positions[vertex]=p;normals[vertex]=normal;
+                    check(std::abs(glm::length(normal)-1.0f)<1e-5f,
+                          "BossFX source icosahedron must retain unit source face normals");
+                    check(std::isfinite(uv.x)&&std::isfinite(uv.y)&&uv.x>=0&&uv.x<=1.1f&&uv.y>=0&&uv.y<=1,
+                          "BossFX source icosahedron must retain finite source UV coordinates");
+                    uniqueVertices[{int(std::lround(p.x*10000)),int(std::lround(p.y*10000)),int(std::lround(p.z*10000))}]=true;
+                }
+                check(uniqueVertices.size()==12,"BossFX detail-zero icosahedron must have the source 12 unique vertices");
+                for(std::size_t triangle=0;triangle<60;triangle+=3){
+                    const auto& normal=normals[triangle];
+                    const glm::vec3 winding=glm::normalize(glm::cross(positions[triangle+1]-positions[triangle],positions[triangle+2]-positions[triangle]));
+                    check(glm::distance(normal,normals[triangle+1])<1e-5f&&glm::distance(normal,normals[triangle+2])<1e-5f&&glm::dot(normal,winding)>0.999f,
+                          "BossFX source icosahedron must preserve flat per-face normals and outward triangle winding");
+                }
+                for(std::size_t index=0;index<60;++index){
+                    const auto offset=60*32+index*4;
+                    const std::uint32_t value=std::uint32_t(static_cast<unsigned char>(payload[offset]))|
+                        (std::uint32_t(static_cast<unsigned char>(payload[offset+1]))<<8)|
+                        (std::uint32_t(static_cast<unsigned char>(payload[offset+2]))<<16)|
+                        (std::uint32_t(static_cast<unsigned char>(payload[offset+3]))<<24);
+                    check(value==index,"Non-indexed source BossFX icosahedron must retain source triangle order");
+                }
+            }
+            const auto beforePositions=popEffects.liveItems();
+            const glm::dvec3 popCamera=anchor+glm::dvec3(0,1.5,3.0);
+            popEffects.Update(1.0/60.0,popWorld,popCamera);
+            const auto updatedPopItems=popEffects.liveItems();
+            check(countShape(updatedPopItems,WorldFxShape::BossBlob)==10,"The source-mesh pop burst must remain live after its first simulation frame");
+            check(std::any_of(updatedPopItems.begin(),updatedPopItems.end(),[&](const auto& item){
+                return item.shape==WorldFxShape::BossBlob&&glm::distance(item.pos,beforePositions.front().pos)>1e-5f;
+            }),"Boss pop blobs must advance through the source physical pool");
+            check(std::all_of(updatedPopItems.begin(),updatedPopItems.end(),[](const auto& item){
+                return item.shape!=WorldFxShape::BossBlob||item.renderScale.z>item.renderScale.x;
+            }),"Airborne source BossFX blobs must stretch along their velocity axis");
+            const glm::vec3 popEye(popCamera),popTarget(anchor+glm::dvec3(0,0.3,0));
+            const auto popView=glm::lookAt(popEye,popTarget,glm::vec3(0,1,0));
+            const auto popProjection=glm::perspective(glm::radians(48.f),1.f,.1f,20.f);
+            EnvironmentRenderer environment;environment.Load(*stage);const auto popLighting=environment.Lights();
+            RenderPipeline pipeline;pipeline.Configure(0,false,false,false);
+            pipeline.Begin(128,128,popProjection,glm::inverse(popView),.1f,20.f);
+            GLboolean colorMaskBeforeClear[4]{},depthMaskBeforeClear=GL_FALSE;
+            glGetBooleanv(GL_COLOR_WRITEMASK,colorMaskBeforeClear);glGetBooleanv(GL_DEPTH_WRITEMASK,&depthMaskBeforeClear);
+            glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);glDepthMask(GL_TRUE);
+            glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            GLint sceneFramebufferBefore=0,sceneFramebufferAfter=0;
+            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING,&sceneFramebufferBefore);
+            const int popDraws=popEffects.Draw(popView,popProjection,popEye,&popLighting);
+            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING,&sceneFramebufferAfter);
+            check(popDraws>0,"Boss pop blobs must draw through the native WorldFX pool");
+            std::vector<float> scenePixels(128*128*4),sceneDepth(128*128);
+            glReadPixels(0,0,128,128,GL_RGBA,GL_FLOAT,scenePixels.data());
+            glReadPixels(0,0,128,128,GL_DEPTH_COMPONENT,GL_FLOAT,sceneDepth.data());
+            float sceneMaxRgb=0,sceneMinAlpha=1,sceneMaxAlpha=0;int sceneLit=0,sceneNonFiniteRgb=0,sceneNonFiniteAtDepth=0;
+            const int sceneDepthWritten=static_cast<int>(std::count_if(sceneDepth.begin(),sceneDepth.end(),[](float d){return d<.99999f;}));
+            for(std::size_t i=0;i<scenePixels.size();i+=4){
+                const bool finiteRgb=std::isfinite(scenePixels[i])&&std::isfinite(scenePixels[i+1])&&std::isfinite(scenePixels[i+2]);
+                if(!finiteRgb){++sceneNonFiniteRgb;if(sceneDepth[i/4]<.99999f)++sceneNonFiniteAtDepth;}
+                else sceneMaxRgb=std::max(sceneMaxRgb,std::max(scenePixels[i],std::max(scenePixels[i+1],scenePixels[i+2])));
+                sceneMinAlpha=std::min(sceneMinAlpha,scenePixels[i+3]);sceneMaxAlpha=std::max(sceneMaxAlpha,scenePixels[i+3]);
+                if(finiteRgb&&(scenePixels[i]>1e-4f||scenePixels[i+1]>1e-4f||scenePixels[i+2]>1e-4f))++sceneLit;
+            }
+            ScreenEffects noScreenEffects;noScreenEffects.enabled=false;pipeline.End(GradeSettings{},noScreenEffects,128,128);
+            std::vector<unsigned char> popPixels(128*128*4);glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,popPixels.data());
+            int popVisible=0;
+            for(std::size_t i=0;i<popPixels.size();i+=4)
+                if(popPixels[i]>20||popPixels[i+1]>20||popPixels[i+2]>20)++popVisible;
+            const GLenum popGlError=glGetError();
+            check(popVisible>5&&popGlError==GL_NO_ERROR&&sceneNonFiniteAtDepth==0,
+                  "Boss crablet pop must produce visible native GPU pixels (visible="+std::to_string(popVisible)+", GL error="+std::to_string(popGlError)+", sceneFbo="+std::to_string(sceneFramebufferBefore)+"->"+std::to_string(sceneFramebufferAfter)+", sceneLit="+std::to_string(sceneLit)+", sceneMaxRgb="+std::to_string(sceneMaxRgb)+", nonFiniteRgb="+std::to_string(sceneNonFiniteRgb)+", nonFiniteAtDepth="+std::to_string(sceneNonFiniteAtDepth)+", sceneAlpha="+std::to_string(sceneMinAlpha)+".."+std::to_string(sceneMaxAlpha)+", depthPixels="+std::to_string(sceneDepthWritten)+", masksBeforeClear="+std::to_string(colorMaskBeforeClear[0])+std::to_string(colorMaskBeforeClear[1])+std::to_string(colorMaskBeforeClear[2])+std::to_string(colorMaskBeforeClear[3])+"/"+std::to_string(depthMaskBeforeClear)+")");
+        }
+        {
             WorldFxParticleRenderer pools;
             const glm::vec3 eye(0,3,5);const auto view=glm::lookAt(eye,glm::vec3(0),glm::vec3(0,1,0));
             const auto projection=glm::perspective(glm::radians(48.f),1.f,.1f,30.f);
             std::filesystem::create_directories("build/captures/worldfx");
+            const GLenum prePoolGlError=glGetError();
             for(int i=0;i<6;++i){
                 WorldFxParticle item;item.shape=static_cast<WorldFxShape>(i);item.radius=item.renderRadius=.65f;item.radius1=1;
                 item.life=1;item.age=.2f;item.renderLength=i==5?2.f:1.2f;item.alpha=item.renderAlpha=1;
                 item.color={1,.25415f,.007f};item.normal={0,1,0};item.vel={1,2,0};item.crown=1;item.seed=.37f;
-                glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glViewport(0,0,128,128);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+                glBindFramebuffer(GL_FRAMEBUFFER,0);glReadBuffer(GL_BACK);glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);glViewport(0,0,128,128);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
                 glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);glPolygonOffset(2,3);
-                check(pools.Draw({item},{},view,projection,eye,nullptr,.4)==1,"Every source particle pool must submit its actual shader and attributes");
+                const int poolDraws=pools.Draw({item},{},view,projection,eye,nullptr,.4);const GLenum drawGlError=glGetError();
+                check(poolDraws==1,"Every source particle pool must submit its actual shader and attributes");
                 GLint equation=0;glGetIntegerv(GL_BLEND_EQUATION_RGB,&equation);check(equation==GL_FUNC_REVERSE_SUBTRACT&&glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE),"Source particle draws must restore caller GL state");
                 std::vector<unsigned char> pixels(128*128*4);glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
-                int visible=0;for(std::size_t p=0;p<pixels.size();p+=4)if(pixels[p]>20||pixels[p+1]>20||pixels[p+2]>20)++visible;
-                check(visible>5&&glGetError()==GL_NO_ERROR,"A source particle pool must render visible native pixels without GL errors: "+std::to_string(i));
+                int visible=0,maxChannel=0;for(std::size_t p=0;p<pixels.size();p+=4){if(pixels[p]>20||pixels[p+1]>20||pixels[p+2]>20)++visible;maxChannel=std::max(maxChannel,std::max(int(pixels[p]),std::max(int(pixels[p+1]),int(pixels[p+2]))));}
+                GLint drawFbo=0,readFbo=0,readBuffer=0;glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING,&drawFbo);glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING,&readFbo);glGetIntegerv(GL_READ_BUFFER,&readBuffer);const GLenum poolGlError=glGetError();
+                check(visible>5&&poolGlError==GL_NO_ERROR&&drawGlError==GL_NO_ERROR&&prePoolGlError==GL_NO_ERROR,"A source particle pool must render visible native pixels without GL errors: shape="+std::to_string(i)+", visible="+std::to_string(visible)+", max="+std::to_string(maxChannel)+", GL error="+std::to_string(poolGlError)+", draw error="+std::to_string(drawGlError)+", pre error="+std::to_string(prePoolGlError)+", fbo="+std::to_string(drawFbo)+"/"+std::to_string(readFbo)+", readBuffer="+std::to_string(readBuffer));
                 stbi_flip_vertically_on_write(1);stbi_write_png(("build/captures/worldfx/pool-"+std::to_string(i)+".png").c_str(),128,128,4,pixels.data(),128*4);
             }
             glBlendEquation(GL_FUNC_ADD);glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);glPolygonOffset(0,0);

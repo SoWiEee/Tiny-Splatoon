@@ -50,6 +50,11 @@ struct UiMapFrame {
     unsigned int nativeMapTexture=0; // Borrowed from StageMapView; RmlRenderer only borrows it.
     bool haveNativeMapView=false;
 };
+struct UiLobbyPlate {
+    network::MemberId member=0;
+    float x=0,y=0;
+    bool visible=false;
+};
 struct UiOnlineRequest {
     enum class Kind { Create, Join, Leave, Ready, Team, Settings, Start, Emote, LocalService };
     Kind kind=Kind::Create;
@@ -89,6 +94,7 @@ public:
     void ConfirmJumpMapCursor();
     void ShowOnline();
     void SetOnlineState(const network::RoomView& view);
+    void SetLobbyPresentation(bool active,int countdown,bool launching,const std::vector<UiLobbyPlate>& plates={});
     std::vector<UiOnlineRequest> TakeOnlineRequests();
 private:
     struct Impl;

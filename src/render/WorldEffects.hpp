@@ -24,7 +24,7 @@ class WorldEffects {
 public:
     using Shape = WorldFxShape;
     using Item = WorldFxParticle;
-    struct Counts { std::size_t drops=0,puffs=0,glows=0,rings=0,shells=0,beams=0,world=0; };
+    struct Counts { std::size_t drops=0,puffs=0,glows=0,rings=0,shells=0,beams=0,world=0,bossBlobs=0; };
 
     explicit WorldEffects(const CharacterData& data);
     ~WorldEffects();
@@ -35,6 +35,8 @@ public:
     void SetDeviceRenderer(DeviceRenderer* models){models_=models;}
     void SetPaintSurface(FacePaint* paint){paint_=paint;}
     void Footstep(const PlayerSimulation& actor,glm::dvec3 position,double speed);
+    // Pass the crablet's ground-root position when its source pop reaches 0.14 s.
+    void BossCrabletPop(glm::dvec3 rootPosition,int team=1);
     void Clear();
     Counts counts() const;
     const std::vector<Item>& liveItems() const { return live_; }

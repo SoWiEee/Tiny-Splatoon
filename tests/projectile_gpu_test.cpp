@@ -85,6 +85,24 @@ int main(int argc,char** argv){
         }
         rangeWorld.tick(.15);renderer.Update(.15,rangeWorld,{});
         if(renderer.Draw(view,projection,eye,lights)!=0)throw std::runtime_error("Blade wave range fade outlived 0.14 seconds");
+
+        GLuint shadowFramebuffer=0,shadowDepth=0;glGenFramebuffers(1,&shadowFramebuffer);glBindFramebuffer(GL_FRAMEBUFFER,shadowFramebuffer);
+        glGenTextures(1,&shadowDepth);glBindTexture(GL_TEXTURE_2D,shadowDepth);glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,256,256,0,GL_DEPTH_COMPONENT,GL_FLOAT,nullptr);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,shadowDepth,0);glDrawBuffer(GL_NONE);glReadBuffer(GL_NONE);
+        if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw std::runtime_error("Projectile shadow depth framebuffer is incomplete");
+        glViewport(0,0,256,256);glEnable(GL_DEPTH_TEST);glDepthMask(GL_TRUE);glDepthFunc(GL_LESS);glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
+        const auto checkShadow=[&](const char* kind,int expectedDraws,bool expectedDepth){
+            world.clear();auto caster=shot;caster.kind=kind;caster.weaponId=kind;caster.state="fly";caster.pos={0,0,0};caster.vel={28,0,2};caster.flightDir=glm::normalize(caster.vel);caster.age=.12;caster.distance=3;caster.tier=2;
+            world.launch(caster);renderer.Update(0,world,{});glClearDepth(1.0);glClear(GL_DEPTH_BUFFER_BIT);
+            const auto draws=renderer.DrawShadow(projection*view,lights);
+            std::vector<float> depth(256*256);glReadPixels(0,0,256,256,GL_DEPTH_COMPONENT,GL_FLOAT,depth.data());
+            const auto covered=std::count_if(depth.begin(),depth.end(),[](float value){return value<.9999f;});
+            if(draws!=expectedDraws||((covered>0)!=expectedDepth)||glGetError()!=GL_NO_ERROR)
+                throw std::runtime_error(std::string("Projectile source shadow caster mismatch: ")+kind+" draws="+std::to_string(draws)+" covered="+std::to_string(covered));
+        };
+        checkShadow("shot",1,true);checkShadow("arrow",2,true);checkShadow("fist",1,true);checkShadow("bladewave",0,false);
+        glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);glBindFramebuffer(GL_FRAMEBUFFER,0);glDeleteTextures(1,&shadowDepth);glDeleteFramebuffers(1,&shadowFramebuffer);
         if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Source projectile renderer GL error");
         std::cout<<"PROJECTILE_GPU source_teardrop=4 visible_pixels="<<colored<<" ribbon_lifecycle=pass renderer="<<glGetString(GL_RENDERER)<<'\n';
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';result=1;}

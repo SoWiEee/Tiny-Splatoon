@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -138,6 +139,16 @@ glm::vec3 WorldEffects::cone(glm::vec3 normal,float spread) {
     return normal*z+(side*std::cos(a)+other*std::sin(a))*r;
 }
 void WorldEffects::spawn(Item item) {
+    if(item.shape==Shape::BossBlob){
+        constexpr std::size_t capacity=128;
+        std::size_t count=0;auto oldest=live_.end();double remaining=std::numeric_limits<double>::infinity();
+        for(auto it=live_.begin();it!=live_.end();++it)if(it->shape==Shape::BossBlob){
+            ++count;const double left=double(it->life)-it->age;if(left<remaining){remaining=left;oldest=it;}
+        }
+        if(count>=capacity){if(oldest!=live_.end())*oldest=item;}
+        else live_.push_back(item);
+        return;
+    }
     const int type=static_cast<int>(item.shape);
     const std::size_t caps[]={2600,520,300,300,32,10};
     if(type<0||type>=6){live_.push_back(item);return;}
@@ -151,6 +162,10 @@ void WorldEffects::spawn(Item item) {
 void WorldEffects::burst(glm::vec3 pos,glm::vec3 normal,glm::vec3 color,float size,int count) {
     WorldFxRecipeContext context;context.count=count;context.size=size;
     auto items=BuildWorldFxRecipe("burst",pos,normal,color,0,random_,-1.6,camera_,{},context);
+    for(auto& item:items)spawn(std::move(item));
+}
+void WorldEffects::BossCrabletPop(glm::dvec3 rootPosition,int team) {
+    auto items=BuildWorldFxRecipe("bossCrabletPop",rootPosition,{0,1,0},ink(team),0,random_,-1.6,camera_);
     for(auto& item:items)spawn(std::move(item));
 }
 void WorldEffects::explosion(glm::vec3 pos,glm::vec3 color,float radius) {
@@ -432,7 +447,7 @@ void WorldEffects::Clear(){live_.clear();world_.clear();lastEvents_.clear();acto
 WorldEffects::Counts WorldEffects::counts() const {
     Counts c;c.world=world_.size();
     for(const auto& p:live_)switch(p.shape){case Shape::Drop:++c.drops;break;case Shape::Puff:++c.puffs;break;
-        case Shape::Glow:++c.glows;break;case Shape::Ring:++c.rings;break;case Shape::Shell:++c.shells;break;case Shape::Beam:++c.beams;break;default:break;}
+        case Shape::Glow:++c.glows;break;case Shape::Ring:++c.rings;break;case Shape::Shell:++c.shells;break;case Shape::Beam:++c.beams;break;case Shape::BossBlob:++c.bossBlobs;break;default:break;}
     return c;
 }
 

@@ -2786,15 +2786,15 @@ void CharacterPose::setStyle(const CharacterStyle& style) {
     material.iris=CharacterIris[style.eyes][0]; material.iris2=CharacterIris[style.eyes][1];
     material.freckle=CharacterSkinLighting[style.skin].freckle;
 }
-void CharacterPose::setDance(const std::string& requested) {
+void CharacterPose::setDance(const std::string& requested,int variant,double startTime) {
     auto& s=*state_;
     const std::string dance=requested.empty()?std::string{}:requested;
-    if(dance==s.dance) return;
+    if(dance==s.dance&&variant<0&&startTime==0) return;
     if(!s.dance.empty()&&!dance.empty()) {
         s.previousDance=s.dance; s.previousDanceTime=s.danceTime; s.danceFade=0.0;
     }
-    s.dance=dance; s.danceTime=0.0;
-    s.danceVariant=(dance=="victory"||dance=="defeat")?static_cast<int>((s.seed>>5)%3u):0;
+    s.dance=dance; s.danceTime=std::isfinite(startTime)?std::max(0.0,startTime):0.0;
+    s.danceVariant=variant>=0?std::clamp(variant,0,2):(dance=="victory"||dance=="defeat")?static_cast<int>((s.seed>>5)%3u):0;
     static constexpr std::array<double,8> joy={0.1,0.7,-0.12,0.25,0.12,0.72,0.0,0.35};
     static constexpr std::array<double,8> sigh={0.3,0.1,-0.35,-0.2,-0.1,0.22,0.0,0.0};
     if(dance=="victory") {

@@ -657,11 +657,28 @@ void PlayerSimulation::tick(double dt) {
         world_->recordHudDenial(*this, specialId_, false);
     }
 
+    surface();
+    const auto special = world_->specials_.pose(*this);
+    const bool ownInkGround = state.grounded && state.groundTeam == 1;
+    bool ownInkWallAhead = false;
+    const glm::dvec3 requestedMove(input.move.x, 0.0, input.move.z);
+    const double requestedMoveLength = horizontalLength(requestedMove);
+    if (input.squid && !ownInkGround && requestedMoveLength >= 0.2) {
+        const glm::dvec3 direction = requestedMove / requestedMoveLength;
+        const RayHit hit = geometry_.raycast(state.pos + glm::dvec3(0.0, 0.3, 0.0), direction, 0.73);
+        const bool wall = hit.hit && std::abs(hit.normal.y) < 0.5;
+        const bool inked = wall && hit.face >= 0 && paint_.sample(hit.face, hit.u, hit.v) - 1 == team_;
+        const double into = wall ? -glm::dot(requestedMove, hit.normal) / requestedMoveLength : 0.0;
+        ownInkWallAhead = inked && into > 0.5;
+    }
+    // Starting a squid dive requires friendly ink underfoot or an inked wall
+    // that this input can actually climb. An existing airborne squid form is
+    // allowed to finish its jump, while landing on dry/enemy ground surfaces it.
+    const bool validSquidSurface = ownInkGround || ownInkWallAhead || (state.squid && !state.grounded);
     const bool fireWins = (input.fire || fireBuffer_ > 0.0) && firePressT_ >= squidPressT_;
-    const bool squid = input.squid && !fireWins && !runner_.busy() && !world_->specials_.pose(*this).noSquid;
+    const bool squid = input.squid && validSquidSurface && !fireWins && !runner_.busy() && !special.noSquid;
     if (state.squid && !squid) kidT_ = 0.0;
     state.squid = squid;
-    surface();
     state.submerged = state.squid && state.grounded && state.groundTeam == 1;
     const bool enemy = state.grounded && state.groundTeam == 2 && !state.submerged && !world_->specials_.pose(*this).inkProof;
     const bool dodged = jumpPressed && runner_.tryDodge();

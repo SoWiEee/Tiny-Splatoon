@@ -2,6 +2,7 @@
 #include "../src/world/FacePaint.hpp"
 #include "fixtures/player_fixtures.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <string>
@@ -96,18 +97,49 @@ int main() {
             oracle->tick(f.dt);++oracleFrame;
         }
         const auto& s=oracle->state;
+        const test::PlayerFixture* expected = &f;
+        if (scenario == "squidDry") {
+            const auto run = std::find_if(test::playerFixtures().begin(), test::playerFixtures().end(), [&](const auto& candidate) {
+                return std::string(candidate.scenario) == "run" && candidate.frame == f.frame && candidate.dt == f.dt;
+            });
+            check(run != test::playerFixtures().end(), "dry Shift override is missing its matching kid-run oracle frame");
+            if (run != test::playerFixtures().end()) expected = &*run;
+        }
         auto close=[](double a,double b){return std::abs(a-b)<1e-6;};
         const auto& jump=oracle->superJumpState();
-        const bool equal=close(s.pos.x,f.x)&&close(s.pos.y,f.y)&&close(s.pos.z,f.z)&&
-            close(s.vel.x,f.vx)&&close(s.vel.y,f.vy)&&close(s.vel.z,f.vz)&&close(s.yaw,f.yaw)&&
-            close(s.hp,f.hp)&&close(s.ink,f.ink)&&s.grounded==bool(f.ground)&&s.squid==bool(f.squid)&&
-            s.submerged==bool(f.submerged)&&s.climbing==bool(f.climbing)&&
-            (jump?int(jump->flight):-1)==f.jumpPhase&&close(jump?jump->elapsed:0.0,f.jumpTime)&&
-            close(jump?jump->duration:0.0,f.jumpDuration)&&bool(jump&&jump->home)==bool(f.jumpHome);
+        const bool jumpMatches=(jump?int(jump->flight):-1)==expected->jumpPhase&&
+            close(jump?jump->elapsed:0.0,expected->jumpTime)&&close(jump?jump->duration:0.0,expected->jumpDuration)&&
+            bool(jump&&jump->home)==bool(expected->jumpHome);
+        bool equal = false;
+        if (scenario == "wall") {
+            // The source trace dives from dry ground before reaching its wall,
+            // then stays squid after landing. Native Shift now waits for the
+            // own-ink wall and surfaces on dry ground; the focused check below
+            // covers that full native trajectory.
+            equal=close(s.yaw,f.yaw)&&close(s.hp,f.hp)&&close(s.ink,f.ink)&&jumpMatches;
+        } else if (scenario == "grate") {
+            // Dry Shift must not enter squid form to drop through a grate.
+            equal=close(s.pos.x,f.x)&&close(s.pos.y,0.0)&&close(s.pos.z,f.z)&&
+                close(s.vel.x,0.0)&&close(s.vel.y,0.0)&&close(s.vel.z,0.0)&&close(s.yaw,f.yaw)&&
+                close(s.hp,f.hp)&&close(s.ink,f.ink)&&s.grounded&&!s.squid&&!s.submerged&&!s.climbing&&jumpMatches;
+        } else {
+            equal=close(s.pos.x,expected->x)&&close(s.pos.y,expected->y)&&close(s.pos.z,expected->z)&&
+                close(s.vel.x,expected->vx)&&close(s.vel.y,expected->vy)&&close(s.vel.z,expected->vz)&&close(s.yaw,expected->yaw)&&
+                close(s.hp,expected->hp)&&close(s.ink,expected->ink)&&s.grounded==bool(expected->ground)&&s.squid==bool(expected->squid)&&
+                s.submerged==bool(expected->submerged)&&s.climbing==bool(expected->climbing)&&jumpMatches;
+        }
         if(!equal) {
-            if(oracleFailures++<12) std::cerr<<"Actor "<<scenario<<" frame "<<f.frame<<": pos "<<s.pos.x<<','<<s.pos.y<<','<<s.pos.z<<" expected "<<f.x<<','<<f.y<<','<<f.z
-                <<" vel "<<s.vel.x<<','<<s.vel.y<<','<<s.vel.z<<" expected "<<f.vx<<','<<f.vy<<','<<f.vz
-                <<" yaw/hp/ink "<<s.yaw<<'/'<<s.hp<<'/'<<s.ink<<" expected "<<f.yaw<<'/'<<f.hp<<'/'<<f.ink<<'\n';
+            if (oracleFailures++ < 12) {
+                if (scenario == "wall")
+                    std::cerr << "Actor wall frame " << f.frame << ": native wall override changed yaw/hp/ink or jump state\n";
+                else if (scenario == "grate")
+                    std::cerr << "Actor grate frame " << f.frame << ": expected grounded kid at y=0; got y=" << s.pos.y
+                              << " grounded=" << s.grounded << " squid=" << s.squid << '\n';
+                else
+                    std::cerr<<"Actor "<<scenario<<" frame "<<f.frame<<": pos "<<s.pos.x<<','<<s.pos.y<<','<<s.pos.z<<" expected "<<expected->x<<','<<expected->y<<','<<expected->z
+                        <<" vel "<<s.vel.x<<','<<s.vel.y<<','<<s.vel.z<<" expected "<<expected->vx<<','<<expected->vy<<','<<expected->vz
+                        <<" yaw/hp/ink "<<s.yaw<<'/'<<s.hp<<'/'<<s.ink<<" expected "<<expected->yaw<<'/'<<expected->hp<<'/'<<expected->ink<<'\n';
+            }
         }
     }
     check(oracleFailures==0,"reference Actor trace mismatch");
@@ -125,14 +157,65 @@ int main() {
     player.input.squid = true;
     player.input.move = {0, 0, 1};
     for (int i = 0; i < 120; ++i) player.tick(dt);
-    check(player.state.squid && near(std::hypot(player.state.vel.x, player.state.vel.z), 2.9),
-          "dry squid reaches source 2.9 m/s speed");
+    check(!player.state.squid && player.state.groundTeam == 0 &&
+          near(std::hypot(player.state.vel.x, player.state.vel.z), 6.0),
+          "holding Shift on dry ground must keep the actor in kid form and at kid run speed");
     player.spawnAt({0, 0, 0}, 0);
     paint.splat({0, 0.1, 0}, 2.0, 0, 0.3);
     player.input.squid = true;
     player.input.move = {0, 0, 1};
     for (int i = 0; i < 25; ++i) player.tick(dt);
     check(player.state.submerged && player.state.vel.z > 8.0, "own ink enables swim acceleration");
+
+    paint.clear();
+    paint.splat({0, 0.1, 0}, 2.0, 1, 0.3);
+    player.spawnAt({0, 0, 0}, 0);
+    player.input.squid = true;
+    player.input.move = {0, 0, 1};
+    for (int i = 0; i < 120; ++i) player.tick(dt);
+    check(!player.state.squid && !player.state.submerged && player.state.groundTeam == 2 &&
+          std::hypot(player.state.vel.x, player.state.vel.z) <= 1.91,
+          "holding Shift on enemy ink must stay kid while preserving enemy-ink movement slowdown");
+
+    StageData wallStage = makeStage();
+    wallStage.faces[0].paintable = false;
+    StageGeometry wallGeometry(wallStage);
+    FacePaint wallPaint(wallStage, wallGeometry, 2048);
+    wallPaint.splat({0, 1.0, 7.8}, 10.0, 0, 0.2);
+    PlayerSimulation climber(wallStage, wallGeometry, wallPaint);
+    climber.spawnAt({0, 0, 7.0}, 0);
+    climber.input.squid = true;
+    climber.input.move = {0, 0, 1};
+    bool startedAsKidOnDryGround = false, sawInkWallClimb = false;
+    bool carriedSquidAcrossTheClimbJump = false, surfacedOnDryLanding = false;
+    for (int i = 0; i < 120; ++i) {
+        climber.tick(dt);
+        if (i == 0) startedAsKidOnDryGround = !climber.state.squid && climber.state.grounded && climber.state.groundTeam == 0;
+        sawInkWallClimb = sawInkWallClimb || climber.state.climbing;
+        if (sawInkWallClimb && !climber.state.grounded && climber.state.squid)
+            carriedSquidAcrossTheClimbJump = true;
+        if (sawInkWallClimb && climber.state.grounded && climber.state.groundTeam == 0 && !climber.state.squid)
+            surfacedOnDryLanding = true;
+    }
+    check(startedAsKidOnDryGround && sawInkWallClimb && carriedSquidAcrossTheClimbJump && surfacedOnDryLanding,
+          "dry Shift waits for the own-ink wall, climbs it, then surfaces on dry ground after landing");
+
+    StageData grateStage = makeStage();
+    grateStage.blocks[0].grate = true;
+    StageGeometry grateGeometry(grateStage);
+    FacePaint gratePaint(grateStage, grateGeometry, 2048);
+    PlayerSimulation grateWalker(grateStage, grateGeometry, gratePaint);
+    grateWalker.input.squid = true;
+    bool stayedKidOnGrate = true;
+    for (int i = 0; i < 120; ++i) {
+        grateWalker.tick(dt);
+        stayedKidOnGrate = stayedKidOnGrate && grateWalker.state.grounded && !grateWalker.state.squid &&
+                           near(grateWalker.state.pos.y, 0.0);
+    }
+    check(stayedKidOnGrate, "dry Shift on a grate must stay kid and must not fall through");
+
+    paint.clear();
+    paint.splat({0, 0.1, 0}, 2.0, 0, 0.3);
 
     // Source actor.js records input press times, lets the most recent Swim/Fire
     // press win, and carries the fire buffer across the kid emerge delay.
@@ -153,10 +236,13 @@ int main() {
     player.tick(dt);
     check(player.state.squid && player.state.submerged,"Later Swim press did not win while Fire stayed held");
 
+    paint.clear();
     player.spawnAt({0, 0, 0}, 0);
+    player.input.squid = true;
     player.input.jump = true;
     player.tick(dt);
-    check(!player.state.grounded && player.state.vel.y > 8.0, "jump uses source 8.4 m/s impulse");
+    check(!player.state.grounded && !player.state.squid && player.state.vel.y > 8.0,
+          "dry Shift stays kid without suppressing the source 8.4 m/s jump impulse");
     player.input.jump = false;
     for (int i = 0; i < 150; ++i) player.tick(dt);
     check(player.state.grounded && near(player.state.pos.y, 0.0), "jump lands on floor");

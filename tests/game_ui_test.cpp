@@ -41,6 +41,33 @@ std::vector<unsigned char> Capture(const std::filesystem::path& file,int width,i
     Check(stbi_write_png(file.string().c_str(),width,height,3,pixels.data(),width*3)!=0,"UI capture failed");
     return pixels;
 }
+std::array<unsigned char,3> PixelTop(const std::vector<unsigned char>& pixels,int width,int height,int x,int y){
+    x=std::clamp(x,0,width-1);y=std::clamp(y,0,height-1);
+    const auto index=(static_cast<std::size_t>(height-1-y)*width+static_cast<std::size_t>(x))*3;
+    return {pixels[index],pixels[index+1],pixels[index+2]};
+}
+std::array<unsigned char,3> MapPinIconCornerPixel(const std::vector<unsigned char>& pixels,int width,int height,Rml::Element& pin){
+    const auto offset=pin.GetAbsoluteOffset(Rml::BoxArea::Border);const auto size=pin.GetBox().GetSize(Rml::BoxArea::Border);
+    const float iconSize=size.x*(36.0f/64.0f);const float margin=(size.x-iconSize)*.5f;
+    const int x=static_cast<int>(std::lround(offset.x+margin+iconSize*(2.0f/36.0f)));
+    const int y=static_cast<int>(std::lround(offset.y+margin+iconSize*(2.0f/36.0f)));
+    return PixelTop(pixels,width,height,x,y);
+}
+std::array<unsigned char,3> MapPinTeamFillPixel(const std::vector<unsigned char>& pixels,int width,int height,Rml::Element& pin){
+    const auto offset=pin.GetAbsoluteOffset(Rml::BoxArea::Border);const auto size=pin.GetBox().GetSize(Rml::BoxArea::Border);
+    return PixelTop(pixels,width,height,static_cast<int>(std::lround(offset.x+size.x*.125f)),static_cast<int>(std::lround(offset.y+size.y*.5f)));
+}
+std::size_t MapPinIconContrastPixels(const std::vector<unsigned char>& pixels,int width,int height,Rml::Element& pin,const std::array<unsigned char,3>& teamFill){
+    const auto offset=pin.GetAbsoluteOffset(Rml::BoxArea::Border);const auto size=pin.GetBox().GetSize(Rml::BoxArea::Border);
+    const float iconSize=size.x*(36.0f/64.0f),margin=(size.x-iconSize)*.5f;
+    const int left=static_cast<int>(std::lround(offset.x+margin+iconSize*.05f));
+    const int top=static_cast<int>(std::lround(offset.y+margin+iconSize*.05f));
+    const int right=static_cast<int>(std::lround(offset.x+margin+iconSize*.8f));
+    const int bottom=static_cast<int>(std::lround(offset.y+margin+iconSize*.95f));
+    std::size_t contrast=0;
+    for(int y=top;y<=bottom;++y)for(int x=left;x<=right;++x)if(PixelTop(pixels,width,height,x,y)!=teamFill)++contrast;
+    return contrast;
+}
 }
 int main(int argc,char** argv){
     if(argc!=3||!glfwInit())return 1;
@@ -81,6 +108,15 @@ int main(int argc,char** argv){
         Check(element("title-start")->Focus(),"Title start action must accept keyboard focus");context->ProcessKeyDown(Rml::Input::KI_RETURN,0);context->ProcessKeyUp(Rml::Input::KI_RETURN,0);
         render();Check(element("panel-home")->IsVisible()&&!element("panel-title")->IsVisible(),"Starting from the title screen must enter Home");
         Check(ui.preview().type==UiPreviewType::None,"Home must use the full page without an unnecessary character viewport");
+        element("nav-play")->Click();render();
+        auto* mapSelect=dynamic_cast<Rml::ElementFormControlSelect*>(element("stage"));Check(mapSelect!=nullptr,"Stage picker must exist");
+        for(const char* mode:{"mode-turf","mode-zones","mode-boss"}){
+            element(mode)->Click();render();mapSelect->SetValue("kelpline");mapSelect->DispatchEvent("change",{});render();
+            bool localizedOption=false;
+            for(int i=0;i<mapSelect->GetNumOptions();++i){auto* option=mapSelect->GetOption(i);if(option->GetAttribute<Rml::String>("value","")=="kelpline")localizedOption=option->GetInnerRML()=="海帶線貨運站";}
+            Check(mapSelect->GetValue()=="kelpline"&&ui.setup().stage=="kelpline"&&localizedOption,"Kelpline Terminal must remain selectable under its Chinese name in all three modes");
+        }
+        element("mode-turf")->Click();mapSelect->SetValue("tidewater");mapSelect->DispatchEvent("change",{});element("nav-home")->Click();render();
         int profileWrites=0;PlayerProfile loaded;loaded.name="Mint";loaded.weapon="shooter";loaded.xp=120;loaded.style.hair=2;loaded.settings.showFps=true;
         ui.SetProfile(loaded);ui.SetProfileSink([&](const PlayerProfile&){++profileWrites;});
         Check(profileWrites==0&&ui.profile().name=="Mint","Loading a profile must not write it back immediately");
@@ -108,6 +144,36 @@ int main(int argc,char** argv){
             room.members[0].ready=true;
             ui.SetOnlineState(room);render();
             Check(!element("online-start")->HasAttribute("disabled"),"A fully ready lobby must allow its host to start");
+            UiLobbyPlate lobbyPlate; lobbyPlate.member=1; lobbyPlate.x=.55f; lobbyPlate.y=.5f; lobbyPlate.visible=true;
+            UiLobbyPlate guestPlate; guestPlate.member=2; guestPlate.x=.75f; guestPlate.y=.5f; guestPlate.visible=true;
+            const std::vector<UiLobbyPlate> lobbyPlates{lobbyPlate,guestPlate};
+            ui.SetLobbyPresentation(true,-1,false,lobbyPlates);render();
+            Check(element("lobby-plates")->IsVisible()&&!element("lobby-countdown")->IsVisible(),"Active Online presentation must show lineup labels without a countdown");
+            const auto lobbyLabels=element("lobby-plates")->GetInnerRML();
+            Check(lobbyLabels.find("玩家 1（你）")!=Rml::String::npos&&lobbyLabels.find("玩家 2")!=Rml::String::npos&&lobbyLabels.find("已準備")!=Rml::String::npos,"World-space lobby plates must show player labels and ready states");
+            element("online-loadout")->Click();render();
+            Check(ui.preview().screen==UiScreen::Loadout,"Room must expose weapon changes while preserving the connection");
+            element("menu-back")->Click();render();
+            Check(ui.preview().screen==UiScreen::Online,"Returning from room loadout must restore the lobby");
+            element("online-locker")->Click();render();
+            Check(ui.preview().screen==UiScreen::Locker,"Room must expose character style changes");
+            element("menu-back")->Click();render();
+            Check(ui.preview().screen==UiScreen::Online,"Returning from room styling must restore the lobby");
+            ui.SetLobbyPresentation(true,3,true,lobbyPlates);render();
+            Check(element("lobby-countdown")->IsVisible()&&element("lobby-countdown-number")->GetInnerRML()=="3"&&element("lobby-countdown-label")->GetInnerRML()=="準備出發","Lobby countdown must display 3");
+            Check(!element("lobby-plates")->IsVisible(),"Lineup labels must hide during the launch countdown");
+            ui.SetLobbyPresentation(true,2,true,lobbyPlates);render();
+            Check(element("lobby-countdown-number")->GetInnerRML()=="2","Lobby countdown must display 2");
+            ui.SetLobbyPresentation(true,1,true,lobbyPlates);render();
+            Check(element("lobby-countdown-number")->GetInnerRML()=="1","Lobby countdown must display 1");
+            ui.SetLobbyPresentation(true,0,true,lobbyPlates);render();
+            Check(element("lobby-countdown-number")->GetInnerRML()=="出發！"&&element("lobby-countdown-label")->GetInnerRML()=="超級跳躍","Lobby countdown must display GO as the super-jump handoff");
+            ui.SetLobbyPresentation(true,-1,true,lobbyPlates);render();
+            Check(!element("lobby-countdown")->IsVisible(),"The pre-countdown delay must keep the number hidden while input remains locked");
+            element("online-ready")->Click();
+            element("online-leave")->Click();
+            Check(ui.TakeOnlineRequests().empty(),"Online controls must ignore input while launch presentation is active");
+            ui.SetLobbyPresentation(false,-1,false);
             element("online-ready")->Click();requests=ui.TakeOnlineRequests();
             Check(requests.size()==1&&requests[0].kind==UiOnlineRequest::Kind::Ready&&!requests[0].ready,"Ready must support cancelling the current ready state");
             element("online-copy")->Click();
@@ -132,6 +198,12 @@ int main(int argc,char** argv){
             element("online-leave")->Click();requests=ui.TakeOnlineRequests();
             Check(requests.size()==1&&requests[0].kind==UiOnlineRequest::Kind::Leave,"Leave must reach the session owner");
             ui.SetOnlineState({});ui.ShowMenu("tidewater");render();
+            ui.SetLobbyPresentation(true,2,true,lobbyPlates);render();
+            Check(!element("lobby-plates")->IsVisible()&&!element("lobby-countdown")->IsVisible(),"Lobby world overlays must stay hidden on Home");
+            element("nav-locker")->Click();render();
+            Check(ui.preview().type==UiPreviewType::Locker,"Launch input lock must be scoped to Online and leave other menu navigation active");
+            ui.SetLobbyPresentation(false,-1,false);
+            element("nav-home")->Click();render();
         }
         element("nav-locker")->Click();render();
         auto* hair=dynamic_cast<Rml::ElementFormControl*>(element("style-hair"));Check(hair!=nullptr,"Locker must expose source hair choices");
@@ -330,6 +402,7 @@ int main(int argc,char** argv){
             auto* own=hud->GetElementById("squad-a");auto* enemy=hud->GetElementById("squad-b");
             Check(own->GetNumChildren()==4&&enemy->GetNumChildren()==4,"Combat roster must display both four-player teams");
             Check(hud->GetElementById("squad-a-count")->GetInnerRML().find("4 / 4")!=Rml::String::npos,"Squad count must report actual living actors");
+            match.startPlaying();
             auto& actor=match.local();const auto saved=actor.state;
             actor.state.alive=false;actor.state.respawnTimer=2.2;hudRender(false);
             auto* badge=hud->GetElementById("squad-player-0");
@@ -356,6 +429,20 @@ int main(int argc,char** argv){
             Check(own->GetNumChildren()==2&&enemy->GetNumChildren()==1&&hud->GetElementById("squad-player-1")->IsClassSet("self"),"A guest must see its actual team on the left even when its actor is not index zero");
             onlineMatch.setNetworkActorActive(2,false);ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
             Check(own->GetNumChildren()==1&&hud->GetElementById("squad-player-2")==nullptr,"An inactive departed actor must leave both the roster and its living count");
+            onlineMatch.restart();auto& respawning=onlineMatch.local();respawning.state.alive=false;respawning.state.respawnTimer=2.2;
+            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            Check(!hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-hint")->IsClassSet("hidden"),"Intro must hide the respawn card and hint");
+            onlineMatch.startPlaying();respawning.state.respawnTimer=-1.2;
+            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            Check(hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-seconds")->GetInnerRML()=="0"&&hud->GetElementById("player-status")->GetInnerRML().find("0 秒")!=Rml::String::npos,"Playing respawn countdowns must clamp at zero");
+            Check(hud->GetElementById("squad-player-1")->GetAttribute<Rml::String>("title","").find("復活 0 秒")!=Rml::String::npos,"The squad countdown must clamp at zero");
+            onlineMatch.applyNetworkState(MatchPhase::Finish,onlineMatch.remaining(),std::nullopt);
+            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            Check(!hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-hint")->IsClassSet("hidden")&&hud->GetElementById("player-status")->IsClassSet("hidden")&&hud->GetElementById("squad-player-1")->GetAttribute<Rml::String>("title","").find("已退場")!=Rml::String::npos,"Finish must immediately hide respawn hints");
+            MatchResult result{};onlineMatch.applyNetworkState(MatchPhase::Results,0,result);
+            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            Check(!hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-hint")->IsClassSet("hidden"),"Results must not show respawn hints");
+            onlineMatch.restart();ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
             FacePaint bossPaint(*stage,geometry);MatchOptions bossOptions;bossOptions.mode="boss";
             MatchSimulation bossMatch(*stage,geometry,bossPaint,nav,bossOptions);
             glViewport(0,0,1600,900);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
@@ -423,7 +510,8 @@ int main(int argc,char** argv){
             auto controllerTargets=[&]{return jumpController.SuperJumpMapTargets(jumpMatch);};
             auto uiTargets=[&]{
                 std::vector<UiJumpMapTarget> targets;
-                for(const auto& target:controllerTargets())targets.push_back({target.key,target.x,target.z,target.label,target.available});
+                for(const auto& target:controllerTargets())targets.push_back({target.key,target.x,target.z,target.label,target.available,target.y,
+                    target.actor?std::string(target.actor->weapon().kind):std::string()});
                 return targets;
             };
             auto setMapFrame=[&](bool open,std::vector<UiJumpMapTarget> targets,int queuedKey=-1,std::string queuedLabel=std::string()){
@@ -444,6 +532,19 @@ int main(int argc,char** argv){
                 const auto detailSize=hud->GetElementById("jump-map-help")->GetBox().GetSize(Rml::BoxArea::Border);
                 Check(mapSize.x>450.f&&detailSize.y>0.f,"Expanded Super Jump map should expose its map panel and instructions");
                 Check(hud->GetElementById("jump-map-legend")->GetInnerRML().find("jump-target-1")!=Rml::String::npos,"Expanded Super Jump map should list teammate targets");
+                for(int key=1;key<=3;++key){
+                    auto* teammate=hud->GetElementById(("jump-map-marker-"+std::to_string(key)).c_str());
+                    const auto target=std::find_if(targets.begin(),targets.end(),[&](const auto& candidate){return candidate.key==key;});
+                    const auto expectedSrc=target==targets.end()?std::string():"weapons/"+target->weapon+".png";
+                    const std::string targetKey=target==targets.end()?"<missing>":std::to_string(target->key);
+                    const std::string weapon=target==targets.end()?"<missing>":target->weapon;
+                    auto* image=teammate?teammate->GetFirstChild():nullptr;
+                    const std::string actualSrc=image?image->GetAttribute<Rml::String>("src",""):std::string();
+                    const auto markup=teammate?teammate->GetInnerRML():"<missing pin>";
+                    Check(teammate&&target!=targets.end()&&!target->weapon.empty()&&image&&image->GetTagName()=="img"&&actualSrc==expectedSrc,
+                          "Teammate weapon icon mismatch: key="+std::to_string(key)+" targetKey="+targetKey
+                          +" weapon="+weapon+" expectedSrc="+expectedSrc+" actualSrc="+actualSrc+" innerRML="+markup);
+                }
                 auto* map=hud->GetElementById("minimap-map");
                 const auto mapOffset=map->GetAbsoluteOffset(Rml::BoxArea::Border);
                 const auto mapBounds=map->GetBox().GetSize(Rml::BoxArea::Border);
@@ -489,7 +590,14 @@ int main(int argc,char** argv){
             auto* minimapPanel=hud->GetElementById("minimap");
             renderJumpMap(1280,720,"jump-map-1280x720.png");
             renderJumpMap(1920,1080,"jump-map-1920x1080.png");
+            auto missingWeaponTargets=uiTargets();
+            for(auto& target:missingWeaponTargets)if(target.key==1)target.weapon.clear();
+            setMapFrame(true,std::move(missingWeaponTargets));ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            Check(hud->GetElementById("jump-map-marker-1")->GetInnerRML().find("weapons/shooter.png")!=std::string::npos,
+                  "A teammate pin without weapon metadata must use the source-default shooter icon rather than a blank white tile");
             Check(clickTarget(1)==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1),"Clicking a live teammate target must route into the controller and start the selected jump");
+            Check(hud->GetElementById("jump-map-marker-1")->GetInnerRML().find("weapons/shooter.png")!=std::string::npos,
+                  "Selecting a teammate must preserve its weapon icon instead of turning the pin into a white square");
             Check(jumpMatch.local().superJumpState()&&jumpMatch.local().superJumpState()->actorTarget==controllerTargets()[0].actor,"Teammate click must preserve the selected actor target");
             jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
             setMapTargets();
@@ -535,9 +643,39 @@ int main(int argc,char** argv){
             Check(jumpMatch.local().damage(200)&&!jumpMatch.local().state.alive,"Dead-map fixture should splat the local player before choosing a queued target");
             setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(controllerTargets()[0].available&&!hud->GetElementById("jump-target-1")->HasAttribute("disabled"),"A living teammate remains available as a queued target while the local player is dead");
-            Check(clickTarget(1)==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1)&&jumpController.HasQueuedSuperJump()&&jumpController.QueuedSuperJumpKey()==1,"Clicking an available teammate while dead should queue that teammate's respawn jump");
-            setMapFrame(true,uiTargets(),1,"隊友");ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            const auto unselectedMapPixels=Capture(std::filesystem::path(argv[2])/"jump-map-teammate-unselected.png",1600,900);
+            auto* unselectedMapPin=hud->GetElementById("jump-map-marker-1");
+            const auto unselectedIconCorner=MapPinIconCornerPixel(unselectedMapPixels,1600,900,*unselectedMapPin);
+            const auto unselectedTeamFill=MapPinTeamFillPixel(unselectedMapPixels,1600,900,*unselectedMapPin);
+            const int selectedTargetKey=clickTarget(1);
+            Check(selectedTargetKey==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1)&&jumpController.HasQueuedSuperJump()&&jumpController.QueuedSuperJumpKey()==1,"Clicking an available teammate while dead should queue that teammate's respawn jump");
+            const auto queuedTargets=uiTargets();
+            const auto queuedTeammate=std::find_if(queuedTargets.begin(),queuedTargets.end(),[](const auto& target){return target.key==1;});
+            Check(queuedTeammate!=queuedTargets.end()&&!queuedTeammate->weapon.empty(),"The queued pin fixture must carry the actual teammate's equipped weapon");
+            setMapFrame(true,queuedTargets,1,"隊友");ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(hud->GetElementById("jump-map-marker-1")->IsClassSet("queued"),"The queued landing pin must show its selection ring on the map");
+            glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            const auto selectedMapPixels=Capture(std::filesystem::path(argv[2])/"jump-map-teammate-selected.png",1600,900);
+            auto* selectedMapPin=hud->GetElementById("jump-map-marker-1");
+            auto* selectedMapImage=selectedMapPin?selectedMapPin->GetFirstChild():nullptr;
+            const std::string queuedExpectedSrc="weapons/"+queuedTeammate->weapon+".png";
+            const std::string queuedActualSrc=selectedMapImage?selectedMapImage->GetAttribute<Rml::String>("src",""):std::string();
+            const std::string queuedMarkup=selectedMapPin?selectedMapPin->GetInnerRML():"<missing pin>";
+            Check(selectedMapImage&&selectedMapImage->GetTagName()=="img"&&queuedActualSrc==queuedExpectedSrc,
+                  "Queued teammate weapon icon mismatch: key=1 weapon="+queuedTeammate->weapon+" expectedSrc="+queuedExpectedSrc+" actualSrc="+queuedActualSrc+" innerRML="+queuedMarkup);
+            const auto selectedIconCorner=MapPinIconCornerPixel(selectedMapPixels,1600,900,*selectedMapPin);
+            const auto selectedTeamFill=MapPinTeamFillPixel(selectedMapPixels,1600,900,*selectedMapPin);
+            const auto whiteSquare=[](const auto& pixel){return pixel[0]>220&&pixel[1]>220&&pixel[2]>220;};
+            Check(!whiteSquare(unselectedIconCorner)&&!whiteSquare(selectedIconCorner)
+                &&unselectedIconCorner==unselectedTeamFill&&selectedIconCorner==selectedTeamFill,
+                "Transparent weapon-icon corners must reveal the team circle instead of an opaque white square");
+            Check(MapPinIconContrastPixels(unselectedMapPixels,1600,900,*unselectedMapPin,unselectedTeamFill)>20
+                &&MapPinIconContrastPixels(selectedMapPixels,1600,900,*selectedMapPin,selectedTeamFill)>20,
+                "The equipped weapon image must load visible pixels in both unselected and queued teammate pins");
+            Check(unselectedTeamFill==selectedTeamFill,"Queuing a teammate must preserve the pin's interior team-color fill");
             jumpController.ClearQueuedSuperJump();
             jumpMatch.local().spawnAt(stage->spawnPads[jumpMatch.local().team()],0.0);
             setMapTargets();
@@ -644,11 +782,29 @@ int main(int argc,char** argv){
         match.local().state.pos.x+=2.0;glfwSetTime(glfwGetTime()+.12);hudRender(true);
         const auto mapAfter=minimap->GetInnerRML();Check(mapAfter.find("map-actor-local")!=Rml::String::npos&&mapAfter!=mapBefore,"Moving the player must move its visible minimap marker");
         Capture(std::filesystem::path(argv[2])/"pause.png",1600,900);
-        hud->GetElementById("return-menu")->Click();Check(hudRender(true)==UiAction::None&&ui.preview().screen==UiScreen::LeaveConfirm,"Leaving an unfinished match must ask for confirmation");
+        const auto clickAt=[&](Rml::Element* target){const auto pos=target->GetAbsoluteOffset(Rml::BoxArea::Border);const auto size=target->GetBox().GetSize(Rml::BoxArea::Border);const int x=int(pos.x+size.x*.5f),y=int(pos.y+size.y*.5f);context->ProcessMouseMove(x,y,0);context->ProcessMouseButtonDown(0,0);context->ProcessMouseButtonUp(0,0);};
+        clickAt(hud->GetElementById("return-menu"));Check(hudRender(true)==UiAction::None&&ui.preview().screen==UiScreen::LeaveConfirm,"Leaving an unfinished match must ask for confirmation");
+        clickAt(hud->GetElementById("leave-stay"));
+        Check(hudRender(true)==UiAction::None&&!hud->GetElementById("leave-confirm")->IsVisible(),"Canceling leave must return to the pause menu without resuming the match");
+        Check(hud->GetElementById("pause-settings")==nullptr,"Pause must not expose an in-battle Settings entry");
+        const auto pausePhase=match.phase();const bool previousPauseState=match.paused;match.paused=true;clickAt(hud->GetElementById("pause-howto"));Check(hudRender(true)==UiAction::None,"Opening pause How To must not change match state");
+        Check(menu->IsVisible()&&!hud->IsVisible()&&element("panel-howto")->IsVisible()&&!element("navigation")->IsVisible(),"Pause How To must display as a full-page menu over the match");
+        element("nav-settings")->Click();hudRender(true);
+        Check(element("panel-howto")->IsVisible()&&!element("panel-settings")->IsVisible()&&!element("navigation")->IsVisible()&&!hud->IsVisible()&&match.phase()==pausePhase&&match.paused,"Main-menu navigation must not bypass pause How To into Settings");
         context->ProcessKeyDown(Rml::Input::KI_ESCAPE,0);context->ProcessKeyUp(Rml::Input::KI_ESCAPE,0);
-        Check(hudRender(true)==UiAction::None&&!hud->GetElementById("leave-confirm")->IsVisible(),"Escape must cancel leaving without resuming the match");
-        hud->GetElementById("resume")->Click();Check(hudRender(false)==UiAction::Resume,"Resume did not reach the match loop");
+        Check(hudRender(true)==UiAction::None&&!menu->IsVisible()&&hud->GetElementById("pause")->IsVisible()&&ui.preview().screen==UiScreen::Pause&&match.phase()==pausePhase&&match.paused,"Escape from pause How To must restore the pause menu without resuming");
+        clickAt(hud->GetElementById("pause-howto"));hudRender(true);
+        clickAt(element("menu-back"));
+        Check(hudRender(true)==UiAction::None&&!menu->IsVisible()&&hud->GetElementById("pause")->IsVisible()&&match.phase()==pausePhase&&match.paused,"How To Back must restore the pause menu without resuming");
+        clickAt(hud->GetElementById("resume"));Check(hudRender(false)==UiAction::Resume,"Resume did not reach the match loop");
+        match.paused=previousPauseState;
         Check(!hud->GetElementById("pause")->IsVisible(),"Resume did not hide the pause overlay");
+        match.paused=true;hudRender(true);clickAt(hud->GetElementById("return-menu"));hudRender(true);
+        Check(hud->GetElementById("leave-confirm")->IsVisible(),"Returning to the menu must ask for confirmation");
+        clickAt(hud->GetElementById("leave-yes"));Check(hudRender(true)==UiAction::StageSelect,"Confirmed return to menu must reach the match loop");
+        ui.ShowMenu("tidewater");render();
+        Check(menu->IsVisible()&&!hud->IsVisible()&&element("navigation")->IsVisible()&&element("nav-settings")->IsVisible()&&hud->GetElementById("pause")->IsClassSet("hidden")&&hud->GetElementById("leave-confirm")->IsClassSet("hidden")&&match.paused,"Returning to the main menu must clear stale pause and confirmation overlays");
+        match.paused=previousPauseState;
         ui.ShowPracticeGear();hudRender(true,true);
         Check(ui.preview().type==UiPreviewType::Locker&&ui.preview().screen==UiScreen::PracticeGear&&menu->IsVisible()&&hud->IsVisible(),"Practice gear should expose its screen and open over the HUD");
         context->ProcessKeyDown(Rml::Input::KI_ESCAPE,0);context->ProcessKeyUp(Rml::Input::KI_ESCAPE,0);

@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace restoration {
-enum class WorldFxShape : int { Drop, Puff, Glow, Ring, Shell, Beam, Swirl, Bubble, Orb, Stamp, Speaker, Missile, Cloud, WarningRing, SourceBeam };
+enum class WorldFxShape : int { Drop, Puff, Glow, Ring, Shell, Beam, Swirl, Bubble, Orb, Stamp, Speaker, Missile, Cloud, WarningRing, SourceBeam, BossBlob };
 
 // CPU pool record. The first fields are the common draw inputs; the remaining
 // fields preserve the reference fx.js pool attributes so source recipes and
@@ -20,6 +20,9 @@ struct WorldFxParticle {
     float drag=2.2f, buoyancy=0, kind=0, fadeIn=0.08f, fadeOut=0;
     float rotation=0, rotationVelocity=0, wobble=0, expand=0, crown=0;
     float renderRadius=0, renderLength=0, renderAlpha=1;
+    // Ground plane used by the source BossFX crablet-pop ink pool.
+    float sourceGroundY=0;
+    glm::vec3 renderScale{1};
 };
 
 struct WorldFxHit { glm::vec3 point{0}, normal{0,1,0}; };

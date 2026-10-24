@@ -30,10 +30,13 @@ struct CharacterArt::GpuMesh {
 CharacterArt::CharacterArt(std::filesystem::path directory,bool linearOutput,bool environment):data_(directory) {
     for(const auto& material:CharacterMaterials()){
         const auto shaders=directory/"shaders";
-        programs_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shaders/(material.key+".vert")),CharacterShader::readSource(shaders/(material.key+".frag")),linearOutput,environment));
+        try{programs_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shaders/(material.key+".vert")),CharacterShader::readSource(shaders/(material.key+".frag")),linearOutput,environment));}
+        catch(const std::exception& error){throw std::runtime_error((shaders/material.key).string()+": "+error.what());}
         const auto shadowShaders=directory/"shaders-shadow";
-        if(std::filesystem::exists(shadowShaders/(material.key+".vert")))
-            shadowPrograms_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shadowShaders/(material.key+".vert")),CharacterShader::readSource(shadowShaders/(material.key+".frag")),linearOutput,environment));
+        if(std::filesystem::exists(shadowShaders/(material.key+".vert"))){
+            try{shadowPrograms_.emplace(material.key,std::make_unique<CharacterShader>(CharacterShader::readSource(shadowShaders/(material.key+".vert")),CharacterShader::readSource(shadowShaders/(material.key+".frag")),linearOutput,environment));}
+            catch(const std::exception& error){throw std::runtime_error((shadowShaders/material.key).string()+": "+error.what());}
+        }
         materials_.emplace(material.key,&material);
     }
     glGenTextures(1,&dfg_);glBindTexture(GL_TEXTURE_2D,dfg_);
@@ -118,6 +121,7 @@ std::size_t CharacterArt::draw(const CharacterPoseFrame& frame,const CharacterSt
         const auto& definition=*materials_.at(draw.program);auto& shader=*(useShadowShader?shadowPrograms_.at(draw.program):programs_.at(draw.program));
         shader.use();for(const auto& [name,value]:definition.uniforms)shader.uniform(name,value);
         shader.uniform("uLodFade",{draw.body?lodDraw.fade:0.0,lodDraw.side});
+        shader.uniform("iwDepthOnly",shadow&&shadow->depthOnly?1.0:0.0);
         glActiveTexture(GL_TEXTURE6);glBindTexture(GL_TEXTURE_2D,dfg_);shader.uniform("dfgLUT",6.0);
         shader.material(material);shader.lights(lighting,view);shader.matrices(draw.world,view,projection,camera);
         if(useShadowShader){

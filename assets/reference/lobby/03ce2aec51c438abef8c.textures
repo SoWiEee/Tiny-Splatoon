@@ -1,0 +1,50 @@
+[
+  {
+    "uniform": "tAlbedo",
+    "key": "mesh-7-tAlbedo",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1003,
+      "magFilter": 1003,
+      "generateMipmaps": false
+    }
+  },
+  {
+    "uniform": "tDecal",
+    "key": "mesh-7-tDecal",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1008,
+      "magFilter": 1006,
+      "generateMipmaps": true
+    }
+  },
+  {
+    "uniform": "tNormal",
+    "key": "mesh-7-tNormal",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1003,
+      "magFilter": 1003,
+      "generateMipmaps": false
+    }
+  },
+  {
+    "uniform": "tOrm",
+    "key": "mesh-7-tOrm",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1003,
+      "magFilter": 1003,
+      "generateMipmaps": false
+    }
+  }
+]

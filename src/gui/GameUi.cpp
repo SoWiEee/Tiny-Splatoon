@@ -119,6 +119,7 @@ struct GameUi::Impl : Rml::EventListener {
     UiAction leaveAction=UiAction::StageSelect;
     UiScreen screen=UiScreen::Home;
     UiScreen previousScreen=UiScreen::Home;
+    bool onlineEdit=false;
     std::function<void(const PlayerProfile&)> profileSink;
     std::function<void(const std::string&)> sound;
     std::function<void(const std::string&,double,double)> detailedSound;
@@ -129,6 +130,8 @@ struct GameUi::Impl : Rml::EventListener {
     network::RoomView online;
     std::vector<UiOnlineRequest> onlineRequests;
     bool onlineServerSettings=false,onlineRoomSettings=false;
+    bool lobbyPresentation=false,lobbyLaunching=false;
+    std::string lobbyPlatesMarkup;
     std::string onlineStagesMode,onlineRosterMarkup;
     double onlineNoticeUntil=0;
     bool syncingControls=false;
@@ -385,10 +388,14 @@ struct GameUi::Impl : Rml::EventListener {
     }
     void GoTo(UiScreen destination){
         screen=destination;
+        if(destination==UiScreen::Home||destination==UiScreen::Play||destination==UiScreen::Title)onlineEdit=false;
+        menu->SetClass("online-world",destination==UiScreen::Online&&lobbyPresentation);
+        Hidden(menu,"lobby-plates",destination!=UiScreen::Online||!lobbyPresentation);
+        if(destination!=UiScreen::Online)Hidden(menu,"lobby-countdown",true);
         menu->SetClass("with-preview",destination==UiScreen::Loadout||destination==UiScreen::Locker||practiceGear);
         const std::array<std::pair<UiScreen,const char*>,9> panels={{{UiScreen::Title,"title"},{UiScreen::Home,"home"},{UiScreen::Play,"play"},{UiScreen::Online,"online"},{UiScreen::Loadout,"loadout"},{UiScreen::Locker,"locker"},{UiScreen::Settings,"settings"},{UiScreen::HowTo,"howto"},{UiScreen::Credits,"credits"}}};
         for(const auto& [id,name]:panels){Hidden(menu,std::string("panel-")+name,id!=destination);auto* nav=menu->GetElementById(std::string("nav-")+name);if(nav)nav->SetClass("selected",id==destination);}
-        Hidden(menu,"navigation",destination==UiScreen::Title);Hidden(menu,"menu-footer",destination==UiScreen::Title);Hidden(menu,"profile-header",destination==UiScreen::Title);
+        Hidden(menu,"navigation",destination==UiScreen::Title||hudOverlay);Hidden(menu,"menu-footer",destination==UiScreen::Title);Hidden(menu,"profile-header",destination==UiScreen::Title);
         const char* title=destination==UiScreen::Title?"":"Tiny Splatoon";
         switch(destination){case UiScreen::Home:title="首頁";break;case UiScreen::Play:title="遊玩";break;case UiScreen::Online:title="線上遊玩";break;case UiScreen::Loadout:title="裝備";break;case UiScreen::Locker:title="角色置物櫃";break;case UiScreen::Settings:title="設定";break;case UiScreen::HowTo:title="操作說明";break;case UiScreen::Credits:title="製作名單";break;default:break;}
         Text(menu,"screen-title",title);menu->SetClass("title-screen",destination==UiScreen::Title);
@@ -513,6 +520,7 @@ struct GameUi::Impl : Rml::EventListener {
         Commit();Play("ui_click");
     }
     void ProcessEvent(Rml::Event& event)override{
+        if(lobbyLaunching&&screen==UiScreen::Online&&event.GetType()!="mousemove")return;
         if(event.GetType()=="mousemove"){pointerPosition={event.GetParameter<float>("mouse_x",0),event.GetParameter<float>("mouse_y",0)};return;}
         if(event.GetType()=="keydown"&&event.GetParameter<int>("key_identifier",0)==Rml::Input::KI_ESCAPE&&hud->IsVisible()&&Find(hud,"leave-confirm")->IsVisible()){
             Find(hud,"leave-stay")->Click();event.StopPropagation();return;
@@ -588,7 +596,11 @@ struct GameUi::Impl : Rml::EventListener {
         if(type!="click"||element->GetTagName()!="button")return;
         if(id.rfind("online-",0)==0){
             if(element->HasAttribute("disabled"))return;
-            if(id=="online-server-toggle"){onlineServerSettings=!onlineServerSettings;Hidden(menu,"online-server-settings",!onlineServerSettings);}
+            if(id=="online-loadout"||id=="online-locker"){
+                onlineEdit=true;GoTo(id=="online-loadout"?UiScreen::Loadout:UiScreen::Locker);
+                if(id=="online-locker")LockerTab("presets");
+            }
+            else if(id=="online-server-toggle"){onlineServerSettings=!onlineServerSettings;Hidden(menu,"online-server-settings",!onlineServerSettings);}
             else if(id=="online-settings-toggle"){onlineRoomSettings=!onlineRoomSettings;Hidden(menu,"online-room-settings",!onlineRoomSettings);}
             else if(id=="online-copy"){
                 glfwGetError(nullptr);glfwSetClipboardString(window,online.code.c_str());
@@ -619,11 +631,12 @@ struct GameUi::Impl : Rml::EventListener {
         else if(id=="special-next")CycleLoadoutPart(EquipmentCategory::Special,1);
         else if(id.rfind("settings-tab-",0)==0){SettingsTab(id.substr(13));Play("ui_click");}
         else if(id=="title-start"){GoTo(UiScreen::Home);Play("ui_confirm");}
-        else if(id.rfind("nav-",0)==0){Tab(id.substr(4));Play("ui_click");}
+        else if(id.rfind("nav-",0)==0){if(hudOverlay)return;Tab(id.substr(4));Play("ui_click");}
         else if(id=="home-play"){GoTo(UiScreen::Play);Play("ui_click");}
         else if(id=="online-play"){GoTo(UiScreen::Play);Play("ui_click");}
         else if(id=="menu-back"){
-            if(practiceGear){practiceGear=false;menuVisible=false;menu->Hide();hud->Show();hudOverlay=false;action=UiAction::Resume;Play("ui_back");}
+            if(onlineEdit&&(screen==UiScreen::Loadout||screen==UiScreen::Locker)){onlineEdit=false;GoTo(UiScreen::Online);Play("ui_back");}
+            else if(practiceGear){practiceGear=false;menuVisible=false;menu->Hide();hud->Show();hudOverlay=false;action=UiAction::Resume;Play("ui_back");}
             else if(hudOverlay){hudOverlay=false;practiceGear=false;menuVisible=false;menu->Hide();hud->Show();Play("ui_back");}
             else{GoTo(UiScreen::Home);Play("ui_back");}
         }
@@ -653,8 +666,8 @@ struct GameUi::Impl : Rml::EventListener {
         else if(id=="practice-spawn"){action=UiAction::PracticeSpawn;Play("ui_confirm");}
         else if(id=="practice-stage"){action=UiAction::PracticeStage;Play("ui_click");}
         else if(id=="practice-gear"){OpenPracticeGear();Play("ui_click");}
-        else if(id=="pause-settings"||id=="pause-howto"){
-            previousScreen=screen;hudOverlay=true;menuVisible=true;menu->Show();GoTo(id=="pause-settings"?UiScreen::Settings:UiScreen::HowTo);Play("ui_click");
+        else if(id=="pause-howto"){
+            previousScreen=screen;hudOverlay=true;menuVisible=true;menu->Show();GoTo(UiScreen::HowTo);Play("ui_click");
         }
     }
     void OpenPracticeGear(){
@@ -837,11 +850,12 @@ struct GameUi::Impl : Rml::EventListener {
                 ++total;if(actor.state.alive)++alive;
                 if(match.boss()&&((total-1)/4)!=side)continue;
                 const bool ready=actor.state.alive&&actor.state.specialCharge>=actor.weapon().number("specialCost",190);
-                const std::string status=actor.state.alive?(ready?"特殊就緒":"存活"):actor.canRespawn()?"復活 "+Integer(std::ceil(actor.state.respawnTimer))+" 秒":"已退場";
+                const bool respawning=match.phase()==MatchPhase::Playing&&actor.canRespawn();
+                const std::string status=actor.state.alive?(ready?"特殊就緒":"存活"):respawning?"復活 "+Integer(std::ceil(std::max(0.,actor.state.respawnTimer)))+" 秒":"已退場";
                 const auto label=EquipmentLabel(EquipmentCategory::Main,actor.mainId());
                 markup+="<div id=\"squad-player-"+std::to_string(i)+"\" class=\"squad-player"+std::string(actor.state.alive?"":" dead")+(ready?" ready":"")+(actor.isLocal()?" self":"")+"\" title=\""+Escape(entry.name+" · "+std::string(label)+" · "+status)+"\" style=\"background-color:"+std::string(actor.state.alive?palette[actor.team()]:"#403c4a")+";\">";
                 markup+="<img class=\"squad-weapon\" src=\"weapons/"+std::string(actor.weapon().kind)+".png\" /><i class=\"squad-cross-a\"></i><i class=\"squad-cross-b\"></i>";
-                markup+="<hud-ring id=\"squad-ring-"+std::to_string(i)+"\" class=\"squad-ring\"></hud-ring><span class=\"squad-state\">"+(actor.state.alive?(ready?std::string("就緒"):std::string()):actor.canRespawn()?Integer(std::ceil(actor.state.respawnTimer)):std::string("退場"))+"</span><span class=\"squad-self\">你</span></div>";
+                markup+="<hud-ring id=\"squad-ring-"+std::to_string(i)+"\" class=\"squad-ring\"></hud-ring><span class=\"squad-state\">"+(actor.state.alive?(ready?std::string("就緒"):std::string()):respawning?Integer(std::ceil(std::max(0.,actor.state.respawnTimer))):std::string("退場"))+"</span><span class=\"squad-self\">你</span></div>";
             }
             const char* id=side==0?"squad-a":"squad-b";
             const auto key=std::string("hud/")+id;
@@ -989,7 +1003,7 @@ struct GameUi::Impl : Rml::EventListener {
         activePractice=practice;
         interactive=paused||results||practiceGear||hudOverlay;
         interactive=interactive||mapInteraction.open();
-        Hidden(hud,"pause",!paused||results);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
+        Hidden(hud,"pause",!paused||results||hudOverlay);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
         Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results||!match.local().state.alive||match.local().state.squid||mapInteraction.open()||hudOverlay||practiceGear);
         Text(hud,"pause-title",onlineMatch?"對戰選單":practice?"練習暫停":"已暫停");Text(hud,"pause-description",onlineMatch?"線上對戰會持續進行。關閉選單即可繼續操作。":practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
         Text(hud,"pause-hint",onlineMatch?"Esc 選單":"Esc 暫停");Text(hud,"results-menu-label",onlineMatch?"返回房間":"返回選單");Hidden(hud,"results-rematch",onlineMatch);
@@ -1004,7 +1018,9 @@ struct GameUi::Impl : Rml::EventListener {
         UpdateBossFeedback(match,paused,results);
         UpdateAllyMarkers(match,paused||results||mapInteraction.open()||hudOverlay||practiceGear);
         UpdateDeathMarks(match,paused,paused||results||mapInteraction.open()||hudOverlay||practiceGear);
-        Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(state.respawnTimer))+" 秒");
+        const bool playing=match.phase()==MatchPhase::Playing;
+        Hidden(hud,"player-status",!playing);
+        Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(std::max(0.,state.respawnTimer)))+" 秒");
         Hidden(hud,"boss",!match.boss());
         if(const auto* boss=match.boss()){
             const auto& state=boss->state();
@@ -1057,18 +1073,38 @@ void GameUi::ShowMenu(const std::string& initialStage){
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;
     p.selection.duration=p.selection.mode=="zones"?300:p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;
     p.Value("difficulty",p.selection.difficulty);p.Value("theme",p.selection.theme);p.Value("duration",std::to_string(p.selection.duration));
-    p.Tab("home");p.LockerTab("presets");p.menu->Show();p.hud->Hide();p.menuVisible=true;p.practiceGear=false;p.hudOverlay=false;p.interactive=true;p.action=UiAction::None;p.Mode();
+    p.practiceGear=false;p.hudOverlay=false;p.menuVisible=true;p.interactive=true;
+    p.Hidden(p.hud,"pause",true);p.Hidden(p.hud,"leave-confirm",true);
+    p.Tab("home");p.LockerTab("presets");p.menu->Show();p.hud->Hide();p.action=UiAction::None;p.Mode();
 }
 void GameUi::ShowTitle(const std::string& initialStage){ShowMenu(initialStage);auto& p=*impl_;p.GoTo(UiScreen::Title);p.Find(p.menu,"title-start")->Focus();}
 void GameUi::ShowPracticeGear(){impl_->OpenPracticeGear();}
 void GameUi::ShowOnline(){auto& p=*impl_;p.menu->Show();p.hud->Hide();p.menuVisible=true;p.practiceGear=false;p.hudOverlay=false;p.GoTo(UiScreen::Online);}
 void GameUi::SetOnlineState(const network::RoomView& view){impl_->OnlineState(view);}
+void GameUi::SetLobbyPresentation(bool active,int countdown,bool launching,const std::vector<UiLobbyPlate>& plates){
+    auto& p=*impl_;p.lobbyPresentation=active;p.lobbyLaunching=active&&launching;
+    const bool visible=active&&p.screen==UiScreen::Online;
+    p.menu->SetClass("online-world",visible);p.menu->SetClass("lobby-launching",visible&&launching);
+    p.Hidden(p.menu,"lobby-plates",!visible||launching);p.Hidden(p.menu,"lobby-countdown",!visible||!launching||countdown<0);
+    p.Text(p.menu,"lobby-countdown-number",countdown>0?std::to_string(countdown):"出發！");
+    p.Text(p.menu,"lobby-countdown-label",countdown>0?"準備出發":"超級跳躍");
+    std::string markup;
+    for(const auto& plate:plates){
+        if(!plate.visible||plate.x<.36f||plate.x>.98f||plate.y<.08f||plate.y>.9f)continue;
+        const auto found=std::find_if(p.online.members.begin(),p.online.members.end(),[&](const network::Member& member){return member.id==plate.member;});
+        if(found==p.online.members.end())continue;
+        const auto label=EquipmentLabel(EquipmentCategory::Main,found->main);
+        markup+="<div class=\"lobby-plate "+std::string(found->ready?"ready":"")+"\" style=\"left:"+Number(plate.x*100)+"%;top:"+Number(plate.y*100)+"%;\"><strong>"+Escape(found->name)+(found->id==p.online.selfId?"（你）":"")+"</strong><span>"+Escape(std::string(label))+(found->ready?" · 已準備":"")+"</span></div>";
+    }
+    if(markup!=p.lobbyPlatesMarkup){p.Find(p.menu,"lobby-plates")->SetInnerRML(markup);p.lobbyPlatesMarkup=std::move(markup);}
+}
 std::vector<UiOnlineRequest> GameUi::TakeOnlineRequests(){return std::exchange(impl_->onlineRequests,{});}
 UiAction GameUi::RenderMenu(int width,int height){return impl_->Render(width,height,false);}
 void GameUi::ShowPracticeStage(const std::string& initialStage){ShowMenu(initialStage);auto& p=*impl_;p.selection.mode="practice";p.selection.practice=true;p.Mode();p.GoTo(UiScreen::Play);}
 UiAction GameUi::RenderHud(const StageData& stage,const FacePaint& paint,MatchSimulation& match,int width,int height,bool paused,bool nativeApp,bool practice){
     auto& p=*impl_;
-    if(p.practiceGear||p.hudOverlay){p.menu->Show();p.hud->Show();p.menuVisible=true;}
+    if(p.hudOverlay){p.menu->Show();p.hud->Hide();p.menuVisible=true;}
+    else if(p.practiceGear){p.menu->Show();p.hud->Show();p.menuVisible=true;}
     else{p.menu->Hide();p.hud->Show();p.menuVisible=false;}
     p.context->SetDimensions({width,height});
     p.context->SetDensityIndependentPixelRatio(std::clamp(std::min(width/1440.f,height/900.f),.72f,1.6f));

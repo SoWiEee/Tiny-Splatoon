@@ -165,12 +165,23 @@ void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::ve
     }
 }
 int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights) {
-    if(impl_->blobs.empty()&&ribbons()==0&&impl_->custom.empty()&&impl_->fadingWaves.empty())return 0;
-    GLint program,vao,buffer,srcRgb,dstRgb,srcAlpha,dstAlpha,activeTexture,oldDfg;GLboolean depth;
+    return DrawPass(view,projection,eye,lights,false);
+}
+int ProjectileRenderer::DrawShadow(const glm::dmat4& lightViewProjection,const CharacterLightState& lights) {
+    return DrawPass(glm::dmat4(1),lightViewProjection,glm::dvec3(0),lights,true);
+}
+int ProjectileRenderer::DrawPass(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,bool shadowOnly) {
+    if(shadowOnly){
+        const bool customCaster=std::any_of(impl_->custom.begin(),impl_->custom.end(),[](const auto& p){return p.kind=="arrow"||p.kind=="fist";});
+        if(impl_->blobs.empty()&&!customCaster)return 0;
+    }else if(impl_->blobs.empty()&&ribbons()==0&&impl_->custom.empty()&&impl_->fadingWaves.empty())return 0;
+    GLint program,vao,buffer,srcRgb,dstRgb,srcAlpha,dstAlpha,activeTexture,oldDfg,depthFunc;GLboolean depth;
     glGetIntegerv(GL_CURRENT_PROGRAM,&program);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&vao);glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&buffer);
     glGetIntegerv(GL_BLEND_SRC_RGB,&srcRgb);glGetIntegerv(GL_BLEND_DST_RGB,&dstRgb);glGetIntegerv(GL_BLEND_SRC_ALPHA,&srcAlpha);glGetIntegerv(GL_BLEND_DST_ALPHA,&dstAlpha);glGetBooleanv(GL_DEPTH_WRITEMASK,&depth);
+    glGetIntegerv(GL_DEPTH_FUNC,&depthFunc);
     glGetIntegerv(GL_ACTIVE_TEXTURE,&activeTexture);glActiveTexture(GL_TEXTURE6);glGetIntegerv(GL_TEXTURE_BINDING_2D,&oldDfg);glBindTexture(GL_TEXTURE_2D,impl_->dfg);
-    const bool blend=glIsEnabled(GL_BLEND),cull=glIsEnabled(GL_CULL_FACE);
+    const bool blend=glIsEnabled(GL_BLEND),cull=glIsEnabled(GL_CULL_FACE),depthTest=glIsEnabled(GL_DEPTH_TEST);
+    if(shadowOnly){glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LESS);glDisable(GL_BLEND);glDepthMask(GL_TRUE);}
     int draws=0;
     if(!impl_->blobs.empty()) {
         glDisable(GL_BLEND);glEnable(GL_CULL_FACE);glDepthMask(GL_TRUE);
@@ -200,6 +211,18 @@ int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection
         auto direction=p.kind=="arrow"?p.flightDir:p.vel;
         direction=glm::length(direction)>1e-8?glm::normalize(direction):glm::dvec3(0,0,1);
         const auto rotation=glm::mat4_cast(glm::rotation(glm::dvec3(0,0,1),direction));
+        if(shadowOnly){
+            if(p.kind=="arrow"){
+                const auto model=glm::translate(glm::dmat4(1),p.pos)*rotation;
+                drawPart("arrowInk",model,color);drawPart("arrowFletch",model,glm::dvec3(1));
+            }else if(p.kind=="fist"){
+                auto x=glm::cross(glm::dvec3(0,1,0),direction);x=glm::length(x)>1e-6?glm::normalize(x):glm::dvec3(1,0,0);const auto y=glm::normalize(glm::cross(direction,x));
+                const auto basis=glm::dmat4(glm::dmat3(x,y,direction));
+                const double grow=std::min(1.0,.45+p.age/.05*.55),wob=std::sin(p.age*46+p.seed*6)*.1,k=1.25*grow;
+                drawPart("fist",glm::translate(glm::dmat4(1),p.pos)*basis*glm::scale(glm::dmat4(1),glm::dvec3(k*(1+wob*.6),k*(1+wob*.6),k*(1-wob))),color);
+            }
+            continue;
+        }
         if(p.kind=="arrow") {
             const auto model=glm::translate(glm::dmat4(1),p.pos)*rotation;
             drawPart("arrowInk",model,color);drawPart("arrowFletch",model,glm::dvec3(1));
@@ -224,11 +247,11 @@ int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection
             }
         }
     }
-    for(const auto& fade:impl_->fadingWaves){
+    if(!shadowOnly)for(const auto& fade:impl_->fadingWaves){
         const double alpha=std::clamp(1-(impl_->gameTime-fade.started)/.14,0.0,1.0);
         drawWave(fade.wave.pos,fade.wave.vel,fade.wave.distance,fade.wave.age+(impl_->gameTime-fade.started),fade.wave.color,alpha);
     }
-    if(ribbons()) {
+    if(!shadowOnly&&ribbons()) {
         glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDisable(GL_CULL_FACE);glDepthMask(GL_FALSE);
         auto& shader=impl_->ribbonShader;shader.use();glBindVertexArray(impl_->ribbonVao);
         const auto draw=[&](const auto& ribbon){
@@ -241,8 +264,8 @@ int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection
         };
         for(const auto& beam:impl_->beams)draw(beam);for(const auto& sight:impl_->sights)draw(sight);
     }
-    glUseProgram(program);glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,buffer);glDepthMask(depth);glBlendFuncSeparate(srcRgb,dstRgb,srcAlpha,dstAlpha);
-    if(blend)glEnable(GL_BLEND);else glDisable(GL_BLEND);if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);
+    glUseProgram(program);glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,buffer);glDepthMask(depth);glDepthFunc(depthFunc);glBlendFuncSeparate(srcRgb,dstRgb,srcAlpha,dstAlpha);
+    if(blend)glEnable(GL_BLEND);else glDisable(GL_BLEND);if(cull)glEnable(GL_CULL_FACE);else glDisable(GL_CULL_FACE);if(depthTest)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);
     glActiveTexture(GL_TEXTURE6);glBindTexture(GL_TEXTURE_2D,oldDfg);glActiveTexture(activeTexture);
     return draws;
 }

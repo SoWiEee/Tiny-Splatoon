@@ -22,7 +22,7 @@ GLuint compile(GLenum type, const std::string& source) {
         std::string log(static_cast<std::size_t>(length), '\0');
         glGetShaderInfoLog(shader, length, nullptr, log.data());
         glDeleteShader(shader);
-        throw std::runtime_error("Source character shader compilation: " + log);
+        throw std::runtime_error(std::string("Source character ")+(type==GL_VERTEX_SHADER?"vertex":"fragment")+" shader compilation: "+log);
     }
     return shader;
 }
@@ -104,7 +104,13 @@ void main() {
 
 CharacterShader::~CharacterShader() {
     if (boneTexture_) glDeleteTextures(1, &boneTexture_);
-    if (program_) glDeleteProgram(program_);
+    if (program_) {
+        // A deleted current program must not escape into the next renderer's state guard.
+        GLint current = 0;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &current);
+        if (static_cast<GLuint>(current) == program_) glUseProgram(0);
+        glDeleteProgram(program_);
+    }
 }
 
 void CharacterShader::use() const { glUseProgram(program_); }

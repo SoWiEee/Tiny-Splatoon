@@ -13,7 +13,8 @@ struct CharacterLightState;
 // exported source GLSL and source base meshes.
 class WorldFxParticleRenderer {
 public:
-    explicit WorldFxParticleRenderer(std::filesystem::path assets = "assets/reference/worldfx-particles");
+    explicit WorldFxParticleRenderer(std::filesystem::path assets = "assets/reference/worldfx-particles",
+                                    std::filesystem::path bossAssets = "assets/reference/boss/shaders");
     ~WorldFxParticleRenderer();
     WorldFxParticleRenderer(const WorldFxParticleRenderer&) = delete;
     WorldFxParticleRenderer& operator=(const WorldFxParticleRenderer&) = delete;
@@ -28,8 +29,12 @@ public:
 
 private:
     struct Pool;
+    struct BossBlobPool;
     void initialize();
+    void initializeBossBlob();
     std::filesystem::path assets_;
+    std::filesystem::path bossAssets_;
     std::array<std::unique_ptr<Pool>, 6> pools_;
+    std::unique_ptr<BossBlobPool> bossBlobPool_;
 };
 }

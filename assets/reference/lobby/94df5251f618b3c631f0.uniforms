@@ -1,0 +1,23 @@
+alphaMapTransform 9 1 0 0 0 1 0 0 0 1
+alphaTest 1 0
+aoMapIntensity 1 1
+aoMapTransform 9 1 0 0 0 1 0 0 0 1
+diffuse 3 1.2 1.25 1.35
+envMapRotation 9 1 0 0 0 1 0 0 0 1
+fogColor 3 1 1 1
+fogDensity 1 0.00025
+fogFar 1 2000
+fogNear 1 1
+ior 1 1.5
+lightMapIntensity 1 1
+lightMapTransform 9 1 0 0 0 1 0 0 0 1
+mapTransform 9 1 0 0 0 1 0 0 0 1
+opacity 1 1
+reflectivity 1 1
+refractionRatio 1 0.98
+specularMapTransform 9 1 0 0 0 1 0 0 0 1
+toneMappingExposure 1 1
+uHzA 3 0.012 0.018 0.034
+uHzB 3 0.2 0.13 0.09
+uHzK 4 0.013 0.14 10 36
+uHzStart 1 6

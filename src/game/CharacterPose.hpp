@@ -166,7 +166,7 @@ public:
     CharacterPose& operator=(const CharacterPose&) = delete;
     void setWeapon(const std::string& weapon);
     void setSub(const std::string& sub);
-    void setDance(const std::string& dance);
+    void setDance(const std::string& dance,int variant=-1,double startTime=0.0);
     void setStyle(const CharacterStyle& style);
     void setHurt(double amount, glm::dvec3 enemyLinearColor);
     void setColor(glm::dvec3 linearColor);

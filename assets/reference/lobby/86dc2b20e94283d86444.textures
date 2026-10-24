@@ -1,0 +1,14 @@
+[
+  {
+    "uniform": "map",
+    "key": "mesh-0-map",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1008,
+      "magFilter": 1006,
+      "generateMipmaps": true
+    }
+  }
+]

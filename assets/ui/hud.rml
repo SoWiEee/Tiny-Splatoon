@@ -48,7 +48,7 @@
         <button id="practice-spawn">返回生點</button>
         <button id="practice-stage">更換場地</button>
       </div>
-      <button id="pause-settings">設定</button><button id="pause-howto">操作說明</button>
+      <button id="pause-howto">操作說明</button>
       <button id="return-menu">返回選單</button><button id="pause-close" class="quiet">離開遊戲</button>
     </div>
     <div id="leave-confirm" class="dialog leave-dialog hidden">

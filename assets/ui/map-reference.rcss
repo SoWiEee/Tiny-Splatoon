@@ -277,7 +277,7 @@
 #hud .jump-map-open .jump-map-legend { display: none; }
 
 /* Native renderer has no shadow-filter layers; use the existing solid borders. */
-#hud .minimap, #hud .map-target, #hud .map-pin-ground, #hud .map-actor-ally, #hud .map-actor-local, #hud .map-self-arrow em, #hud .map-base-icon em u { box-shadow: none; }
+#hud .minimap, #hud .map-target, #hud .map-target.queued, #hud .map-pin-ground, #hud .map-actor-ally, #hud .map-actor-local, #hud .map-self-arrow em, #hud .map-base-icon em u { box-shadow: none; }
 #hud .minimap-heading { flex-direction: row; }
 
 #hud .map-actor-tracked { transform: rotate(45deg); border-radius: 3dp; border: 2dp #ffffff; width: 14dp; height: 14dp; margin-left: -7dp; margin-top: -7dp; }

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "sourceHashes": {
+    "splat-ref/src/game/lobbySet.js": "5950d1615e3dedf4a8871400af761273518e3ed4289d4f5185655394e72fa673",
+    "splat-ref/src/game/lobbySet-geo.js": "c16a8cca227ef16b10e83cec1b50bc3aaa7e765dcbe878ab2713469c0864d117",
+    "splat-ref/src/game/lobbySet-mats.js": "8bcbdd73574ca4960197a08c0ba424543f55d0ac8121d301a083fdd64707a3cc",
+    "splat-ref/src/game/lobbySet-tex.js": "d58c52c3e195fcf8f5bb2ea65d0563e497bc1e51c75024c5c77fa64ff6e9f90a",
+    "splat-ref/src/world/texlib.js": "14d39c645a02f10be999412b6238632250ec93508a9329487db4505ca4e5c0dd",
+    "splat-ref/assets/fonts/TitanOne-latin.woff2": "f5f3f60e9246f7e78242697ef18f1fa78467dc4135312208b693e33678e78c4c",
+    "splat-ref/assets/fonts/Rubik-latin.woff2": "99ec7ccb40cf143f977c893649deece6cc2dcc7c0ff82ebf84b6584090f207ea"
+  },
+  "meshes": 18,
+  "textures": 24,
+  "shaderKeys": [
+    "03ce2aec51c438abef8c",
+    "0e49cf0a10a5f97ae747",
+    "1ab2bd6ddf01af3da2d8",
+    "3d0d0e09d12f4f7c0a38",
+    "4baa358415570b69cb8e",
+    "5ac717000e672c1c1186",
+    "5d25a13d650c15527314",
+    "61b004a08a588dec2f46",
+    "665f9da1d832dde6c12f",
+    "86dc2b20e94283d86444",
+    "94df5251f618b3c631f0",
+    "a4614d42683d26c19471",
+    "c3fd79e9be630e8f7813",
+    "c9de86c282a5afccb04d",
+    "ce359ef5e49a3b74e9e8",
+    "d13e809e4a9b34e347a7",
+    "d3c1ad183087cdda6b71",
+    "edea2f4edb9c64e5798b"
+  ],
+  "omitted": []
+}

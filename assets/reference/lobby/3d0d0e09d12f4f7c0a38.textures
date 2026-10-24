@@ -1,0 +1,62 @@
+[
+  {
+    "uniform": "tAlbedo",
+    "key": "mesh-6-tAlbedo",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1003,
+      "magFilter": 1003,
+      "generateMipmaps": false
+    }
+  },
+  {
+    "uniform": "tMask",
+    "key": "mesh-6-tMask",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1008,
+      "magFilter": 1006,
+      "generateMipmaps": true
+    }
+  },
+  {
+    "uniform": "tNormal",
+    "key": "mesh-6-tNormal",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1003,
+      "magFilter": 1003,
+      "generateMipmaps": false
+    }
+  },
+  {
+    "uniform": "tOrm",
+    "key": "mesh-6-tOrm",
+    "dynamic": false,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1003,
+      "magFilter": 1003,
+      "generateMipmaps": false
+    }
+  },
+  {
+    "uniform": "tRefl",
+    "key": "mesh-6-tRefl",
+    "dynamic": true,
+    "sampler": {
+      "wrapS": 1001,
+      "wrapT": 1001,
+      "minFilter": 1008,
+      "magFilter": 1006,
+      "generateMipmaps": true
+    }
+  }
+]

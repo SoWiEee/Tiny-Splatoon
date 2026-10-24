@@ -216,7 +216,9 @@ void DeviceRenderer::Update(double dt,const CombatWorld& world,glm::dvec3 eye){
             // Cosmetic RNG stays separate from gameplay and is stable for a network device ID.
             std::uint32_t seed=static_cast<std::uint32_t>(d.id^(d.id>>32))^0x6d2b79f5u;
             const auto random=[&](){seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return double(seed)/4294967296.;};
-            m.rateX=d.kind=="bomb"?random()*8:d.kind=="shaker"?4+random()*5:3+random()*6;m.rateZ=d.kind=="bomb"?random()*8:d.kind=="shaker"?3+random()*5:3+random()*6;
+            // Source subs.js assigns each thrown prop independent 3..9 rad/s X/Z rates;
+            // shaker.js supplies its own 4..9 / 3..8 rates.
+            m.rateX=d.kind=="shaker"?4+random()*5:3+random()*6;m.rateZ=d.kind=="shaker"?3+random()*5:3+random()*6;
             if(d.kind=="shaker"){m.tumbleX=random()*6;m.tumbleY=random()*6;m.tumble=glm::quat_cast(rotate(glm::dmat4(1),m.tumbleX,m.tumbleY,0));}m.rng=seed;
         }
         if(d.kind=="shaker"&&d.grounded&&d.held){
@@ -226,8 +228,7 @@ void DeviceRenderer::Update(double dt,const CombatWorld& world,glm::dvec3 eye){
             const auto random=[&](){m.rng^=m.rng<<13;m.rng^=m.rng>>17;m.rng^=m.rng<<5;return double(m.rng)/4294967296.;};
             const double amount=.05+.1*progress;m.rattleX=(random()*2-1)*amount;m.rattleZ=(random()*2-1)*amount;
         }else if(d.state=="fly"){
-            const double speed=d.kind=="bomb"&&d.fuse>=0?.2:1;
-            m.tumbleX+=impl_->dt*m.rateX*speed;m.tumbleZ+=impl_->dt*m.rateZ*speed;
+            m.tumbleX+=impl_->dt*m.rateX;m.tumbleZ+=impl_->dt*m.rateZ;
             if(d.kind=="shaker")m.tumble=glm::quat_cast(rotate(glm::dmat4(1),m.tumbleX,m.tumbleY,m.tumbleZ));
         }
         if(d.kind=="tracer"){

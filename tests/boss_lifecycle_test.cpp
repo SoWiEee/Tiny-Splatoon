@@ -61,6 +61,19 @@ int main() {
         require(poseUpdates == 2 && std::abs(lastBossClock - 1.0 / 60.0) < 1e-9,
             "Boss CPU pose must publish once after each fixed simulation update");
 
+        auto movement = makeMatch(stage, geometry, paint, nav, 180, 1);
+        movement.startPlaying();
+        for (int frame = 0; frame < 200; ++frame) movement.tick(0.1);
+        int crowdedGoalPairs = 0;
+        for (std::size_t i = 0; i < movement.bots().size(); ++i) for (std::size_t j = i + 1; j < movement.bots().size(); ++j) {
+            const auto& a = *movement.bots()[i]; const auto& b = *movement.bots()[j];
+            if (!a.actor().state.alive || !b.actor().state.alive || a.goal() < 0 || b.goal() < 0) continue;
+            const auto& ga = nav.nodes()[a.goal()]; const auto& gb = nav.nodes()[b.goal()];
+            if (std::hypot(ga.x - gb.x, ga.z - gb.z) < 4.0) ++crowdedGoalPairs;
+        }
+        require(crowdedGoalPairs<=1,
+            "Tidewater Boss bots must not crowd multiple navigation goals into the same center flank");
+
         // The maximum accepted simulation step keeps this lifecycle check quick
         // while still traversing the actual match timeout and finish branches.
         loss.startPlaying();

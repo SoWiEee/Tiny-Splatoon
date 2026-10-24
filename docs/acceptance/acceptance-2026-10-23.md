@@ -101,3 +101,15 @@
 - Impeccable 分別對選單與本次 Zones 範圍進行一次 detector；僅回報使用者指定 Inter 的 overused-font 警告（選單 2、HUD 6），保留指定字體。鎖定的 splat-ref 與 baseline 未修改；未重跑未受本次 UI 變更影響的完整套件。
 
 - 實際 Zones 擷取發現 RmlUi 不接受 `font-variant-numeric`／`border-style`，移除無效宣告並補跑 UI 確認（1/1，11.27 秒，`v085-zones-style-confirm.log`）；採既有 border 寬度／顏色，沒有加入瀏覽器專用 CSS。
+
+
+## v0.8.6 先行發布與未通過項目（2026-10-24）
+
+- 依使用者最新指示停止本輪修正，先 commit／push 並發布 v0.8.6；以下保留實際失敗，不宣稱全綠或完整還原。
+- Release 遊戲及受影響目標建置成功（`build/logs/v086-latest-build.log`、`v086-boss-ui-build.log`）；包含正式執行檔與最新部署資產。18 項回歸 16 項通過，75.81 秒（`v086-latest-acceptance.log`）：GNS 兩／三客戶、角色展示、大廳 CPU／GPU／FX、控制器、裝置／投射物 GPU、Boss 生命週期、AI、特殊控制、World FX oracle、角色姿勢／變體及 pose bridge。
+- World FX GPU 補驗通過，8.25 秒（`v086-boss-worldfx-ui-confirm.log`）：小螃蟹來源低面數 physical 材質修正 interleaved mesh 及 DFG LUT 綁定；HDR 真實燈光下確認可見像素與有限數值。共用 CharacterShader 解構先解除自身仍在使用的 program，修正後製 program 被刪除後跨渲染器還原失效 ID 的 GL 錯誤。
+- 部署目錄 `build/` 不含 splat-ref，從該目錄以 `lobby_visual_gpu_test.exe . captures/lobby-staged` 完成大廳原生場景／UI 擷取；檢視 1280×720 畫面，來源光影、八人角色與暖紙色 UI 正常。既有大廳 GPU 測試含 720p／1080p、反射／陰影開關及泳跡像素斷言。
+- Boss GPU 未通過：自然模擬仍未選到合法 Charge（`alive=1,target=0,clock=125.25,moves=2`），尚待建立 source-valid 跑道／朝向前置條件；不能據此宣稱六類招式已驗收完成。
+- UI 首次因新加 Kelpline 選單測試誤讀 select 本體的 InnerRML 失敗，改讀實際 option 後繼續；其後舊復活 fixture 未進入 Playing，再隔離調整。最新執行仍在結果獎章 `塗地之王／擊倒之星` 斷言失敗（`v086-ui-phase-confirm.log`，15.18 秒）；暫停全按鈕測試位於後段，尚未完成執行。程式已移除局內設定、操作說明隱藏整份 HUD、返回主選單清除暫停／確認層，仍需下一輪完整補驗。
+- 玩家 Shift 回歸尚未通過（`v086-player-override-confirm.log`，2.85 秒）：格柵測試、chargerDive 墨量及己墨牆面落地斷言仍存在差異。乾地／敵墨維持人形為使用者明確指定的來源差異，但目前未完成相關 fixture 與實作的最終判定。
+- 未重跑完整測試套件；Bot 自主隊友超級跳躍仍保留待辦，Kelpline／海帶線貨運站已提供三模式。未修改鎖定的 splat-ref 或 baseline。發布後不追蹤 GitHub CI 進度。

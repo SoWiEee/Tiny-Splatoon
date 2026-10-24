@@ -1,0 +1,44 @@
+alphaMapTransform 9 1 0 0 0 1 0 0 0 1
+alphaTest 1 0
+aoMapIntensity 1 1
+aoMapTransform 9 1 0 0 0 1 0 0 0 1
+bumpMapTransform 9 1 0 0 0 1 0 0 0 1
+bumpScale 1 1
+diffuse 3 1 1 1
+displacementBias 1 0
+displacementMapTransform 9 1 0 0 0 1 0 0 0 1
+displacementScale 1 1
+emissive 3 0 0 0
+emissiveMapTransform 9 1 0 0 0 1 0 0 0 1
+envMapIntensity 1 0.55
+envMapRotation 9 1 0 0 0 1 0 0 0 1
+fogColor 3 1 1 1
+fogDensity 1 0.00025
+fogFar 1 2000
+fogNear 1 1
+ior 1 1.5
+lightMapIntensity 1 1
+lightMapTransform 9 1 0 0 0 1 0 0 0 1
+mapTransform 9 1 0 0 0 1 0 0 0 1
+metalness 1 0
+metalnessMapTransform 9 1 0 0 0 1 0 0 0 1
+normalMapTransform 9 1 0 0 0 1 0 0 0 1
+normalScale 2 1 1
+opacity 1 1
+probesMax 3 0 0 0
+probesMin 3 0 0 0
+probesResolution 3 0 0 0
+reflectivity 1 1
+refractionRatio 1 0.98
+roughness 1 1
+roughnessMapTransform 9 1 0 0 0 1 0 0 0 1
+toneMappingExposure 1 1
+uHzA 3 0.012 0.018 0.034
+uHzB 3 0.2 0.13 0.09
+uHzK 4 0.013 0.14 10 36
+uHzStart 1 6
+uTeamA 3 1 0.2541520943200296 0.0069954101845983935
+uTeamB 3 0.028426039499072558 0.10461648408208657 1
+uTime 1 0
+uTL 48 0 0.25 1 7 9 0.5 1 1 18 0.4166666666666667 2 7 0 0.25 1 7 5 0.5 1 3 6 0.4166666666666667 0 0 7 0.5 0 0 19 0.8928571428571428 1 1 12 0.4464285714285714 1 1 8 0.8333333333333334 1 3 10 0.5 2 7 3 0.5 2 7
+uTLt 48 -1 0 0 0 1 1 0 0 2 0.9 0 0 1 0.8 0 0 1 0.8 0 0 1 1 0 0 1 0.8 0 0 2 0.9 0 0 0 1 0 0 0 0.7 0 0 1 0.7 0 0 1 0.9 0 0
