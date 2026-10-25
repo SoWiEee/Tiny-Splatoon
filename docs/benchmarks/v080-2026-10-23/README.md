@@ -10,4 +10,4 @@ GTX 1650 Max-Q／1920×1080／低畫質，暖機 30 幀、量測 120 幀，固�
 .\build\Tiny-Splatoon.exe --reference-match tidewater --benchmark-camera player --benchmark-warmup 30 --benchmark-frames 120 --graphics-quality low --width 1920 --height 1080 --benchmark-report build/v080-player-low.json
 ```
 
-這是短時間固定負載的整合檢查，不是全圖／全畫質／最壞視效 QA-12，也不代表最低 FPS 穩定超過 60。其他品質沿用既有選項。
+這是短時間固定負載的整合檢查，不含全地圖／全畫質／最壞視效矩陣，也不代表最低 FPS 穩定超過 60。其他品質沿用既有選項。

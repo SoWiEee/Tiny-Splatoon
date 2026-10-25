@@ -69,7 +69,7 @@ private:
     std::vector<WorldVisualEvent> lastEvents_;
     struct ActorState { glm::dvec3 pos{0}; double hp=100,charge=0,step=0,born=0,climbEnd=-9,wakeTimer=0; bool initialized=false,alive=true,squid=false,swimming=false,climbing=false,grounded=false,footsteps=false; std::string special,phase; };
     std::unordered_map<const void*,ActorState> actors_;
-    struct WeaponFxState { double drip=0,spark=0,spin=0,dryT=-9,flickT=-9,dodgeTime=0; int shotsFired=-1; bool full=false,spinFull=false; };
+    struct WeaponFxState { double drip=0,spark=0,spin=0,dryT=-9,flickT=-9,dodgeTime=0; int shotsFired=-1; bool full=false,spinFull=false,burstFiring=false; };
     std::unordered_map<const void*,WeaponFxState> weaponActors_;
     struct KitFxActorState { int mittsLeapEvents=-1; bool mittsLeaping=false,mittsWasClimbing=false; double mittsLandTime=99.0,canopyHp=-1.0; std::string canopyState; glm::dvec3 canopyCenter{0},canopyNormal{0,0,1},mittsWallNormal{0,0,1}; };
     std::unordered_map<const PlayerSimulation*,KitFxActorState> kitActors_;

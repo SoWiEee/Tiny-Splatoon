@@ -44,7 +44,7 @@ int main(int argc,char** argv) {
         ShooterProjectile otherKind=inkShot;otherKind.kind="blast";
         const std::vector<ShooterProjectile> inkShots{inkShot,otherShot,otherKind};
         std::vector<ProjectileBlob> filtered;BuildProjectileBlobs(inkShots,filtered,false);
-        if(filtered.size()!=2)throw std::runtime_error("Shooter filter must skip only regular shooter shots");
+        if(filtered.size()!=1)throw std::runtime_error("Native shot/stream must bypass the source blob builder");
         std::vector<ProjectileBlob> inkA,inkB;AppendShooterInkBlobs(inkShots,inkA);AppendShooterInkBlobs(inkShots,inkB);
         if(inkA.size()!=2||inkA.size()!=inkB.size()||inkA.size()>4)throw std::runtime_error("Shooter ink blob count or filter mismatch");
         for(std::size_t blobIndex=0;blobIndex<inkA.size();blobIndex++) {

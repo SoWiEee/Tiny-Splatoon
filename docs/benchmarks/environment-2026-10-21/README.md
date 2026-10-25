@@ -1,6 +1,6 @@
 # Player-view graphics quality measurements
 
-2026-10-21, MSVC x64 Release, NVIDIA GTX 1650 Max-Q / 591.74, Intel i7-1280P, OpenGL 4.5. Every run uses 1920x1080 output, a real FollowCamera and native-resolution RmlUi HUD, seed 1, eight actors, fixed 60 Hz simulation and vsync off. Runs are serialized without browser exporters or other GPU tests. Each measures 600 frames after Turf 120 / Boss 480 warmup frames; completed-frame FPS includes the final GPU query.
+2026-10-21, MSVC x64 Release, NVIDIA GTX 1650 Max-Q / 591.74, Intel i7-1280P, OpenGL 4.5. Every run uses 1920x1080 output, a real FollowCamera and native-resolution RmlUi HUD, seed 1, eight actors, fixed 60 Hz simulation and vsync off. Runs are serialized with other GPU tests inactive. Each measures 600 frames after Turf 120 / Boss 480 warmup frames; completed-frame FPS includes the final GPU query.
 
 | Mode | Quality | FPS | GPU mean / p95 ms | Mean draws | Mean particles | Peak working set MiB |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -13,7 +13,7 @@
 
 Low uses 65% internal scene resolution with shadows, reflections and optional post effects disabled. Medium uses 85%, 1024 shadows, no reflection and AO/bloom/screen effects. High uses 100%, 2048 shadows, marina reflections and post effects. HUD text remains at full output resolution. Individual overrides are available from the menu and apply on the next match. Settings currently live only for this app session.
 
-Low exceeds the 60 FPS target in these two measured cases; Medium and High do not. This is evidence for selectable quality on this device, not full QA-12 acceptance or a promise for other machines. These short fixed-seed runs do not cover every map, long-session memory behaviour, all simultaneous specials, reduced-motion combinations or browser pixel parity. qa12_claim remains false. The earlier pre-environment overview reports are not comparable to this player-view workload.
+Low exceeds the 60 FPS target in these two measured cases; Medium and High do not. This is evidence for selectable quality on this device, not the complete performance matrix or a promise for other machines. These short fixed-seed runs do not cover every map, long-session memory behaviour, all simultaneous specials, reduced-motion combinations or browser pixel parity. The earlier pre-environment overview reports are not comparable to this player-view workload.
 
 A preliminary full-quality player-view run measured 19.84 FPS before the shadow fragment path skipped PBR lighting after source alpha clipping. Its diagnostic artifact is retained only under build/. The six final reports above include that optimization and the final quality controls. Raw JSON and per-frame CSV files are committed alongside this note.
 

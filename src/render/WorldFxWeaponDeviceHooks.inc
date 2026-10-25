@@ -54,10 +54,19 @@ void WorldEffects::weaponDeviceHooks(double dt,CombatWorld& combat,glm::dvec3 ca
             state.flickT=time_;
             const auto at=player.pos+glm::dvec3(0,1.05,0);
             const glm::dvec3 forward(std::sin(player.yaw),0,std::cos(player.yaw));
-            emit("flickCurtain",at,forward,actor->team(),weapon.number("flickSpreadDeg",50),{},forward);
+            WorldFxRecipeContext context;context.factor=id=="brush"?.6:1.0;context.speed=weapon.number(id=="bucket"?"throwSpeed":id=="brush"?"swipeSpeed":"flickSpeed",15);
+            auto seed=static_cast<std::uint32_t>(shots)*0x9e3779b9u^actor->networkNid()^static_cast<std::uint32_t>(std::abs(at.x*997+at.z*313));if(!seed)seed=0x6d2b79f5u;
+            auto particles=BuildWorldFxRecipe(id=="bucket"?"inkSlosh":"inkFlick",at,forward,ink(actor->team()),1,seed,-1.6,camera,{},context,glm::normalize(aim+glm::dvec3(0,id=="bucket"?.22:.10,0)));
+            for(auto& particle:particles)spawn(std::move(particle));
         }
 
         const auto pose=actor->combatPose();
+        if((id=="bucket"||id=="roller"||id=="brush")&&pose.firing&&!pose.rolling&&!state.burstFiring&&fireEvents==0&&near(player.pos,34)){
+            auto seed=std::uint32_t(shots+1)*0x85ebca6bu;if(!seed)seed=1;
+            auto particles=BuildWorldFxRecipe("inkAnticipation",actor->muzzle(),aim,ink(actor->team()),1,seed,-1.6,camera,{}, {},aim);
+            for(auto& particle:particles)spawn(std::move(particle));
+        }
+        state.burstFiring=pose.firing;
         if(weapon.kind=="twins"){
             const glm::dvec3 horizontal(player.vel.x,0,player.vel.z);
             const auto forward=glm::length2(horizontal)>1e-8?glm::normalize(horizontal):glm::dvec3(std::sin(player.yaw),0,std::cos(player.yaw));

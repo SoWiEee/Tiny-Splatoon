@@ -1,6 +1,6 @@
 # Player UI direction
 
-Confirmed by the user on 2026-10-23: replace the previous minimal menu direction with a bold, source-inspired game interface. The native UI should feel like a lively lobby: warm paper panels, dark ink outlines, punchy orange actions, cobalt-blue secondary actions, and clear team-color accents. Preserve the existing gameplay and menu behavior in `spec.md` and `PRODUCT.md`.
+Confirmed by the user on 2026-10-23: replace the previous minimal menu direction with a bold, source-inspired game interface. The native UI should feel like a lively lobby: warm paper panels, dark ink outlines, punchy orange actions, cobalt-blue secondary actions, and clear team-color accents. Preserve the existing gameplay and menu behavior in `docs/spec.md` and `PRODUCT.md`.
 
 Use flat, high-contrast surfaces with confident type and compact, deliberate rules. Keep the character preview lane visible at the right of the menu. Give navigation, tabs, selected modes, buttons, inputs, and checkboxes distinct hover, pressed, selected, disabled, and keyboard-focus states. Keep focus visible without relying on color alone; use a strong border and fill change. Use short color transitions only, and honor the reduced-motion setting where the application already applies it.
 

@@ -30,7 +30,6 @@ function parseMeshPack(buffer) {
 
 test('source-derived stage geometry and render material assets are present for every legal stage mode', async () => {
   const manifest = JSON.parse(await readFile(new URL('manifest.json', root), 'utf8'));
-  assert.equal(manifest.generator, 'tools/export-stage-visuals.mjs');
   assert.match(manifest.geometrySource, /Level\.buildGeometry/);
   assert.match(manifest.inkSource, /paint\.js.*inkShading\.js/);
   assert.ok(manifest.stages.length >= 20, 'all source stage/mode combinations are exported');

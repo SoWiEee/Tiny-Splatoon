@@ -842,8 +842,8 @@ void CombatWorld::tick(double dt) {
         bool done=blockCanopyShot(prev,p.pos,owner.team(),p.damage,&p);
         if(!done) done=specials_.shotHit(prev,p.pos,owner.team(),p.damage,&owner);
         const auto path=p.pos-prev;const double distance=glm::length(path);
-        const bool shooterInk=p.kind=="shot"&&p.weaponId=="shooter";
-        const auto& impactSource=shooterInk?p.weaponId:p.kind;
+        const bool nativeInk=(p.kind=="shot"&&p.weaponId=="shooter")||(p.kind=="slosh"&&p.weaponId=="bucket")||(p.kind=="drop"&&(p.weaponId=="roller"||p.weaponId=="brush"));
+        const auto& impactSource=nativeInk?p.weaponId:p.kind;
         for(auto* e:actors_) {
             if(done)break;
             if (!e) continue;
@@ -861,7 +861,7 @@ void CombatWorld::tick(double dt) {
             }
             if(p.belowFalloff) dmg*=1-std::clamp((p.start.y-(e->state.pos.y+0.8)-0.5)*p.belowFalloff,0.0,p.belowFalloffMax);
             applyHit(owner,*e,dmg,p.weaponId);
-            if(p.kind!="blast")emitVisual({"bulletImpact",at,(shooterInk?-path:path)/(distance>1e-9?distance:1.0),p.radius,owner.team(),0,.08,shooterInk?p.seed:0.0,impactSource,p.id});
+            if(p.kind!="blast")emitVisual({"bulletImpact",at,(nativeInk?-path:path)/(distance>1e-9?distance:1.0),p.radius,owner.team(),0,.08,nativeInk?p.seed:0.0,impactSource,p.id});
             if(p.kind=="blast") {const auto& w=owner.weapon();burst(owner,at,w.number("splashRadius"),w.number("splashDamageMax"),w.number("splashDamageMin"),w.number("impactRadius"),p.weaponId,e,p.special);}
             done=true;break;
         }
@@ -880,7 +880,7 @@ void CombatWorld::tick(double dt) {
                         if(p.kind=="drop")amount+=(p.damageFar-amount)*std::clamp(glm::length(p.start-bossHit->point)/7.0,0.0,1.0);
                         boss_->hit(owner,amount,*bossHit,p.weaponId);
                     }
-                    if(p.kind!="blast")emitVisual({"bulletImpact",bossHit->point,(shooterInk?-path:path)/(distance>1e-9?distance:1.0),p.radius,owner.team(),0,.08,shooterInk?p.seed:0.0,impactSource,p.id});
+                    if(p.kind!="blast")emitVisual({"bulletImpact",bossHit->point,(nativeInk?-path:path)/(distance>1e-9?distance:1.0),p.radius,owner.team(),0,.08,nativeInk?p.seed:0.0,impactSource,p.id});
                     if(p.kind=="blast"){
                         const auto& w=owner.weapon();
                         burst(owner,bossHit->point,w.number("splashRadius"),w.number("splashDamageMax"),w.number("splashDamageMin"),w.number("impactRadius"),p.weaponId,nullptr,p.special,true);
@@ -894,7 +894,7 @@ void CombatWorld::tick(double dt) {
             if(hit.hit) {
                 SplatOptions options;options.stretch=glm::normalize(p.vel);options.hasStretch=true;options.stretchAmt=0.7;
                 paint(owner,hit.point+hit.normal*0.14,p.radius*(0.85+owner.random()*0.3),p.seed,options,p.special);
-                emitVisual({"bulletImpact",hit.point,hit.normal,p.radius,owner.team(),0,.08,shooterInk?p.seed:0.0,impactSource,p.id});
+                emitVisual({"bulletImpact",hit.point,hit.normal,p.radius,owner.team(),0,.08,nativeInk?p.seed:0.0,impactSource,p.id});
                 if(p.kind=="blast") {const auto& w=owner.weapon();burst(owner,hit.point,w.number("splashRadius"),w.number("splashDamageMax"),w.number("splashDamageMin"),w.number("impactRadius"),p.weaponId,nullptr,p.special);}
                 done=true;
             }

@@ -1,5 +1,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "ProjectileRenderer.hpp"
+#include "InkStreamRenderer.hpp"
 #include "TeamPalette.hpp"
 #include "CharacterShader.hpp"
 #include "CharacterRenderData.hpp"
@@ -35,6 +36,8 @@ struct ProjectileRenderer::Impl {
     GLuint vao=0,inkVao=0,vertex=0,index=0,instance=0,ribbonVao=0,ribbonVertex=0,dfg=0;
     GLsizei indexCount=0;
     std::vector<ProjectileBlob> blobs;
+    InkStream stream;
+    std::unique_ptr<InkStreamRenderer> streamRenderer;
     std::size_t legacyCount=0;
     std::vector<Ribbon> beams,sights;
     std::vector<ShooterProjectile> custom;
@@ -48,6 +51,7 @@ struct ProjectileRenderer::Impl {
        ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),
        inkShader(CharacterShader::readSource(assets.parent_path().parent_path()/"shaders/ink-shot/shot.vert"),
                  CharacterShader::readSource(assets.parent_path().parent_path()/"shaders/ink-shot/shot.frag"),true),assets(assets),environment(environment) {
+        streamRenderer=std::make_unique<InkStreamRenderer>(assets.parent_path().parent_path()/"shaders/ink-stream");
         std::ifstream file(assets/"blob.bin",std::ios::binary);
         char magic[8]{};std::uint32_t vertices=0,indices=0;
         file.read(magic,8);file.read(reinterpret_cast<char*>(&vertices),4);file.read(reinterpret_cast<char*>(&indices),4);
@@ -134,9 +138,24 @@ const std::vector<ProjectileBlob>& ProjectileRenderer::blobs()const{return impl_
 std::size_t ProjectileRenderer::ribbons()const{return impl_->beams.size()+impl_->sights.size();}
 void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::vector<WorldVisualEvent>& events) {
     const double now=world.time();
-    if(impl_->timeInitialized&&now<impl_->gameTime){impl_->waves.clear();impl_->fadingWaves.clear();impl_->beams.clear();}
+    if(impl_->timeInitialized&&now<impl_->gameTime){impl_->waves.clear();impl_->fadingWaves.clear();impl_->beams.clear();impl_->stream.Clear();}
     impl_->gameTime=now;impl_->timeInitialized=true;
     const auto& shots=world.projectiles();
+    std::vector<InkStreamEmitter> emitters;
+    for(const auto* actor:world.actors()){
+        if(!actor||!actor->state.alive||actor->state.squid||actor->mainId()!="spinner"||!actor->combatPose().streaming)continue;
+        const ShooterProjectile* newest=nullptr;
+        for(const auto& shot:shots)if(shot.owner==actor&&shot.weaponId=="spinner"&&shot.kind=="shot"&&(!newest||shot.age<newest->age))newest=&shot;
+        const auto& weapon=actor->weapon();
+        InkStreamEmitter emitter;emitter.id=actor->networkNid()?actor->networkNid():reinterpret_cast<std::uintptr_t>(actor);emitter.active=true;emitter.team=actor->team();
+        emitter.position=actor->muzzle();emitter.velocity=newest?newest->vel:actor->aimDirection()*weapon.number("speedMax",40);
+        const double speed=glm::length(emitter.velocity),power=std::clamp((speed-weapon.number("speedMin",25))/std::max(1.0,weapon.number("speedMax",40)-weapon.number("speedMin",25)),0.0,1.0);
+        emitter.straight=newest?newest->straight:.12;emitter.gravity=newest?newest->gravity:28;emitter.drag=newest?newest->drag:.8;
+        emitter.life=std::clamp((weapon.number("rangeMin",10)+(weapon.number("rangeMax",21)-weapon.number("rangeMin",10))*power)/std::max(1.0,speed),.15,.7);
+        emitter.seed=.37;emitter.radius=.10;emitters.push_back(emitter);
+    }
+    impl_->stream.Update(dt,emitters,world.geometry());
+    impl_->streamRenderer->Update(impl_->stream.pieces(),impl_->stream.drops());
     BuildProjectileBlobs(shots,impl_->blobs,false);
     impl_->legacyCount=impl_->blobs.size();
     AppendShooterInkBlobs(shots,impl_->blobs);
@@ -185,8 +204,8 @@ int ProjectileRenderer::DrawShadow(const glm::dmat4& lightViewProjection,const C
 int ProjectileRenderer::DrawPass(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,bool shadowOnly) {
     if(shadowOnly){
         const bool customCaster=std::any_of(impl_->custom.begin(),impl_->custom.end(),[](const auto& p){return p.kind=="arrow"||p.kind=="fist";});
-        if(impl_->blobs.empty()&&!customCaster)return 0;
-    }else if(impl_->blobs.empty()&&ribbons()==0&&impl_->custom.empty()&&impl_->fadingWaves.empty())return 0;
+        if(impl_->blobs.empty()&&impl_->stream.pieces().empty()&&impl_->stream.drops().empty()&&!customCaster)return 0;
+    }else if(impl_->blobs.empty()&&impl_->stream.pieces().empty()&&impl_->stream.drops().empty()&&ribbons()==0&&impl_->custom.empty()&&impl_->fadingWaves.empty())return 0;
     GLint program,vao,buffer,srcRgb,dstRgb,srcAlpha,dstAlpha,activeTexture,oldDfg,depthFunc,viewport[4];GLboolean depth;
     glGetIntegerv(GL_CURRENT_PROGRAM,&program);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&vao);glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&buffer);
     glGetIntegerv(GL_BLEND_SRC_RGB,&srcRgb);glGetIntegerv(GL_BLEND_DST_RGB,&dstRgb);glGetIntegerv(GL_BLEND_SRC_ALPHA,&srcAlpha);glGetIntegerv(GL_BLEND_DST_ALPHA,&dstAlpha);glGetBooleanv(GL_DEPTH_WRITEMASK,&depth);
@@ -195,7 +214,7 @@ int ProjectileRenderer::DrawPass(const glm::dmat4& view,const glm::dmat4& projec
     glGetIntegerv(GL_ACTIVE_TEXTURE,&activeTexture);glActiveTexture(GL_TEXTURE6);glGetIntegerv(GL_TEXTURE_BINDING_2D,&oldDfg);glBindTexture(GL_TEXTURE_2D,impl_->dfg);
     const bool blend=glIsEnabled(GL_BLEND),cull=glIsEnabled(GL_CULL_FACE),depthTest=glIsEnabled(GL_DEPTH_TEST);
     if(shadowOnly){glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LESS);glDisable(GL_BLEND);glDepthMask(GL_TRUE);}
-    int draws=0;
+    int draws=impl_->streamRenderer->Draw(view,projection,eye,lights,InkStreamMode::Tube,shadowOnly);
     if(!impl_->blobs.empty()) {
         glDisable(GL_BLEND);glEnable(GL_CULL_FACE);glDepthMask(GL_TRUE);
         glBindVertexArray(impl_->vao);glBindBuffer(GL_ARRAY_BUFFER,impl_->instance);

@@ -1,6 +1,6 @@
 # Live Turf 診斷效能紀錄 — 2026-10-20
 
-這份紀錄對應清理前的 commit `250e599`，來源／執行檔雜湊保留作為該次量測紀錄；後續入口整併沒有重跑此七圖正式量測。這份紀錄只驗收當次原生 Turf 模組場景。`qa12_claim=false`；未包含最終環境、陰影、後製、projectile meshes、particles、特殊 world props／視效與 Boss。不能把結果外推為完成版 1080p high 的 QA-12 通過。
+這份紀錄對應清理前的 commit `250e599`，來源／執行檔雜湊保留作為該次量測紀錄；後續入口整併沒有重跑此七圖正式量測。這份紀錄只涵蓋當次原生 Turf 模組場景，未包含最終環境、陰影、後製、投射物網格、粒子、特殊物件視效與 Boss。不能把結果外推為完成版 1080p 高畫質效能通過。
 
 Release／MSVC x64，OpenGL 4.5，1920×1080，VSync off，固定 seed 1／60 Hz simulation。每圖 120 warmup + 600 measured frames，每幀執行 MatchSimulation、八名 live actor／CharacterPose 及來源角色 mesh／現有地形與墨渲染；body 固定 game tier，使用固定 overview camera，略過互動 HUD。量測時沒有同時執行編譯或測試。
 

@@ -12,7 +12,7 @@
 ![CMake](https://img.shields.io/badge/Build-CMake-064F8C?style=flat-square&logo=cmake&logoColor=white)
 [![Windows / Linux Build](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml/badge.svg)](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml)
 
-[下載遊戲](https://github.com/SoWiEee/Tiny-Splatoon/releases/latest) · [還原進度](docs/restoration-progress.md) · [工程規格](spec.md) · [Old Demo](https://youtu.be/rS_o25PM3hM)
+[下載遊戲](https://github.com/SoWiEee/Tiny-Splatoon/releases/latest) · [還原進度](docs/restoration-progress.md) · [目前實作規格](docs/spec.md) · [Old Demo](https://youtu.be/rS_o25PM3hM)
 
 <sub>Old Demo 為原始期末專案影片；以下截圖為目前原生版本。</sub>
 
@@ -36,7 +36,7 @@
 ![區域爭奪遊戲畫面](docs/images/zones.png)
 *v0.8.7 Zones 計數、控制區與小地圖。*
 
-一般建置、遊玩及原生 fixture 驗證不需要 `splat-ref/`；來源重匯出為可選工具。完整還原仍在進行，原生多人目前以指定服務位址及房碼連線。已完成範圍與差異請見[還原進度](docs/restoration-progress.md)及[待辦清單](docs/next-round-backlog.md)。
+一般建置、遊玩及原生 fixture 驗證不需要 `splat-ref/`。完整還原仍在進行，原生多人目前以指定服務位址及房碼連線。已完成範圍與待驗收限制見[還原進度](docs/restoration-progress.md)。
 
 ## 🛠️ Build & Run
 
@@ -55,7 +55,7 @@ cmake --build build --parallel 4
 
 Ubuntu 22.04 x64 的建置、套件安裝與執行步驟見[開發與驗證指引](docs/development.md#linux-ubuntu-2204-x64)。
 
-[開發與驗證指引](docs/development.md) · [套件相依](vcpkg.json) · [玩家保存與設定](docs/save-player-flow.md)
+[開發與驗證指引](docs/development.md) · [套件相依](vcpkg.json) · [玩法與玩家流程契約](docs/contracts/gameplay-player-flow.md)
 
 多人遊玩：進入「線上遊玩」，在「伺服器設定」啟動本機服務，再建立房間。其他玩家使用相同服務位址及房碼加入；同機測試預設為 `127.0.0.1:27020`。區網需另外啟動服務並綁定可連線的區網 IP：
 
@@ -63,7 +63,7 @@ Ubuntu 22.04 x64 的建置、套件安裝與執行步驟見[開發與驗證指�
 .\build\Tiny-Splatoon-Server.exe --bind 192.168.1.10 --port 27020
 ```
 
-請將範例 IP 換成服務電腦的實際位址。房間服務獨立於房主程序，房主離線後可由下一位玩家接手；跨網部署及 NAT 穿透尚未提供。詳見[多人連線契約](docs/contracts/network-source-contract.md)。
+請將範例 IP 換成服務電腦的實際位址。房間服務獨立於房主程序，房主離線後可由下一位玩家接手；跨網部署及 NAT 穿透尚未提供。詳見[多人連線契約](docs/contracts/network.md)。
 
 ## ⌨️ Controls
 
@@ -85,7 +85,7 @@ ctest --test-dir build -C Release --output-on-failure
 .\build\Tiny-Splatoon.exe --reference-zones tidewater
 ```
 
-[擷取、效能與來源對照](docs/development.md) · [最新驗收](docs/acceptance/acceptance-2026-10-23.md) · [HUD 差異](docs/audits/hud-source-audit.md) · [傷害核對](docs/audits/damage-source-audit.md) · [發布流程](docs/release-workflow.md)
+[擷取與效能](docs/development.md) · [還原進度](docs/restoration-progress.md) · [玩法與玩家流程](docs/contracts/gameplay-player-flow.md) · [戰鬥視覺](docs/contracts/combat-visuals.md) · [發布流程](docs/release-workflow.md)
 
 ## 🗂️ Project Layout
 
@@ -96,7 +96,7 @@ ctest --test-dir build -C Release --output-on-failure
 | `src/render/`、`src/gui/`、`src/audio/` | OpenGL、RmlUi 與 miniaudio |
 | `src/network/` | GNS 傳輸、房間服務及遊戲同步 |
 | `assets/` | 已匯出的原生資產、UI、字體與音訊 |
-| [tests/](tests/README.md)、[tools/](tools/README.md) | 回歸測試、獨立 fixtures、來源匯出與效能工具 |
-| [docs/](docs/README.md) | 依契約、差異盤點、驗收及歷史紀錄分層 |
+| [tests/](tests/README.md)、[tools/](tools/README.md) | 原生回歸、來源 oracle、fixtures 與量測工具 |
+| [docs/](docs/README.md) | 目前規格、領域契約、進度紀錄與量測資料 |
 
-[架構說明](architecture.md) · [UI 翻譯](docs/ui-translations.md) · [場景](docs/contracts/stage-visual-source-contract.md) · [視效](docs/contracts/worldfx-source-contract.md) · [音訊](docs/contracts/audio-source-contract.md)
+[架構說明](architecture.md) · [UI 翻譯](docs/ui-translations.md) · [場景與渲染](docs/contracts/rendering-stage-environment.md) · [戰鬥視覺](docs/contracts/combat-visuals.md) · [音訊](docs/contracts/audio.md)

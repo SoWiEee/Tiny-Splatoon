@@ -7,6 +7,7 @@
 #include <vector>
 
 namespace restoration {
+enum InkBurstLayerFlag : int { InkBurstHero=256, InkBurstMid=512, InkBurstMicro=1024 };
 enum class WorldFxShape : int { Drop, Puff, Glow, Ring, Shell, Beam, Swirl, Bubble, Orb, Stamp, Speaker, Missile, Cloud, WarningRing, SourceBeam, BossBlob };
 
 // CPU pool record. The first fields are the common draw inputs; the remaining

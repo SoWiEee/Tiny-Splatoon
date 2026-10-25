@@ -75,14 +75,25 @@ struct Lane {
     restoration::ProjectileRenderer* renderer;std::vector<restoration::WorldFxParticle> fx;
     std::uint32_t rng;int hits=0;bool drew=false;
 };
-void launch(Lane& l,int i,const char* id){
+void launch(Lane& l,int i,const char* id,bool stream,const std::string& preset){
+    if(preset=="explosion"){l.world->burst(*l.actor,{0,.15,0},2,50,10,2.2,"bomb");return;}
+    const bool wide=preset=="bucket"||preset=="roller";
+    const int count=wide?(preset=="bucket"?5:9):1;
+    for(int blob=0;blob<count;blob++){
     using namespace restoration;ShooterProjectile p;p.owner=l.actor;p.weaponId=id;p.pos=p.start={0,1,-2};p.vel={0,-1,13};
-    p.seed=double((i*37+11)%97)/97;p.radius=.3;p.size=.15;p.straight=.10;p.gravity=28;p.trailEvery=0;
-    p.look={.15,1,1.2,.03,20,.2,3};l.world->launch(std::move(p));
+    if(wide){const double side=double(blob)/(count-1)-.5;p.kind=preset=="bucket"?"slosh":"drop";p.vel={side*(preset=="bucket"?8:12),3.5,13};p.life=2;p.straight=0;}
+    p.seed=double((i*37+blob*17+11)%97)/97;p.radius=.3;p.size=.15;p.straight=wide?0:.10;p.gravity=28;p.trailEvery=0;
+    p.look={stream?.12:.15,1,1.2,.03,20,.2,3};l.world->launch(std::move(p));
+    }
+    if(wide){restoration::WorldFxRecipeContext c;c.speed=13;const bool native=std::string(id)!="reference";
+        const char* recipe=native?(preset=="bucket"?"inkSlosh":"inkFlick"):"flickCurtain";
+        auto fx=restoration::BuildWorldFxRecipe(recipe,{0,1,-2},{0,1,0},restoration::InkColors[0],1,l.rng,-1.6,{0,2,4},{},c,{0,.2,1});l.fx.insert(l.fx.end(),fx.begin(),fx.end());}
 }
-void impact(Lane& l,const restoration::WorldVisualEvent& e,bool shooter,glm::dvec3 eye){
-    using namespace restoration;if(e.kind!="bulletImpact")return;++l.hits;std::vector<WorldFxParticle> spawned;
-    if(shooter){
+void impact(Lane& l,const restoration::WorldVisualEvent& e,bool shooter,bool native,glm::dvec3 eye){
+    using namespace restoration;if(e.kind!="bulletImpact"&&e.kind!="explosion")return;++l.hits;std::vector<WorldFxParticle> spawned;
+    if(e.kind=="explosion")spawned=BuildWorldFxRecipe(native?"inkExplosion":"explosion",e.pos,e.normal,InkColors[0],e.radius,l.rng,-1.6,eye);
+    else if(native&&(e.source=="bucket"||e.source=="roller"))spawned=BuildWorldFxRecipe("inkImpact",e.pos,e.normal,InkColors[0],.5,l.rng,-1.6,eye);
+    else if(shooter){
         check(e.source=="shooter","Shooter impact lost its visual source classification");
         auto seed=static_cast<std::uint32_t>(std::fmod(std::abs(e.seed),1.0)*4294967295.0)^static_cast<std::uint32_t>(e.id);
         if(!seed)seed=0x6d2b79f5u;
@@ -97,12 +108,14 @@ bool finite(const std::vector<restoration::WorldFxParticle>& fx){
         !std::isfinite(p.vel.x)||!std::isfinite(p.vel.y)||!std::isfinite(p.vel.z)||!std::isfinite(p.alpha)||
         !std::isfinite(p.renderRadius))return false;return true;
 }
-struct Options {std::filesystem::path assets="assets",output="build/captures/shooter-ink";int frames=180;};
+struct Options {std::filesystem::path assets="assets",output="build/captures/shooter-ink";int frames=180;std::string weapon="shooter";};
 Options options(int argc,char** argv){
     Options o;for(int i=1;i<argc;++i){std::string a=argv[i];
         if(a=="--assets"&&i+1<argc)o.assets=argv[++i];else if(a=="--output"&&i+1<argc)o.output=argv[++i];
         else if(a=="--frames"&&i+1<argc)o.frames=std::stoi(argv[++i]);
-        else throw std::invalid_argument("Usage: shooter_ink_capture [--assets DIR] [--output DIR] [--frames N]");}
+        else if(a=="--weapon"&&i+1<argc)o.weapon=argv[++i];
+        else throw std::invalid_argument("Usage: shooter_ink_capture [--assets DIR] [--output DIR] [--frames N] [--weapon shooter|spinner|bucket|roller|explosion]");}
+    check(o.weapon=="shooter"||o.weapon=="spinner"||o.weapon=="bucket"||o.weapon=="roller"||o.weapon=="explosion","Unsupported capture preset");
     check(o.frames>0&&o.frames<=3600,"Frame count must be in 1..3600");return o;
 }
 }
@@ -119,6 +132,8 @@ int main(int argc,char** argv){
             using namespace restoration;auto stage=makeStage();StageGeometry geometry(stage);
             FacePaint lp(stage,geometry),sp(stage,geometry);CombatWorld lw(stage,geometry,lp),sw(stage,geometry,sp);
             PlayerSimulation la(stage,geometry,lp,0,&lw),sa(stage,geometry,sp,0,&sw);la.state.alive=sa.state.alive=true;
+            la.setLoadout(o.weapon=="explosion"?"shooter":o.weapon);sa.setLoadout(o.weapon=="explosion"?"shooter":o.weapon);const bool stream=o.weapon=="spinner",wide=o.weapon=="bucket"||o.weapon=="roller"||o.weapon=="explosion";
+            if(stream){sa.state.pos={0,0,-2};sa.setMuzzleSource([](int){return glm::dvec3(0,1,-2);});}
             ProjectileRenderer lr(o.assets/"reference/projectiles"),sr(o.assets/"reference/projectiles");
             WorldFxParticleRenderer fx(o.assets/"reference/worldfx-particles",o.assets/"reference/boss/shaders");MatteFloor floor;
             Lane lanes[2]={{&lw,&lp,&la,&lr,{},0x13579BDFu},{&sw,&sp,&sa,&sr,{},0x13579BDFu}};
@@ -127,18 +142,20 @@ int main(int argc,char** argv){
             std::vector<unsigned char> pixels(std::size_t(W)*H*3);std::size_t visible=0;stbi_flip_vertically_on_write(1);
             glPixelStorei(GL_PACK_ALIGNMENT,1);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LESS);glDisable(GL_CULL_FACE);glDisable(GL_BLEND);
             for(int frame=0;frame<o.frames;++frame){
-                if(frame<90&&frame%6==0){launch(lanes[0],frame/6,"reference");launch(lanes[1],frame/6,"shooter");}
+                if(stream){CombatPose pose;pose.streaming=frame<90;sa.setNetworkGhostPose(pose,{});}
+                const int interval=wide?36:stream?3:6;
+                if(frame<90&&frame%interval==0){launch(lanes[0],frame/interval,"reference",stream,o.weapon);launch(lanes[1],frame/interval,o.weapon.c_str(),stream,o.weapon);}
                 const double t=frame*DT,angle=.35+.45*double(frame)/std::max(1,o.frames-1);
                 const glm::dvec3 eye(std::cos(angle)*4.2,2.7,std::sin(angle)*4.2),target(0,.45,0);
                 const auto vd=glm::lookAt(eye,target,glm::dvec3(0,1,0));
                 const auto pd=glm::perspective(glm::radians(48.0),double(PW)/H,.08,60.0);const glm::mat4 v(vd),p(pd);
                 for(auto& l:lanes){l.world->tick(DT);const auto events=l.world->takeVisualEvents();l.renderer->Update(DT,*l.world,events);
-                    for(const auto& e:events)impact(l,e,l.actor==&sa,eye);UpdateWorldFxRecipe(l.fx,DT,l.rng,{},-1.6f,false,false);
+                    for(const auto& e:events)impact(l,e,o.weapon=="shooter"&&l.actor==&sa,l.actor==&sa,eye);UpdateWorldFxRecipe(l.fx,DT,l.rng,{},-1.6f,false,false);
                     check(finite(l.fx),"World FX particle contains a non-finite value");}
                 glViewport(0,0,W,H);glClearColor(.055f,.062f,.078f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
                 for(int side=0;side<2;++side){glViewport(side*PW,0,PW,H);floor.draw(v,p);
                     lanes[side].drew|=lanes[side].renderer->Draw(vd,pd,eye,light)>0;
-                    fx.Draw(lanes[side].fx,{},v,p,glm::vec3(eye),&light,t);}
+                    lanes[side].drew|=fx.Draw(lanes[side].fx,{},v,p,glm::vec3(eye),&light,t)>0;}
                 glReadPixels(0,0,W,H,GL_RGB,GL_UNSIGNED_BYTE,pixels.data());
                 for(std::size_t i=0;i<pixels.size();i+=3)if(pixels[i]>28||pixels[i+1]>30||pixels[i+2]>34)++visible;
                 std::ostringstream name;name<<"frame-"<<std::setw(4)<<std::setfill('0')<<frame<<".png";const auto file=o.output/name.str();
@@ -150,7 +167,7 @@ int main(int argc,char** argv){
             check(lanes[0].drew&&lanes[1].drew,"Both projectile lanes must draw");
             check(visible>std::size_t(o.frames)*W*H/12,"Capture produced too few non-background pixels");
             std::cout<<"SHOOTER_INK_CAPTURE renderer="<<reinterpret_cast<const char*>(glGetString(GL_RENDERER))
-                <<" frames="<<o.frames<<" legacy_hits="<<lanes[0].hits<<" shooter_hits="<<lanes[1].hits
+                <<" weapon="<<o.weapon<<" frames="<<o.frames<<" legacy_hits="<<lanes[0].hits<<" shooter_hits="<<lanes[1].hits
                 <<" paint_versions="<<lp.version()<<','<<sp.version()<<" nonbackground_pixels="<<visible
                 <<" output="<<o.output.string()<<'\n';
         } // GL resources are released while the context is still current.

@@ -169,11 +169,12 @@ void WorldEffects::BossCrabletPop(glm::dvec3 rootPosition,int team) {
     for(auto& item:items)spawn(std::move(item));
 }
 void WorldEffects::explosion(glm::vec3 pos,glm::vec3 color,float radius) {
-    auto items=BuildWorldFxRecipe("explosion",pos,{0,1,0},color,radius,random_,-1.6,camera_);
+    auto items=BuildWorldFxRecipe("inkExplosion",pos,{0,1,0},color,radius,random_,-1.6,camera_);
     for(auto& item:items)spawn(std::move(item));
 }
 void WorldEffects::emitSpecial(const char* kind,glm::vec3 pos,glm::vec3 normal,glm::vec3 color,float radius,glm::vec3 camera) {
     const std::string_view recipe(kind);
+    if(recipe=="explosion"){explosion(pos,color,radius);return;}
     if(recipe=="burst"||recipe=="explosion"||recipe=="slamWave"||recipe=="stormStart"||
        recipe=="formPop"||recipe=="dive"||recipe=="emerge"||recipe=="wake") {
         WorldFxRippleSink ripple;
@@ -218,6 +219,11 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
         if(event.kind=="beam")continue; // Source charger ribbons are owned by ProjectileRenderer.
         if(!near(event.pos,65))continue;
         if(event.kind=="bulletImpact") {
+            if(event.source=="bucket"||event.source=="roller"||event.source=="brush"){
+                auto seed=std::uint32_t(event.id)^0x6d2b79f5u;auto particles=BuildWorldFxRecipe("inkImpact",event.pos,event.normal,ink(event.team),std::clamp(event.radius,.4,1.2),seed);
+                for(auto& particle:particles)spawn(std::move(particle));
+                continue;
+            }
             if(event.source=="shooter"){
                 auto seed=static_cast<std::uint32_t>((std::isfinite(event.seed)?std::fmod(std::abs(event.seed),1.0):0.0)*4294967295.0)^static_cast<std::uint32_t>(event.id);
                 if(!seed)seed=0x6d2b79f5u;

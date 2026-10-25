@@ -190,6 +190,7 @@ void WorldFxParticleRenderer::initializeBossBlob(){
 int WorldFxParticleRenderer::Draw(const std::vector<WorldFxParticle>& live,const std::vector<WorldFxParticle>& world,
     const glm::mat4& view,const glm::mat4& projection,const glm::vec3& eye,const CharacterLightState* lights,double time){
     ScopedGlState state;initialize();
+    GLint viewport[4]{};glGetIntegerv(GL_VIEWPORT,viewport);
     for(auto& pool:pools_)pool->items.clear();
     std::vector<const WorldFxParticle*> bossBlobs;
     const auto append=[&](const std::vector<WorldFxParticle>& particles){
@@ -198,6 +199,12 @@ int WorldFxParticleRenderer::Draw(const std::vector<WorldFxParticle>& live,const
             const int index=static_cast<int>(p.shape);if(index<0||index>=6)continue;
             const float radius=p.renderRadius>0?p.renderRadius:(p.shape==WorldFxShape::Ring?p.radius:0);
             if(!(radius>0))continue;
+            if(static_cast<int>(p.flags)&InkBurstMicro){
+                const auto clip=projection*view*glm::vec4(p.pos,1);
+                const float pad=radius*std::max(std::abs(projection[0][0]),std::abs(projection[1][1]));
+                const float pixels=clip.w>0?radius*std::abs(projection[1][1])*viewport[3]*.5f/clip.w:0;
+                if(pixels<.65f||std::abs(clip.x)>clip.w+pad||std::abs(clip.y)>clip.w+pad)continue;
+            }
             GpuInstance item{};const float t=tOf(p);
             item.pos=v4(p.pos,radius);
             switch(p.shape){

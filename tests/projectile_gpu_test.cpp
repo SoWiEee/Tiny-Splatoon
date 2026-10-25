@@ -144,6 +144,18 @@ int main(int argc,char** argv){
             GLint cullMode=0;glGetIntegerv(GL_CULL_FACE_MODE,&cullMode);
             if(cullMode!=GL_BACK)throw std::runtime_error("SDF proxy leaked front-face culling into other renderers");
         }
+        {
+            world.clear();actor.setLoadout("spinner");actor.setMuzzleSource([](int){return glm::dvec3(0);});
+            CombatPose pose;pose.streaming=true;actor.setNetworkGhostPose(pose,{});
+            auto streamShot=shot;streamShot.weaponId="spinner";streamShot.pos=glm::dvec3(0);streamShot.vel={0,0,20};world.launch(streamShot);
+            for(int i=0;i<20;i++)renderer.Update(1.0/60,world,{});
+            const glm::dvec3 streamEye(3,1,3);const auto streamView=glm::lookAt(streamEye,glm::dvec3(0,0,1),glm::dvec3(0,1,0));
+            if(!renderer.blobs().empty()||renderer.Draw(streamView,projection,streamEye,lights)<1)throw std::runtime_error("Actual spinner streaming pose failed to reach the jet renderer");
+            pose.streaming=false;actor.setNetworkGhostPose(pose,{});
+            for(int i=0;i<100;i++)renderer.Update(1.0/60,world,{});
+            if(renderer.Draw(streamView,projection,streamEye,lights)!=0)throw std::runtime_error("Stopped spinner retained a stale stream");
+            actor.setLoadout("shooter");actor.setMuzzleSource({});actor.setNetworkGhostPose({},{});
+        }
         world.clear();world.launch(shot);renderer.Update(0,world,{});
         renderer.Update(.01,world,{{"beam",{-1,0,0},{1,0,0},2,0,.8,.17,.4}});
         if(renderer.ribbons()!=1||renderer.Draw(view,projection,eye,lights)!=2)throw std::runtime_error("Source charger ribbon absent");

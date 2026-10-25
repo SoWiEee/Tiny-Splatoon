@@ -2,11 +2,7 @@
 
 The fixtures were generated from the unchanged `splat-ref/src/audio/audio.js` and `splat-ref/src/audio/music.js` using headless Edge and `OfflineAudioContext`:
 
-```powershell
-node tools/export-native-reverb-fixture.mjs
-```
-
-Running the command without flags explicitly regenerates both binary fixtures. Use `node tools/export-native-reverb-fixture.mjs --check` to render and compare the current source without writing fixture files. Check mode requires exact metadata, normalization within `1e-8`, exact raw impulse and input samples, and a maximum per-sample wet-render difference of `3e-6` to allow small offline-render variation.
+The original regeneration pipeline is retired. Native tests consume the committed binary fixtures directly and verify the impulse, metadata and wet-render tolerances. Current audio behavior is specified in [the audio contract](../../docs/contracts/audio.md).
 
 The plaza fixture uses a 1.5 s impulse, 3.4 decay, 12 ms pre-delay, seed 3, and 0.6 return gain. The music fixture uses a 2.2 s impulse, 2.4 decay, seed 5, bright 0.7, dark 0.08, and 0.5 return gain. The deterministic 1,024-frame input is rendered through a default-normalized stereo `ConvolverNode`; fixture headers record its measured 48 kHz normalization: 0.01141840140 for plaza and 0.01169976630 for music. The music chain's separate 0.25 FX reverb send is applied by the native riser helper.
 

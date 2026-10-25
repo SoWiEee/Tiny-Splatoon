@@ -24,7 +24,7 @@ void BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots,std::vecto
     result.reserve(std::min<std::size_t>(700,shots.size()*4));
     for(const auto& p:shots) {
         if(result.size()>=695)break;
-        if(!includeShooter&&p.kind=="shot"&&p.weaponId=="shooter")continue;
+        if(!includeShooter&&p.kind=="shot"&&(p.weaponId=="shooter"||p.weaponId=="spinner"))continue;
         if(!p.owner||p.delay>0||p.kind=="arrow"||p.kind=="bladewave"||p.kind=="fist")continue;
         const double speed=glm::length(p.vel);
         const auto direction=p.vel/std::max(speed,1e-3);

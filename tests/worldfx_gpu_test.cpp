@@ -406,7 +406,38 @@ int main() {
             for(int i=0;i<24;i++)impactEffects.Update(1.0/60,impactWorld,camera);
             check(impactEffects.liveItems().empty()&&paint.version()==paintVersion,"Shooter splash must expire without adding paint");
         }
-        std::cout << "WORLD_FX_GPU sourceShapes=tornado,speaker,beam,bubble shooter_impact=pass draws=" << drawCalls
+        {
+            WorldFxParticleRenderer burstRenderer("assets/reference/worldfx-particles","assets/reference/boss/shaders");
+            std::uint32_t seed=37;WorldFxRecipeContext context;context.speed=12;
+            auto burst=BuildWorldFxRecipe("inkSlosh",{0,0,0},{0,1,0},{1,.2,.01},1,seed,-100,{0,1,3},{},context,{0,.2,1});
+            UpdateWorldFxRecipe(burst,.06,seed,{},-100,false,false);
+            const glm::vec3 burstEye(0,.6,2);const auto v=glm::lookAt(burstEye,glm::vec3(0,.1,.4),glm::vec3(0,1,0));
+            const auto p=glm::perspective(glm::radians(50.f),1.f,.05f,30.f);
+            for(const int layer:{InkBurstHero,InkBurstMid,InkBurstMicro}){
+                std::vector<WorldFxParticle> isolated;for(auto x:burst)if(int(x.flags)&layer)isolated.push_back(x);
+                glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);check(burstRenderer.Draw(isolated,{},v,p,burstEye,nullptr,.06)>0,"Burst layer submitted no geometry");
+                glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+                std::size_t count=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>30||pixels[i+1]>30||pixels[i+2]>30)++count;
+                check(count>3&&glGetError()==GL_NO_ERROR,"Isolated hero/mid/micro layer has no visible pixels");
+            }
+            WorldFxParticle tiny;tiny.shape=WorldFxShape::Puff;tiny.pos={0,0,-20};tiny.radius=tiny.renderRadius=.001f;tiny.life=.2f;tiny.renderAlpha=1;tiny.flags=InkBurstMicro;
+            check(burstRenderer.Draw({tiny},{},v,p,burstEye,nullptr,.06)==0,"Subpixel micro spray must be culled");
+        }
+        for(const char* weapon:{"bucket","roller","brush"}){
+            FacePaint burstPaint(*stage,geometry);CombatWorld burstWorld(*stage,geometry,burstPaint);
+            PlayerSimulation burstActor(*stage,geometry,burstPaint,0,&burstWorld);burstActor.spawnAt(anchor,0);burstActor.setLoadout(weapon,"bomb","storm");
+            WorldEffects burstEffects(characterData);burstEffects.SetPaintSurface(&burstPaint);burstEffects.Update(1.0/60,burstWorld,camera);
+            bool hero=false,mid=false,micro=false;
+            for(int frame=0;frame<60;frame++){
+                burstActor.input.fire=frame<2;burstActor.tick(1.0/60);burstWorld.tick(1.0/60);
+                const auto version=burstPaint.version();burstEffects.Update(1.0/60,burstWorld,camera);
+                check(burstPaint.version()==version,"Burst cosmetics modified gameplay paint");
+                for(const auto& item:burstEffects.liveItems()){hero|=(int(item.flags)&InkBurstHero)!=0;mid|=(int(item.flags)&InkBurstMid)!=0;micro|=(int(item.flags)&InkBurstMicro)!=0;}
+            }
+            check(burstActor.shotsFired()>0&&hero&&mid&&micro,"Actual bucket/roller/brush action failed to emit all burst layers");
+            check(burstPaint.version()>0,"Logical burst projectiles failed to paint their impact surface");
+        }
+        std::cout << "WORLD_FX_GPU sourceShapes=tornado,speaker,beam,bubble shooter_impact=pass burst_layers=pass burst_weapons=pass draws=" << drawCalls
                   << " renderer=" << reinterpret_cast<const char*>(glGetString(GL_RENDERER)) << '\n';
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

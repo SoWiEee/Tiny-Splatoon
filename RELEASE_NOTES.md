@@ -19,4 +19,4 @@ Linux：解壓 Tiny-Splatoon-v0.8.7-linux-x64.tar.gz，執行 ./Tiny-Splatoon-li
 
 ## 驗收界線
 
-Windows UI／音訊／Boss 與受影響回歸通過；Linux Mesa UI／正式入口五項通過，Boss 16 情境及已部署素材的完整音訊通過。五項來源重匯出因缺 Edge 未完成，Windows 掛載來源的 MP3 非同步 seek 測試仍有時限差異；一般執行不需要這些來源工具。詳細結果記錄於 docs/acceptance/acceptance-2026-10-23.md。Linux 以 Ubuntu 22.04／WSL 與軟體 Mesa 執行建置與啟動測試；實體 Linux NVIDIA／AMD／Intel 的效能、手把及跨網多人矩陣未完整驗收。此次更新不宣稱墨水視效已與商業版完全一致。
+Windows UI／音訊／Boss 與受影響回歸通過；Linux Mesa UI／正式入口五項通過，Boss 16 情境及已部署素材的完整音訊通過。五項來源重匯出因缺 Edge 未完成，Windows 掛載來源的 MP3 非同步 seek 測試仍有時限差異；一般執行不需要這些來源工具。詳細結果記錄於 docs/restoration-progress.md。Linux 以 Ubuntu 22.04／WSL 與軟體 Mesa 執行建置與啟動測試；實體 Linux NVIDIA／AMD／Intel 的效能、手把及跨網多人矩陣未完整驗收。此次更新不宣稱墨水視效已與商業版完全一致。

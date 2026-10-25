@@ -51,6 +51,7 @@ void eraseAt(std::vector<WorldFxParticle>& items,std::size_t i,WorldFxShape shap
     items.erase(items.begin()+static_cast<std::ptrdiff_t>(i));
 }
 std::size_t countShape(const std::vector<WorldFxParticle>& items,WorldFxShape shape){return std::count_if(items.begin(),items.end(),[&](const auto& x){return x.shape==shape;});}
+#include "WorldFxBurstRecipes.inc"
 #include "WorldFxWeaponRecipes.inc"
 #include "WorldFxKitRecipes.inc"
 #include "WorldFxSpecialRecipes.inc"
@@ -59,6 +60,7 @@ std::size_t countShape(const std::vector<WorldFxParticle>& items,WorldFxShape sh
 std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3 pos,glm::dvec3 normal,glm::dvec3 color,double radius,std::uint32_t& rng,double waterY,glm::dvec3 camera,const WorldFxRippleSink& ripple,const WorldFxRecipeContext& context,glm::dvec3 direction,double time,double dt){
     // Weapon recipes receive aim direction separately from a recipe's surface normal.
     std::vector<WorldFxParticle> out;const glm::dvec3 sourceVector=normal;normal=normalized(normal);const glm::dvec3 up(0,1,0),white(1);
+    if(buildInkBurstRecipe(out,name,pos,normal,color,radius,rng,context,direction))return out;
     if(name=="bossCrabletPop"){
         // bossModel.js creates a fresh low-quality BossFX at pop time. Keep its
         // Mulberry32 seed and the source's 26 * 0.4 particle count and motion.
@@ -426,7 +428,7 @@ void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& p,double seconds,std::uin
     }
     // Values submitted to the source instanced meshes after the source update.
     for(auto& x:p){const double t=x.life>0?double(x.age)/x.life:0;
-        if(x.shape==WorldFxShape::Drop){const double speed=std::sqrt(double(x.vel.x)*x.vel.x+double(x.vel.y)*x.vel.y+double(x.vel.z)*x.vel.z);double stretch=1+std::min(speed*0.062*double(x.stretch),2.3*double(x.stretch));stretch*=1+0.14*std::sin(double(x.age)*38+double(x.seed)*20)*std::min(1.0,double(x.age)*6);x.renderRadius=f32(double(x.radius)*std::min(1.0,double(x.age)*22+0.35)*std::min(1.0,(double(x.life)-x.age)/0.12));x.renderLength=f32(std::max(1.0,stretch));}
+        if(x.shape==WorldFxShape::Drop){const double speed=std::sqrt(double(x.vel.x)*x.vel.x+double(x.vel.y)*x.vel.y+double(x.vel.z)*x.vel.z);double stretch=1+std::min(speed*0.062*double(x.stretch),2.3*double(x.stretch));stretch*=1+0.14*std::sin(double(x.age)*38+double(x.seed)*20)*std::min(1.0,double(x.age)*6);x.renderRadius=f32(double(x.radius)*std::min(1.0,double(x.age)*22+0.35)*std::min(1.0,(double(x.life)-x.age)/0.12));x.renderLength=f32(std::max(1.0,stretch));if(int(x.flags)&InkBurstHero){const double bloom=0.35+0.65*(1-std::exp(-double(x.age)*(18+double(x.seed)*8)));const double wobble=1+0.10*std::sin(double(x.age)*22+double(x.seed)*12)*std::exp(-double(x.age)*4);x.renderRadius=f32(double(x.radius)*bloom*wobble*std::min(1.0,(double(x.life)-x.age)/.12));x.renderLength=f32(std::clamp(stretch,1.4,2.2));}}
         else if(x.shape==WorldFxShape::Puff||x.shape==WorldFxShape::Glow){x.renderRadius=f32(double(x.radius)+(double(x.radius1)-x.radius)*easeOut(t));const double fi=x.fadeIn>0?std::min(1.0,double(x.age)/x.fadeIn):1,fo=x.fadeOut>0?std::min(1.0,(double(x.life)-x.age)/x.fadeOut):(x.shape==WorldFxShape::Glow?1-t:1-t*t);x.renderAlpha=f32(double(x.alpha)*fi*fo);}
         else if(x.shape==WorldFxShape::Ring){const double expand=double(x.expand);x.renderRadius=f32(double(x.radius)*(expand+(1.0-expand)*easeOut(t)));}
         else if(x.shape==WorldFxShape::Shell){const double te=std::min(1.0,double(x.age)/x.expand);x.renderRadius=f32(double(x.radius)+(double(x.radius1)-x.radius)*easeOut(te));x.renderAlpha=x.alpha;x.renderLength=f32(double(x.wobble)*(1-te*0.6));}

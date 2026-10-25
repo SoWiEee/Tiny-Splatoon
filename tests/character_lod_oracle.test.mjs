@@ -14,7 +14,7 @@ assert.deepEqual(fixture.qualities.map(row=>row.name),['low','medium','high','ul
 assert.equal(fixture.updateCount,2288,'Character LOD fixture must cover all 2,288 source updates');
 assert.equal(fixture.scenarios.length,8,'Character LOD fixture must cover local and remote actors at every quality');
 
-// Source regeneration and baseline verification live in the optional exporter check.
+// Compare native output with the committed observations from the locked source.
 
 const input=[];
 const expected=[];
