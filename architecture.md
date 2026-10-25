@@ -6,9 +6,13 @@
 
 - `restoration_core` is the C++17 static library for reference data, stage geometry, CPU paint, player/controller, weapons, combat world, specials, navigation, bots, match lifecycle, and live character poses. It depends on GLM and has no GLFW or network lifetime.
 - `Tiny-Splatoon` adds `StageViewer`, `CharacterArt`, `CharacterShader`, `PerformanceCapture`, and `GpuPreference`. GLFW／GLAD／OpenGL own the window and graphics; RmlUi owns all interface pages and stb writes validation PNGs.
-- `player_ui` owns `GameUi` and the RmlUi OpenGL renderer. RML/RCSS assets describe the menu and HUD; UI emits actions and settings rather than mutating the simulation directly. Inter and Noto Sans TC are bundled under OFL.
+- `player_ui` owns `GameUi` and the RmlUi OpenGL renderer. RML/RCSS assets describe the menu and HUD; UI emits actions and settings rather than mutating the simulation directly. The current primary fonts are 華康新綜藝體 and BlitzMain, with bundled fallback fonts.
 - `game_audio` owns miniaudio playback, source cue metadata, bounded one-shot voices, positional loops and streamed source music. `GameAudio` maps actor, world, match and Boss state to that playback interface. Source-rendered assets and remaining limits are documented in [the audio contract](docs/contracts/audio.md).
 - Tests link the same core library. Source exporters operate on the locally supplied, hash-locked `splat-ref/`; native fixtures and application builds use committed data.
+
+Public simulation/profile/room headers share `game/CharacterStyle.hpp` and `game/MatchParticipant.hpp`. Room protocol names remain aliases of the participant value types, preserving their fields and wire representation. `MatchSimulation.hpp` does not include room UI types or generated character material tables.
+
+CMake include paths are target-scoped: `restoration_core` exports game/world headers, UI and audio export their own headers, and application/render/test paths stay private to their consumers. Character pose evaluation still privately reads generated CPU material data; this is not a claim that every simulation implementation is independent of render data.
 
 ## Source layers
 
@@ -22,6 +26,10 @@
 | `src/audio` | Cached PCM, bounded playback, volume buses and gameplay audio routing | `AudioEngine`, `GameAudio` |
 
 The physical `restoration/` directory is retired. The existing C++ namespace and library/test names remain compatible; they are not paths. The actor/controller and world already have explicit ownership, so this reorganization does not introduce a second entity/component registry. Render snapshots and one-shot visual events form the boundary between gameplay and presentation.
+
+`hud_view_model` is a CPU-only presentation-data target linked to `restoration_core`, with no RmlUi, GLFW or GL link dependency. `StageViewer` builds an owned `HudViewModel` before rendering; `GameUi::RenderHud` consumes it as const for squads, ink/reticle, battle feedback, Boss, Zones and results. Event actor references become roster indices (`-1` means no known actor). An opaque match identity and HUD event epoch reset temporal presentation state on restart. Snapshots own their strings, events and mode data and remain valid after simulation changes.
+
+Map interaction remains a separate, explicit `GameUi::UpdateMapInteraction` call using the live simulation, paint data and current viewport. It retains teammate/death-marker and jump-selection behavior; this step does not extract a general render snapshot or replace map interaction with a HUD DTO.
 
 ## Runtime ownership
 

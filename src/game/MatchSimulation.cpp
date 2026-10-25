@@ -5,6 +5,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 namespace restoration {
 MatchSimulation::MatchSimulation(const StageData& stage,const StageGeometry& geometry,FacePaint& paint,const NavGraph& nav,MatchOptions options)
@@ -142,6 +143,9 @@ void MatchSimulation::restart(){
     }
 }
 PlayerSimulation& MatchSimulation::local(){
+    return const_cast<PlayerSimulation&>(std::as_const(*this).local());
+}
+const PlayerSimulation& MatchSimulation::local() const{
     if(!options_.network)return *actors_.front();
     for(std::size_t i=0;i<roster_.size();++i)if(roster_[i].local)return *actors_[i];
     throw std::logic_error("Online roster has no local player");
@@ -165,10 +169,10 @@ void MatchSimulation::setNetworkActorActive(std::uint32_t nid,bool active){
         botPointers_.push_back(bot.get());bots_.push_back(std::move(bot));
     }
 }
-void MatchSimulation::setNetworkAuthorityPeer(network::MemberId peer){
+void MatchSimulation::setNetworkAuthorityPeer(PeerId peer){
     setNetworkAuthorityPeer(peer,options_.networkRoster);
 }
-void MatchSimulation::setNetworkAuthorityPeer(network::MemberId peer,const std::vector<network::RosterEntry>& roster){
+void MatchSimulation::setNetworkAuthorityPeer(PeerId peer,const std::vector<MatchParticipant>& roster){
     if(!options_.network||!peer)throw std::invalid_argument("Invalid online authority peer");
     if(options_.authorityPeer==peer){applyNetworkRoster(roster);return;}
     options_.authorityPeer=peer;
@@ -180,7 +184,7 @@ void MatchSimulation::setNetworkAuthorityPeer(network::MemberId peer,const std::
 void MatchSimulation::updateNetworkBossPresentation(){
     if(boss_&&bossPoseSink_)bossPoseSink_(*boss_);
 }
-void MatchSimulation::applyNetworkRoster(const std::vector<network::RosterEntry>& incoming){
+void MatchSimulation::applyNetworkRoster(const std::vector<MatchParticipant>& incoming){
     if(!options_.network)throw std::logic_error("Roster ownership updates require an online match");
     if(incoming.size()>8)throw std::invalid_argument("Online roster exceeds actor limit");
     options_.networkRoster=incoming;

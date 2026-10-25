@@ -18,8 +18,6 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# The source layers share public domain types without a second forwarding-header tree.
-include_directories(src/world src/game src/render src/gui src/app src/audio)
 if(MSVC)
     add_compile_options(/utf-8)
 endif()
@@ -71,6 +69,9 @@ add_library(restoration_core STATIC
     src/network/AuthorityState.cpp
 )
 target_link_libraries(restoration_core PUBLIC glm::glm)
+target_include_directories(restoration_core
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/world" "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/render" "${CMAKE_CURRENT_SOURCE_DIR}/src/network")
 target_link_libraries(game_network PUBLIC restoration_core)
 add_executable(Tiny-Splatoon-Server src/network/RoomServerMain.cpp)
 target_link_libraries(Tiny-Splatoon-Server PRIVATE game_network)
@@ -78,12 +79,19 @@ add_dependencies(Tiny-Splatoon Tiny-Splatoon-Server)
 if(MSVC)
     target_compile_options(restoration_core PRIVATE /utf-8)
 endif()
+add_library(hud_view_model STATIC src/gui/HudViewModel.cpp)
+target_include_directories(hud_view_model PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/gui")
+target_link_libraries(hud_view_model PUBLIC restoration_core)
 add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/MapInteraction.cpp src/gui/InkTankElement.cpp src/gui/WeaponReticleElement.cpp src/gui/SpecialGaugeElement.cpp src/gui/BattleFeedbackElement.cpp src/gui/RmlRenderer.cpp src/gui/UiText.cpp)
-target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
+target_include_directories(player_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/gui")
+target_link_libraries(player_ui PUBLIC hud_view_model RmlUi::RmlUi glad::glad glfw OpenGL::GL)
 add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp src/audio/ZoneHum.cpp src/audio/NativeReverb.cpp)
-target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
+target_include_directories(game_audio
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
+    PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
 target_link_libraries(game_audio PUBLIC restoration_core Threads::Threads ${CMAKE_DL_LIBS})
 add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp src/render/InkStream.cpp src/render/InkStreamRenderer.cpp)
+target_include_directories(projectile_visuals PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/render")
 target_link_libraries(projectile_visuals PUBLIC restoration_core PRIVATE glad::glad)
 target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/MatchInputState.cpp src/app/OnlinePlay.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
@@ -91,6 +99,9 @@ target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/MatchInputS
     src/render/WorldFxRecipes.cpp src/render/StageMapView.cpp src/render/StageMapCamera.cpp
     src/app/GpuPreference.cpp src/render/ProjectileRenderer.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/LobbyRenderer.cpp src/render/DeviceRenderer.cpp src/render/PlayerShowcase.cpp src/render/ZoneRenderer.cpp)
 target_link_libraries(Tiny-Splatoon PRIVATE restoration_core player_ui game_audio projectile_visuals game_network)
+target_include_directories(Tiny-Splatoon PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/render")
 
 target_link_libraries(Tiny-Splatoon PRIVATE
     glad::glad
@@ -111,6 +122,9 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(hud_view_model_test tests/hud_view_model_test.cpp)
+    target_link_libraries(hud_view_model_test PRIVATE hud_view_model)
+    add_test(NAME native_hud_view_model COMMAND hud_view_model_test)
     add_test(NAME native_runtime_asset_staging COMMAND "${CMAKE_COMMAND}"
         "-DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-staging-fixtures"
         "-DASSET_MODULE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/RuntimeAssets.cmake"
@@ -142,6 +156,7 @@ if(BUILD_TESTING)
     target_link_libraries(network_authority_test PRIVATE restoration_core)
     add_test(NAME native_network_authority COMMAND network_authority_test)
     add_executable(online_play_test tests/online_play_test.cpp src/app/OnlinePlay.cpp)
+    target_include_directories(online_play_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/app")
     target_link_libraries(online_play_test PRIVATE game_network)
     add_executable(zone_match_test tests/zone_match_test.cpp)
     target_link_libraries(zone_match_test PRIVATE restoration_core)
@@ -154,6 +169,7 @@ if(BUILD_TESTING)
     target_link_libraries(zone_ai_test PRIVATE restoration_core)
     add_test(NAME native_zone_ai COMMAND zone_ai_test)
     add_executable(zone_hum_test tests/zone_hum_test.cpp src/audio/ZoneHum.cpp)
+    target_include_directories(zone_hum_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/audio")
     target_link_libraries(zone_hum_test PRIVATE Threads::Threads)
     add_test(NAME native_zone_hum COMMAND zone_hum_test)
     add_executable(zone_visual_gpu_test tests/zone_visual_gpu_test.cpp src/render/ZoneRenderer.cpp src/render/StageRenderer.cpp src/render/CharacterShader.cpp src/render/DirectionalShadow.cpp src/app/GpuPreference.cpp)
@@ -189,6 +205,7 @@ if(BUILD_TESTING)
     target_link_libraries(player_controller_test PRIVATE restoration_core)
     add_test(NAME native_player_controller COMMAND player_controller_test)
     add_executable(ui_text_test tests/ui_text_test.cpp src/gui/UiText.cpp)
+    target_include_directories(ui_text_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/gui")
     target_link_libraries(ui_text_test PRIVATE restoration_core)
     add_test(NAME native_ui_translations COMMAND ui_text_test)
     add_executable(stage_prop_animation_test tests/stage_prop_animation_test.cpp)
@@ -445,4 +462,17 @@ if(BUILD_TESTING)
             set_tests_properties(reference_combat_source_oracles PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
         endif()
     endif()
+
+    foreach(render_test IN ITEMS
+        zone_visual_gpu_test boss_material_gpu_test device_visual_gpu_test environment_gpu_test
+        player_showcase_test lobby_effects_test lobby_visual_gpu_test team_palette_test stage_visual_gpu_test
+        projectile_visual_test character_lod_eval shooter_impact_test ink_burst_test character_pose_shader_test
+        character_art_test render_pipeline_test screen_effects_eval worldfx_eval worldfx_gpu_test projectile_gpu_test
+        stage_map_camera_test game_ui_test stage_prop_animation_test worldfx_transition_test swim_wake_test
+        ink_stream_gpu_test ink_stream_test)
+        target_include_directories(${render_test} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/render")
+    endforeach()
+    foreach(render_test IN ITEMS character_pose_shader_test render_pipeline_test)
+        target_include_directories(${render_test} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/game")
+    endforeach()
 endif()

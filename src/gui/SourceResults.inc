@@ -1,12 +1,11 @@
-    void UpdateResults(MatchSimulation& match,const std::array<double,2>& coverage){
-        if(!match.result())return;
-        (void)coverage;
-        const auto& result=*match.result();
-        const auto& local=match.local();
-        const bool win=result.boss?result.boss->win:result.winner==local.team();
+    void UpdateResults(const HudViewModel& view){
+        if(!view.result||view.localActor<0)return;
+        const auto& result=*view.result;
+        const auto& local=view.actors[static_cast<std::size_t>(view.localActor)];
+        const bool win=result.boss?result.boss->win:result.winner==local.team;
         const double now=glfwGetTime();
-        if(resultXpMatch!=&match){
-            resultXpMatch=&match;resultXpStartedAt=now;resultXpNextTick=now+.065;
+        if(resultXpMatchId!=view.matchId){
+            resultXpMatchId=view.matchId;resultXpStartedAt=now;resultXpNextTick=now+.065;
             resultSkipped=false;resultDone=false;resultFocused=false;
         }
         const double elapsed=std::max(0.0,now-resultXpStartedAt);
@@ -27,9 +26,9 @@
         }
         Text(hud,"result-title",win?"VICTORY!":"DEFEAT");
         Find(hud,"result-title")->GetParentNode()->SetClass("defeat",!win);
-        const auto stageLabel=StageLabel(match.stage().id);
-        Text(hud,"result-detail",(stageLabel.empty()?std::string(match.stage().name):std::string(stageLabel))+" · "+(result.boss?"破艦巨獸":result.zones?"區域爭奪":"塗地對戰"));
-        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
+        const auto stageLabel=StageLabel(view.stageId);
+        Text(hud,"result-detail",(stageLabel.empty()?view.stageName:std::string(stageLabel))+" · "+(result.boss?"破艦巨獸":result.zones?"區域爭奪":"塗地對戰"));
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,view.boss.has_value());
         static constexpr std::array<std::array<std::string_view,2>,5> names={{{"橘紅","鈷藍"},{"泡泡糖","薄荷"},{"檸檬","葡萄"},{"水藍","櫻桃"},{"萊姆","洋紅"}}};
         const auto teamNames=player.settings.colorblind?std::array<std::string_view,2>{"陽光","海洋"}:names[std::clamp(player.settings.palette,0,4)];
         auto* splat=Find(hud,"result-splat");
@@ -66,24 +65,24 @@
             Find(hud,"result-score-a-fill")->SetProperty("width",Number(std::clamp(result.coverage[0],0.0,1.0)*100*scoreProgress)+"%");
             Find(hud,"result-score-b-fill")->SetProperty("width",Number(std::clamp(result.coverage[1],0.0,1.0)*100*scoreProgress)+"%");
         }
-        const auto medals=ResultMedals(match,result);
+        const auto medals=ResultMedals(view,result);
         const auto medalKey="hud/result-medals";
         if(textCache[medalKey]!=medals){Find(hud,"result-medals")->SetInnerRML(medals);textCache[medalKey]=medals;}
         Hidden(hud,"result-medals",resultIntro||showTime<2.05);
         std::vector<std::size_t> order;
-        for(std::size_t i=0;i<match.actors().size();++i)if(match.roster()[i].active)order.push_back(i);
-        const auto* boss=match.boss();
+        for(std::size_t i=0;i<view.actors.size();++i)if(view.actors[i].active)order.push_back(i);
+        const auto* boss=view.boss?&*view.boss:nullptr;
         std::stable_sort(order.begin(),order.end(),[&](std::size_t a,std::size_t b){
-            if(boss&&boss->squadDamage()[a]!=boss->squadDamage()[b])return boss->squadDamage()[a]>boss->squadDamage()[b];
-            if(!boss&&match.roster()[a].team!=match.roster()[b].team)return match.roster()[a].team<match.roster()[b].team;
-            return match.actors()[a]->turfPainted()>match.actors()[b]->turfPainted();
+            if(boss&&boss->squadDamage[a]!=boss->squadDamage[b])return boss->squadDamage[a]>boss->squadDamage[b];
+            if(!boss&&view.actors[a].team!=view.actors[b].team)return view.actors[a].team<view.actors[b].team;
+            return view.actors[a].turf>view.actors[b].turf;
         });
         double bestTurf=0,bestDamage=0;int bestSplats=0;
-        for(auto i:order){bestTurf=std::max(bestTurf,match.actors()[i]->turfPainted());bestSplats=std::max(bestSplats,match.actors()[i]->splats());if(boss)bestDamage=std::max(bestDamage,boss->squadDamage()[i]);}
+        for(auto i:order){bestTurf=std::max(bestTurf,view.actors[i].turf);bestSplats=std::max(bestSplats,view.actors[i].splats);if(boss)bestDamage=std::max(bestDamage,boss->squadDamage[i]);}
         std::string rows;
         for(int team=0;team<2;++team){
             rows+="<div class=\"result-team"+std::string(boss?" boss-team":result.zones?" zones":"")+"\">";
-            rows+="<div class=\"result-team-head\"><span class=\"result-team-name\" style=\"color:"+std::string(palette[boss?local.team():team])+";\">● "+(boss?std::string(team?"協力小隊 · 5–8":"協力小隊 · 前四名"):std::string(teamNames[team]))+(boss?(win&&!team?" <strong>★ 擊破</strong>":""):(result.winner==team?" <strong>★ 勝利</strong>":""))+"</span><span class=\"result-col turf\">"+(boss?"傷害":"塗地")+"</span>";
+            rows+="<div class=\"result-team-head\"><span class=\"result-team-name\" style=\"color:"+std::string(palette[boss?local.team:team])+";\">● "+(boss?std::string(team?"協力小隊 · 5–8":"協力小隊 · 前四名"):std::string(teamNames[team]))+(boss?(win&&!team?" <strong>★ 擊破</strong>":""):(result.winner==team?" <strong>★ 勝利</strong>":""))+"</span><span class=\"result-col turf\">"+(boss?"傷害":"塗地")+"</span>";
             if(result.zones&&!boss)rows+="<span class=\"result-col zone\">區域</span>";
             if(boss)rows+="<span class=\"result-col small\">弱點</span>";
             rows+="<span class=\"result-col small\">擊倒</span><span class=\"result-col small\">陣亡</span>";
@@ -91,20 +90,18 @@
             rows+="</div>";
             int rowNumber=0;
             for(std::size_t position=0;position<order.size();++position){
-                const auto i=order[position];
-                if(boss?position/4!=static_cast<std::size_t>(team):match.roster()[i].team!=team)continue;
-                const auto& entry=match.roster()[i];const auto& actor=*match.actors()[i];
+                const auto i=order[position];const auto& actor=view.actors[i];
+                if(boss?position/4!=static_cast<std::size_t>(team):actor.team!=team)continue;
                 const double rowProgress=resultDone?1.0:1.0-std::pow(1.0-std::clamp((showTime-.8-rowNumber*.13)/.75,0.0,1.0),3.0);
-                const bool mvp=boss?bestDamage>0&&boss->squadDamage()[i]==bestDamage:entry.local&&medals.find("MVP")!=std::string::npos;
-                rows+="<div class=\"result-player"+std::string(entry.local?" result-self":"")+(mvp?" result-mvp":"")+"\"><span class=\"result-identity\"><img class=\"result-weapon\" src=\"weapons/"+std::string(actor.weapon().kind)+".png\"/><span class=\"result-name\">"+(boss?std::to_string(position+1)+"  ":"")+Escape(entry.name)+"</span>"+(entry.local?" <em>自己</em>":entry.bot||actor.botControlled()?" <em>BOT</em>":"");
-                if(resultDone||showTime>=2.05){if(mvp)rows+="<span class=\"result-award\" title=\"MVP\">★</span>";if(!boss&&bestTurf>0&&actor.turfPainted()==bestTurf)rows+="<span class=\"result-award\" title=\"Turf\">★</span>";if(!boss&&bestSplats>0&&actor.splats()==bestSplats)rows+="<span class=\"result-award\" title=\"Splats\">★</span>";}
-                rows+="</span><span class=\"result-stat turf\">"+Integer((boss?boss->squadDamage()[i]:actor.turfPainted())*rowProgress)+(boss?"":"<small>p</small>")+"</span>";
-                if(result.zones&&!boss)rows+="<span class=\"result-stat zone\">"+Integer(actor.zoneTurf()*rowProgress)+"</span>";
-                if(boss)rows+="<span class=\"result-stat small\">"+std::to_string(boss->squadWeakHits()[i])+"</span>";
-                rows+="<span class=\"result-stat small\">"+std::to_string(boss?boss->squadSplats()[i]:actor.splats())+"</span><span class=\"result-stat small\">"+std::to_string(actor.deaths())+"</span>";
-                if(boss)rows+="<span class=\"result-stat turf\">"+Integer(actor.turfPainted()*rowProgress)+"<small>p</small></span>";
-                rows+="</div>";
-                ++rowNumber;
+                const bool mvp=boss?bestDamage>0&&boss->squadDamage[i]==bestDamage:actor.local&&medals.find("MVP")!=std::string::npos;
+                rows+="<div class=\"result-player"+std::string(actor.local?" result-self":"")+(mvp?" result-mvp":"")+"\"><span class=\"result-identity\"><img class=\"result-weapon\" src=\"weapons/"+actor.weaponKind+".png\"/><span class=\"result-name\">"+(boss?std::to_string(position+1)+"  ":"")+Escape(actor.name)+"</span>"+(actor.local?" <em>自己</em>":actor.bot?" <em>BOT</em>":"");
+                if(resultDone||showTime>=2.05){if(mvp)rows+="<span class=\"result-award\" title=\"MVP\">★</span>";if(!boss&&bestTurf>0&&actor.turf==bestTurf)rows+="<span class=\"result-award\" title=\"Turf\">★</span>";if(!boss&&bestSplats>0&&actor.splats==bestSplats)rows+="<span class=\"result-award\" title=\"Splats\">★</span>";}
+                rows+="</span><span class=\"result-stat turf\">"+Integer((boss?boss->squadDamage[i]:actor.turf)*rowProgress)+(boss?"":"<small>p</small>")+"</span>";
+                if(result.zones&&!boss)rows+="<span class=\"result-stat zone\">"+Integer(actor.zoneTurf*rowProgress)+"</span>";
+                if(boss)rows+="<span class=\"result-stat small\">"+std::to_string(boss->squadWeakHits[i])+"</span>";
+                rows+="<span class=\"result-stat small\">"+std::to_string(boss?boss->squadSplats[i]:actor.splats)+"</span><span class=\"result-stat small\">"+std::to_string(actor.deaths)+"</span>";
+                if(boss)rows+="<span class=\"result-stat turf\">"+Integer(actor.turf*rowProgress)+"<small>p</small></span>";
+                rows+="</div>";++rowNumber;
             }
             rows+="</div>";
         }
@@ -123,11 +120,10 @@
         std::string breakdown;
         if(reward.applied&&xpProgress>0){
             const int base=win?1200:500;
-            const int turf=static_cast<int>(std::llround(local.turfPainted()*(result.zones?0.6:1.0)));
-            const int splats=local.splats()*40;
-            const int zone=result.zones?static_cast<int>(std::llround(local.zoneTurf())):0;
-            std::size_t self=match.actors().size();for(std::size_t i=0;i<match.actors().size();++i)if(match.actors()[i].get()==&local){self=i;break;}
-            const int damage=boss&&self<match.actors().size()?static_cast<int>(std::llround(boss->squadDamage()[self]*.04)):0;
+            const int turf=static_cast<int>(std::llround(local.turf*(result.zones?0.6:1.0)));
+            const int splats=local.splats*40;
+            const int zone=result.zones?static_cast<int>(std::llround(local.zoneTurf)):0;
+            const int damage=boss?static_cast<int>(std::llround(boss->squadDamage[static_cast<std::size_t>(view.localActor)]*.04)):0;
             const int knockout=result.zones&&win&&result.zones->reason=="knockout"?300:0;
             if(std::abs(base+turf+splats+zone+damage+knockout-reward.gained)<=2){
                 breakdown=(win?"勝利獎勵 +":"對戰獎勵 +")+std::to_string(base)+"　 塗地 +"+std::to_string(turf);

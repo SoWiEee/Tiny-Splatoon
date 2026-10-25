@@ -9,6 +9,7 @@
 #include "../src/gui/UiText.hpp"
 #include "WeaponReticleElement.hpp"
 #include "MatchSimulation.hpp"
+#include "../src/network/RoomTypes.hpp"
 #include "../src/network/AuthorityState.hpp"
 #include "PlayerController.hpp"
 #include "ZoneControl.hpp"
@@ -67,6 +68,11 @@ std::size_t MapPinIconContrastPixels(const std::vector<unsigned char>& pixels,in
     std::size_t contrast=0;
     for(int y=top;y<=bottom;++y)for(int x=left;x<=right;++x)if(PixelTop(pixels,width,height,x,y)!=teamFill)++contrast;
     return contrast;
+}
+restoration::UiAction RenderHudSnapshot(restoration::GameUi& ui,const restoration::StageData& stage,const restoration::FacePaint& paint,restoration::MatchSimulation& match,int width,int height,bool paused,bool nativeApp,bool practice=false){
+    ui.UpdateMapInteraction(stage,paint,match,width,height,paused);
+    const auto view=restoration::BuildHudViewModel(match);
+    return ui.RenderHud(view,width,height,paused,nativeApp,practice);
 }
 }
 int main(int argc,char** argv){
@@ -324,7 +330,7 @@ int main(int argc,char** argv){
         StageGeometry geometry(*stage);FacePaint paint(*stage,geometry);NavGraph nav(*stage,geometry);
         MatchOptions matchOptions;matchOptions.duration=90;
         MatchSimulation match(*stage,geometry,paint,nav,matchOptions);
-        auto hudRender=[&](bool paused,bool practice=false){glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return ui.RenderHud(*stage,paint,match,1600,900,paused,true,practice);};
+        auto hudRender=[&](bool paused,bool practice=false){glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return RenderHudSnapshot(ui,*stage,paint,match,1600,900,paused,true,practice);};
         hudRender(true);
         auto* hud=context->GetDocument("hud");Check(hud!=nullptr,"Missing match HUD document");
         Check(!menu->IsVisible()&&hud->IsVisible(),"Starting a match must hide the menu and reveal the HUD");
@@ -339,7 +345,7 @@ int main(int argc,char** argv){
             Check(gauge->GetAttribute<Rml::String>("aria-valuenow","")=="50","The ink meter must expose actual ink, independent of its smoothed liquid");
             for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
                 glViewport(0,0,size[0],size[1]);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-                ui.RenderHud(*stage,paint,match,size[0],size[1],false,true);
+                RenderHudSnapshot(ui,*stage,paint,match,size[0],size[1],false,true);
                 const auto position=gauge->GetAbsoluteOffset(Rml::BoxArea::Border);const auto bounds=gauge->GetBox().GetSize(Rml::BoxArea::Border);
                 Check(position.x>size[0]*.5&&position.x<size[0]*.6&&std::abs(position.y+bounds.y*.5-size[1]*.5)<2,"The ink tube must sit immediately right of the reticle and stay vertically centered");
                 const auto pixels=Capture(std::filesystem::path(argv[2])/("ink-tank-"+std::to_string(size[0])+"x"+std::to_string(size[1])+".png"),size[0],size[1]);
@@ -421,7 +427,7 @@ int main(int argc,char** argv){
             Check(badge->IsClassSet("ready")&&!badge->IsClassSet("dead"),"Respawn and special-ready must refresh the existing player's HUD state");
             for(const auto size:{std::array<int,2>{1280,720},std::array<int,2>{1920,1080}}){
                 glViewport(0,0,size[0],size[1]);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-                ui.RenderHud(*stage,paint,match,size[0],size[1],false,true);
+                RenderHudSnapshot(ui,*stage,paint,match,size[0],size[1],false,true);
                 const auto clockOffset=hud->GetElementById("clock")->GetAbsoluteOffset();
                 const auto left=own->GetAbsoluteOffset();const auto right=enemy->GetAbsoluteOffset();
                 Check(left.x+own->GetOffsetWidth()<=clockOffset.x+1&&right.x>=clockOffset.x+hud->GetElementById("clock")->GetOffsetWidth()-1,"Squads must flank the clock without overlap");
@@ -432,27 +438,27 @@ int main(int argc,char** argv){
             FacePaint onlinePaint(*stage,geometry);MatchOptions onlineOptions;onlineOptions.network=true;onlineOptions.duration=180;onlineOptions.localPeer=2;onlineOptions.authorityPeer=1;
             for(unsigned i=0;i<3;++i){network::RosterEntry entry;entry.nid=i;entry.owner=i==1?2:1;entry.bot=i==2;entry.team=i==0?0:1;entry.slot=i==2?1:0;entry.name=i==1?"<self>":"Peer";entry.main="shooter";onlineOptions.networkRoster.push_back(entry);}
             MatchSimulation onlineMatch(*stage,geometry,onlinePaint,nav,onlineOptions);
-            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,onlinePaint,onlineMatch,1600,900,false,true);
             Check(own->GetNumChildren()==2&&enemy->GetNumChildren()==1&&hud->GetElementById("squad-player-1")->IsClassSet("self"),"A guest must see its actual team on the left even when its actor is not index zero");
-            onlineMatch.setNetworkActorActive(2,false);ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            onlineMatch.setNetworkActorActive(2,false);RenderHudSnapshot(ui,*stage,onlinePaint,onlineMatch,1600,900,false,true);
             Check(own->GetNumChildren()==1&&hud->GetElementById("squad-player-2")==nullptr,"An inactive departed actor must leave both the roster and its living count");
             onlineMatch.restart();auto& respawning=onlineMatch.local();respawning.state.alive=false;respawning.state.respawnTimer=2.2;
-            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,onlinePaint,onlineMatch,1600,900,false,true);
             Check(!hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-hint")->IsClassSet("hidden"),"Intro must hide the respawn card and hint");
             onlineMatch.startPlaying();respawning.state.respawnTimer=-1.2;
-            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,onlinePaint,onlineMatch,1600,900,false,true);
             Check(hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-seconds")->GetInnerRML()=="0"&&hud->GetElementById("player-status")->GetInnerRML().find("0 秒")!=Rml::String::npos,"Playing respawn countdowns must clamp at zero");
             Check(hud->GetElementById("squad-player-1")->GetAttribute<Rml::String>("title","").find("復活 0 秒")!=Rml::String::npos,"The squad countdown must clamp at zero");
             onlineMatch.applyNetworkState(MatchPhase::Finish,onlineMatch.remaining(),std::nullopt);
-            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,onlinePaint,onlineMatch,1600,900,false,true);
             Check(!hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-hint")->IsClassSet("hidden")&&hud->GetElementById("player-status")->IsClassSet("hidden")&&hud->GetElementById("squad-player-1")->GetAttribute<Rml::String>("title","").find("已退場")!=Rml::String::npos,"Finish must immediately hide respawn hints");
             MatchResult result{};onlineMatch.applyNetworkState(MatchPhase::Results,0,result);
-            ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,onlinePaint,onlineMatch,1600,900,false,true);
             Check(!hud->GetElementById("death-card")->IsVisible()&&hud->GetElementById("respawn-hint")->IsClassSet("hidden"),"Results must not show respawn hints");
-            onlineMatch.restart();ui.RenderHud(*stage,onlinePaint,onlineMatch,1600,900,false,true);
+            onlineMatch.restart();RenderHudSnapshot(ui,*stage,onlinePaint,onlineMatch,1600,900,false,true);
             FacePaint bossPaint(*stage,geometry);MatchOptions bossOptions;bossOptions.mode="boss";
             MatchSimulation bossMatch(*stage,geometry,bossPaint,nav,bossOptions);
-            glViewport(0,0,1600,900);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+            glViewport(0,0,1600,900);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);
             Check(own->GetNumChildren()==4&&enemy->GetNumChildren()==4&&hud->GetElementById("squad-a-count")->GetInnerRML().find("8 / 8")!=Rml::String::npos,"Boss HUD must split the eight-person squad around the timer and count the full squad");
             Capture(std::filesystem::path(argv[2])/"boss-roster-1600x900.png",1600,900);
             for(const auto& actor:bossMatch.actors())Check(actor->team()==0,"Every Boss squad actor must use the same ink team");
@@ -461,7 +467,7 @@ int main(int argc,char** argv){
             for(const int phase:{2,3}){
                 auto wire=boss->captureAuthorityState();wire.state.phase=phase;wire.state.hp=wire.state.maxHp*(phase==2?.6:.3);wire.state.anim=2;wire.state.animT0=wire.state.clock;
                 Check(boss->adoptAuthorityState(wire),"Boss phase presentation fixture must adopt a valid state");
-                ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+                RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);
                 Check(hud->GetElementById("boss-phase")->GetInnerRML().find(phase==2?"◆◆◇":"◆◆◆")!=Rml::String::npos,"Boss phase pips must follow live simulation");
                 Check(hud->GetElementById("boss-state")->GetInnerRML().find("怒吼")!=Rml::String::npos,"Phase transformation must display the live roar state");
                 Check(hud->GetElementById("boss-hp")->GetInnerRML()==(phase==2?"60%":"30%"),"Boss HP must show the real percentage");
@@ -469,25 +475,25 @@ int main(int argc,char** argv){
                 Capture(std::filesystem::path(argv[2])/("boss-phase-"+std::to_string(phase)+".png"),1600,900);
             }
             {auto wire=boss->captureAuthorityState();wire.state.anim=0;wire.state.stunned=false;wire.move.reset();wire.moves.clear();Check(boss->adoptAuthorityState(wire),"Boss callout fixture must exit its phase roar");}
-            boss->forceMove(BossMoveId::Slam);for(int i=0;i<100&&!boss->move();++i)bossMatch.tick(.1);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+            boss->forceMove(BossMoveId::Slam);for(int i=0;i<100&&!boss->move();++i)bossMatch.tick(.1);RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);
             Check(hud->GetElementById("boss-feedback-move")->IsVisible(),"A real Boss telegraph must display its dedicated move callout");
-            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);Capture(std::filesystem::path(argv[2])/"v085-boss-callout.png",1600,900);
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);Capture(std::filesystem::path(argv[2])/"v085-boss-callout.png",1600,900);
             Check(hud->GetElementById("battle-banner")->IsClassSet("hidden"),"Boss phase banner suppresses overlapping generic battle banner");
             BossSegmentHit feedbackHit;feedbackHit.weak=true;feedbackHit.point=boss->state().pos+glm::dvec3(0,3,0);
-            boss->hit(bossMatch.local(),120,feedbackHit,"shooter");ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+            boss->hit(bossMatch.local(),120,feedbackHit,"shooter");RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);
             Check(hud->GetElementById("boss-feedback-numbers")->GetNumChildren()>0,"A real local weakpoint hit must create Boss damage/weakpoint feedback");
             Capture(std::filesystem::path(argv[2])/"v085-boss-hit.png",1600,900);
-            ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,true,true);Check(!hud->GetElementById("boss-feedback-layer")->IsVisible(),"Paused Boss feedback must hide transient overlays");
+            RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,true,true);Check(!hud->GetElementById("boss-feedback-layer")->IsVisible(),"Paused Boss feedback must hide transient overlays");
             for(bool won:{false,true}){
                 if(won){bossMatch.restart();bossMatch.startPlaying();for(int i=0;i<40;++i)bossMatch.tick(.1);BossSegmentHit hit;hit.weak=true;bossMatch.boss()->hit(bossMatch.local(),1000000,hit,"shooter");}
                 for(int i=0;i<2600&&bossMatch.phase()!=MatchPhase::Judge;++i)bossMatch.tick(.1);
                 Check(bossMatch.phase()==MatchPhase::Judge,"Boss fixture must complete the real victory/timeout flow");bossMatch.finishJudging();
-                ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
-                hud->GetElementById("result-skip")->Click();ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+                RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);
+                hud->GetElementById("result-skip")->Click();RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);
                 Check(hud->GetElementById("result-boss")->IsVisible()&&!hud->GetElementById("result-score")->IsVisible(),"Boss results must use a dedicated HP/phase/time panel");
                 Check(!hud->GetElementById("result-boss-time")->GetInnerRML().empty()&&hud->GetElementById("result-boss-stamp")->GetInnerRML()==(won?"擊破！":"逃脫"),"Boss result must show the actual clear/timeout result");
                 const auto rows=hud->GetElementById("results-table")->GetInnerRML();Check(rows.find("5–8")!=Rml::String::npos&&rows.find("弱點")!=Rml::String::npos&&rows.find("塗地")!=Rml::String::npos,"Boss results require both squad columns, weak hits and turf");
-                glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,bossPaint,bossMatch,1600,900,false,true);
+                glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);RenderHudSnapshot(ui,*stage,bossPaint,bossMatch,1600,900,false,true);
                 Capture(std::filesystem::path(argv[2])/(won?"boss-results-win.png":"boss-results-timeout.png"),1600,900);
             }
             hudRender(true);
@@ -532,7 +538,7 @@ int main(int argc,char** argv){
                 ui.SetWorldView(glm::mat4(mapCamera.projection*mapCamera.view),mapCamera.eye,float(mapCamera.projection[1][1]));
                 setMapFrame(true,targets);
                 glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-                ui.RenderHud(*stage,jumpPaint,jumpMatch,width,height,false,true);
+                RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,width,height,false,true);
                 auto* panel=hud->GetElementById("minimap");
                 Check(panel->IsVisible()&&panel->IsClassSet("jump-map-open"),"Opening the Super Jump map must expand and show the minimap panel");
                 const auto mapSize=panel->GetBox().GetSize(Rml::BoxArea::Border);
@@ -599,7 +605,7 @@ int main(int argc,char** argv){
             renderJumpMap(1920,1080,"jump-map-1920x1080.png");
             auto missingWeaponTargets=uiTargets();
             for(auto& target:missingWeaponTargets)if(target.key==1)target.weapon.clear();
-            setMapFrame(true,std::move(missingWeaponTargets));ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapFrame(true,std::move(missingWeaponTargets));RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(hud->GetElementById("jump-map-marker-1")->GetInnerRML().find("weapons/shooter.png")!=std::string::npos,
                   "A teammate pin without weapon metadata must use the source-default shooter icon rather than a blank white tile");
             Check(clickTarget(1)==1&&jumpController.SelectSuperJumpMapTarget(jumpMatch,1),"Clicking a live teammate target must route into the controller and start the selected jump");
@@ -617,30 +623,30 @@ int main(int argc,char** argv){
             ally->state.invuln=0;
             Check(ally->damage(200)&&!ally->state.alive,"Disabled-target fixture should splat the selected teammate");
             setMapTargets();
-            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(!controllerTargets()[0].available&&hud->GetElementById("jump-map-legend")->GetInnerRML().find("jump-target-1")!=Rml::String::npos&&hud->GetElementById("jump-map-legend")->GetInnerRML().find("unavailable")!=Rml::String::npos&&hud->GetElementById("jump-target-1")->HasAttribute("disabled"),"Dead teammates must remain listed with a visibly disabled target state");
             const auto confirmsBeforeDeadClick=std::count(sounds.begin(),sounds.end(),"ui_confirm");
             Check(clickTarget(1)==-1&&!jumpController.SelectSuperJumpMapTarget(jumpMatch,1)&&!jumpMatch.local().superJumpState()&&std::count(sounds.begin(),sounds.end(),"ui_confirm")==confirmsBeforeDeadClick,"Clicking an unavailable teammate must not start a jump or emit a confirm cue");
             ally->spawnAt(stage->spawnPads[ally->team()]+glm::dvec3(2,0,0),0.0);
 
             jumpMatch.local().setCanRespawn(false);
-            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapTargets();RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(!controllerTargets()[3].available&&hud->GetElementById("jump-target-4")->HasAttribute("disabled"),"Respawn gating must disable the base target");
             Check(clickTarget(4)==-1&&!jumpController.SelectSuperJumpMapTarget(jumpMatch,4)&&!jumpMatch.local().superJumpState(),"Clicking the gated base target must not start a jump");
             jumpMatch.local().setCanRespawn(true);
 
             jumpMatch.local().setLoadout("shooter","beacon","slam");
             jumpMatch.local().combatWorld().deploy(jumpMatch.local(),"beacon");
-            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapTargets();RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             const auto targetsWithBeacon=controllerTargets();
             const auto beaconTarget=std::find_if(targetsWithBeacon.begin(),targetsWithBeacon.end(),[](const auto& target){return target.kind==SuperJumpMapTargetKind::Beacon;});
             Check(beaconTarget!=targetsWithBeacon.end()&&beaconTarget->key==5,"The oldest live team beacon should be listed at key 5");
             jumpMatch.local().setCanRespawn(false);
-            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapTargets();RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(!controllerTargets()[4].available&&hud->GetElementById("jump-target-5")->HasAttribute("disabled"),"Respawn gating must disable the beacon target");
             Check(clickTarget(5)==-1&&!jumpController.SelectSuperJumpMapTarget(jumpMatch,5),"Clicking a gated beacon must not start a jump");
             jumpMatch.local().setCanRespawn(true);
-            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapTargets();RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(clickTarget(5)==5&&jumpController.SelectSuperJumpMapTarget(jumpMatch,5),"Clicking the beacon target must route into the controller and start the beacon jump");
             Check(jumpMatch.local().superJumpState()&&jumpMatch.local().superJumpState()->beaconId==beaconTarget->beaconId,"Beacon click must preserve the selected device id");
 
@@ -648,10 +654,10 @@ int main(int argc,char** argv){
             setMapTargets();
             jumpMatch.local().state.invuln=0;
             Check(jumpMatch.local().damage(200)&&!jumpMatch.local().state.alive,"Dead-map fixture should splat the local player before choosing a queued target");
-            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapTargets();RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(controllerTargets()[0].available&&!hud->GetElementById("jump-target-1")->HasAttribute("disabled"),"A living teammate remains available as a queued target while the local player is dead");
             glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             const auto unselectedMapPixels=Capture(std::filesystem::path(argv[2])/"jump-map-teammate-unselected.png",1600,900);
             auto* unselectedMapPin=hud->GetElementById("jump-map-marker-1");
             const auto unselectedIconCorner=MapPinIconCornerPixel(unselectedMapPixels,1600,900,*unselectedMapPin);
@@ -661,10 +667,10 @@ int main(int argc,char** argv){
             const auto queuedTargets=uiTargets();
             const auto queuedTeammate=std::find_if(queuedTargets.begin(),queuedTargets.end(),[](const auto& target){return target.key==1;});
             Check(queuedTeammate!=queuedTargets.end()&&!queuedTeammate->weapon.empty(),"The queued pin fixture must carry the actual teammate's equipped weapon");
-            setMapFrame(true,queuedTargets,1,"隊友");ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapFrame(true,queuedTargets,1,"隊友");RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(hud->GetElementById("jump-map-marker-1")->IsClassSet("queued"),"The queued landing pin must show its selection ring on the map");
             glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             const auto selectedMapPixels=Capture(std::filesystem::path(argv[2])/"jump-map-teammate-selected.png",1600,900);
             auto* selectedMapPin=hud->GetElementById("jump-map-marker-1");
             auto* selectedMapImage=selectedMapPin?selectedMapPin->GetFirstChild():nullptr;
@@ -688,21 +694,21 @@ int main(int argc,char** argv){
             setMapTargets();
             hud->GetElementById("jump-target-1")->Click();
             setMapFrame(false,{});
-            glfwSetTime(glfwGetTime()+.2);ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            glfwSetTime(glfwGetTime()+.2);RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(!minimapPanel->IsClassSet("jump-map-open")&&ui.TakeJumpMapSelection()==-1,"Closing the map must collapse it and discard any pending target click");
             Check(hud->GetElementById("jump-map-marker-1")==nullptr,"Closing the map must remove its large pins from the compact map immediately");
-            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapTargets();RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(minimapPanel->IsClassSet("jump-map-open")&&hud->GetElementById("jump-map-marker-1")!=nullptr,"Reopening the map must rebuild pins in the same frame");
 
             const auto mapHelp=hud->GetElementById("jump-map-help")->GetInnerRML();
-            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(!mapHelp.empty()&&hud->GetElementById("jump-map-help")->GetInnerRML()==mapHelp,"Repeated map frames must retain the module-owned help text");
             const auto mapProfile=ui.profile();auto noMinimapProfile=mapProfile;noMinimapProfile.settings.minimap=false;ui.SetProfile(noMinimapProfile);
-            ui.SetMapFrame(UiMapFrame{});ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            ui.SetMapFrame(UiMapFrame{});RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(!minimapPanel->IsClassSet("jump-map-open")&&hud->GetElementById("jump-map-marker-1")==nullptr,"Closing with the minimap disabled must clear its open class and pins without waiting for a cache tick");
             Check(hud->GetElementById("jump-map-help")->GetInnerRML().empty(),"Closing with the minimap disabled must clear map help");
             ui.SetProfile(mapProfile);UiMapFrame reopened;reopened.open=true;reopened.targets=uiTargets();ui.SetMapFrame(std::move(reopened));
-            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(hud->GetElementById("jump-map-marker-1")!=nullptr,"Immediate reopen must rebuild pins without advancing the clock");
 
             auto removedFirstTarget=uiTargets();removedFirstTarget.erase(std::remove_if(removedFirstTarget.begin(),removedFirstTarget.end(),[](const auto& target){return target.key==1;}),removedFirstTarget.end());
@@ -712,24 +718,24 @@ int main(int argc,char** argv){
             setMapTargets();hud->GetElementById("jump-map-marker-1")->Click();setMapFrame(true,unavailableFirstTarget);
             Check(ui.TakeJumpMapSelection()==-1,"A selected target that becomes unavailable must be discarded");
 
-            setMapTargets();ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapTargets();RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             auto* hoverPin=hud->GetElementById("jump-map-marker-1");const auto hoverOffset=hoverPin->GetAbsoluteOffset(Rml::BoxArea::Border);const auto hoverSize=hoverPin->GetBox().GetSize(Rml::BoxArea::Border);
             context->ProcessMouseMove(static_cast<int>(hoverOffset.x+hoverSize.x*.5),static_cast<int>(hoverOffset.y+hoverSize.y*.5),0);
-            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             auto noHoveredTarget=uiTargets();noHoveredTarget.erase(std::remove_if(noHoveredTarget.begin(),noHoveredTarget.end(),[](const auto& target){return target.key==1;}),noHoveredTarget.end());
             setMapFrame(true,noHoveredTarget);ui.ConfirmJumpMapCursor();
             Check(ui.TakeJumpMapSelection()==-1,"Confirming a stale cursor hover after its target disappears must not select it");
 
             setMapTargets();hud->GetElementById("jump-map-marker-1")->Click();jumpMatch.restart();jumpMatch.startPlaying();
-            ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
             Check(ui.TakeJumpMapSelection()==-1,"Restarting a match must clear a pending map selection even when the MatchSimulation address is unchanged");
-            setMapFrame(false,{});ui.RenderHud(*stage,jumpPaint,jumpMatch,1600,900,false,true);
+            setMapFrame(false,{});RenderHudSnapshot(ui,*stage,jumpPaint,jumpMatch,1600,900,false,true);
         }
         StageGeometry zonesGeometry(*zonesStage);FacePaint zonesPaint(*zonesStage,zonesGeometry);NavGraph zonesNav(*zonesStage,zonesGeometry);
         MatchOptions zonesOptions;zonesOptions.mode="zones";zonesOptions.duration=300;zonesOptions.seed=41;
         MatchSimulation zonesMatch(*zonesStage,zonesGeometry,zonesPaint,zonesNav,zonesOptions);
         Check(zonesMatch.zones()!=nullptr,"Zone Control match should expose its live objective state");
-        auto zonesHudRender=[&]{glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return ui.RenderHud(*zonesStage,zonesPaint,zonesMatch,1600,900,true,true);};
+        auto zonesHudRender=[&]{glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);return RenderHudSnapshot(ui,*zonesStage,zonesPaint,zonesMatch,1600,900,true,true);};
         zonesHudRender();
         Check(hud->GetElementById("hp")==nullptr&&hud->GetElementById("team-score")==nullptr,"Source battle HUD must not expose player HP or live turf percentages");
         Check(hud->GetElementById("zones-hud")->IsVisible()&&hud->GetElementById("zone-score-a")->IsVisible()&&hud->GetElementById("zone-score-b")->IsVisible(),"Zone Control should show source-style team counters around the clock");
@@ -740,7 +746,7 @@ int main(int argc,char** argv){
         Check(hud->GetElementById("zone-phase-hint")->IsClassSet("hidden"),"Routine objective rotation must not show a persistent countdown");
         auto captureZonesHud=[&](int width,int height,const char* filename){
             glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-            ui.RenderHud(*zonesStage,zonesPaint,zonesMatch,width,height,false,true);
+            RenderHudSnapshot(ui,*zonesStage,zonesPaint,zonesMatch,width,height,false,true);
             auto* panel=hud->GetElementById("zones-hud");
             Check(panel->GetBox().GetSize(Rml::BoxArea::Border).y<height*.25f,"Zone HUD should stay compact at 720p and 1080p");
             const float dpRatio=std::clamp(std::min(width/1440.f,height/900.f),.72f,1.6f);
@@ -855,21 +861,21 @@ int main(int argc,char** argv){
         Capture(std::filesystem::path(argv[2])/"results.png",1600,900);
         auto captureResults=[&](int width,int height,const char* filename){
             glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-            ui.RenderHud(*stage,paint,match,width,height,false,true);
+            RenderHudSnapshot(ui,*stage,paint,match,width,height,false,true);
             Capture(std::filesystem::path(argv[2])/filename,width,height);
         };
         captureResults(1280,720,"results-1280x720.png");captureResults(1920,1080,"results-1920x1080.png");
         match.restart();
         glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        ui.RenderHud(*stage,paint,match,1600,900,false,true); // Intro frame clears the prior result identity.
+        RenderHudSnapshot(ui,*stage,paint,match,1600,900,false,true); // Intro frame clears the prior result identity.
         match.startPlaying();
         for(int i=0;i<1000&&match.phase()!=MatchPhase::Judge;++i)match.tick(.1);
         Check(match.phase()==MatchPhase::Judge,"Rematch UI lifecycle did not reach judging");match.finishJudging();
         sounds.clear();ui.SetReward(reward);
         glViewport(0,0,1600,900);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        ui.RenderHud(*stage,paint,match,1600,900,false,true);
+        RenderHudSnapshot(ui,*stage,paint,match,1600,900,false,true);
         Check(xpLabel->GetInnerRML().find("+0")!=Rml::String::npos,"The same-match rematch should start a fresh XP reveal for an identical award");
-        glfwSetTime(glfwGetTime()+2.3+3.6+.2);ui.RenderHud(*stage,paint,match,1600,900,false,true);
+        glfwSetTime(glfwGetTime()+2.3+3.6+.2);RenderHudSnapshot(ui,*stage,paint,match,1600,900,false,true);
         Check(xpLabel->GetInnerRML().find("+640")==Rml::String::npos&&std::count(sounds.begin(),sounds.end(),"xp_tick")==1,"The same-match rematch's identical award should animate and tick once");
         hud->GetElementById("result-skip")->Click();hudRender(false);
         Check(ui.preview().type==UiPreviewType::Podium,"Skipping the reveal must expose the complete podium without exiting the match");
@@ -881,7 +887,7 @@ int main(int argc,char** argv){
             for(const auto& equipment:SpecialEquipment())Check(std::filesystem::exists(std::filesystem::path(argv[1])/"assets/ui/equipment"/("special-"+std::string(equipment.id)+".png")),"Every special must have source HUD artwork");
             FacePaint combatPaint(*stage,geometry);MatchOptions options;options.duration=90;
             MatchSimulation combatMatch(*stage,geometry,combatPaint,nav,options);combatMatch.startPlaying();
-            auto draw=[&](int w=1600,int h=900,bool paused=false){glViewport(0,0,w,h);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,combatPaint,combatMatch,w,h,paused,true);};
+            auto draw=[&](int w=1600,int h=900,bool paused=false){glViewport(0,0,w,h);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);RenderHudSnapshot(ui,*stage,combatPaint,combatMatch,w,h,paused,true);};
             auto& local=combatMatch.local();local.state.invuln=0;std::vector<PlayerSimulation*> foes;PlayerSimulation* ally=nullptr;
             for(const auto& actor:combatMatch.actors()){actor->state.invuln=0;if(actor->team()!=local.team())foes.push_back(actor.get());else if(actor.get()!=&local)ally=actor.get();}
             Check(foes.size()==4&&ally,"Combat HUD fixture needs two complete teams");draw();
@@ -932,7 +938,7 @@ int main(int argc,char** argv){
             ally->spawnAt(deathPosition+glm::dvec3(5,0,0),0);
             const auto view=glm::scale(glm::mat4(1),glm::vec3(.05f))*glm::translate(glm::mat4(1),-glm::vec3(deathPosition));
             ui.SetWorldView(view,deathPosition+glm::dvec3(0,4,0),1.0f);
-            auto draw=[&](int width=1600,int height=900){glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);ui.RenderHud(*stage,markerPaint,markerMatch,width,height,false,true);};
+            auto draw=[&](int width=1600,int height=900){glViewport(0,0,width,height);glClearColor(.25f,.3f,.35f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);RenderHudSnapshot(ui,*stage,markerPaint,markerMatch,width,height,false,true);};
             draw();
             Check(hud->GetElementById("death-markers")->GetNumChildren()==1&&hud->GetElementById("minimap-map")->GetInnerRML().find("map-death-mark")!=Rml::String::npos,"A death before the first HUD frame must retain its original world and map positions after respawn");
             draw(1280,720);Capture(std::filesystem::path(argv[2])/"death-markers-1280x720.png",1280,720);
@@ -982,28 +988,28 @@ int main(int argc,char** argv){
             };
             for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
                 background(dims.first,dims.second);setSceneMapFrame(true,dims.first,dims.second);
-                ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
                 Check(hud->GetElementById("jump-map-marker-1")->IsVisible(),"The actual map camera must project a friendly jump pin");
                 auto* pin=hud->GetElementById("jump-map-marker-1");const auto pinOffset=pin->GetAbsoluteOffset(Rml::BoxArea::Border);const auto pinSize=pin->GetBox().GetSize(Rml::BoxArea::Border);
                 context->ProcessMouseMove(static_cast<int>(pinOffset.x+pinSize.x*.5),static_cast<int>(pinOffset.y+pinSize.y*.5),0);
-                ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);ui.ConfirmJumpMapCursor();Check(ui.TakeJumpMapSelection()>=1,"The map cursor must snap and confirm a nearby live teammate pin");
+                RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);ui.ConfirmJumpMapCursor();Check(ui.TakeJumpMapSelection()>=1,"The map cursor must snap and confirm a nearby live teammate pin");
                 Capture(std::filesystem::path(argv[2])/("source-native-tab-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
-                background(dims.first,dims.second);setSceneMapFrame(false,dims.first,dims.second);ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                background(dims.first,dims.second);setSceneMapFrame(false,dims.first,dims.second);RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
                 Check(hud->GetElementById("minimap-render")->IsVisible(),"The compact map must show the native stage texture");
                 Check(hud->GetElementById("jump-map-marker-1")==nullptr,"Closing Tab must immediately remove large jump pins from the compact map");
                 Capture(std::filesystem::path(argv[2])/("source-native-mini-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
             }
             for(int i=0;i<1000&&sceneMatch.phase()!=MatchPhase::Judge;++i)sceneMatch.tick(.1);
             Check(sceneMatch.phase()==MatchPhase::Judge,"Native results composition fixture must finish the match");sceneMatch.finishJudging();sceneRenderer.UploadInk(*stage,scenePaint);
-            ui.SetReward({});background(1600,900);ui.RenderHud(*stage,scenePaint,sceneMatch,1600,900,false,true);
+            ui.SetReward({});background(1600,900);RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,1600,900,false,true);
             Capture(std::filesystem::path(argv[2])/"source-native-results-intro.png",1600,900);
-            hud->GetElementById("result-skip")->Click();ui.RenderHud(*stage,scenePaint,sceneMatch,1600,900,false,true);
+            hud->GetElementById("result-skip")->Click();RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,1600,900,false,true);
             PlayerShowcase showcase(references/"characters");std::vector<PlayerShowcase::PodiumPlayer> squad;
             for(std::size_t i=0;i<sceneMatch.actors().size();++i){const auto& actor=*sceneMatch.actors()[i];if(actor.team()==sceneMatch.local().team())squad.push_back({sceneMatch.roster()[i].name,sceneMatch.roster()[i].style,actor.mainId(),actor.subId()});}
             for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
-                background(dims.first,dims.second);ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);
+                background(dims.first,dims.second);RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);
                 showcase.drawPodium(squad,sceneMatch.result()->winner==sceneMatch.local().team(),{int(preview.x*dims.first),int((1-preview.y-preview.height)*dims.second),int(preview.width*dims.first),int(preview.height*dims.second)},glfwGetTime(),true);
-                ui.RenderHud(*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
+                RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);
                 for(const char* id:{"results-rematch","results-menu"}){auto* button=hud->GetElementById(id);auto* label=button->GetFirstChild();Check(label!=nullptr&&label->GetTagName()=="span","Results actions need stable span labels even when returning to a room");const auto b=button->GetAbsoluteOffset(Rml::BoxArea::Border),t=label->GetAbsoluteOffset(Rml::BoxArea::Border);Check(std::abs((t.y+label->GetOffsetHeight()*.5)-(b.y+button->GetOffsetHeight()*.5))<5,"Results action labels must be vertically centered");}
                 Capture(std::filesystem::path(argv[2])/("source-native-results-full-"+std::to_string(dims.second)+".png"),dims.first,dims.second);
             }
@@ -1013,12 +1019,12 @@ int main(int argc,char** argv){
             BossSegmentHit weakHit;weakHit.weak=true;bossScene.boss()->hit(bossScene.local(),1000000,weakHit,"shooter");
             for(int i=0;i<70&&bossScene.phase()!=MatchPhase::Judge;++i)bossScene.tick(.1);
             Check(bossScene.phase()==MatchPhase::Judge,"Boss scene composition must complete the victory flow");bossScene.finishJudging();
-            ui.RenderHud(*stage,bossScenePaint,bossScene,1600,900,false,true);hud->GetElementById("result-skip")->Click();
+            RenderHudSnapshot(ui,*stage,bossScenePaint,bossScene,1600,900,false,true);hud->GetElementById("result-skip")->Click();
             std::vector<PlayerShowcase::PodiumPlayer> bossSquad;for(std::size_t i=0;i<4;++i){const auto& actor=*bossScene.actors()[i];bossSquad.push_back({bossScene.roster()[i].name,bossScene.roster()[i].style,actor.mainId(),actor.subId()});}
             for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
-                ui.RenderHud(*stage,bossScenePaint,bossScene,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);
+                RenderHudSnapshot(ui,*stage,bossScenePaint,bossScene,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);
                 showcase.drawPodium(bossSquad,true,{int(preview.x*dims.first),int((1-preview.y-preview.height)*dims.second),int(preview.width*dims.first),int(preview.height*dims.second)},glfwGetTime(),true);
-                ui.RenderHud(*stage,bossScenePaint,bossScene,dims.first,dims.second,false,true);
+                RenderHudSnapshot(ui,*stage,bossScenePaint,bossScene,dims.first,dims.second,false,true);
                 Check(!hud->GetElementById("boss")->IsVisible(),"Results must hide the combat Boss plate");
                 Check(hud->GetElementById("results-table")->GetFirstChild()->GetOffsetWidth()>dims.first*.4,"Boss rankings must occupy two readable columns");
                 Capture(std::filesystem::path(argv[2])/("source-native-boss-results-"+std::to_string(dims.second)+".png"),dims.first,dims.second);

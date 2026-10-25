@@ -34,6 +34,10 @@
 - HUD 顯示隊伍名單、武器、存活／復活、特殊技能狀態、武器準星、擊倒訊息、Zones 計分與局內提示。敵方位置只在己方追蹤期間顯示；隊伍塗地比例在結果揭曉，不顯示局內 HP 數字。
 - 小地圖與彈射地圖提供地形、墨面、隊友、基地、訊標、合法落點及預選提示；死亡標記保留五秒並於最後 1.3 秒淡出，對局重開時清除。
 
+## HUD 資料介面
+
+`BuildHudViewModel(const MatchSimulation&)` 在顯示前建立持有自身資料的快照，戰鬥 HUD、Boss／Zones 回饋與結果介面以唯讀方式消費；不在 HUD 呈現路徑中讀寫對戰模擬。快照中的事件角色以名單索引表示，無攻擊者為 `-1`；對局識別與事件 epoch 負責重開時的狀態重設。地圖、隊友／死亡位置標記及彈射選取仍使用獨立的地圖更新入口，並先套用當前視窗尺寸。
+
 ## 玩家資料
 
 設定檔位於 Windows `%LOCALAPPDATA%/Tiny-Splatoon/profile.json`；Linux 使用絕對路徑 `XDG_DATA_HOME/Tiny-Splatoon/profile.json`，否則使用 `$HOME/.local/share/Tiny-Splatoon/profile.json`。檔案包含玩家名稱、裝備、外觀、等級、XP、勝場、場次、累積塗地及支援的設定。缺檔或無效 JSON 使用預設；舊武器別名轉為現行 ID；寫入先使用暫存檔再原子替換，替換失敗保留舊檔。完整離線對戰只結算一次；練習與中途離場不結算 XP。

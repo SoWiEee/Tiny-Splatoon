@@ -9,6 +9,7 @@
 #include "../game/MatchSimulation.hpp"
 #include "../game/PlayerSimulation.hpp"
 #include "../game/ZoneControl.hpp"
+#include "../render/CharacterRenderData.hpp"
 #include "UiText.hpp"
 #include "EquipmentDescriptionZhTw.hpp"
 #include "../world/FacePaint.hpp"
@@ -147,18 +148,18 @@ struct GameUi::Impl : Rml::EventListener {
     GLFWcharfun previousChar=nullptr;
     double lastHudTime=0;
     double inkFullIdle=0;
-    const MatchSimulation* inkMatch=nullptr;
-    const PlayerSimulation* inkActor=nullptr;
+    std::uint64_t inkMatchId=0;
+    int inkActorSlot=-1;
     glm::mat4 worldView{1.f};
     float projectionY=1.78f;
     glm::dvec3 worldEye{0};
     bool haveWorldView=false;
     int hudFps=0;
     std::string stageOptionMode,durationOptionMode;
-    const ZoneControl* displayedZones=nullptr;
+    std::uint64_t displayedZonesMatchId=0;
     std::size_t zoneEventCursor=0;
     double zoneCalloutUntil=0.0;
-    const MatchSimulation* resultXpMatch=nullptr;
+    std::uint64_t resultXpMatchId=0;
     double resultXpStartedAt=0.0,resultXpNextTick=0.0;
     bool resultIntro=false,resultSkipped=false,resultDone=false,resultFocused=false;
     const MatchSimulation* deathMatch=nullptr;
@@ -820,76 +821,75 @@ struct GameUi::Impl : Rml::EventListener {
         }
         const auto key="hud/death-markers";if(textCache[key]!=markup){Find(hud,"death-markers")->SetInnerRML(markup);textCache[key]=markup;}
     }
-    void UpdateInkGauge(MatchSimulation& match,bool paused,bool results){
-        auto& actor=match.local();const auto& state=actor.state;
+    void UpdateInkGauge(const HudViewModel& view,bool paused,bool results){
+        const auto& actor=view.actors[static_cast<std::size_t>(view.localActor)];
         auto* gauge=Find(hud,"ink-gauge");
         auto* tank=dynamic_cast<InkTankElement*>(Find(hud,"ink-tank"));
         if(!tank)throw std::runtime_error("Ink tank element was not registered");
-        if(inkMatch!=&match||inkActor!=&actor){inkMatch=&match;inkActor=&actor;inkFullIdle=0;tank->Reset();}
+        if(inkMatchId!=view.matchId||inkActorSlot!=view.localActor){inkMatchId=view.matchId;inkActorSlot=view.localActor;inkFullIdle=0;tank->Reset();}
         const double now=glfwGetTime();
         const double dt=!paused&&!results&&lastHudTime>0?std::clamp(now-lastHudTime,0.0,.1):0;
-        const auto combat=actor.combatPose();const auto special=actor.specialPose();
-        const double subCost=special.active&&special.phase=="barrage"?0:actor.subWeapon().number("inkCost",70);
-        const bool low=state.ink<18;
-        inkFullIdle=state.ink>=99.5&&!low&&!combat.subAim?inkFullIdle+dt:0;
+        const double subCost=actor.specialBarrage?0:actor.subCost;
+        const bool low=actor.ink<18;
+        inkFullIdle=actor.ink>=99.5&&!low&&!actor.subAim?inkFullIdle+dt:0;
         gauge->SetClass("idle",inkFullIdle>1.4);
-        gauge->SetClass("low",low);gauge->SetClass("nosub",state.ink<subCost);
-        const auto kind=actor.weapon().kind;
+        gauge->SetClass("low",low);gauge->SetClass("nosub",actor.ink<subCost);
+        const auto& kind=actor.weaponKind;
         gauge->SetClass("roller",kind=="roller"||kind=="brush");gauge->SetClass("charger",kind=="charger");
-        gauge->SetAttribute("aria-valuenow",Integer(std::clamp(state.ink,0.,100.)));
-        Hidden(hud,"ink-gauge",paused||results||!state.alive||mapInteraction.open()||hudOverlay||practiceGear);
+        gauge->SetAttribute("aria-valuenow",Integer(std::clamp(actor.ink,0.,100.)));
+        Hidden(hud,"ink-gauge",paused||results||!actor.alive||mapInteraction.open()||hudOverlay||practiceGear);
         Hidden(hud,"ink-low",!low);
-        const auto hex=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr)[actor.team()];
+        const auto hex=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,view.boss.has_value())[actor.team];
         const auto rgb=std::stoul(std::string(hex.substr(1)),nullptr,16);
-        InkTankFrame frame;frame.ink=state.ink;frame.subCost=subCost;frame.low=low;frame.aiming=combat.subAim;
-        frame.reducedMotion=player.settings.reducedMotion;frame.yaw=actor.input.aimYaw;frame.vx=state.vel.x;frame.vz=state.vel.z;frame.dt=dt;
-        frame.color=Rml::Colourb((rgb>>16)&255,(rgb>>8)&255,rgb&255,255);if(match.world().time()<battle.emptyUntil)frame.color=Rml::Colourb(255,70,88,255);tank->Update(frame);
+        InkTankFrame frame;frame.ink=actor.ink;frame.subCost=subCost;frame.low=low;frame.aiming=actor.subAim;
+        frame.reducedMotion=player.settings.reducedMotion;frame.yaw=actor.aimYaw;frame.vx=actor.velocity.x;frame.vz=actor.velocity.z;frame.dt=dt;
+        frame.color=Rml::Colourb((rgb>>16)&255,(rgb>>8)&255,rgb&255,255);if(view.worldTime<battle.emptyUntil)frame.color=Rml::Colourb(255,70,88,255);tank->Update(frame);
         auto* reticle=dynamic_cast<WeaponReticleElement*>(Find(hud,"reticle"));
         if(!reticle)throw std::runtime_error("Weapon reticle element was not registered");
-        WeaponReticleFrame aim;aim.weapon=kind;aim.pose=combat;aim.dt=dt;aim.shotsFired=actor.shotsFired();
-        aim.grounded=state.grounded;aim.clinging=state.climbing;aim.burstDuration=actor.streamDuration();aim.inkColor=frame.color;
-        const double pixels=std::tan(actor.crosshairSpreadDegrees()*3.141592653589793/180)*projectionY*context->GetDimensions().y*.5;
+        WeaponReticleFrame aim;aim.weapon=kind;aim.pose=actor.combatPose;aim.dt=dt;aim.shotsFired=actor.shotsFired;
+        aim.grounded=actor.grounded;aim.clinging=actor.climbing;aim.burstDuration=actor.streamDuration;aim.inkColor=frame.color;
+        const double pixels=std::tan(actor.spreadDegrees*3.141592653589793/180)*projectionY*context->GetDimensions().y*.5;
         aim.spreadPx=std::min(90.,pixels);
         if(kind=="roller"||kind=="brush")aim.spreadPx=kind=="roller"?28:22;
         reticle->SetAttribute("data-weapon",std::string(kind));reticle->Update(aim);
     }
-    void UpdateSquads(MatchSimulation& match,bool practice){
+    void UpdateSquads(const HudViewModel& view,bool practice){
         Hidden(hud,"squad-a",practice);Hidden(hud,"squad-b",practice);
         Hidden(hud,"squad-a-count",practice);Hidden(hud,"squad-b-count",practice);
-        Find(hud,"battle-top")->SetClass("boss-squad",match.boss()!=nullptr);
-        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
+        Find(hud,"battle-top")->SetClass("boss-squad",view.boss.has_value());
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,view.boss.has_value());
         for(int side=0;side<2;++side){
-            const int team=side==0?match.local().team():1-match.local().team();
+            const int team=side==0?view.localTeam:1-view.localTeam;
             std::string markup;int alive=0,total=0;
-            for(std::size_t i=0;i<match.actors().size();++i){
-                const auto& actor=*match.actors()[i];const auto& entry=match.roster()[i];
-                if(!entry.active||actor.team()!=(match.boss()?match.local().team():team))continue;
-                ++total;if(actor.state.alive)++alive;
-                if(match.boss()&&((total-1)/4)!=side)continue;
-                const bool ready=actor.state.alive&&actor.state.specialCharge>=actor.weapon().number("specialCost",190);
-                const bool respawning=match.phase()==MatchPhase::Playing&&actor.canRespawn();
-                const std::string status=actor.state.alive?(ready?"特殊就緒":"存活"):respawning?"復活 "+Integer(std::ceil(std::max(0.,actor.state.respawnTimer)))+" 秒":"已退場";
-                const auto label=EquipmentLabel(EquipmentCategory::Main,actor.mainId());
-                markup+="<div id=\"squad-player-"+std::to_string(i)+"\" class=\"squad-player"+std::string(actor.state.alive?"":" dead")+(ready?" ready":"")+(actor.isLocal()?" self":"")+"\" title=\""+Escape(entry.name+" · "+std::string(label)+" · "+status)+"\" style=\"background-color:"+std::string(actor.state.alive?palette[actor.team()]:"#403c4a")+";\">";
-                markup+="<img class=\"squad-weapon\" src=\"weapons/"+std::string(actor.weapon().kind)+".png\" /><i class=\"squad-cross-a\"></i><i class=\"squad-cross-b\"></i>";
-                markup+="<hud-ring id=\"squad-ring-"+std::to_string(i)+"\" class=\"squad-ring\"></hud-ring><span class=\"squad-state\">"+(actor.state.alive?(ready?std::string("就緒"):std::string()):respawning?Integer(std::ceil(std::max(0.,actor.state.respawnTimer))):std::string("退場"))+"</span><span class=\"squad-self\">你</span></div>";
+            for(std::size_t i=0;i<view.actors.size();++i){
+                const auto& actor=view.actors[i];
+                if(!actor.active||actor.team!=(view.boss?view.localTeam:team))continue;
+                ++total;if(actor.alive)++alive;
+                if(view.boss&&((total-1)/4)!=side)continue;
+                const bool ready=actor.alive&&actor.specialCharge>=actor.specialCost;
+                const bool respawning=view.phase==HudMatchPhase::Playing&&actor.canRespawn;
+                const std::string status=actor.alive?(ready?"特殊就緒":"存活"):respawning?"復活 "+Integer(std::ceil(std::max(0.,actor.respawnTimer)))+" 秒":"已退場";
+                const auto label=EquipmentLabel(EquipmentCategory::Main,actor.mainId);
+                markup+="<div id=\"squad-player-"+std::to_string(i)+"\" class=\"squad-player"+std::string(actor.alive?"":" dead")+(ready?" ready":"")+(actor.local?" self":"")+"\" title=\""+Escape(actor.name+" · "+std::string(label)+" · "+status)+"\" style=\"background-color:"+std::string(actor.alive?palette[actor.team]:"#403c4a")+";\">";
+                markup+="<img class=\"squad-weapon\" src=\"weapons/"+actor.weaponKind+".png\" /><i class=\"squad-cross-a\"></i><i class=\"squad-cross-b\"></i>";
+                markup+="<hud-ring id=\"squad-ring-"+std::to_string(i)+"\" class=\"squad-ring\"></hud-ring><span class=\"squad-state\">"+(actor.alive?(ready?std::string("就緒"):std::string()):respawning?Integer(std::ceil(std::max(0.,actor.respawnTimer))):std::string("退場"))+"</span><span class=\"squad-self\">你</span></div>";
             }
             const char* id=side==0?"squad-a":"squad-b";
             const auto key=std::string("hud/")+id;
             if(textCache[key]!=markup){Find(hud,id)->SetInnerRML(markup);textCache[key]=markup;}
-            Text(hud,side==0?"squad-a-count":"squad-b-count",std::string(match.boss()?"協力小隊":side==0?"我方":"對方")+"  "+std::to_string(alive)+" / "+std::to_string(total));
+            Text(hud,side==0?"squad-a-count":"squad-b-count",std::string(view.boss?"協力小隊":side==0?"我方":"對方")+"  "+std::to_string(alive)+" / "+std::to_string(total));
         }
     }
-    void UpdateZonesHud(MatchSimulation& match){
-        const auto* zones=match.zones();
+    void UpdateZonesHud(const HudViewModel& view){
+        const auto* zones=view.zones?&*view.zones:nullptr;
         Hidden(hud,"zones-hud",zones==nullptr);
         Find(hud,"battle-top")->SetClass("zones-mode",zones!=nullptr);
-        if(!zones){displayedZones=nullptr;zoneEventCursor=0;Hidden(hud,"zone-callout",true);Hidden(hud,"zone-phase-hint",true);return;}
+        if(!zones){displayedZonesMatchId=0;zoneEventCursor=0;Hidden(hud,"zone-callout",true);Hidden(hud,"zone-phase-hint",true);return;}
 
-        const int localTeam=match.local().team(),enemyTeam=1-localTeam;
+        const int localTeam=view.localTeam,enemyTeam=1-localTeam;
         const auto teamName=[&](int team){return team==localTeam?std::string("我方"):team==enemyTeam?std::string("對方"):std::string("無隊伍");};
-        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,match.boss()!=nullptr);
-        const auto& counts=zones->counts();const auto& penalties=zones->penalty();
+        const auto palette=ProfilePaletteColors(player.settings.palette,player.settings.colorblind,view.boss.has_value());
+        const auto& counts=zones->counts;const auto& penalties=zones->penalty;
         Text(hud,"zone-count-a",ZoneCount(counts[localTeam]));Text(hud,"zone-count-b",ZoneCount(counts[enemyTeam]));
         Text(hud,"zone-penalty-a","+"+ZoneCount(penalties[localTeam]));Text(hud,"zone-penalty-b","+"+ZoneCount(penalties[enemyTeam]));
         Hidden(hud,"zone-penalty-a",penalties[localTeam]<=0);Hidden(hud,"zone-penalty-b",penalties[enemyTeam]<=0);
@@ -900,10 +900,9 @@ struct GameUi::Impl : Rml::EventListener {
         Find(hud,"zone-score-a")->SetAttribute("style","border-color:"+std::string(palette[0])+";");
         Find(hud,"zone-score-b")->SetAttribute("style","border-color:"+std::string(palette[1])+";");
 
-        const auto& objective=zones->objective();
-        const std::string objectiveLabel=objective.id=="center"?"中央區":objective.home==localTeam?"己方側區":"敵方側區";
-        const auto& active=zones->activeIndices();const auto& all=zones->zones();
-        const int objectiveOwner=zones->owner();
+        const std::string objectiveLabel=zones->objective=="center"?"中央區":zones->objectiveHome==localTeam?"己方側區":"敵方側區";
+        const auto& active=zones->activeIndices;const auto& all=zones->zones;
+        const int objectiveOwner=zones->owner;
         const std::string objectiveColor=objectiveOwner<0?"#d1c8b7":std::string(palette[objectiveOwner==localTeam?0:1]);
         std::string markup="<div class=\"zone-chip\" style=\"border-color:"+objectiveColor+";\"><div class=\"zone-areas\">";
         for(const int index:active){
@@ -922,60 +921,58 @@ struct GameUi::Impl : Rml::EventListener {
         markup+="</div><strong id=\"zone-objective\" class=\"zone-objective\">"+objectiveLabel+"</strong></div>";
         const auto key=std::string("hud/zones-active");if(textCache[key]!=markup){Find(hud,"zones-active")->SetInnerRML(markup);textCache[key]=markup;}
 
-        const double secondsToSwap=std::max(0.0,zones->nextSwap());
+        const double secondsToSwap=std::max(0.0,zones->nextSwap);
         bool showPhaseHint=false;
-        if(zones->overtime()){
+        if(zones->overtime){
             Text(hud,"zone-phase","延長賽");
-            Text(hud,"zone-phase-detail","離開有效區 "+ZoneCount(zones->neutralTime())+" / 10 秒");
+            Text(hud,"zone-phase-detail","離開有效區 "+ZoneCount(zones->neutralTime)+" / 10 秒");
             showPhaseHint=true;
-        }else if(!zones->final()&&!zones->ended()&&secondsToSwap>0.0&&secondsToSwap<=5.0){
+        }else if(!zones->final&&!zones->ended&&secondsToSwap>0.0&&secondsToSwap<=5.0){
             Text(hud,"zone-phase","即將輪替");Text(hud,"zone-phase-detail",ZoneCount(secondsToSwap)+" 秒後輪替");
             showPhaseHint=true;
         }
         Hidden(hud,"zone-phase-hint",!showPhaseHint);
 
-        if(displayedZones!=zones||zones->events().size()<zoneEventCursor){displayedZones=zones;zoneEventCursor=zones->events().size();zoneCalloutUntil=0;}
-        const auto& events=zones->events();const double now=glfwGetTime();
+        if(displayedZonesMatchId!=view.matchId||zones->events.size()<zoneEventCursor){displayedZonesMatchId=view.matchId;zoneEventCursor=zones->events.size();zoneCalloutUntil=0;}
+        const auto& events=zones->events;const double now=glfwGetTime();
         for(;zoneEventCursor<events.size();++zoneEventCursor){
             const auto& event=events[zoneEventCursor];std::string callout;
             switch(event.type){
-                case ZoneEventType::ZoneOwnerChanged:callout=std::string("區域由")+teamName(event.owner)+"掌控";break;
-                case ZoneEventType::ControlChanged:callout=event.owner<0?"區域控制權爭奪中":std::string(teamName(event.owner))+"取得區域控制";break;
-                case ZoneEventType::PenaltyAdded:callout=std::string(teamName(event.team))+"罰則 +"+ZoneCount(event.penalty);break;
-                case ZoneEventType::ObjectiveChanged:callout=event.final?"最後 30 秒，僅中央區":event.moved?"區域輪替至"+std::string(event.objective=="center"?"中央區":"側區"):std::string();break;
-                case ZoneEventType::FinalStarted:callout="最後 30 秒，僅中央區";break;
-                case ZoneEventType::OvertimeStarted:callout="進入延長賽";break;
-                case ZoneEventType::Contested:callout="區域爭奪中";break;
-                case ZoneEventType::MatchEnded:callout=event.reason=="knockout"?"擊倒勝！":ZoneReason(event.reason);break;
+                case HudZoneEventType::OwnerChanged:callout=std::string("區域由")+teamName(event.owner)+"掌控";break;
+                case HudZoneEventType::ControlChanged:callout=event.owner<0?"區域控制權爭奪中":std::string(teamName(event.owner))+"取得區域控制";break;
+                case HudZoneEventType::PenaltyAdded:callout=std::string(teamName(event.team))+"罰則 +"+ZoneCount(event.penalty);break;
+                case HudZoneEventType::ObjectiveChanged:callout=event.final?"最後 30 秒，僅中央區":event.moved?"區域輪替至"+std::string(event.objective=="center"?"中央區":"側區"):std::string();break;
+                case HudZoneEventType::FinalStarted:callout="最後 30 秒，僅中央區";break;
+                case HudZoneEventType::OvertimeStarted:callout="進入延長賽";break;
+                case HudZoneEventType::Contested:callout="區域爭奪中";break;
+                case HudZoneEventType::MatchEnded:callout=event.reason=="knockout"?"擊倒勝！":ZoneReason(event.reason);break;
             }
             if(!callout.empty()){Text(hud,"zone-callout",callout);zoneCalloutUntil=now+4.0;}
         }
         Hidden(hud,"zone-callout",now>=zoneCalloutUntil);
     }
-    std::string ResultMedals(MatchSimulation& match,const MatchResult& result){
+    std::string ResultMedals(const HudViewModel& view,const HudResult& result){
         std::vector<std::size_t> players;
-        std::size_t self=match.actors().size();
-        for(std::size_t i=0;i<match.actors().size();++i)if(match.roster()[i].active){
-            players.push_back(i);if(match.actors()[i].get()==&match.local())self=i;
-        }
-        if(self==match.actors().size())return {};
-        const auto& local=*match.actors()[self];
+        const std::size_t self=view.localActor;
+        for(std::size_t i=0;i<view.actors.size();++i)if(view.actors[i].active)players.push_back(i);
+        if(self>=view.actors.size()||!view.actors[self].active)return {};
+        const auto& local=view.actors[self];
         std::vector<std::string> awards;
         auto give=[&](const char* label){if(awards.size()<4)awards.emplace_back(label);};
-        auto turf=[&](std::size_t i){return match.actors()[i]->turfPainted();};
-        auto splats=[&](std::size_t i){return match.actors()[i]->splats();};
-        auto deaths=[&](std::size_t i){return match.actors()[i]->deaths();};
+        auto turf=[&](std::size_t i){return view.actors[i].turf;};
+        auto splats=[&](std::size_t i){return view.actors[i].splats;};
+        auto deaths=[&](std::size_t i){return view.actors[i].deaths;};
         double maxTurf=0;int maxSplats=0,maxDeaths=0;
         for(const auto i:players){maxTurf=std::max(maxTurf,turf(i));maxSplats=std::max(maxSplats,splats(i));maxDeaths=std::max(maxDeaths,deaths(i));}
-        if(const auto* boss=match.boss()){
-            auto damage=[&](std::size_t i){return boss->squadDamage()[i];};
-            auto weak=[&](std::size_t i){return boss->squadWeakHits()[i];};
-            auto brood=[&](std::size_t i){return boss->squadSplats()[i];};
+        if(view.boss){
+            auto damage=[&](std::size_t i){return view.boss->squadDamage[i];};
+            auto weak=[&](std::size_t i){return view.boss->squadWeakHits[i];};
+            auto brood=[&](std::size_t i){return view.boss->squadSplats[i];};
             double maxDamage=0;int maxWeak=0,maxBrood=0;
             for(const auto i:players){maxDamage=std::max(maxDamage,damage(i));maxWeak=std::max(maxWeak,weak(i));maxBrood=std::max(maxBrood,brood(i));}
             auto score=[&](std::size_t i){return damage(i)/std::max(1.0,maxDamage)+.35*weak(i)/std::max(1,maxWeak)+.2*brood(i)/std::max(1,maxBrood)+.15*turf(i)/std::max(1.0,maxTurf)-.25*deaths(i)/std::max(1,maxDeaths);};
-            std::size_t mvp=match.actors().size();
-            for(const auto i:players)if(damage(i)>0||turf(i)>0)if(mvp==match.actors().size()||score(i)>score(mvp)+1e-9)mvp=i;
+            std::size_t mvp=view.actors.size();
+            for(const auto i:players)if(damage(i)>0||turf(i)>0)if(mvp==view.actors.size()||score(i)>score(mvp)+1e-9)mvp=i;
             if(mvp==self)give("MVP");
             if(maxDamage>0&&damage(self)==maxDamage)give("重擊手");
             if(maxWeak>=3&&weak(self)==maxWeak)give("破殼高手");
@@ -988,15 +985,15 @@ struct GameUi::Impl : Rml::EventListener {
             if(maxTurf>0&&turf(self)==maxTurf)give("清理隊員");
         }else{
             auto score=[&](std::size_t i){return turf(i)/std::max(1.0,maxTurf)+.55*splats(i)/std::max(1,maxSplats)-.3*deaths(i)/std::max(1,maxDeaths);};
-            std::size_t mvp=match.actors().size();
-            for(const auto i:players)if(match.roster()[i].team==result.winner&&(turf(i)>0||splats(i)>0))
-                if(mvp==match.actors().size()||score(i)>score(mvp)+1e-9||(std::abs(score(i)-score(mvp))<1e-9&&turf(i)>turf(mvp)))mvp=i;
+            std::size_t mvp=view.actors.size();
+            for(const auto i:players)if(view.actors[i].team==result.winner&&(turf(i)>0||splats(i)>0))
+                if(mvp==view.actors.size()||score(i)>score(mvp)+1e-9||(std::abs(score(i)-score(mvp))<1e-9&&turf(i)>turf(mvp)))mvp=i;
             if(mvp==self)give("MVP");
             const bool king=maxTurf>0&&turf(self)==maxTurf;
             if(king)give("塗地之王");
             if(maxSplats>0&&splats(self)==maxSplats)give("擊倒之星");
             bool teamKing=false;double teamTurf=0;
-            for(const auto i:players)if(match.roster()[i].team==local.team()){teamKing|=maxTurf>0&&turf(i)==maxTurf;teamTurf=std::max(teamTurf,turf(i));}
+            for(const auto i:players)if(view.actors[i].team==local.team){teamKing|=maxTurf>0&&turf(i)==maxTurf;teamTurf=std::max(teamTurf,turf(i));}
             if(!teamKing&&teamTurf>0&&turf(self)==teamTurf)give("隊伍塗地高手");
             std::vector<std::size_t> active;for(const auto i:players)if(turf(i)>=30||splats(i)>0)active.push_back(i);
             int zero=0,minDeaths=std::numeric_limits<int>::max(),minCount=0;
@@ -1012,48 +1009,44 @@ struct GameUi::Impl : Rml::EventListener {
     #include "SourceResults.inc"
     #include "BattleHud.inc"
     #include "BossHud.inc"
-    void RenderHudData(const StageData& stage,const FacePaint& paint,MatchSimulation& match,bool paused,bool nativeApp,bool practice){
-        const bool results=match.phase()==MatchPhase::Results;
+    void RenderHudData(const HudViewModel& view,bool paused,bool nativeApp,bool practice){
+        const bool results=view.phase==HudMatchPhase::Results;
         const bool onlineMatch=online.phase==network::RoomPhase::Match||online.phase==network::RoomPhase::Starting;
-        if(!results){resultXpMatch=nullptr;resultIntro=false;resultSkipped=false;resultDone=false;resultFocused=false;}
+        if(!results){resultXpMatchId=0;resultIntro=false;resultSkipped=false;resultDone=false;resultFocused=false;}
         hud->SetClass("results-active",results);
         activePractice=practice;
         interactive=paused||results||practiceGear||hudOverlay;
         interactive=interactive||mapInteraction.open();
         Hidden(hud,"pause",!paused||results||hudOverlay);Hidden(hud,"results",!results);Hidden(hud,"return-menu",!nativeApp);Hidden(hud,"results-menu",!nativeApp);
-        Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results||!match.local().state.alive||match.local().state.squid||mapInteraction.open()||hudOverlay||practiceGear);
+        const auto& local=view.actors[static_cast<std::size_t>(view.localActor)];
+        Hidden(hud,"practice-tools",!practice);Hidden(hud,"reticle",paused||results||!local.alive||local.squid||mapInteraction.open()||hudOverlay||practiceGear);
         Text(hud,"pause-title",onlineMatch?"對戰選單":practice?"練習暫停":"已暫停");Text(hud,"pause-description",onlineMatch?"線上對戰會持續進行。關閉選單即可繼續操作。":practice?"練習不會計時或結算。調整角色、補充資源，或更換場地。":"準備好後，繼續這場對戰。");
         Text(hud,"pause-hint",onlineMatch?"Esc 選單":"Esc 暫停");Text(hud,"results-menu-label",onlineMatch?"返回房間":"返回選單");Hidden(hud,"results-rematch",onlineMatch);
-        const auto stageLabel=StageLabel(stage.id);Text(hud,"stage-name",stageLabel.empty()?std::string(stage.name):std::string(stageLabel));
-        const int seconds=static_cast<int>(std::ceil(std::max(0.,match.remaining())));char clock[16];std::snprintf(clock,sizeof(clock),"%02d:%02d",seconds/60,seconds%60);Text(hud,"clock",clock);
+        const auto stageLabel=StageLabel(view.stageId);Text(hud,"stage-name",stageLabel.empty()?view.stageName:std::string(stageLabel));
+        const int seconds=static_cast<int>(std::ceil(std::max(0.,view.remaining)));char clock[16];std::snprintf(clock,sizeof(clock),"%02d:%02d",seconds/60,seconds%60);Text(hud,"clock",clock);
         Find(hud,"clock")->SetClass("last-minute",seconds<=60&&!practice);Find(hud,"clock")->SetClass("final-seconds",seconds<=10&&!practice);
-        UpdateSquads(match,practice);
-        const auto& local=match.local();const auto& state=local.state;
-        Text(hud,"ink",Integer(state.ink));
-        UpdateInkGauge(match,paused,results);
-        UpdateBattleHud(match,paused,results,practice);
-        UpdateBossFeedback(match,paused,results);
-        UpdateAllyMarkers(match,paused||results||mapInteraction.open()||hudOverlay||practiceGear);
-        UpdateDeathMarks(match,paused,paused||results||mapInteraction.open()||hudOverlay||practiceGear);
-        const bool playing=match.phase()==MatchPhase::Playing;
+        UpdateSquads(view,practice);
+        Text(hud,"ink",Integer(local.ink));
+        UpdateInkGauge(view,paused,results);
+        UpdateBattleHud(view,paused,results,practice);
+        UpdateBossFeedback(view,paused,results);
+        const bool playing=view.phase==HudMatchPhase::Playing;
         Hidden(hud,"player-status",!playing);
-        Text(hud,"player-status",state.alive?(local.specialPose().mapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(std::max(0.,state.respawnTimer)))+" 秒");
-        Hidden(hud,"boss",!match.boss());
-        if(const auto* boss=match.boss()){
-            const auto& state=boss->state();
-            const double hp=state.maxHp>0?std::clamp(state.hp/state.maxHp,0.,1.)*100:0;
-            Text(hud,"boss-phase","階段 "+std::string(state.phase>=1?"◆":"◇")+(state.phase>=2?"◆":"◇")+(state.phase>=3?"◆":"◇"));
+        Text(hud,"player-status",local.alive?(local.specialMapTarget?"瞄準目標後按左鍵確認":""):"等待復活  "+Integer(std::ceil(std::max(0.,local.respawnTimer)))+" 秒");
+        Hidden(hud,"boss",!view.boss);
+        if(const auto* boss=view.boss?&*view.boss:nullptr){
+            const double hp=boss->maxHp>0?std::clamp(boss->hp/boss->maxHp,0.,1.)*100:0;
+            Text(hud,"boss-phase","階段 "+std::string(boss->phase>=1?"◆":"◇")+(boss->phase>=2?"◆":"◇")+(boss->phase>=3?"◆":"◇"));
             Find(hud,"boss-fill")->SetProperty("width",Integer(hp)+"%");Text(hud,"boss-hp",Integer(hp)+"%");
-            Find(hud,"boss-emblem")->SetAttribute("src",state.phase>=3?"markers/boss-cracked.png":"markers/boss.png");
-            Find(hud,"boss")->SetClass("enraged",state.phase>=3);Find(hud,"boss")->SetClass("open",state.stunned);
-            Text(hud,"boss-state",state.dead?"已擊破":state.stunned?"弱點開啟！":state.anim==2?"換階段 · 怒吼":state.phase>=3?"外殼破裂 · 攻擊腹部！":"");
-            std::string move;if(boss->move()){const char* names[]={"重鉗衝擊","貨櫃彈幕","墨砲掃射","船殼衝撞","小蟹群","狂亂攻勢"};move=names[static_cast<int>(boss->move()->id)];switch(boss->move()->phase(state.clock)){case BossMovePhase::Telegraph:move+="  ·  注意預兆";break;case BossMovePhase::Active:move+="  ·  攻擊中";break;case BossMovePhase::Recovery:move+="  ·  恢復中";break;default:break;}}Text(hud,"boss-move",move);
+            Find(hud,"boss-emblem")->SetAttribute("src",boss->phase>=3?"markers/boss-cracked.png":"markers/boss.png");
+            Find(hud,"boss")->SetClass("enraged",boss->phase>=3);Find(hud,"boss")->SetClass("open",boss->stunned);
+            Text(hud,"boss-state",boss->dead?"已擊破":boss->stunned?"弱點開啟！":boss->anim==2?"換階段 · 怒吼":boss->phase>=3?"外殼破裂 · 攻擊腹部！":"");
+            std::string move;if(boss->hasMove){switch(boss->moveId){case HudBossMove::Slam:move="重鉗衝擊";break;case HudBossMove::Barrage:move="貨櫃彈幕";break;case HudBossMove::Sweep:move="墨砲掃射";break;case HudBossMove::Charge:move="船殼衝撞";break;case HudBossMove::Crablets:move="小蟹群";break;case HudBossMove::Frenzy:move="狂亂攻勢";break;}switch(boss->movePhase){case HudBossMovePhase::Telegraph:move+="  ·  注意預兆";break;case HudBossMovePhase::Active:move+="  ·  攻擊中";break;case HudBossMovePhase::Recovery:move+="  ·  恢復中";break;default:break;}}Text(hud,"boss-move",move);
         }
-        UpdateZonesHud(match);
-        mapInteraction.Update(context,hud,stage,paint,match,player,deathMarks,deathClock);
+        UpdateZonesHud(view);
         const double now=glfwGetTime();if(lastHudTime>0&&now>lastHudTime)hudFps=static_cast<int>(std::round(1./(now-lastHudTime)));lastHudTime=now;
         Hidden(hud,"fps",!player.settings.showFps);if(player.settings.showFps)Text(hud,"fps-value",std::to_string(hudFps));
-        if(results)UpdateResults(match,paint.coverage());
+        if(results)UpdateResults(view);
     }
 };
 
@@ -1086,7 +1079,7 @@ void GameUi::SetMapFrame(UiMapFrame frame){
 void GameUi::ConfirmJumpMapCursor(){impl_->mapInteraction.SelectHoveredTarget();}
 int GameUi::TakeJumpMapSelection(){return impl_->mapInteraction.TakeSelection();}
 void GameUi::ShowMenu(const std::string& initialStage){
-    auto& p=*impl_;p.resultXpMatch=nullptr;p.resultIntro=false;p.resultSkipped=false;p.resultDone=false;p.resultFocused=false;p.inkMatch=nullptr;p.inkActor=nullptr;p.inkFullIdle=0;p.lastHudTime=0;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
+    auto& p=*impl_;p.resultXpMatchId=0;p.resultIntro=false;p.resultSkipped=false;p.resultDone=false;p.resultFocused=false;p.inkMatchId=0;p.inkActorSlot=-1;p.inkFullIdle=0;p.lastHudTime=0;p.selection.stage=initialStage;p.selection.mode=p.player.settings.lastMode=="zones"?"zones":p.player.settings.lastMode=="boss"?"boss":"turf";p.selection.practice=false;
     p.RebuildStageOptions();p.selection.difficulty=p.player.settings.difficulty;p.selection.theme=p.player.settings.timeOfDay;
     p.selection.duration=p.selection.mode=="zones"?300:p.selection.mode=="boss"?p.player.settings.bossLength:p.player.settings.matchLength;
     p.Value("difficulty",p.selection.difficulty);p.Value("theme",p.selection.theme);p.Value("duration",std::to_string(p.selection.duration));
@@ -1118,14 +1111,23 @@ void GameUi::SetLobbyPresentation(bool active,int countdown,bool launching,const
 std::vector<UiOnlineRequest> GameUi::TakeOnlineRequests(){return std::exchange(impl_->onlineRequests,{});}
 UiAction GameUi::RenderMenu(int width,int height){return impl_->Render(width,height,false);}
 void GameUi::ShowPracticeStage(const std::string& initialStage){ShowMenu(initialStage);auto& p=*impl_;p.selection.mode="practice";p.selection.practice=true;p.Mode();p.GoTo(UiScreen::Play);}
-UiAction GameUi::RenderHud(const StageData& stage,const FacePaint& paint,MatchSimulation& match,int width,int height,bool paused,bool nativeApp,bool practice){
+void GameUi::UpdateMapInteraction(const StageData& stage,const FacePaint& paint,MatchSimulation& match,int width,int height,bool paused){
+    auto& p=*impl_;p.context->SetDimensions({width,height});
+    p.context->SetDensityIndependentPixelRatio(std::clamp(std::min(width/1440.f,height/900.f),.72f,1.6f));
+    const bool results=match.phase()==MatchPhase::Results;
+    p.UpdateAllyMarkers(match,paused||results||p.mapInteraction.open()||p.hudOverlay||p.practiceGear);
+    p.UpdateDeathMarks(match,paused,paused||results||p.mapInteraction.open()||p.hudOverlay||p.practiceGear);
+    p.mapInteraction.Update(p.context,p.hud,stage,paint,match,p.player,p.deathMarks,p.deathClock);
+}
+UiAction GameUi::RenderHud(const HudViewModel& view,int width,int height,bool paused,bool nativeApp,bool practice){
+    if(view.localActor<0||static_cast<std::size_t>(view.localActor)>=view.actors.size())throw std::invalid_argument("HUD snapshot has no local actor");
     auto& p=*impl_;
     if(p.hudOverlay){p.menu->Show();p.hud->Hide();p.menuVisible=true;}
     else if(p.practiceGear){p.menu->Show();p.hud->Show();p.menuVisible=true;}
     else{p.menu->Hide();p.hud->Show();p.menuVisible=false;}
     p.context->SetDimensions({width,height});
     p.context->SetDensityIndependentPixelRatio(std::clamp(std::min(width/1440.f,height/900.f),.72f,1.6f));
-    p.RenderHudData(stage,paint,match,paused,nativeApp,practice);
+    p.RenderHudData(view,paused,nativeApp,practice);
     return p.Render(width,height,true);
 }
 } // namespace restoration

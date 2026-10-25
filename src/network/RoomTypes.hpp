@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../render/CharacterRenderData.hpp"
+#include "../game/MatchParticipant.hpp"
 
 #include <cstdint>
 #include <string>
@@ -8,7 +8,7 @@
 
 namespace restoration::network {
 
-using MemberId = std::uint32_t;
+using MemberId = PeerId;
 
 enum class RoomPhase : std::uint8_t { Offline, Connecting, Lobby, Starting, Match, Error };
 
@@ -43,14 +43,7 @@ struct RoomView {
     std::uint32_t seed = 0;
 };
 
-struct RosterEntry {
-    std::uint32_t nid = 0;
-    MemberId owner = 0;
-    bool bot = false;
-    int team = 0, slot = 0;
-    std::string name, main = "shooter", sub, special;
-    CharacterStyle style{};
-};
+using RosterEntry = MatchParticipant;
 
 struct GamePacket {
     MemberId from = 0;

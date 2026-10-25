@@ -2,10 +2,10 @@
 #include "BotSimulation.hpp"
 #include "BossSimulation.hpp"
 #include "CombatWorld.hpp"
-#include "CharacterRenderData.hpp"
+#include "CharacterStyle.hpp"
 #include "ZoneControl.hpp"
 #include "ZonePlan.hpp"
-#include "../network/RoomTypes.hpp"
+#include "MatchParticipant.hpp"
 #include <array>
 #include <functional>
 #include <memory>
@@ -21,12 +21,12 @@ struct MatchOptions {
     std::string main="shooter",sub,special,difficulty="normal";
     std::string playerName="You";
     CharacterStyle style;
-    network::MemberId localPeer=0,authorityPeer=0;
-    std::vector<network::RosterEntry> networkRoster;
+    PeerId localPeer=0,authorityPeer=0;
+    std::vector<MatchParticipant> networkRoster;
 };
 struct MatchRosterEntry {
     std::string name; CharacterStyle style; int team=0,slot=0; bool local=false;
-    std::uint32_t nid=0; network::MemberId owner=0; bool bot=false,active=true;
+    std::uint32_t nid=0; PeerId owner=0; bool bot=false,active=true;
 };
 enum class MatchPhase { Intro, Playing, Finish, Judge, Results };
 struct BossResult { bool win=false; double time=0,hp=0,maxHp=0; int phase=1; };
@@ -55,23 +55,25 @@ public:
     void startPlaying();
     void finishJudging();
     void applyNetworkState(MatchPhase phase,double remaining,std::optional<MatchResult> result);
-    void setNetworkAuthorityPeer(network::MemberId peer);
-    void setNetworkAuthorityPeer(network::MemberId peer,const std::vector<network::RosterEntry>& roster);
-    void applyNetworkRoster(const std::vector<network::RosterEntry>& roster);
+    void setNetworkAuthorityPeer(PeerId peer);
+    void setNetworkAuthorityPeer(PeerId peer,const std::vector<MatchParticipant>& roster);
+    void applyNetworkRoster(const std::vector<MatchParticipant>& roster);
     bool networked() const { return options_.network; }
     bool networkAuthority() const { return !options_.network||options_.localPeer==options_.authorityPeer; }
-    network::MemberId localPeer() const { return options_.localPeer; }
-    network::MemberId authorityPeer() const { return options_.authorityPeer; }
+    PeerId localPeer() const { return options_.localPeer; }
+    PeerId authorityPeer() const { return options_.authorityPeer; }
     void setNetworkActorActive(std::uint32_t nid,bool active);
     void updateNetworkBossPresentation();
     // CPU-only animated sockets stay synchronized with fixed simulation ticks.
     void setBossPoseSink(std::function<void(BossSimulation&)> sink);
     PlayerSimulation& local();
+    const PlayerSimulation& local() const;
     const std::vector<std::unique_ptr<PlayerSimulation>>& actors() const { return actors_; }
     const std::vector<std::unique_ptr<BotSimulation>>& bots() const { return bots_; }
     const std::vector<MatchRosterEntry>& roster() const { return roster_; }
     const StageData& stage() const { return stage_; }
     CombatWorld& world() { return world_; }
+    const CombatWorld& world() const { return world_; }
     const ZoneControl* zones() const { return zones_.get(); }
     BossSimulation* boss() { return boss_.get(); }
     const BossSimulation* boss() const { return boss_.get(); }

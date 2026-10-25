@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../render/CharacterRenderData.hpp"
+#include "CharacterStyle.hpp"
 #include "../render/GraphicsSettings.hpp"
 #include <array>
 #include <filesystem>

@@ -792,7 +792,13 @@ MatchExit MatchLoop(GLFWwindow* window,const Options& options,const StageData& s
             mapFrame.nativeMapTexture=nativeMap.texture();mapFrame.nativeMapViewProjection=glm::mat4(nativeMap.viewProjection());mapFrame.haveNativeMapView=true;
             ui.SetMapFrame(std::move(mapFrame));
             if(gearOpen&&showcase){const auto p=ui.preview();if(p.width>0&&p.height>0)showcase->drawPlayer(ui.profile(),ui.setup().main,ui.setup().sub,{int(p.x*width),int((1-p.y-p.height)*height),int(p.width*width),int(p.height*height)},now,ui.profile().settings.reducedMotion);}
-            const auto hudAction=gearOpen?ui.RenderMenu(width,height):ui.RenderHud(stage,paint,match,width,height,interaction.paused(),nativeApp,options.practice);
+            UiAction hudAction;
+            if(gearOpen)hudAction=ui.RenderMenu(width,height);
+            else{
+                ui.UpdateMapInteraction(stage,paint,match,width,height,interaction.paused());
+                const auto hud=BuildHudViewModel(match);
+                hudAction=ui.RenderHud(hud,width,height,interaction.paused(),nativeApp,options.practice);
+            }
             const int jumpMapSelection=ui.TakeJumpMapSelection();
             if(jumpMapSelection>=0)controller.SelectSuperJumpMapTarget(match,jumpMapSelection);
             if(hudAction==UiAction::Resume){

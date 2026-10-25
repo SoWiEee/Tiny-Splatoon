@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../game/PlayerProfile.hpp"
+#include "HudViewModel.hpp"
 #include "../render/GraphicsSettings.hpp"
 #include "../network/RoomTypes.hpp"
 #include <filesystem>
@@ -76,7 +77,8 @@ public:
     void ShowPracticeStage(const std::string& initialStage);
     void ShowPracticeGear();
     UiAction RenderMenu(int width,int height);
-    UiAction RenderHud(const StageData&,const FacePaint&,MatchSimulation&,int width,int height,bool paused,bool nativeApp,bool practice=false);
+    void UpdateMapInteraction(const StageData&,const FacePaint&,MatchSimulation&,int width,int height,bool paused);
+    UiAction RenderHud(const HudViewModel&,int width,int height,bool paused,bool nativeApp,bool practice=false);
     const UiSetup& setup() const;
     const PlayerProfile& profile() const;
     const GraphicsSettings& graphicsSettings() const;
