@@ -11,10 +11,15 @@
 
 namespace restoration {
 std::vector<ProjectileBlob> BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots) {
+    std::vector<ProjectileBlob> result;
+    BuildProjectileBlobs(shots,result);
+    return result;
+}
+void BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots,std::vector<ProjectileBlob>& result) {
     constexpr double pi=3.14159265358979323846;
     constexpr double satelliteSize[]={0.46,0.33,0.24,0.17};
     const auto& colors=InkColors;
-    std::vector<ProjectileBlob> result;
+    result.clear();
     result.reserve(std::min<std::size_t>(700,shots.size()*4));
     for(const auto& p:shots) {
         if(result.size()>=695)break;
@@ -53,6 +58,5 @@ std::vector<ProjectileBlob> BuildProjectileBlobs(const std::vector<ShooterProjec
             add(at,radius,{1.3+0.25*speedK,0.05,phase*3,0},color);
         }
     }
-    return result;
 }
 }

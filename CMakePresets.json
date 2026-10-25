@@ -8,6 +8,58 @@
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
+    },
+    {
+      "name": "vcpkg-sccache",
+      "inherits": "vcpkg",
+      "binaryDir": "${sourceDir}/build-sccache",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache"
+      }
+    },
+    {
+      "name": "vcpkg-clang-tidy",
+      "inherits": "vcpkg",
+      "binaryDir": "${sourceDir}/build-clang-tidy",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_CXX_CLANG_TIDY": "clang-tidy;-checks=-*,bugprone-use-after-move,bugprone-unused-return-value,performance-move-const-arg"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vcpkg",
+      "configurePreset": "vcpkg"
+    },
+    {
+      "name": "vcpkg-sccache",
+      "configurePreset": "vcpkg-sccache"
+    },
+    {
+      "name": "vcpkg-clang-tidy",
+      "configurePreset": "vcpkg-clang-tidy",
+      "targets": [
+        "Tiny-Splatoon"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "vcpkg",
+      "configurePreset": "vcpkg",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "vcpkg-sccache",
+      "configurePreset": "vcpkg-sccache",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

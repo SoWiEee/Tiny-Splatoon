@@ -28,8 +28,9 @@ void WorldEffects::weaponHooks(double dt,CombatWorld& combat,glm::dvec3 camera){
         }
     }
     int budget=48;
-    std::vector<std::uint64_t> liveIds;liveIds.reserve(combat.projectiles().size());
-    for(const auto& p:combat.projectiles()){
+    const auto& shots=combat.projectiles();
+    std::vector<std::uint64_t> liveIds;liveIds.reserve(shots.size());
+    for(const auto& p:shots){
         if(!p.owner||p.delay>p.age||(p.kind!="shot"&&p.kind!="blast"&&p.kind!="drop"&&p.kind!="slosh"))continue;
         liveIds.push_back(p.id);auto& distance=weaponTrailDistance_[p.id];distance+=glm::length(p.vel)*dt;
         const double step=p.kind=="blast"?.55:p.kind=="drop"?1.1:p.kind=="slosh"?1.:.8;

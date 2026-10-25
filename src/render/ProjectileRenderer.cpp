@@ -41,7 +41,7 @@ struct ProjectileRenderer::Impl {
     std::vector<FadingWave> fadingWaves;
     std::map<std::string,std::unique_ptr<Part>> parts;
     std::filesystem::path assets;
-    double gameTime=0;bool environment=false,timeInitialized=false;
+    double gameTime=0;bool environment=false,timeInitialized=false,blobsUploaded=false;
     explicit Impl(const std::filesystem::path& assets,bool environment)
       :blobShader(CharacterShader::readSource(assets/"blob.vert"),CharacterShader::readSource(assets/"blob.frag"),true,environment),
        ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),assets(assets),environment(environment) {
@@ -128,11 +128,13 @@ void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::ve
     const double now=world.time();
     if(impl_->timeInitialized&&now<impl_->gameTime){impl_->waves.clear();impl_->fadingWaves.clear();impl_->beams.clear();}
     impl_->gameTime=now;impl_->timeInitialized=true;
-    impl_->blobs=BuildProjectileBlobs(world.projectiles());
+    const auto& shots=world.projectiles();
+    BuildProjectileBlobs(shots,impl_->blobs);
+    impl_->blobsUploaded=false;
     auto previousWaves=std::move(impl_->waves);
     impl_->waves.clear();
     impl_->custom.clear();
-    for(const auto& p:world.projectiles())if(p.owner&&p.delay<=0&&(p.kind=="arrow"||p.kind=="fist"||p.kind=="bladewave")){
+    for(const auto& p:shots)if(p.owner&&p.delay<=0&&(p.kind=="arrow"||p.kind=="fist"||p.kind=="bladewave")){
         impl_->custom.push_back(p);
         if(p.kind=="bladewave")impl_->waves.push_back({p.id,p.pos,p.vel,teamColor(p.owner->team()),p.age,p.distance});
     }
@@ -188,7 +190,10 @@ int ProjectileRenderer::DrawPass(const glm::dmat4& view,const glm::dmat4& projec
         auto& shader=impl_->blobShader;shader.use();shader.matrices(glm::dmat4(1),view,projection,eye);shader.lights(lights,view);
         shader.uniform("dfgLUT",6);
         glBindVertexArray(impl_->vao);glBindBuffer(GL_ARRAY_BUFFER,impl_->instance);
-        glBufferData(GL_ARRAY_BUFFER,impl_->blobs.size()*sizeof(ProjectileBlob),impl_->blobs.data(),GL_STREAM_DRAW);
+        if(!impl_->blobsUploaded){
+            glBufferData(GL_ARRAY_BUFFER,impl_->blobs.size()*sizeof(ProjectileBlob),impl_->blobs.data(),GL_STREAM_DRAW);
+            impl_->blobsUploaded=true;
+        }
         glDrawElementsInstanced(GL_TRIANGLES,impl_->indexCount,GL_UNSIGNED_INT,nullptr,static_cast<GLsizei>(impl_->blobs.size()));++draws;
     }
     const auto drawPart=[&](const char* name,const glm::dmat4& model,glm::dvec3 color,double time=0,double fade=1) {

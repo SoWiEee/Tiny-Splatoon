@@ -11,6 +11,25 @@
 #include <vector>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
+#ifdef TINY_RENDERDOC_CAPTURE
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <renderdoc_app.h>
+#endif
+
+namespace {
+PFNGLBUFFERDATAPROC originalBufferData=nullptr;
+std::size_t instanceUploads=0;
+void APIENTRY CountBufferData(GLenum target,GLsizeiptr size,const void* data,GLenum usage){
+    if(target==GL_ARRAY_BUFFER&&usage==GL_STREAM_DRAW)++instanceUploads;
+    originalBufferData(target,size,data,usage);
+}
+struct UploadProbe {
+    UploadProbe(){originalBufferData=glad_glBufferData;instanceUploads=0;glad_glBufferData=CountBufferData;}
+    ~UploadProbe(){glad_glBufferData=originalBufferData;}
+};
+}
 
 int main(int argc,char** argv){
     if(!glfwInit())return 1;
@@ -28,7 +47,20 @@ int main(int argc,char** argv){
         if(renderer.blobs().size()!=4)throw std::runtime_error("Shot plus satellite draw instances missing");
         CharacterLightState lights;lights.ambient={.3,.3,.3};lights.sunDirection=glm::normalize(glm::vec3(-.4,.85,.35));lights.sunColor={1,.92,.82};
         const glm::dvec3 eye(0,.5,4);const auto view=glm::lookAt(eye,glm::dvec3(0),glm::dvec3(0,1,0));const auto projection=glm::perspective(glm::radians(45.0),1.0,.05,50.0);
+#ifdef TINY_RENDERDOC_CAPTURE
+        RENDERDOC_API_1_6_0* capture=nullptr;
+        if(argc>3){
+            const auto module=GetModuleHandleA("renderdoc.dll");
+            const auto getApi=module?reinterpret_cast<pRENDERDOC_GetAPI>(GetProcAddress(module,"RENDERDOC_GetAPI")):nullptr;
+            if(!getApi||getApi(eRENDERDOC_API_Version_1_6_0,reinterpret_cast<void**>(&capture))!=1)
+                throw std::runtime_error("Launch this diagnostic through renderdoccmd capture to record a frame");
+            capture->SetCaptureFilePathTemplate(argv[3]);capture->StartFrameCapture(nullptr,nullptr);
+        }
+#else
+        if(argc>3)throw std::runtime_error("RenderDoc capture requires the optional RenderDoc header on Windows");
+#endif
         glViewport(0,0,256,256);glEnable(GL_DEPTH_TEST);glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        UploadProbe uploadProbe;
         if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("No source instanced projectile draw");
         std::vector<unsigned char> pixels(256*256*4);glReadPixels(0,0,256,256,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
         std::size_t colored=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++colored;
@@ -36,6 +68,13 @@ int main(int argc,char** argv){
         if(drawError!=GL_NO_ERROR)throw std::runtime_error("Source projectile draw GL error "+std::to_string(drawError));
         if(colored<60)throw std::runtime_error("Source projectile draw changed too few pixels: "+std::to_string(colored));
         if(argc>2){std::filesystem::create_directories(std::filesystem::path(argv[2]).parent_path());stbi_flip_vertically_on_write(1);if(!stbi_write_png(argv[2],256,256,4,pixels.data(),256*4))throw std::runtime_error("Cannot save projectile evidence");}
+        renderer.DrawShadow(projection*view,lights);renderer.Draw(view,projection,eye,lights);
+        if(instanceUploads!=1)throw std::runtime_error("Shadow and color passes must share one snapshot upload");
+#ifdef TINY_RENDERDOC_CAPTURE
+        if(capture&&!capture->EndFrameCapture(nullptr,nullptr))throw std::runtime_error("RenderDoc did not save the projectile capture");
+#endif
+        renderer.Update(0,world,{});renderer.Draw(view,projection,eye,lights);
+        if(instanceUploads!=2)throw std::runtime_error("A changed snapshot must invalidate its GPU upload");
         renderer.Update(.01,world,{{"beam",{-1,0,0},{1,0,0},2,0,.8,.17,.4}});
         if(renderer.ribbons()!=1||renderer.Draw(view,projection,eye,lights)!=2)throw std::runtime_error("Source charger ribbon absent");
         renderer.Update(1,world,{});if(renderer.ribbons()!=0)throw std::runtime_error("Charger ribbon did not expire");
@@ -104,7 +143,7 @@ int main(int argc,char** argv){
         checkShadow("shot",1,true);checkShadow("arrow",2,true);checkShadow("fist",1,true);checkShadow("bladewave",0,false);
         glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);glBindFramebuffer(GL_FRAMEBUFFER,0);glDeleteTextures(1,&shadowDepth);glDeleteFramebuffers(1,&shadowFramebuffer);
         if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Source projectile renderer GL error");
-        std::cout<<"PROJECTILE_GPU source_teardrop=4 visible_pixels="<<colored<<" ribbon_lifecycle=pass renderer="<<glGetString(GL_RENDERER)<<'\n';
+        std::cout<<"PROJECTILE_GPU source_teardrop=4 visible_pixels="<<colored<<" snapshot_upload_reuse=pass ribbon_lifecycle=pass renderer="<<glGetString(GL_RENDERER)<<'\n';
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';result=1;}
     glfwDestroyWindow(window);glfwTerminate();return result;
 }

@@ -13,3 +13,12 @@ The actor muzzle adapter uses the live rig's right/left socket and rejects non-f
 ## Blade stop transition (v0.8.0)
 
 Wall, shield and range termination emit a visual stop event with the projectile id. The renderer snapshots position, velocity, color and wave parameters without an actor pointer, then applies the source 0.14-second fade. A victim contact does not terminate the wave. World-time rollback clears retained fades; lodged bow glow also uses world time. The isolated GPU test checks visible wall fades, range-stop events, nonterminal hit behavior and expiry, including owner destruction during the retained fade.
+
+
+## Snapshot preparation and shared upload (2026-10-25)
+
+`ProjectileRenderer::Update` borrows one combat projectile view and fills its retained blob storage. The returning `BuildProjectileBlobs` interface remains compatible with all 24 source fixtures; the output overload clears and reuses caller capacity. Weapon trails also borrow one view per hook update. This removes repeated remote-view merging at these callers without adding a cross-caller invalidation cache.
+
+The instance buffer is invalidated by Update and uploaded lazily by the first draw. Shadow and color passes share that upload; multiple updates before drawing only upload the latest snapshot. The GPU diagnostic intercepts actual GL buffer submissions, checks one upload across both passes, and checks invalidation on the next Update. Existing geometry, gameplay, colors and shader assets are unchanged.
+
+Targeted CPU/GPU tests passed (2/2, 11.45 seconds), as did World FX GPU (7.46 seconds). A RenderDoc 1.46 capture is available locally at `build/captures/ink-module_capture.rdc`. The fixed seed 11 Tidewater diagnostic (1920×1080, medium, 180 warmup / 120 measured frames, GTX 1650 Max-Q) changed from 60.21 to 60.40 FPS, CPU p95 17.65 to 17.59 ms and GPU p95 17.57 to 17.53 ms. This short comparison does not establish a material FPS gain; the verified reduction is one instance upload instead of two for a shared snapshot.
