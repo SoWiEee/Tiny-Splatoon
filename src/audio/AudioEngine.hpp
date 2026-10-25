@@ -88,6 +88,7 @@ private:
     friend bool AudioEngineMusicTestState(const AudioEngine&, std::filesystem::path&, bool&,
         std::uint64_t&, std::uint64_t&, std::uint64_t&, double&);
     friend bool AudioEngineMusicTestReadsAcrossEnd(AudioEngine&);
+    friend double AudioEngineTestTime(const AudioEngine&);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

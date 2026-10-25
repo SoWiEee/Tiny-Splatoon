@@ -10,7 +10,7 @@
 ![miniaudio](https://img.shields.io/badge/Audio-miniaudio-7B4DAB?style=flat-square)
 ![GameNetworkingSockets](https://img.shields.io/badge/Network-GameNetworkingSockets-385A75?style=flat-square)
 ![CMake](https://img.shields.io/badge/Build-CMake-064F8C?style=flat-square&logo=cmake&logoColor=white)
-[![Windows Build](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml/badge.svg)](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml)
+[![Windows / Linux Build](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml/badge.svg)](https://github.com/SoWiEee/Tiny-Splatoon/actions/workflows/release.yml)
 
 [下載遊戲](https://github.com/SoWiEee/Tiny-Splatoon/releases/latest) · [還原進度](docs/restoration-progress.md) · [工程規格](spec.md) · [Old Demo](https://youtu.be/rS_o25PM3hM)
 
@@ -23,18 +23,18 @@
 - 離線 4v4 塗地、區域爭奪（Zones）、八人協力 Boss 與自由練習。
 - 角色換裝、主／副／特殊武器、Bot AI 與固定 60 Hz 模擬。
 - 連續墨水、動態場景、陰影／反射／後製與可保存的畫質、反鋸齒設定。
-- 繁中介面、Noto Sans TC／Inter、音樂與定位音效、玩家資料自動保存。
+- 繁中介面、華康新綜藝體／BlitzMain、音樂與定位音效、玩家資料自動保存。
 - GNS 私人房碼、八人 3D 大廳、自動游泳就位與倒數彈射、換主及遊戲同步。
 - 存活名單、隊友名牌、武器準心、動態墨槽與 3D Tab 地圖。
 
-![v0.8.6 原生 3D 私人房間](docs/images/menu.png)
-*v0.8.6 八人巷弄大廳與暖紙色操作欄；此為原生場景／UI 的固定名單驗收畫面。*
+![v0.8.7 原生裝備選單](docs/images/menu.png)
+*v0.8.7 暖紙色裝備卡片、華康／BlitzMain 字體與原生角色展示。*
 
 ![塗地對戰遊戲畫面](docs/images/turf.png)
-*v0.8.5 原生塗地對戰、隊伍存活名單、隊友名牌、準心墨槽與圓角小地圖。*
+*v0.8.7 原生塗地對戰、隊伍存活名單、隊友名牌、準心墨槽與圓角小地圖。*
 
 ![區域爭奪遊戲畫面](docs/images/zones.png)
-*v0.8.5 Zones 計數、控制區與小地圖。*
+*v0.8.7 Zones 計數、控制區與小地圖。*
 
 一般建置、遊玩及原生 fixture 驗證不需要 `splat-ref/`；來源重匯出為可選工具。完整還原仍在進行，原生多人目前以指定服務位址及房碼連線。已完成範圍與差異請見[還原進度](docs/restoration-progress.md)及[待辦清單](docs/next-round-backlog.md)。
 
@@ -42,7 +42,9 @@
 
 直接遊玩：下載 [Windows x64 Release](https://github.com/SoWiEee/Tiny-Splatoon/releases/latest)，完整解壓後執行 `Tiny-Splatoon.exe`。
 
-原始碼建置需要 Windows、OpenGL 4.5、Visual Studio C++ 工具、CMake 3.20+、Ninja 與 vcpkg。在 **x64 Native Tools** 終端執行：
+Linux x64 Release（Ubuntu 22.04+，需支援 OpenGL 4.5 的圖形驅動）也由[最新 Release](https://github.com/SoWiEee/Tiny-Splatoon/releases/latest)提供，下載 `Tiny-Splatoon-<版本>-linux-x64.tar.gz`，完整解壓後在資料夾內執行 `./Tiny-Splatoon`。請保留 `assets/`、`lib/` 與兩個執行檔在同一資料夾。
+
+Windows 原始碼建置需要 OpenGL 4.5、Visual Studio C++ 工具、CMake 3.20+、Ninja 與 vcpkg。在 **x64 Native Tools** 終端執行：
 
 ```powershell
 $env:VCPKG_ROOT = 'C:\path\to\vcpkg'
@@ -50,6 +52,8 @@ cmake --preset vcpkg -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 4
 .\build\Tiny-Splatoon.exe
 ```
+
+Ubuntu 22.04 x64 的建置、套件安裝與執行步驟見[開發與驗證指引](docs/development.md#linux-ubuntu-2204-x64)。
 
 [開發與驗證指引](docs/development.md) · [套件相依](vcpkg.json) · [玩家保存與設定](docs/save-player-flow.md)
 

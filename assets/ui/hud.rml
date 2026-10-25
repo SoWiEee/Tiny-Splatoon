@@ -33,7 +33,7 @@
   </div>
   <div id="boss-feedback-layer" class="boss-feedback-layer hidden">
     <div id="boss-feedback-numbers" class="boss-feedback-numbers"></div>
-    <div id="boss-feedback-move" class="boss-feedback-move hidden"><i id="boss-feedback-edge-arrow" class="boss-feedback-edge-arrow">▶</i><span class="boss-feedback-move-pill"><i class="boss-feedback-warning">!</i><strong id="boss-feedback-move-label"></strong><i id="boss-feedback-move-direction" class="boss-feedback-move-direction">➤</i></span></div>
+    <div id="boss-feedback-move" class="boss-feedback-move hidden"><i id="boss-feedback-edge-arrow" class="boss-feedback-edge-arrow">▶</i><span class="boss-feedback-move-pill"><i class="boss-feedback-warning">!</i><strong id="boss-feedback-move-label"></strong><i id="boss-feedback-move-direction" class="boss-feedback-move-direction">▶</i></span></div>
     <div id="boss-feedback-title" class="boss-feedback-title hidden"><div class="boss-feedback-title-band"><i></i></div><img src="markers/boss.png"/><div class="boss-feedback-title-text"><small>頭目對戰</small><strong>破艦巨獸</strong><span>鏽殼恐怖巨蟹</span></div></div>
     <div id="boss-feedback-phase" class="boss-feedback-phase hidden" aria-live="polite"><strong id="boss-feedback-phase-title"></strong><span id="boss-feedback-phase-sub"></span></div>
   </div>

@@ -355,7 +355,8 @@ void BossPose::Animator::apply(Rig& rig,double dt,const BossPoseInput& s){
 
 void BossPose::Animator::chainsStep(Rig& rig,double dt,const BossPoseInput& s){
     chainAcc=std::min(chainAcc+dt,4.0/60);const double h=1.0/60;int steps=0;while(chainAcc>=h){chainAcc-=h;++steps;}
-    const auto storeParticle=[](glm::dvec3 value){const glm::vec3 stored(value);return glm::dvec3(stored);};
+    // Match source Float32Array stores; GCC can elide a GLM float/double round trip.
+    const auto storeParticle=[](glm::dvec3 value){volatile float x=static_cast<float>(value.x),y=static_cast<float>(value.y),z=static_cast<float>(value.z);return glm::dvec3(x,y,z);};
     const glm::dmat4 root=trs(rootPos,rootQ,glm::dvec3(1));
     const glm::dmat4 shellWorld=multiplyThree(root,rig.currentGlobal[rig.byName.at("shell")]);
     const glm::dmat4 toContainer=multiplyThree(multiplyThree(shellWorld,glm::translate(glm::dmat4(1),-source.containerPosition)),source.containerMatrix);

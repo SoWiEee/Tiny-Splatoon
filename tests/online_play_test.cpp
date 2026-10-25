@@ -2,6 +2,8 @@
 #include <chrono>
 #include <iostream>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <thread>
 
 using namespace restoration;
@@ -18,13 +20,20 @@ template<class Check>void waitFor(OnlinePlay& online,Check check){
 }
 int main(int argc,char** argv){
     try{
-        require(argc==2,"server address required");
+        const bool localService=argc==3&&std::string_view(argv[1])=="--local-service";
+        require(argc==2||localService,"usage: online_play_test <server-address> | --local-service <server-address>");
+        const std::string address=localService?argv[2]:argv[1];
         OnlinePlay online(std::filesystem::absolute(argv[0]));PlayerProfile profile;
         profile.name="連線測試";profile.weapon="shooter";profile.style.hair=2;
-        UiOnlineRequest request;request.kind=UiOnlineRequest::Kind::Create;request.address="invalid-address";
+        UiOnlineRequest request;
+        if(localService){
+            request.kind=UiOnlineRequest::Kind::LocalService;request.address=address;online.Handle(request,profile);
+            require(online.view().error.empty(),"local service request must launch the packaged server");
+        }
+        request.kind=UiOnlineRequest::Kind::Create;request.address="invalid-address";
         online.Handle(request,profile);
         require(online.view().phase==network::RoomPhase::Error&&!online.view().error.empty(),"invalid address needs a visible recoverable error");
-        request.address=argv[1];online.Handle(request,profile);
+        request.address=address;online.Handle(request,profile);
         waitFor(online,[&]{return online.view().phase==network::RoomPhase::Lobby;});
         require(online.view().code.size()==5&&online.view().members.size()==1,"create must receive a real five-character room code");
         require(online.view().members[0].name==profile.name&&online.view().members[0].style.hair==2,"room must carry the public profile and style");
@@ -43,6 +52,12 @@ int main(int argc,char** argv){
         request.kind=UiOnlineRequest::Kind::Join;request.code="ZZZZZ";online.Handle(request,profile);
         waitFor(online,[&]{return online.view().phase==network::RoomPhase::Error;});
         require(!online.view().error.empty(),"unknown room must expose an actionable error");
-        std::cout<<"Online menu adapter create/profile/ready/start/load/return/leave flow passed\n";return 0;
+        std::cout<<"Online menu adapter create/profile/ready/start/load/return/leave flow passed\n";
+        if(localService){
+            std::cout<<"ONLINE_LOCAL_SERVICE_FLOW_COMPLETE\n"<<std::flush;
+            std::string cleanup;
+            require(std::getline(std::cin,cleanup)&&cleanup=="cleanup","local service harness cleanup signal was missing");
+        }
+        return 0;
     }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
 }

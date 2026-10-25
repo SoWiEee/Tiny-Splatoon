@@ -8,7 +8,7 @@
 
 ### 1.1 產品範圍
 
-- 原生 Windows 桌面遊戲，沿用 C++17、OpenGL 4.5、GLFW、GLAD、GLM 與 CMake / vcpkg 基礎。
+- 原生 Windows 與 Linux 桌面遊戲，沿用 C++17、OpenGL 4.5、GLFW、GLAD、GLM 與 CMake / vcpkg 基礎；Linux x64 發布基線為 Ubuntu 22.04。
 - 全部正式玩家流程：離線對戰、練習、線上房間、三種模式、全部正式地圖、主／副／特殊武器、角色外觀、介面、音效、進度與設定。
 - 世界、角色、墨水、FX 與後製由 OpenGL 實作；不得以嵌入網頁、Electron／Three.js 執行期或影片替代。
 - 可重用既有引擎／依賴，內部模組與演算法組織不必逐行翻譯；可觀察行為、內容與呈現必須一致。
@@ -366,7 +366,7 @@ ID、順序、名稱、預設 kit、數值、動畫／音效／UI／網路均屬
 | HUD-05 | jump0.75 s蓄力、飛行弧線／落點警告／目標有效性／beacon消耗；死亡可預排隊友／beacon jump，復活執行，失效取消依來源。 |
 | HUD-06 | ready/go／末分鐘／十秒／timesup／judge／模式事件動畫與音效，不重複觸發。 |
 | HUD-07 | results姓名／隊伍／武器／turf/splats/deaths、self/bot、獎章、模式統計／XP／升級、rematch/back全流程。 |
-| HUD-08 | 依 2026-10-23 使用者更新，取代先前簡約方向：UI 採更大膽、接近參考版的墨色描邊、隊伍色彩、徽章與互動回饋，優先沿用來源素材。繁體中文用 Noto Sans TC，英文／數字搭配 Inter。保留功能、資訊層級、focus／hover／press 音效與可辨識轉場；設定頁須能捲到全部選項且返回操作可見，驗收 720p／1080p。對戰頂列顯示實際隊伍人數、存活／陣亡、復活倒數與 special ready；Boss 顯示八人協力隊。預設 debug 面板不通過。 |
+| HUD-08 | 依 2026-10-23 使用者更新，取代先前簡約方向：UI 採更大膽、接近參考版的墨色描邊、隊伍色彩、徽章與互動回饋，優先沿用來源素材。依 2026-10-25 使用者更新，繁體中文用 `華康新綜藝體.ttf`，英文／數字用 `BlitzMain.otf`；英數主字體優先、繁中逐字 fallback，避免華康的 Latin 字形覆蓋 BlitzMain。保留功能、資訊層級、focus／hover／press 音效與可辨識轉場；設定頁須能捲到全部選項且返回操作可見，驗收 720p／1080p。對戰頂列顯示實際隊伍人數、存活／陣亡、復活倒數與 special ready；Boss 顯示八人協力隊。預設 debug 面板不通過。 |
 
 ## 13. 音訊、設定與進度
 
@@ -451,8 +451,8 @@ ID、順序、名稱、預設 kit、數值、動畫／音效／UI／網路均屬
 
 ### 15.4 效能、硬體與打包
 
-- QA-11：release可從輸出目錄執行、資源齊全，不依賴瀏覽器runtime／開發工作目錄／本機絕對資源路徑。
-- QA-12：明示OpenGL4.5 Windows驗收硬體；1080p high一般4v4／8人Boss目標60fps，記CPU/GPU/driver、frame time/p95／記憶體／draws／particles，不虛構跨機保證。
+- QA-11：Windows與Ubuntu 22.04 x64 release可從輸出目錄執行、資源齊全，不依賴瀏覽器runtime／開發工作目錄／本機絕對資源路徑。
+- QA-12：明示OpenGL4.5 Windows驗收硬體，並在Ubuntu 22.04 x64以實際driver完成建置、套件啟動與OpenGL 4.5 smoke；此Linux基線不代表已驗收效能。Windows 1080p high一般4v4／8人Boss目標60fps，記CPU/GPU/driver、frame time/p95／記憶體／draws／particles，不虛構跨機保證。
 - QA-13：品質降低不改規則／分數／網路可見性，完整局與多次切場無持續資源增長。
 - QA-14：鍵鼠、至少一標準手把／震動、觸控分開記實機結果；缺硬體／relay／capture列待驗收，不以build替代。
 

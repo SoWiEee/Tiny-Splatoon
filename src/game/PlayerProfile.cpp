@@ -153,7 +153,10 @@ std::filesystem::path DefaultProfilePath(){
     if(!written||written>=needed)throw std::runtime_error("Could not read LOCALAPPDATA");
     local.resize(written);return std::filesystem::path(local)/L"Tiny-Splatoon"/L"profile.json";
 #else
-    if(const char* local=std::getenv("LOCALAPPDATA");local&&*local)return std::filesystem::u8path(local)/"Tiny-Splatoon"/"profile.json";
+    if(const char* dataHome=std::getenv("XDG_DATA_HOME");dataHome&&*dataHome){
+        const auto path=std::filesystem::u8path(dataHome);
+        if(path.is_absolute())return path/"Tiny-Splatoon"/"profile.json";
+    }
     if(const char* home=std::getenv("HOME");home&&*home)return std::filesystem::u8path(home)/".local"/"share"/"Tiny-Splatoon"/"profile.json";
     throw std::runtime_error("No local profile directory is available");
 #endif

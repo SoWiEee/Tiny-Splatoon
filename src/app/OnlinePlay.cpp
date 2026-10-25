@@ -1,6 +1,7 @@
 #include "OnlinePlay.hpp"
 #include "ArsenalData.hpp"
 #include <stdexcept>
+#include <system_error>
 #include <utility>
 
 #ifdef _WIN32
@@ -9,6 +10,15 @@
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <cerrno>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <thread>
+#endif
+
+#ifndef _WIN32
+extern char** environ;
 #endif
 
 namespace restoration {
@@ -22,7 +32,11 @@ SteamNetworkingIPAddr ServerAddress(const std::string& text){
 
 void LaunchLocalService(const std::filesystem::path& game,const SteamNetworkingIPAddr& address){
     if(!address.IsLocalHost())throw std::invalid_argument("啟動本機服務時，請使用 127.0.0.1 或 ::1 的本機位址。");
+#ifdef _WIN32
     const auto server=game.parent_path()/"Tiny-Splatoon-Server.exe";
+#else
+    const auto server=game.parent_path()/"Tiny-Splatoon-Server";
+#endif
     if(!std::filesystem::is_regular_file(server))throw std::runtime_error("找不到房間服務程式，請確認遊戲檔案完整。");
 #ifdef _WIN32
     char ip[SteamNetworkingIPAddr::k_cchMaxString]{};address.ToString(ip,sizeof(ip),false);
@@ -35,7 +49,14 @@ void LaunchLocalService(const std::filesystem::path& game,const SteamNetworkingI
     // Keep the service independent so another player can take over the room.
     CloseHandle(process.hThread);CloseHandle(process.hProcess);
 #else
-    throw std::runtime_error("此平台請先啟動房間服務，再使用伺服器位址連線。");
+    char ip[SteamNetworkingIPAddr::k_cchMaxString]{};address.ToString(ip,sizeof(ip),false);
+    std::string executable=server.string(),host(ip),port=std::to_string(address.m_port);
+    char bindOption[]="--bind",portOption[]="--port",idleOption[]="--idle-exit",idleSeconds[]="180";
+    char* arguments[]={executable.data(),bindOption,host.data(),portOption,port.data(),idleOption,idleSeconds,nullptr};
+    pid_t process{};
+    const int error=posix_spawn(&process,executable.c_str(),nullptr,nullptr,arguments,::environ);
+    if(error)throw std::system_error(error,std::generic_category(),"Could not start local room service");
+    std::thread([process]{int status;while(waitpid(process,&status,0)==-1&&errno==EINTR){}}).detach();
 #endif
 }
 }

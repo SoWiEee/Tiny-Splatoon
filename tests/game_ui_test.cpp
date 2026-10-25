@@ -225,6 +225,13 @@ int main(int argc,char** argv){
                 Check(element(panel.c_str())->IsVisible(),"Each settings category must be reachable");
                 Check(element(button.c_str())->GetAttribute<Rml::String>("aria-selected","")=="true","Settings tabs must expose their selected state");
                 auto* scroll=element("settings-scroll");scroll->SetScrollTop(0);settingsRender();
+                if(std::string(tab)=="controls"){
+                    const auto slider=element("sensitivity")->GetAbsoluteOffset();
+                    const auto value=element("sensitivity-value")->GetAbsoluteOffset();
+                    const auto sliderCenter=slider.y+element("sensitivity")->GetOffsetHeight()*.5f;
+                    const auto valueCenter=value.y+element("sensitivity-value")->GetOffsetHeight()*.5f;
+                    Check(std::abs(sliderCenter-valueCenter)<5,"Settings slider and numeric readout must stay vertically aligned with the updated font metrics");
+                }
                 const auto offset=scroll->GetAbsoluteOffset();
                 if(scroll->GetScrollHeight()>scroll->GetClientHeight()+4){
                     context->ProcessMouseMove(int(offset.x+scroll->GetClientWidth()/2),int(offset.y+40),0);

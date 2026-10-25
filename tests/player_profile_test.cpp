@@ -1,6 +1,7 @@
 #include "PlayerProfile.hpp"
 
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -23,6 +24,16 @@ int main(){
     const auto root=std::filesystem::temp_directory_path()/std::filesystem::path("tiny-splatoon-profile-test-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try{
         std::filesystem::create_directories(root);const auto path=root/"profile.json";ProfileStore store(path);
+#if defined(__linux__)
+        const char* originalDataHome=std::getenv("XDG_DATA_HOME");
+        const std::string savedDataHome=originalDataHome?originalDataHome:"";
+        const auto dataHome=root/"xdg-data";
+        Check(setenv("XDG_DATA_HOME",dataHome.c_str(),1)==0,"could not set XDG_DATA_HOME fixture");
+        Check(ProfileStore{}.path()==dataHome/"Tiny-Splatoon"/"profile.json","default profile path must respect XDG_DATA_HOME");
+        Check(setenv("XDG_DATA_HOME","relative-data",1)==0,"could not set relative XDG fixture");
+        Check(ProfileStore{}.path()==std::filesystem::path(std::getenv("HOME"))/".local"/"share"/"Tiny-Splatoon"/"profile.json","relative XDG_DATA_HOME must fall back to HOME");
+        if(originalDataHome)setenv("XDG_DATA_HOME",savedDataHome.c_str(),1);else unsetenv("XDG_DATA_HOME");
+#endif
         auto profile=store.load();Check(profile.name=="Player"&&profile.level==1&&profile.xp==0&&profile.weapon=="shooter","missing profile defaults changed");
         Check(profile.settings.graphics.preset==GraphicsPreset::Medium&&profile.settings.palette==0&&profile.settings.graphics.antialiasing,"native settings defaults changed");
         Check(!ForPreset(GraphicsPreset::Low).antialiasing&&ForPreset(GraphicsPreset::Medium).antialiasing&&ForPreset(GraphicsPreset::High).antialiasing,"graphics preset antialiasing defaults changed");

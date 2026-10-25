@@ -1,10 +1,10 @@
-body { font-family: Inter; font-size: 19dp; font-weight: normal; color: #202b28; margin: 0; width: 100%; height: 100%; }
+body { font-family: Splatoon2; font-size: 19dp; font-weight: normal; color: #202b28; margin: 0; width: 100%; height: 100%; }
 div { display: block; }
 h1 { display: block; font-size: 40dp; font-weight: 700; margin: 0 0 12dp; }
 p { display: block; margin: 0; }
 strong { font-weight: 700; }
 .muted { color: #596761; font-size: 16dp; }
-button { display: inline-block; tab-index: auto; color: #202b28; font-family: Inter; font-size: 18dp; padding: 13dp 22dp; background-color: #edf0ed; border: 2dp #edf0ed; border-radius: 6dp; cursor: pointer; text-align: center; transition: background-color .12s; }
+button { display: inline-block; tab-index: auto; color: #202b28; font-family: Splatoon2; font-size: 18dp; padding: 13dp 22dp; background-color: #edf0ed; border: 2dp #edf0ed; border-radius: 6dp; cursor: pointer; text-align: center; transition: background-color .12s; }
 button:hover { background-color: #e1e8e2; border-color: #e1e8e2; }
 button:focus { border-color: #206653; }
 button:active { background-color: #d3dfd6; }
@@ -114,7 +114,7 @@ th:first-child, td:first-child { text-align: left; }
 
 /* Warm paper, ink, and team-color language for the menu only. */
 .hidden { display: none; }
-.menu { background-color: transparent; color: #211d27; font-family: Inter; font-size: 19dp; line-height: 1.35; }
+.menu { background-color: transparent; color: #211d27; font-family: Splatoon2; font-size: 19dp; line-height: 1.35; }
 .menu-shell { position: relative; display: block; max-width: none; height: 100%; margin: 0; padding: 0; }
 .menu-left { position: relative; z-index: 1; width: 66%; height: 100%; min-height: 0; box-sizing: border-box; padding: 0 30dp 0 48dp; display: flex; flex-direction: column; background-color: #f4ecdc; border-right: 3dp #211d27; }
 .preview-surface { position: absolute; right: 0; top: 0; width: 34%; height: 100%; background-color: transparent; }
@@ -127,7 +127,7 @@ th:first-child, td:first-child { text-align: left; }
 .profile-header { padding: 9dp 12dp; border: 2dp #211d27; border-radius: 5dp; background-color: #211d27; color: #fff9e9; font-size: 15dp; font-weight: 700; text-align: right; }
 .menu-layout { position: absolute; top: 94dp; bottom: 46dp; left: 48dp; right: 30dp; display: flex; min-height: 0; box-sizing: border-box; padding: 20dp 0 16dp; }
 .navigation { width: 168dp; flex-shrink: 0; display: flex; flex-direction: column; padding-right: 16dp; border-right: 2dp #211d27; }
-.menu button { display: inline-block; tab-index: auto; box-sizing: border-box; color: #211d27; font-family: Inter; font-size: 18dp; font-weight: 700; padding: 10dp 13dp; background-color: #f8f1e4; border: 2dp #211d27; border-radius: 6dp; cursor: pointer; text-align: center; transition: background-color .12s; }
+.menu button { display: inline-block; tab-index: auto; box-sizing: border-box; color: #211d27; font-family: Splatoon2; font-size: 18dp; font-weight: 700; padding: 10dp 13dp; background-color: #f8f1e4; border: 2dp #211d27; border-radius: 6dp; cursor: pointer; text-align: center; transition: background-color .12s; }
 .menu button:hover { background-color: #e4eaff; }
 .menu button:focus { background-color: #fff1bf; border-color: #2f5bff; }
 .menu button:active { background-color: #e7c46f; }
@@ -160,7 +160,7 @@ th:first-child, td:first-child { text-align: left; }
 .menu .title-lockup button { min-width: 220dp; }
 .menu .field { display: flex; align-items: center; margin-bottom: 14dp; }
 .menu .field label { width: 150dp; flex-shrink: 0; color: #392f29; font-weight: 700; }
-.menu select { width: 360dp; height: 40dp; box-sizing: border-box; padding: 8dp 12dp; background-color: #fff9ed; border: 2dp #211d27; border-radius: 5dp; color: #211d27; font-family: Inter; font-size: 16dp; cursor: pointer; }
+.menu select { width: 360dp; height: 40dp; box-sizing: border-box; padding: 8dp 12dp; background-color: #fff9ed; border: 2dp #211d27; border-radius: 5dp; color: #211d27; font-family: Splatoon2; font-size: 16dp; cursor: pointer; }
 .menu select:hover { background-color: #ffffff; border-color: #2f5bff; }
 .menu select:focus { background-color: #fff1bf; border-color: #2f5bff; }
 .menu select selectvalue { color: #211d27; }
@@ -180,7 +180,7 @@ th:first-child, td:first-child { text-align: left; }
 .menu .profile-card { padding: 16dp; margin: 6dp 0 16dp; border: 2dp #211d27; border-radius: 6dp; background-color: #fff8ea; }
 .menu .profile-card-title, .menu .stats-heading { font-size: 15dp; font-weight: 700; color: #81390d; margin-bottom: 12dp; }
 .menu .profile-card .field { margin-bottom: 10dp; }
-.menu .text-input { width: 360dp; height: 38dp; box-sizing: border-box; padding: 8dp 12dp; border: 2dp #211d27; border-radius: 5dp; background-color: #fff9ed; color: #211d27; font-family: Inter; font-size: 16dp; }
+.menu .text-input { width: 360dp; height: 38dp; box-sizing: border-box; padding: 8dp 12dp; border: 2dp #211d27; border-radius: 5dp; background-color: #fff9ed; color: #211d27; font-family: Splatoon2; font-size: 16dp; }
 .menu .text-input:focus { background-color: #fff1bf; border-color: #2f5bff; }
 .menu .profile-progress { font-size: 15dp; color: #4d4141; margin: 12dp 0; }
 .menu .profile-stats { display: flex; color: #5c5047; font-size: 14dp; }
@@ -394,6 +394,15 @@ th:first-child, td:first-child { text-align: left; }
 .special-art { left: 41dp; top: 24dp; }
 .sub-art { right: auto; bottom: auto; left: 20dp; top: 73dp; width: 40dp; height: 40dp; }
 .special-percent { left: 55dp; top: 100dp; width: 78dp; font-size: 15dp; }
+.battle-top .clock { line-height: 1.1; border-color: #f28a24; border-radius: 20dp 10dp 20dp 10dp; }
+.hud .stage-name, .hud .pause-hint { line-height: 1.25; }
+.hud .minimap { background-color: #f4ecdcf2; border-color: #211d27; border-radius: 22dp; }
+.hud .minimap-heading { line-height: 1.15; font-weight: 700; }
+.hud .minimap-heading span { color: #665b50; font-size: 14dp; }
+.hud .minimap-map { border: 2dp #211d27; border-radius: 2dp; }
+.personal-turf { line-height: 1.05; }
+.battle-note { line-height: 1.2; }
+.battle-banner { line-height: 1.1; letter-spacing: .25dp; }
 
 /* Source Boss plate: three phases and the two HP thresholds. */
 #hud .boss { top: 124dp; margin-left: -340dp; width: 680dp; padding: 12dp 16dp; display: flex; align-items: center; background-color: #181523ee; color: #ffffff; border: 4dp #ffffff; border-radius: 32dp; }

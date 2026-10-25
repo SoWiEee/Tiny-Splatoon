@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -140,6 +141,7 @@ struct GameUi::Impl : Rml::EventListener {
     std::array<bool,12> keys{};
     std::string hovered;
     std::map<std::string,std::string> textCache;
+    std::vector<Rml::byte> chineseFontData;
     void* previousUser=nullptr;
     GLFWscrollfun previousScroll=nullptr;
     GLFWcharfun previousChar=nullptr;
@@ -174,11 +176,26 @@ struct GameUi::Impl : Rml::EventListener {
             Rml::Factory::RegisterElementInstancer("special-gauge",&specialGaugeInstancer);
             Rml::Factory::RegisterElementInstancer("battle-feedback",&feedbackInstancer);
             Rml::Factory::RegisterElementInstancer("hud-ring",&ringInstancer);
-            if(!Rml::LoadFontFace((assets/"fonts/Inter.ttf").string(),false,Rml::Style::FontWeight::Normal)||
-               !Rml::LoadFontFace((assets/"fonts/Inter.ttf").string(),false,Rml::Style::FontWeight::Bold)||
-               !Rml::LoadFontFace((assets/"fonts/NotoSansTC.ttf").string(),true,Rml::Style::FontWeight::Normal)||
-               !Rml::LoadFontFace((assets/"fonts/NotoSansTC.ttf").string(),true,Rml::Style::FontWeight::Bold))
-                throw std::runtime_error("Unable to load Inter / Noto Sans TC fonts");
+            std::ifstream chineseFont(assets/std::filesystem::u8path(u8"fonts/華康新綜藝體.ttf"),std::ios::binary|std::ios::ate);
+            const auto chineseFontSize=chineseFont?static_cast<std::streamsize>(chineseFont.tellg()):0;
+            if(chineseFontSize<=0)throw std::runtime_error("Unable to open Chinese UI font");
+            chineseFontData.resize(static_cast<std::size_t>(chineseFontSize));
+            chineseFont.seekg(0);
+            if(!chineseFont.read(reinterpret_cast<char*>(chineseFontData.data()),chineseFontSize))
+                throw std::runtime_error("Unable to read Chinese UI font");
+            const Rml::Span<const Rml::byte> chineseFace(chineseFontData.data(),chineseFontData.size());
+            const auto splatoonFont=(assets/"fonts/BlitzMain.otf").string();
+            const auto notoFallback=(assets/"fonts/NotoSansTC.ttf").string();
+            const auto interFallback=(assets/"fonts/Inter.ttf").string();
+            if(!Rml::LoadFontFace(splatoonFont,false,Rml::Style::FontWeight::Normal)||
+               !Rml::LoadFontFace(splatoonFont,false,Rml::Style::FontWeight::Bold)||
+               !Rml::LoadFontFace(chineseFace,"DFPZongYiW5-B5",Rml::Style::FontStyle::Normal,Rml::Style::FontWeight::Normal,true)||
+               !Rml::LoadFontFace(chineseFace,"DFPZongYiW5-B5",Rml::Style::FontStyle::Normal,Rml::Style::FontWeight::Bold,true)||
+               !Rml::LoadFontFace(notoFallback,true,Rml::Style::FontWeight::Normal)||
+               !Rml::LoadFontFace(notoFallback,true,Rml::Style::FontWeight::Bold)||
+               !Rml::LoadFontFace(interFallback,true,Rml::Style::FontWeight::Normal)||
+               !Rml::LoadFontFace(interFallback,true,Rml::Style::FontWeight::Bold))
+                throw std::runtime_error("Unable to load Splatoon2 / DFPZongYiW5-B5 UI fonts");
             context=Rml::CreateContext("game-ui",{1280,720});
             if(!context)throw std::runtime_error("Unable to create player UI context");
             context->GetRootElement()->AddEventListener("mousemove",this);

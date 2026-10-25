@@ -11,7 +11,35 @@ cmake --build build --parallel 4
 .\build\Tiny-Splatoon.exe
 ```
 
-`assets/` 由獨立的 `Tiny-Splatoon-assets` target 部署到執行檔旁，一般 build 已包含此相依。純素材修改不會重新連結遊戲；新增／刪除素材會更新清單，刪除僅限先前成功部署所記錄的檔案，目錄中的其他本機檔案會保留。一般建置、遊玩與發布不需瀏覽器、Node.js 或 `splat-ref/`。玩家資料位於 `%LOCALAPPDATA%/Tiny-Splatoon/profile.json`，詳見[保存契約](save-player-flow.md)。字體授權位於 `assets/fonts/`。
+`assets/` 由獨立的 `Tiny-Splatoon-assets` target 部署到執行檔旁，一般 build 已包含此相依。純素材修改不會重新連結遊戲；新增／刪除素材會更新清單，刪除僅限先前成功部署所記錄的檔案，目錄中的其他本機檔案會保留。一般建置、遊玩與發布不需瀏覽器、Node.js 或 `splat-ref/`。玩家資料位於 `%LOCALAPPDATA%/Tiny-Splatoon/profile.json`，詳見[保存契約](save-player-flow.md)。字體與隨附授權文件位於 `assets/fonts/`。目前 UI 使用華康新綜藝體（繁中）與 BlitzMain（英文／數字）。
+
+### Linux（Ubuntu 22.04 x64）
+
+需要提供 OpenGL 4.5 core profile 的圖形驅動，以及 CMake 3.20+、Ninja、C++ 編譯器與 vcpkg。安裝建置用系統套件並以專案鎖定的 vcpkg 版本建置：
+
+```bash
+sudo apt-get update
+sudo apt-get install --no-install-recommends build-essential cmake ninja-build pkg-config curl zip unzip tar libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev wayland-protocols libx11-xcb-dev libxxf86vm-dev libasound2-dev libpulse-dev libssl-dev libcurl4-openssl-dev
+git clone https://github.com/microsoft/vcpkg.git "$HOME/vcpkg"
+git -C "$HOME/vcpkg" checkout b1b19307e2d2ec1eefbdb7ea069de7d4bcd31f01
+"$HOME/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+export VCPKG_ROOT="$HOME/vcpkg"
+cmake --preset vcpkg -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 4
+./build/Tiny-Splatoon
+```
+
+原始碼建置會將 `assets/` 部署到執行檔旁。安裝發布包時，解壓縮後保留素材與函式庫的相對位置：
+
+```bash
+mkdir -p "$HOME/.local/opt/tiny-splatoon"
+tar -xzf Tiny-Splatoon-<version>-linux-x64.tar.gz -C "$HOME/.local/opt/tiny-splatoon"
+"$HOME/.local/opt/tiny-splatoon/Tiny-Splatoon-linux-x64/Tiny-Splatoon"
+```
+
+請將 `Tiny-Splatoon-Server`、`assets/` 與 `lib/` 保留於遊戲旁。若 `XDG_DATA_HOME` 為絕對路徑，資料保存至 `$XDG_DATA_HOME/Tiny-Splatoon/profile.json`；否則使用 `$HOME/.local/share/Tiny-Splatoon/profile.json`，詳見[保存契約](save-player-flow.md)。
+
+Linux 與 Windows 都需要 OpenGL 4.5 core；實際建置與執行驗收結果見[驗收紀錄](acceptance/acceptance-2026-10-23.md)。發布包使用系統的 X11、OpenGL 與音訊後端；最小桌面環境可安裝 `libgl1 libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 libasound2 libpulse0`。
 
 Optimus 入口會請求 NVIDIA GPU；啟動紀錄的 `GPU` 行顯示實際 renderer，Windows／驅動偏好可能覆寫。低／中／高畫質可在選單設定；完整效能矩陣尚未驗收。
 

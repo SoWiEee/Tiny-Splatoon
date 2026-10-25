@@ -17,7 +17,7 @@ for(const preset of PRESETS){
 const number=v=>{if(!Number.isFinite(v))throw new Error('Non-finite render fixture');return Number.isInteger(v)?`${v}.0`:String(v);};
 const vec=v=>`{${v.map(number).join(',')}}`;
 const transform=t=>`{${vec(t.position)},${vec([t.quaternion[3],...t.quaternion.slice(0,3)])},${vec(t.scale)},${t.visible}${t.authoredMatrix?`,true,glm::dmat4(${t.authoredMatrix.map(number).join(',')})`:''}}`;
-let out='// Generated source snapshots for renderer tests only; never used by the game.\n#pragma once\n#include "../src/game/CharacterPose.hpp"\n#include <stdexcept>\nnamespace restoration::test {\n';
+let out='// Generated source snapshots for renderer tests only; never used by the game.\n#pragma once\n#include "../../src/game/CharacterPose.hpp"\n#include <stdexcept>\nnamespace restoration::test {\n';
 // Separate functions keep MSVC debug temporaries below the Windows stack limit.
 for(const [index,{frame:f}]of frames.entries()){
     out+=`inline CharacterPoseFrame RenderFixture${index}() {\n    CharacterPoseFrame f;\n`;

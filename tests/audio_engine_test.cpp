@@ -33,6 +33,14 @@ namespace {
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
 }
+// Backends advance audio time in blocks, independently of wall-clock sleeps.
+void waitForAudioTime(const restoration::AudioEngine& audio, double seconds) {
+    const double start=AudioEngineTestTime(audio);
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
+    while(AudioEngineTestTime(audio)-start<seconds&&std::chrono::steady_clock::now()<deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    require(AudioEngineTestTime(audio)-start>=seconds,"Audio device clock did not advance before the deadline");
+}
 }
 
 int main(int argc, char** argv) {
@@ -167,10 +175,10 @@ int main(int argc, char** argv) {
 
         require(audio.Play("bomb_beep"), "A cue with an authored minimum gap must start");
         require(!audio.Play("bomb_beep"), "A repeated source cue inside its authored minimum gap must be rejected");
-        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        waitForAudioTime(audio,0.06);
         require(audio.Play("bomb_beep"), "The source minimum gap must expire while the earlier voice is still active");
         audio.Clear();
-        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        waitForAudioTime(audio,0.06);
 
         AudioPlayOptions voiceCapOptions;
         voiceCapOptions.pitch = 0.05;

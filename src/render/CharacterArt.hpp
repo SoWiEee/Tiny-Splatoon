@@ -23,7 +23,7 @@ public:
     std::size_t draw(const CharacterPoseFrame& frame,const CharacterStyle& style,
                      const std::string& main,const std::string& sub,const std::string& lod,
                      const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 camera,
-                     const CharacterLightState& lighting,LodDraw lodDraw={},
+                     const CharacterLightState& lighting,LodDraw lodDraw={0.0,1.0,true,false},
                      const CharacterShadowState* shadow=nullptr);
 private:
     struct GpuMesh;

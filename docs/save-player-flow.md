@@ -1,10 +1,11 @@
 # 保存與玩家流程
 
-原生入口使用標題、首頁、遊玩、裝備、角色置物櫃、設定、操作說明與製作名單。簡約 RmlUi 版面保留 Inter／Noto Sans TC，品牌為 Tiny Splatoon。裝備、地圖與外觀採繁中名稱；自訂名稱與官方術語的區別見 [翻譯表](ui-translations.md)。來源對齊 `spec.md` 的 SAVE-01–05、FLOW-01–05／09–10；尚未完成的後端不得因欄位存在而視為已移植。
+原生入口使用標題、首頁、遊玩、裝備、角色置物櫃、設定、操作說明與製作名單。RmlUi 版面使用華康新綜藝體（繁中）與 BlitzMain（英文／數字），品牌為 Tiny Splatoon。裝備、地圖與外觀採繁中名稱；自訂名稱與官方術語的區別見 [翻譯表](ui-translations.md)。來源對齊 `spec.md` 的 SAVE-01–05、FLOW-01–05／09–10；尚未完成的後端不得因欄位存在而視為已移植。
 
 ## 保存契約
 
-- `%LOCALAPPDATA%/Tiny-Splatoon/profile.json` 保存玩家名稱、裝備 ID、外觀索引、等級、XP、勝場、場次、累積塗地及設定。
+- Windows 將玩家名稱、裝備 ID、外觀索引、等級、XP、勝場、場次、累積塗地及設定保存於 `%LOCALAPPDATA%/Tiny-Splatoon/profile.json`。
+- Linux 使用 `$XDG_DATA_HOME/Tiny-Splatoon/profile.json`（僅當 `XDG_DATA_HOME` 是絕對路徑）；未設定或為相對路徑時使用 `$HOME/.local/share/Tiny-Splatoon/profile.json`。
 - 缺檔或無效 JSON 使用安全預設；舊武器別名轉為現行 ID，未知欄位不影響讀取。UTF-8 名稱限制為 16 個字元。
 - 先寫入暫存檔，再原子替換正式檔。讀寫權限錯誤呈現在 UI；替換失敗保留舊檔。
 - 完整結束的離線對戰結算一次；中途離場與練習不給 XP。保存最近一次結算 ID，避免同一結果再次套用。這不是歷史賽事重播帳本。

@@ -1,28 +1,22 @@
-# Tiny Splatoon v0.8.6
+# Tiny Splatoon v0.8.7
 
 ## 更新內容
 
-- 加入原生 3D 巷弄 hub／lobby：首次名單出墨／站定位、後續玩家由巷口游入、換隊與離開、自動就位、準備跳躍、招呼與倒數彈射。
-- 大廳使用來源材質、紋理、燈光、滴水／燈串／飛蛾／車燈、聚光燈陰影與角色平面反射；選單操作保留暖紙色、深墨描邊與橘藍，其餘分頁維持純色背景。
-- 大廳支援更換裝備／造型後返回同房；倒數鎖定操作，演出完畢才進入對戰。修正回房、斷線、重用對戰編號與重複表情的呈現狀態。
-- Boss 補齊六類招式的填色危險區域、地面裁切、掃射／衝撞預兆，以及小螃蟹獨立材質、死亡膨脹和來源低面數 clearcoat 爆散。
-- 修正 Boss Bot 選點缺少隊友目標間距懲罰，改善潮汐廣場的中央聚集。
-- 墨彈、弓箭與拳套加入投射物陰影；炸彈飛行回到來源轉速範圍，不再隨 fuse 額外減速。
-- 修正 Tab 地圖選中隊友時的白色方形濾鏡，保留武器透明圖示、隊色圓底與選中邊框。
-- 對戰結束立即隱藏復活提示，倒數不顯示負數；移除戰鬥暫停選單的設定入口，統一回主選單調整；操作說明、返回與取消離開均清理舊暫停層。
-- 依使用者指定調整 Shift：乾地／敵墨不變成魷魚，保留己墨游泳、己墨牆面攀爬、合法起跳及強制彈射姿態。此項與參考版原先允許乾地魷魚的行為不同。
-- 核對 Kelpline Terminal 已提供於塗地、Zones、Boss；繁中名稱為「海帶線貨運站」。
+- 加入 Linux x64 支援與 Ubuntu 22.04 建置／發布流程，隨包附上獨立房間服務。Linux 玩家資料遵循 XDG_DATA_HOME，未設定時使用 ~/.local/share/Tiny-Splatoon/profile.json。
+- Linux 入口以實際執行檔位置尋找 assets，可從其他工作目錄或 PATH 啟動；本機房間服務改用 POSIX 程序啟動。修正 GCC LOD 引數、fixture include 與 Boss Float32 粒子精度，保留來源姿勢。
+- 繁中換成華康新綜藝體，英文與數字換成 BlitzMain；保留 Noto Sans TC／Inter 作為玩家姓名等字元的後備字體，修正 UTF-8 字體檔名部署。
+- 選單、裝備卡片、設定列表、結算與 HUD 加強字級層級、間距、深墨描邊及橘藍互動狀態；保留暖紙色與既有減少動態設定。
+- 撤回本輪尚未提交的實驗墨片、水束與體積墨水改動，回到既有投射物與 RT 墨面；實驗備份不隨遊戲發布。
+- 收入 v0.8.6 發布後完成的 Boss、UI 與潛水驗收修正。
 
 ## 安裝
 
-完整解壓 `Tiny-Splatoon-v0.8.6-windows-x64.zip`，執行 `Tiny-Splatoon.exe`；保留同目錄 DLL 與 `assets`。需要支援 OpenGL 4.5 的 GPU／驅動。私人房間服務 `Tiny-Splatoon-Server.exe` 隨包附上。
+Windows：完整解壓 Tiny-Splatoon-v0.8.7-windows-x64.zip，執行 Tiny-Splatoon.exe。
 
-玩家資料位於 `%LOCALAPPDATA%/Tiny-Splatoon/profile.json`。一般遊玩與原生驗收不需要 `splat-ref/`；來源資產重匯出為開發用可選工具。
+Linux：解壓 Tiny-Splatoon-v0.8.7-linux-x64.tar.gz，執行 ./Tiny-Splatoon-linux-x64/Tiny-Splatoon。目標為 Ubuntu 22.04 或更新的 x64 系統，需安裝系統圖形／音訊執行庫與支援 OpenGL 4.5 core 的 GPU 驅動，詳見 README 與開發指引。保留 lib 與 assets 目錄。
 
-## 驗收範圍與差異
+玩家資料格式維持相容；Windows 仍使用 %LOCALAPPDATA%/Tiny-Splatoon/profile.json。一般遊玩不需要 splat-ref/。
 
-依使用者指示先發布目前成果，已知失敗留待下一輪修正，並非全綠驗收版。本機 Release 遊戲建置成功；受影響 18 項回歸首批 16 項通過，World FX GPU 隨後補驗通過。大廳檢視 720p／1080p，原生 GPU 路徑使用 GTX 1650 Max-Q。
+## 驗收界線
 
-尚未通過：Boss GPU 測試未成功建立衝撞前置條件；UI 回歸在結果獎章斷言失敗，後面的完整暫停切頁測試尚未跑到；玩家移動回歸仍有新 Shift 規則下的牆面／格柵／充能潛水期望值及斷言差異。這些可能包含測試設定與實作問題，尚未完成判定。詳見[驗收紀錄](docs/acceptance/acceptance-2026-10-23.md)與[還原進度](docs/restoration-progress.md)。
-
-元件驗收不代表所有地圖、品質、GPU 的逐像素一致性。跨網／公開服務負載、主觀音訊與最壞視效矩陣仍待驗收；視覺亂數採原生確定性種子。Bot 尚未加入自主選隊友的超級跳躍策略，本輪依使用者允許保留。
+Windows UI／音訊／Boss 與受影響回歸通過；Linux Mesa UI／正式入口五項通過，Boss 16 情境及已部署素材的完整音訊通過。五項來源重匯出因缺 Edge 未完成，Windows 掛載來源的 MP3 非同步 seek 測試仍有時限差異；一般執行不需要這些來源工具。詳細結果記錄於 docs/acceptance/acceptance-2026-10-23.md。Linux 以 Ubuntu 22.04／WSL 與軟體 Mesa 執行建置與啟動測試；實體 Linux NVIDIA／AMD／Intel 的效能、手把及跨網多人矩陣未完整驗收。此次更新不宣稱墨水視效已與商業版完全一致。

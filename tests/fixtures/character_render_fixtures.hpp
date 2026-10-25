@@ -1,6 +1,6 @@
 // Generated source snapshots for renderer tests only; never used by the game.
 #pragma once
-#include "../src/game/CharacterPose.hpp"
+#include "../../src/game/CharacterPose.hpp"
 #include <stdexcept>
 namespace restoration::test {
 inline CharacterPoseFrame RenderFixture0() {

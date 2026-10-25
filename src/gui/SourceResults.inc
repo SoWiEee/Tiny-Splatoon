@@ -61,8 +61,8 @@
             Find(hud,"result-score-a-fill")->SetProperty("width",Number(std::clamp(100.0-z.counts[0],0.0,100.0)*.5*scoreProgress)+"%");
             Find(hud,"result-score-b-fill")->SetProperty("width",Number(std::clamp(100.0-z.counts[1],0.0,100.0)*.5*scoreProgress)+"%");
         }else{
-            Text(hud,"result-score-a-name",std::string(result.winner==0?"♛  ":"")+std::string(teamNames[0])+"  "+Percent(result.coverage[0]*scoreProgress));
-            Text(hud,"result-score-b-name",Percent(result.coverage[1]*scoreProgress)+"  "+std::string(teamNames[1])+(result.winner==1?"  ♛":""));
+            Text(hud,"result-score-a-name",std::string(result.winner==0?"★  ":"")+std::string(teamNames[0])+"  "+Percent(result.coverage[0]*scoreProgress));
+            Text(hud,"result-score-b-name",Percent(result.coverage[1]*scoreProgress)+"  "+std::string(teamNames[1])+(result.winner==1?"  ★":""));
             Find(hud,"result-score-a-fill")->SetProperty("width",Number(std::clamp(result.coverage[0],0.0,1.0)*100*scoreProgress)+"%");
             Find(hud,"result-score-b-fill")->SetProperty("width",Number(std::clamp(result.coverage[1],0.0,1.0)*100*scoreProgress)+"%");
         }
@@ -97,7 +97,7 @@
                 const double rowProgress=resultDone?1.0:1.0-std::pow(1.0-std::clamp((showTime-.8-rowNumber*.13)/.75,0.0,1.0),3.0);
                 const bool mvp=boss?bestDamage>0&&boss->squadDamage()[i]==bestDamage:entry.local&&medals.find("MVP")!=std::string::npos;
                 rows+="<div class=\"result-player"+std::string(entry.local?" result-self":"")+(mvp?" result-mvp":"")+"\"><span class=\"result-identity\"><img class=\"result-weapon\" src=\"weapons/"+std::string(actor.weapon().kind)+".png\"/><span class=\"result-name\">"+(boss?std::to_string(position+1)+"  ":"")+Escape(entry.name)+"</span>"+(entry.local?" <em>自己</em>":entry.bot||actor.botControlled()?" <em>BOT</em>":"");
-                if(resultDone||showTime>=2.05){if(mvp)rows+="<span class=\"result-award\" title=\"MVP\">★</span>";if(!boss&&bestTurf>0&&actor.turfPainted()==bestTurf)rows+="<span class=\"result-award\" title=\"Turf\">✦</span>";if(!boss&&bestSplats>0&&actor.splats()==bestSplats)rows+="<span class=\"result-award\" title=\"Splats\">♛</span>";}
+                if(resultDone||showTime>=2.05){if(mvp)rows+="<span class=\"result-award\" title=\"MVP\">★</span>";if(!boss&&bestTurf>0&&actor.turfPainted()==bestTurf)rows+="<span class=\"result-award\" title=\"Turf\">★</span>";if(!boss&&bestSplats>0&&actor.splats()==bestSplats)rows+="<span class=\"result-award\" title=\"Splats\">★</span>";}
                 rows+="</span><span class=\"result-stat turf\">"+Integer((boss?boss->squadDamage()[i]:actor.turfPainted())*rowProgress)+(boss?"":"<small>p</small>")+"</span>";
                 if(result.zones&&!boss)rows+="<span class=\"result-stat zone\">"+Integer(actor.zoneTurf()*rowProgress)+"</span>";
                 if(boss)rows+="<span class=\"result-stat small\">"+std::to_string(boss->squadWeakHits()[i])+"</span>";

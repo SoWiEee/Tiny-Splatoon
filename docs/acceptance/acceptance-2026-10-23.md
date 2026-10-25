@@ -121,3 +121,27 @@
 - 玩家來源 fixture 原允許乾地變魷魚，與使用者指定規則不同。保留所有不受影響的來源斷言；乾地移動對 run oracle、格柵獨立驗證健康站立人形、charger／spinner／roller 對同武器無 Shift 控制組檢查耗墨／姿態／發射，另檢查 roller windup、己墨牆面攀爬／空中魷魚／乾地落地及強制彈射。`reference_player_simulation` 通過，0.76 秒（`v086-player-resume2-confirm.log`）。
 - Boss 的來源出生朝向不保證符合衝撞導航；一般目標也不保證 chargeLane 非空。GPU fixture 掃描實際 Tidewater plan cells／完整朝向，要求 poseOk／turnOk／cast >= 6 m，經權威狀態入口採用合法位置並放置存活目標，再經真實 forceMove／tick 到前兆與活動期。六招式與小螃蟹含死亡延遲通過，3.90 秒（`v086-boss-resume2-confirm.log`）；不是 AI 自然選招統計。
 - 本批僅修改測試與驗收文件，未修改生產玩法、來源樹或固定 fixture；既有未受影響的完整測試集不重跑。
+
+## 華康／BlitzMain 字體切換（2026-10-25）
+
+- 依使用者指示由 Luna xhigh sub-agent 實作字體變更。RmlUi 主 family 改 `Splatoon2`（BlitzMain.otf 的真實 family）；華康以 `DFPZongYiW5-B5` memory face 載入，font bytes 由 GameUi::Impl 保存到 Shutdown。Windows 中文路徑透過 filesystem::u8path＋ifstream 讀取；備援順序為華康、Noto Sans TC、Inter，保留動態 Unicode 玩家姓名能力。
+- 全 UI 常用文字離線 cmap 檢查：BlitzMain 覆蓋所有 95 個可列印 ASCII，華康支援常用繁中，缺的 6 個非 ASCII 字元均是特殊符號。U+265B／U+2726／U+27A4 在舊／新四字體中都缺，本輪記錄既有差距，不擴張改圖示。
+- Release `Tiny-Splatoon`、`game_ui_test`、`rml_renderer_test` 建置成功（`font-swap-build.log`）。`reference_player_ui_renderer` 2.51 秒、`reference_player_ui_interactions` 21.70 秒，2/2 通過，24.27 秒（`font-swap-tests.log`）。Renderer fixture 同時驗證新英文／數字、繁中 fallback 可見像素及 GL 狀態；互動測試含 720p／1080p 設定、裝備、地圖、HUD、結果及文字置中檢查。
+- 已檢視 1080p 設定、戰鬥 HUD 與完整結果像素。正式 native menu 啟動成功，擷取 `font-swap-menu-1080.png`；實際視窗內容為 1920×1055，測試 FBO 為 1920×1080，兩者不混稱（`font-swap-native.log`）。部署兩字體 hash 與來源一致；未更改字級或遊戲玩法，未重跑未受影響的全套測試，未 commit／push。
+
+
+## v0.8.7：UI／字體、墨水實驗撤回與 Linux（2026-10-25）
+
+- 使用者指定本輪以暖紙色＋深墨描邊＋橘／藍整理 layout、typeset、bolder、animate、polish，並包含 HUD。保留華康／BlitzMain 與 Unicode 備援；加強裝備卡片、設定列表、結算表格／CTA、計時器與通知層級，互動顏色採短轉場，沿用減少動態設定。小地圖維持圓角長方形。結算／方向提示既有缺字改為可用符號。
+- 本輪未提交的長條墨片、Lush 動畫、water-jet／metaball 實驗全部撤回，投射物與 World FX 生產檔案相對 HEAD 無差異；備份置於忽略的 build/reports/ink-experiment-reverted-20261025，不進發布包。RT 墨面與既有遊戲玩法保留。
+- Windows Release 遊戲及受影響測試建置成功。首批 `native_player_profile`、`reference_projectile_gpu`、`reference_player_ui_renderer`、`reference_player_ui_interactions`、`reference_worldfx_gpu` 5/5 通過（58.41 秒，v087-windows-tests.log）。最後 UI 修正後完整互動確認通過（23.37 秒，v087-ui-confirm.log），含 720p／1080p、設定捲動、slider 數值對齊與結果 CTA 置中。
+- UTF-8 資產路徑的部署／移除／保留未知本機檔案回歸通過（12.31 秒，v087-assets-test.log）；獨立 GNS 房間服務跨程序流程通過（6.13 秒，v087-network-test.log）。
+- GTX 1650 Max-Q 正式入口、塗地及 Zones 擷取成功。實際視窗內容 1920×1055，UI fixture 為 1920×1080／1280×720。README 三張圖更新為本版裝備 fixture 與實際塗地／Zones 畫面。Windows 發布目錄從其他工作目錄啟動成功（v087-windows-package.log）。
+
+- Linux：Ubuntu 22.04／GCC 11.4、CMake 3.22、Ninja 與鎖定 vcpkg；全部原生遊戲、房間服務及測試目標完成 Release 編譯。修正 GCC 不接受的巢狀 LOD 預設引數，及三份 fixture／產生器的相對 include 路徑；三個來源重匯出檢查通過，數值未更動。
+- 首批 Linux CPU／Node 90 項回歸為 83 通過、7 失敗（linux-cpu-tests.log）。其中 5 項需要 Edge 的來源重匯出（reverb、Boss 材質、音訊、HUD 裝備、選單圖示），本機未安裝 Edge，列為環境未完成；正式遊戲與發布包不需要瀏覽器。
+- Boss 差異定位為 GCC 最佳化略去 GLM float／double 往返，破壞來源 Float32Array 的鏈條粒子儲存精度；明確以 volatile float 儲存三個分量，保留 Release -O3。來源 oracle 16 情境／3925 更新／280 完整骨架快照通過（linux-boss-rounding-probe.log、linux-final-audio-boss.log）；Windows 同一修正亦通過。
+- Linux 音訊驗收使用 PulseAudio 48 kHz null sink、norewinds=1；最小播放間隔改等待真正的音訊引擎時鐘，保留即時重播拒絕與完整聲部／事件斷言。未修改音訊播放規則。使用 Linux 已部署素材執行完整 audio_engine_test 通過，含 201 cues、全音樂／循環、MP3 真實尾端跨越、事件路由、48 聲部及清理（linux-audio-staged-assets.log）。從 Windows 掛載來源目錄串流 MP3 的 0.5 秒非同步 seek 驗收仍不穩定，未放寬此讀取門檻，不能將首批 CTest 稱為全綠。
+- Linux 軟體 Mesa llvmpipe 23.2.1／LLVM 15，實際 OpenGL 4.5 core：UI renderer、完整 UI 互動、正式入口、render pipeline、CLI 5/5 通過，58.60 秒（linux-gl-ui-tests.log）。720p Linux 設定字體／排版亦檢視。不是實體 GPU 效能驗收。
+- Windows 最終可攜性 5/5 通過，36.83 秒；最後 Boss oracle／完整音訊 2/2 通過，41.22 秒（v087-windows-portability-tests.log、v087-windows-final-tests.log）。
+- Linux 安裝包以 $ORIGIN/lib 尋找隨附 GNS，兩個 ELF 的 ldd 無缺漏；從家目錄啟動安裝遊戲成功，獨立安裝服務可實際監聽（linux-package.log、linux-installed-smoke.log）。Windows／Linux 發布包均隨附 assets 與房間服務。實體 Linux GPU、手把、跨機／跨網與完整效能矩陣仍未驗收；發布後不代為追蹤 GitHub CI。

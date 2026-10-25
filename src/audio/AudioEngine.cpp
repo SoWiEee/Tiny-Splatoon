@@ -477,6 +477,8 @@ struct AudioEngine::Impl {
 AudioEngine::AudioEngine(std::filesystem::path assetDirectory) : impl_(std::make_unique<Impl>(std::move(assetDirectory))) {}
 AudioEngine::~AudioEngine() = default;
 
+double AudioEngineTestTime(const AudioEngine& engine) { return engine.impl_->Now(); }
+
 bool AudioEngineMusicTestState(const AudioEngine& engine, std::filesystem::path& path, bool& looping,
     std::uint64_t& loopBegin, std::uint64_t& loopEnd, std::uint64_t& serial, double& durationSeconds) {
     const auto& impl = *engine.impl_;

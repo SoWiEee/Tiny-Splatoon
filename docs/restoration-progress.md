@@ -179,3 +179,24 @@
 - 線上房間、同步與來源 3D hub／lobby 演出已接入；跨機／跨網及公開服務負載仍未完成，NET-01–12 不全數打勾。
 - 固定來源逐影格／跨地圖 Boss 視覺矩陣、主觀音訊、跨 GPU／品質及最壞視效負載仍待驗收；QA-12 尚未完成。實體手把手感、觸控與震動後端也尚未驗收。
 - splat-ref 仍是來源對照依據；原生遊戲執行已獨立，但測試／fixture 與來源退役條件見[下一輪候選](next-round-backlog.md)。
+
+## 使用者指定 UI 字體（2026-10-25）
+
+- ✅ 英文／數字改用 `BlitzMain.otf`（內部 family `Splatoon2`），繁中優先使用 `華康新綜藝體.ttf`（`DFPZongYiW5-B5`）；原字級與版型保留。
+- ✅ 華康從 UTF-8 路徑讀入記憶體並保留到 RmlUi 關閉；Noto Sans TC／Inter 只作罕見字與符號的最後備援，避免動態玩家姓名退化。
+- ✅ Release 遊戲與 UI 測試建置完成；UI renderer／完整互動 2/2 通過，實際選單啟動與字體部署 hash 確認。設定、戰鬥 HUD 與結果畫面已檢視。
+- 既有三個裝飾符號 U+265B／U+2726／U+27A4 在現有四字體中都缺字，已改用目前可顯示的星形／方向符號；詳見[驗收紀錄](acceptance/acceptance-2026-10-23.md)。
+
+
+## v0.8.7：UI 與跨平台（2026-10-25）
+
+- ✅ 華康／BlitzMain 新字體、UTF-8 字體部署與 Unicode 後備字體；修正既有結算／方向提示缺字。
+- ✅ 選單、裝備、設定、結算與 HUD 字級層級／間距／描邊／互動轉場整理，維持暖紙色＋深墨＋橘／藍與減少動態設定。
+- ✅ 撤回未提交的墨水實驗，回到既有投射物與 RT 墨面；備份保留於忽略的 build/reports。
+- ✅ Windows 受影響 UI、玩家保存、投射物、World FX、資產部署與獨立房間服務驗收通過；README 三張圖片已更新。
+- Linux 驗收證據與平台限制見[本輪驗收](acceptance/acceptance-2026-10-23.md)；未將 WSL／軟體 Mesa 等同所有實體 Linux GPU。
+
+- ✅ Ubuntu 22.04 x64 的 GCC Release、XDG 保存、本機房間服務啟動、獨立安裝路徑與隨附 GNS 函式庫已驗證；新增 Linux CI／TAR.GZ 與平行 Windows／Linux 發布。
+- ✅ 修正 GCC LOD 預設引數、三份 fixture include 與 Boss Float32 粒子精度；Boss 16 情境來源 oracle 通過。
+- ✅ Linux Mesa OpenGL 4.5 的 UI／入口／render pipeline／CLI 5/5；已部署 Linux 素材的完整音訊驗收通過。
+- ⏳ Linux 的 5 項瀏覽器來源重匯出缺 Edge；Windows 掛載來源上的 MP3 seek 測試不穩定；實體 Linux GPU／音訊聽感／效能與跨網仍待驗收，未宣稱全矩陣完成。

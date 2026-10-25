@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -102,6 +103,7 @@ int main(int argc, char** argv) {
         restoration::RmlRenderer renderer;
         Rml::SystemInterface system;
         bool initialized = false;
+        std::vector<Rml::byte> chineseFontData;
         try {
             Rml::SetSystemInterface(&system);
             Rml::SetRenderInterface(&renderer);
@@ -109,12 +111,38 @@ int main(int argc, char** argv) {
             initialized = true;
 
             const std::filesystem::path root(argv[1]);
+            const auto blitz = root / "assets" / "fonts" / "BlitzMain.otf";
+            const auto chinese = root / std::filesystem::u8path(u8"assets/fonts/華康新綜藝體.ttf");
             const auto inter = root / "assets" / "fonts" / "Inter.ttf";
             const auto noto = root / "assets" / "fonts" / "NotoSansTC.ttf";
-            check(std::filesystem::is_regular_file(inter), "Missing assets/fonts/Inter.ttf");
+            check(std::filesystem::is_regular_file(blitz), "Missing assets/fonts/BlitzMain.otf");
+            check(std::filesystem::is_regular_file(chinese), "Missing assets/fonts/華康新綜藝體.ttf");
+            check(std::filesystem::is_regular_file(inter), "Missing assets/fonts/Inter.ttf fallback");
             check(std::filesystem::is_regular_file(noto), "Missing assets/fonts/NotoSansTC.ttf");
-            check(Rml::LoadFontFace(inter.string()), "RmlUi could not load Inter.ttf");
-            check(Rml::LoadFontFace(noto.string(), true), "RmlUi could not load NotoSansTC.ttf fallback");
+            check(Rml::LoadFontFace(blitz.string(), false, Rml::Style::FontWeight::Normal),
+                  "RmlUi could not load BlitzMain.otf");
+            check(Rml::LoadFontFace(blitz.string(), false, Rml::Style::FontWeight::Bold),
+                  "RmlUi could not load BlitzMain.otf bold face");
+            std::ifstream chineseFile(chinese, std::ios::binary | std::ios::ate);
+            const auto chineseSize = chineseFile ? static_cast<std::streamsize>(chineseFile.tellg()) : 0;
+            check(chineseSize > 0, "Could not open the Chinese UI font");
+            chineseFontData.resize(static_cast<std::size_t>(chineseSize));
+            chineseFile.seekg(0);
+            check(static_cast<bool>(chineseFile.read(reinterpret_cast<char*>(chineseFontData.data()), chineseSize)),
+                  "Could not read the Chinese UI font");
+            const Rml::Span<const Rml::byte> chineseFace(chineseFontData.data(), chineseFontData.size());
+            check(Rml::LoadFontFace(chineseFace, "DFPZongYiW5-B5", Rml::Style::FontStyle::Normal,
+                                    Rml::Style::FontWeight::Normal, true),
+                  "RmlUi could not load DFPZongYiW5-B5 fallback");
+            check(Rml::LoadFontFace(chineseFace, "DFPZongYiW5-B5", Rml::Style::FontStyle::Normal,
+                                    Rml::Style::FontWeight::Bold, true),
+                  "RmlUi could not load DFPZongYiW5-B5 bold fallback");
+            check(Rml::LoadFontFace(noto.string(), true, Rml::Style::FontWeight::Normal) &&
+                  Rml::LoadFontFace(noto.string(), true, Rml::Style::FontWeight::Bold),
+                  "RmlUi could not load Noto Sans TC fallback");
+            check(Rml::LoadFontFace(inter.string(), true, Rml::Style::FontWeight::Normal) &&
+                  Rml::LoadFontFace(inter.string(), true, Rml::Style::FontWeight::Bold),
+                  "RmlUi could not load Inter fallback");
 
             const unsigned char mapPixel[] = {17, 231, 73, 255};
             glGenTextures(1, &borrowedMapTexture);
@@ -131,7 +159,7 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
 #red { position: absolute; left: 8px; top: 8px; width: 24px; height: 24px; background-color: #ff0000; }
 #clip { position: absolute; left: 48px; top: 8px; width: 16px; height: 24px; overflow: hidden; }
 #green { display: block; width: 40px; height: 24px; background-color: #00ff00; }
-.label { position: absolute; left: 8px; width: 112px; height: 24px; font-family: Inter; font-size: 16px; color: #ffffff; }
+.label { position: absolute; left: 8px; width: 112px; height: 24px; font-family: Splatoon2; font-size: 16px; color: #ffffff; }
 #latin { top: 42px; }
 #cjk { top: 68px; }
 #round { position: absolute; left: 104px; top: 8px; width: 24px; height: 24px; border-radius: 12px; overflow: hidden; }
@@ -140,7 +168,7 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
 </style></head><body>
 <div id="red"></div><div id="clip"><div id="green"></div></div>
 <img id="borrowed" src="native-map"/><div id="round"><img src="native-map"/></div>
-<div id="latin" class="label">Inter Match UI</div>
+<div id="latin" class="label">UI 0123456789</div>
 <div id="cjk" class="label">繁體中文 墨水</div>
 </body></rml>)RML";
             Rml::ElementDocument* document = context->LoadDocumentFromMemory(documentSource, "rml-renderer-smoke");
@@ -253,7 +281,7 @@ html, body { margin: 0; padding: 0; background-color: transparent; }
             check(std::abs(int(borrowed[0])-17)<3 && std::abs(int(borrowed[1])-231)<3 && std::abs(int(borrowed[2])-73)<3,
                   "RmlUi did not draw the borrowed native map texture");
             check(brightPixels(image, width, height, 8, 40, 120, 66) > 6,
-                  "Inter glyph pixels were not rendered by the RmlUi document");
+                  "Splatoon2 English and digit glyph pixels were not rendered by the RmlUi document");
             check(brightPixels(image, width, height, 8, 66, 120, 95) > 6,
                   "Traditional Chinese fallback glyph pixels were not rendered");
             check(glGetError() == GL_NO_ERROR, "RmlRenderer smoke produced an OpenGL error");

@@ -111,7 +111,7 @@ const row = (f, output) => `  {${f.stage}, ${cppVec(f.pos)}, ${bool(f.skip)}, ${
 const blockCpp = b => `{${cppVec(vec(b.center))}, ${cppVec(vec(b.half))}, {{${b.axes.map(a => cppVec(vec(a))).join(', ')}}}, {${b.faces.join(', ')}}, ${[b.solid,b.grate,b.roof,b.perch,b.noNav,b.rail,b.hidden].map(bool).join(', ')}}`;
 const lines = [
   '// Generated from actual splat-ref Physics by tools/export-controller-fixtures.mjs.',
-  '#pragma once', '#include "../src/world/ReferenceData.hpp"', '#include <array>',
+  '#pragma once', '#include "../../src/world/ReferenceData.hpp"', '#include <array>',
   'namespace restoration::controller_fixtures {',
   `inline const std::array<BlockData, ${synthetic.blocks.length}> syntheticBlocks = {{`,
   ...synthetic.blocks.map(b => `  ${blockCpp(b)},`), '}};',

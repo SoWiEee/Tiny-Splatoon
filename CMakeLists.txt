@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(Tiny-Splatoon VERSION 0.8.6 LANGUAGES CXX C)
+project(Tiny-Splatoon VERSION 0.8.7 LANGUAGES CXX C)
 
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # MSVC emits UTF-8 here; a system-codepage probe can corrupt Ninja's include prefix.
@@ -31,6 +31,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(RmlUi CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(GameNetworkingSockets CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 find_path(MINIAUDIO_INCLUDE_DIR miniaudio.h)
 if(NOT MINIAUDIO_INCLUDE_DIR)
     message(FATAL_ERROR "miniaudio headers were not found")
@@ -39,7 +40,7 @@ endif()
 add_executable(Tiny-Splatoon main.cpp)
 
 add_library(game_network STATIC src/network/GnsTransport.cpp src/network/RoomServer.cpp src/network/RoomSession.cpp src/network/MatchSync.cpp)
-target_link_libraries(game_network PUBLIC GameNetworkingSockets::GameNetworkingSockets)
+target_link_libraries(game_network PUBLIC GameNetworkingSockets::GameNetworkingSockets Threads::Threads)
 target_include_directories(game_network PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/network")
 
 add_library(restoration_core STATIC
@@ -81,7 +82,6 @@ add_library(player_ui STATIC src/gui/GameUi.cpp src/gui/MapInteraction.cpp src/g
 target_link_libraries(player_ui PUBLIC restoration_core RmlUi::RmlUi glad::glad glfw OpenGL::GL)
 add_library(game_audio STATIC src/audio/AudioEngine.cpp src/audio/GameAudio.cpp src/audio/ZoneHum.cpp src/audio/NativeReverb.cpp)
 target_include_directories(game_audio PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
-find_package(Threads REQUIRED)
 target_link_libraries(game_audio PUBLIC restoration_core Threads::Threads ${CMAKE_DL_LIBS})
 add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp)
 target_link_libraries(projectile_visuals PUBLIC restoration_core)
@@ -102,6 +102,12 @@ target_link_libraries(Tiny-Splatoon PRIVATE
 
 include(cmake/RuntimeAssets.cmake)
 tiny_stage_runtime_assets(Tiny-Splatoon "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+
+if(UNIX AND NOT APPLE)
+    set_target_properties(Tiny-Splatoon Tiny-Splatoon-Server PROPERTIES INSTALL_RPATH "$ORIGIN/lib")
+    install(TARGETS Tiny-Splatoon Tiny-Splatoon-Server RUNTIME DESTINATION .)
+    install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/assets" DESTINATION .)
+endif()
 
 include(CTest)
 if(BUILD_TESTING)
