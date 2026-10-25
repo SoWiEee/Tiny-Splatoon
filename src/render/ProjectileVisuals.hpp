@@ -11,5 +11,7 @@ struct ProjectileBlob {
 };
 // Source Projectiles._draw output, including its Float32 instance-buffer boundary.
 std::vector<ProjectileBlob> BuildProjectileBlobs(const std::vector<ShooterProjectile>& projectiles);
-void BuildProjectileBlobs(const std::vector<ShooterProjectile>& projectiles, std::vector<ProjectileBlob>& output);
+void BuildProjectileBlobs(const std::vector<ShooterProjectile>& projectiles, std::vector<ProjectileBlob>& output, bool includeShooter=true);
+// Ink-shot aShape: smooth-union radius (zero for detached drops), launch impulse, seed phase, normalized lifetime.
+void AppendShooterInkBlobs(const std::vector<ShooterProjectile>& projectiles, std::vector<ProjectileBlob>& output);
 }

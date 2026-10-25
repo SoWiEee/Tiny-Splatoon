@@ -6,7 +6,7 @@
 namespace restoration {
 namespace {
 constexpr double pi=3.1415926535897932384626433832795, tau=2*pi;
-constexpr int F_PAINT=1,F_RING=2,F_NOCOL=4,F_QUIET=8,F_MATTE=16,F_BOSS_SPLAT=64;
+constexpr int F_PAINT=1,F_RING=2,F_NOCOL=4,F_QUIET=8,F_MATTE=16,F_BOSS_SPLAT=64,F_VISUAL_ONLY=128;
 float f32(double x){return static_cast<float>(x);}
 double rand01(std::uint32_t& state){state^=state<<13;state^=state>>17;state^=state<<5;return double(state)/4294967296.0;}
 double bossFxRand01(std::uint32_t& state){
@@ -295,6 +295,16 @@ std::vector<WorldFxParticle> BuildWorldFxRecipe(std::string_view name,glm::dvec3
             sprite(out,WorldFxShape::Glow,{pos.x-dir.x*behindX+jitterX,pos.y+0.05,pos.z-dir.z*behindZ+jitterZ},
                 {0,vy,0},bubbleColor,size0,size1,life,0.7,rng,1,0,21,0.03,0);
         }
+    }else if(name=="shooterImpact"){
+        const double scale=std::clamp(std::isfinite(radius)?radius:0.12,0.12,0.32);
+        const glm::dvec3 at=pos+normal*(scale*0.06);
+        shell(out,at,color,scale*0.26,scale*1.05,0.08,0.16,0.92,0,0,0.16,normal,1,rng);
+        const int count=4+static_cast<int>(rand01(rng)*4);
+        for(int i=0;i<count;i++){
+            const auto dir=cone(normal,0.8,rng);const double speed=1.5+rand01(rng)*2.0;
+            const double offset=scale*(0.03+rand01(rng)*0.12),size=scale*(0.12+rand01(rng)*0.08),life=0.12+rand01(rng)*0.1;
+            drop(out,at+dir*offset,dir*speed,color,size,life,0.65,1.2,F_VISUAL_ONLY,rng);
+        }
     }else if(name=="burst"){
         const int count=std::max(1,static_cast<int>(std::round(context.count)));
         const double size=context.size,speedScale=context.speed,spread=std::max(0.05,context.spread),gravity=context.gravity;
@@ -364,7 +374,7 @@ void UpdateWorldFxRecipe(std::vector<WorldFxParticle>& p,double seconds,std::uin
         const glm::vec3 old=x.pos,next{f32(old.x+x.vel.x*dt),f32(old.y+x.vel.y*dt),f32(old.z+x.vel.z*dt)};x.pos=next;
         if(!(int(x.flags)&F_NOCOL)&&collider&&checks<1100){++checks;WorldFxHit hit;if(collider(old,next,hit)){
             const auto landed=x;
-            if(!(int(landed.flags)&F_MATTE)){
+            if(!(int(landed.flags)&(F_MATTE|F_VISUAL_ONLY))){
                 if(speck&&!(int(landed.flags)&F_PAINT)&&landed.radius>0.012)speck(hit,landed.color,landed.radius);
                 if(ripple&&!(int(landed.flags)&F_PAINT)&&((int(landed.flags)&F_RING)||landed.radius>0.03))ripple(hit.point,0.0016+landed.radius*0.05,0.07+landed.radius*0.5,0.75,0.42);
                 if(!onSpeck&&!speck&&!(int(landed.flags)&F_PAINT)&&!(int(landed.flags)&F_QUIET))ring(p,hit.point,hit.normal,landed.color,landed.radius*2.3+0.03,0.2+landed.radius*0.6,2,0.95,1,rng);

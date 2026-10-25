@@ -93,6 +93,14 @@ ctest --preset vcpkg -R '^native_network_'
 
 `--native` 為預設入口別名。`--graphics-quality low|medium|high` 可用於直接對局／擷取；benchmark 報告記錄實際設定。Boss 時間可選 180／240／300 秒。舊 ImGui stage lab／控制器診斷頁及其專用腳本已退役，正式介面統一使用 RmlUi。
 
+連射槍墨團的固定種子動態比較使用同一個原生 renderer，左側保留來源外觀、右側使用局部 SDF 融合與噴射動態。診斷地板為純灰色；命中與塗地一致性由程式檢查。
+
+```powershell
+cmake --build build --target shooter_ink_capture shooter_impact_test
+.\build\shooter_ink_capture.exe --assets assets --output build/captures/shooter-sdf --frames 180
+ctest --test-dir build --output-on-failure -R '^(native_shooter_impact|reference_projectile_visuals|reference_projectile_gpu|reference_worldfx_gpu)$'
+```
+
 ## 回歸與來源對照
 
 ```powershell

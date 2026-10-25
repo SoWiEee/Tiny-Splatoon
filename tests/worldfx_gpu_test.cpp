@@ -389,7 +389,24 @@ int main() {
         check(error == GL_NO_ERROR, "WorldEffects source shader/mesh draw returned GL error "
               + std::to_string(static_cast<unsigned int>(error)));
 
-        std::cout << "WORLD_FX_GPU sourceShapes=tornado,speaker,beam,bubble draws=" << drawCalls
+        {
+            CombatWorld impactWorld(*stage,geometry,paint);WorldEffects impactEffects(characterData);impactEffects.SetPaintSurface(&paint);
+            const auto paintVersion=paint.version();
+            WorldVisualEvent impact;impact.kind="bulletImpact";impact.source="shooter";impact.pos=glm::dvec3(target);impact.normal={0,1,0};impact.radius=.28;impact.seed=.42;impact.id=17;
+            impactWorld.emitVisual(impact);impactEffects.Update(1.0/60,impactWorld,camera);
+            check(std::count_if(impactEffects.liveItems().begin(),impactEffects.liveItems().end(),[](const auto& p){return (static_cast<int>(p.flags)&128)!=0;})>=4,"Shooter impact must dispatch its visual-only drop recipe");
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            const glm::vec3 splashEye=target+glm::vec3(0,.6f,1.2f);
+            const auto splashView=glm::lookAt(splashEye,target,glm::vec3(0,1,0));
+            check(impactEffects.Draw(splashView,projection,splashEye)>0,"Shooter impact crown/drops submitted no draws");
+            glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
+            std::size_t splashPixels=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>30||pixels[i+1]>30||pixels[i+2]>30)++splashPixels;
+            check(splashPixels>40&&glGetError()==GL_NO_ERROR,"Shooter impact must have visible 3D pixels");
+            std::filesystem::create_directories("build/captures");stbi_flip_vertically_on_write(1);stbi_write_png("build/captures/shooter-impact.png",128,128,4,pixels.data(),128*4);
+            for(int i=0;i<24;i++)impactEffects.Update(1.0/60,impactWorld,camera);
+            check(impactEffects.liveItems().empty()&&paint.version()==paintVersion,"Shooter splash must expire without adding paint");
+        }
+        std::cout << "WORLD_FX_GPU sourceShapes=tornado,speaker,beam,bubble shooter_impact=pass draws=" << drawCalls
                   << " renderer=" << reinterpret_cast<const char*>(glGetString(GL_RENDERER)) << '\n';
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

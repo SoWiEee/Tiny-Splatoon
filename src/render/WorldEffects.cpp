@@ -218,6 +218,13 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
         if(event.kind=="beam")continue; // Source charger ribbons are owned by ProjectileRenderer.
         if(!near(event.pos,65))continue;
         if(event.kind=="bulletImpact") {
+            if(event.source=="shooter"){
+                auto seed=static_cast<std::uint32_t>((std::isfinite(event.seed)?std::fmod(std::abs(event.seed),1.0):0.0)*4294967295.0)^static_cast<std::uint32_t>(event.id);
+                if(!seed)seed=0x6d2b79f5u;
+                auto particles=BuildWorldFxRecipe("shooterImpact",event.pos,event.normal,ink(event.team),event.radius,seed);
+                for(auto& particle:particles)spawn(std::move(particle));
+                continue;
+            }
             const bool blast=event.source=="blast";
             WorldFxRecipeContext context;context.count=blast?14:5;context.speed=blast?5:3;context.size=0.07;context.paint=false;
             WorldFxRippleSink ripple;if(paint_)ripple=[this](glm::dvec3 p,double a,double w,double s,double l){paint_->requestVisualRipple({p,a,w,s,l});};

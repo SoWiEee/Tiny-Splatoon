@@ -31,10 +31,11 @@ struct ProjectileRenderer::Impl {
     struct Ribbon {glm::dvec3 pos,dir,color;double age=0,life=.34,length=1,width=.08,charge=0,seed=0;bool sight=false;};
     struct Wave {std::uint64_t id=0;glm::dvec3 pos,vel,color;double age=0,distance=0;};
     struct FadingWave {Wave wave;double started=0;};
-    CharacterShader blobShader,ribbonShader;
-    GLuint vao=0,vertex=0,index=0,instance=0,ribbonVao=0,ribbonVertex=0,dfg=0;
+    CharacterShader blobShader,ribbonShader,inkShader;
+    GLuint vao=0,inkVao=0,vertex=0,index=0,instance=0,ribbonVao=0,ribbonVertex=0,dfg=0;
     GLsizei indexCount=0;
     std::vector<ProjectileBlob> blobs;
+    std::size_t legacyCount=0;
     std::vector<Ribbon> beams,sights;
     std::vector<ShooterProjectile> custom;
     std::vector<Wave> waves;
@@ -44,7 +45,9 @@ struct ProjectileRenderer::Impl {
     double gameTime=0;bool environment=false,timeInitialized=false,blobsUploaded=false;
     explicit Impl(const std::filesystem::path& assets,bool environment)
       :blobShader(CharacterShader::readSource(assets/"blob.vert"),CharacterShader::readSource(assets/"blob.frag"),true,environment),
-       ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),assets(assets),environment(environment) {
+       ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),
+       inkShader(CharacterShader::readSource(assets.parent_path().parent_path()/"shaders/ink-shot/shot.vert"),
+                 CharacterShader::readSource(assets.parent_path().parent_path()/"shaders/ink-shot/shot.frag"),true),assets(assets),environment(environment) {
         std::ifstream file(assets/"blob.bin",std::ios::binary);
         char magic[8]{};std::uint32_t vertices=0,indices=0;
         file.read(magic,8);file.read(reinterpret_cast<char*>(&vertices),4);file.read(reinterpret_cast<char*>(&indices),4);
@@ -58,20 +61,25 @@ struct ProjectileRenderer::Impl {
         indexCount=static_cast<GLsizei>(indices);
         glGenVertexArrays(1,&vao);glBindVertexArray(vao);
         glGenBuffers(1,&vertex);glBindBuffer(GL_ARRAY_BUFFER,vertex);glBufferData(GL_ARRAY_BUFFER,data.size()*sizeof(float),data.data(),GL_STATIC_DRAW);
-        for(const auto& entry:std::array<std::pair<const char*,std::size_t>,2>{{{"position",0},{"normal",3*sizeof(float)}}}) {
-            const auto loc=blobShader.attribute(entry.first);
-            if(loc>=0){glEnableVertexAttribArray(loc);glVertexAttribPointer(loc,3,GL_FLOAT,GL_FALSE,6*sizeof(float),reinterpret_cast<void*>(entry.second));}
-        }
         glGenBuffers(1,&index);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,index);glBufferData(GL_ELEMENT_ARRAY_BUFFER,elements.size()*4,elements.data(),GL_STATIC_DRAW);
-        glGenBuffers(1,&instance);glBindBuffer(GL_ARRAY_BUFFER,instance);
-        const auto attribute=[&](const char* name,int count,std::size_t offset){
-            const auto loc=blobShader.attribute(name);if(loc<0)return;
-            glEnableVertexAttribArray(loc);glVertexAttribPointer(loc,count,GL_FLOAT,GL_FALSE,sizeof(ProjectileBlob),reinterpret_cast<void*>(offset));glVertexAttribDivisor(loc,1);
+        glGenBuffers(1,&instance);
+        const auto configureVao=[&](GLuint target,CharacterShader& shader){
+            glBindVertexArray(target);glBindBuffer(GL_ARRAY_BUFFER,vertex);
+            for(const auto& entry:std::array<std::pair<const char*,std::size_t>,2>{{{"position",0},{"normal",3*sizeof(float)}}}) {
+                const auto loc=shader.attribute(entry.first);
+                if(loc>=0){glEnableVertexAttribArray(loc);glVertexAttribPointer(loc,3,GL_FLOAT,GL_FALSE,6*sizeof(float),reinterpret_cast<void*>(entry.second));}
+            }
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,index);glBindBuffer(GL_ARRAY_BUFFER,instance);
+            const auto attribute=[&](const char* name,int count,std::size_t offset){
+                const auto loc=shader.attribute(name);if(loc<0)return;
+                glEnableVertexAttribArray(loc);glVertexAttribPointer(loc,count,GL_FLOAT,GL_FALSE,sizeof(ProjectileBlob),reinterpret_cast<void*>(offset));glVertexAttribDivisor(loc,1);
+            };
+            const int matrix=shader.attribute("instanceMatrix");
+            if(matrix<0)throw std::runtime_error("Projectile shader lost instancing");
+            for(int i=0;i<4;i++){glEnableVertexAttribArray(matrix+i);glVertexAttribPointer(matrix+i,4,GL_FLOAT,GL_FALSE,sizeof(ProjectileBlob),reinterpret_cast<void*>(offsetof(ProjectileBlob,matrix)+i*sizeof(glm::vec4)));glVertexAttribDivisor(matrix+i,1);}
+            attribute("aShape",4,offsetof(ProjectileBlob,shape));attribute("instanceColor",3,offsetof(ProjectileBlob,color));
         };
-        const int matrix=blobShader.attribute("instanceMatrix");
-        if(matrix<0)throw std::runtime_error("Source projectile shader lost instancing");
-        for(int i=0;i<4;i++){glEnableVertexAttribArray(matrix+i);glVertexAttribPointer(matrix+i,4,GL_FLOAT,GL_FALSE,sizeof(ProjectileBlob),reinterpret_cast<void*>(offsetof(ProjectileBlob,matrix)+i*sizeof(glm::vec4)));glVertexAttribDivisor(matrix+i,1);}
-        attribute("aShape",4,offsetof(ProjectileBlob,shape));attribute("instanceColor",3,offsetof(ProjectileBlob,color));
+        configureVao(vao,blobShader);glGenVertexArrays(1,&inkVao);configureVao(inkVao,inkShader);
         blobShader.use();
         std::ifstream uniforms(assets/"blob.uniforms");std::string name;std::size_t count;
         if(!uniforms)throw std::runtime_error("Missing source projectile material defaults");
@@ -96,7 +104,7 @@ struct ProjectileRenderer::Impl {
     }
     ~Impl(){
         const GLuint buffers[]={vertex,index,instance,ribbonVertex};glDeleteBuffers(4,buffers);
-        const GLuint arrays[]={vao,ribbonVao};glDeleteVertexArrays(2,arrays);
+        const GLuint arrays[]={vao,inkVao,ribbonVao};glDeleteVertexArrays(3,arrays);
         if(dfg)glDeleteTextures(1,&dfg);
     }
     Part& part(const std::string& name) {
@@ -129,7 +137,9 @@ void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::ve
     if(impl_->timeInitialized&&now<impl_->gameTime){impl_->waves.clear();impl_->fadingWaves.clear();impl_->beams.clear();}
     impl_->gameTime=now;impl_->timeInitialized=true;
     const auto& shots=world.projectiles();
-    BuildProjectileBlobs(shots,impl_->blobs);
+    BuildProjectileBlobs(shots,impl_->blobs,false);
+    impl_->legacyCount=impl_->blobs.size();
+    AppendShooterInkBlobs(shots,impl_->blobs);
     impl_->blobsUploaded=false;
     auto previousWaves=std::move(impl_->waves);
     impl_->waves.clear();
@@ -177,24 +187,35 @@ int ProjectileRenderer::DrawPass(const glm::dmat4& view,const glm::dmat4& projec
         const bool customCaster=std::any_of(impl_->custom.begin(),impl_->custom.end(),[](const auto& p){return p.kind=="arrow"||p.kind=="fist";});
         if(impl_->blobs.empty()&&!customCaster)return 0;
     }else if(impl_->blobs.empty()&&ribbons()==0&&impl_->custom.empty()&&impl_->fadingWaves.empty())return 0;
-    GLint program,vao,buffer,srcRgb,dstRgb,srcAlpha,dstAlpha,activeTexture,oldDfg,depthFunc;GLboolean depth;
+    GLint program,vao,buffer,srcRgb,dstRgb,srcAlpha,dstAlpha,activeTexture,oldDfg,depthFunc,viewport[4];GLboolean depth;
     glGetIntegerv(GL_CURRENT_PROGRAM,&program);glGetIntegerv(GL_VERTEX_ARRAY_BINDING,&vao);glGetIntegerv(GL_ARRAY_BUFFER_BINDING,&buffer);
     glGetIntegerv(GL_BLEND_SRC_RGB,&srcRgb);glGetIntegerv(GL_BLEND_DST_RGB,&dstRgb);glGetIntegerv(GL_BLEND_SRC_ALPHA,&srcAlpha);glGetIntegerv(GL_BLEND_DST_ALPHA,&dstAlpha);glGetBooleanv(GL_DEPTH_WRITEMASK,&depth);
     glGetIntegerv(GL_DEPTH_FUNC,&depthFunc);
+    glGetIntegerv(GL_VIEWPORT,viewport);
     glGetIntegerv(GL_ACTIVE_TEXTURE,&activeTexture);glActiveTexture(GL_TEXTURE6);glGetIntegerv(GL_TEXTURE_BINDING_2D,&oldDfg);glBindTexture(GL_TEXTURE_2D,impl_->dfg);
     const bool blend=glIsEnabled(GL_BLEND),cull=glIsEnabled(GL_CULL_FACE),depthTest=glIsEnabled(GL_DEPTH_TEST);
     if(shadowOnly){glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LESS);glDisable(GL_BLEND);glDepthMask(GL_TRUE);}
     int draws=0;
     if(!impl_->blobs.empty()) {
         glDisable(GL_BLEND);glEnable(GL_CULL_FACE);glDepthMask(GL_TRUE);
-        auto& shader=impl_->blobShader;shader.use();shader.matrices(glm::dmat4(1),view,projection,eye);shader.lights(lights,view);
-        shader.uniform("dfgLUT",6);
         glBindVertexArray(impl_->vao);glBindBuffer(GL_ARRAY_BUFFER,impl_->instance);
         if(!impl_->blobsUploaded){
             glBufferData(GL_ARRAY_BUFFER,impl_->blobs.size()*sizeof(ProjectileBlob),impl_->blobs.data(),GL_STREAM_DRAW);
             impl_->blobsUploaded=true;
         }
-        glDrawElementsInstanced(GL_TRIANGLES,impl_->indexCount,GL_UNSIGNED_INT,nullptr,static_cast<GLsizei>(impl_->blobs.size()));++draws;
+        if(impl_->legacyCount){
+            auto& shader=impl_->blobShader;shader.use();shader.matrices(glm::dmat4(1),view,projection,eye);shader.lights(lights,view);shader.uniform("dfgLUT",6);
+            glDrawElementsInstanced(GL_TRIANGLES,impl_->indexCount,GL_UNSIGNED_INT,nullptr,static_cast<GLsizei>(impl_->legacyCount));++draws;
+        }
+        const auto inkCount=impl_->blobs.size()-impl_->legacyCount;
+        if(inkCount){
+            auto& shader=impl_->inkShader;shader.use();shader.matrices(glm::dmat4(1),view,projection,eye);shader.lights(lights,view);
+            shader.uniform("uViewport",{double(viewport[0]),double(viewport[1]),double(viewport[2]),double(viewport[3])});shader.uniform("uInkShadow",shadowOnly?1:0);
+            glDisable(GL_CULL_FACE);
+            glBindVertexArray(impl_->inkVao);
+            glDrawElementsInstancedBaseInstance(GL_TRIANGLES,impl_->indexCount,GL_UNSIGNED_INT,nullptr,static_cast<GLsizei>(inkCount),static_cast<GLuint>(impl_->legacyCount));++draws;
+            glEnable(GL_CULL_FACE);
+        }
     }
     const auto drawPart=[&](const char* name,const glm::dmat4& model,glm::dvec3 color,double time=0,double fade=1) {
         const std::string key(name);const bool additive=key=="arrowGlow"||key=="arrowStreak",alpha=key=="wave";
