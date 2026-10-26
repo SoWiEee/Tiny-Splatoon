@@ -69,7 +69,7 @@ jobs:
       - name: Run CPU and headless native tests
         run: >-
           ctest --test-dir build-linux --output-on-failure
-          -E '^(native_zone_visual_gpu|native_player_showcase|native_lobby_visual_gpu|reference_environment_gpu|reference_device_visual_gpu|reference_boss_material_gpu|reference_stage_visual_gpu|reference_projectile_gpu|reference_player_ui_renderer|reference_player_ui_interactions|reference_native_entry_default|reference_character_shaders|reference_character_art|reference_render_pipeline|reference_worldfx_gpu)$'
+          -E '^(native_ink_stream_gpu|native_zone_visual_gpu|native_player_showcase|native_lobby_visual_gpu|reference_environment_gpu|reference_device_visual_gpu|reference_boss_material_gpu|reference_stage_visual_gpu|reference_projectile_gpu|reference_player_ui_renderer|reference_player_ui_interactions|reference_native_entry_default|reference_character_shaders|reference_character_art|reference_render_pipeline|reference_worldfx_gpu)$'
 
       - name: Run OpenGL 4.5 smoke tests with software Mesa
         env:
@@ -77,7 +77,7 @@ jobs:
         run: >-
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24"
           ctest --test-dir build-linux --output-on-failure
-          -R '^(reference_render_pipeline|reference_native_entry_default)$'
+          -R '^(native_ink_stream_gpu|reference_render_pipeline|reference_native_entry_default)$'
 
       - name: Package Linux build
         run: |
