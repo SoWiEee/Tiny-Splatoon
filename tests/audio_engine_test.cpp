@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
                 "slosh_throw", "roller_flick", "bow_loose", "blade_swish", "crab_cannon", "boss_cannon_sweep", "xp_tick"})
             require(audio.Metadata(name).has_value(), "Weapon, active-special, Boss, and UI cues must resolve by source name");
         {
-            BossPose pose(assets.parent_path() / "reference/boss/model.bin");
+            BossPose pose(assets.parent_path() / "models/boss/model.bin");
             std::vector<BossPoseAudioEvent> poseEvents;
             pose.SetAudioEventSink([&](const BossPoseAudioEvent& event) { poseEvents.push_back(event); });
             BossPoseInput poseInput; poseInput.move = "slam"; poseInput.movePhase = "act"; poseInput.moveTime = 0;

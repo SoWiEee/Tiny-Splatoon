@@ -16,7 +16,7 @@ struct CharacterShadowState {
 class CharacterArt {
 public:
     struct LodDraw { double fade=0.0, side=1.0; bool includeProps=true,hideTank=false; };
-    explicit CharacterArt(std::filesystem::path directory="assets/reference/characters",bool linearOutput=false,bool environment=false);
+    explicit CharacterArt(std::filesystem::path directory="assets/models/characters",bool linearOutput=false,bool environment=false);
     ~CharacterArt();
     const CharacterData& data() const { return data_; }
     glm::dmat4 attachment(const CharacterPoseFrame& frame,const CharacterStyle& style,const std::string& binding) const;

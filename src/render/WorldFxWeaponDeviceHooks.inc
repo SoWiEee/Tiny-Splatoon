@@ -1,5 +1,5 @@
 // Included inside restoration after WorldEffects::Update.
-void WorldEffects::weaponDeviceHooks(double dt,CombatWorld& combat,glm::dvec3 camera){
+void WorldEffects::weaponDeviceHooks(double dt,CombatWorld& combat,glm::dvec3 camera,const std::vector<WorldVisualEvent>& events){
     if(!(dt>0))return;
     const auto near=[&](glm::dvec3 p,double range){return glm::length2(p-camera)<range*range;};
     WorldFxRippleSink ripple;
@@ -12,7 +12,7 @@ void WorldEffects::weaponDeviceHooks(double dt,CombatWorld& combat,glm::dvec3 ca
 
     // Failed shots are emitted by WeaponRunner::spend, so preserve the source
     // event and its muzzle/aim sample instead of inferring failure from input.
-    for(const auto& event:lastEvents_){
+    for(const auto& event:events){
         if(event.kind!="lowink"||!near(event.pos,40))continue;
         const PlayerSimulation* sourceActor=nullptr;
         double closest=std::numeric_limits<double>::infinity();

@@ -234,10 +234,10 @@ int main(int argc, char** argv) {
                   std::to_string(framebufferHeight) + ")");
         const std::filesystem::path root = argc > 1 ? argv[1] : ".";
         const std::filesystem::path output = argc > 2 ? argv[2] : "build/captures/lobby-visual";
-        LobbyRenderer scene(root / "assets/reference/lobby");
-        LobbyEffects effects(root / "assets/reference");
-        PlayerShowcase showcase(root / "assets/reference/characters");
-        RenderPipeline pipeline(root / "assets/reference/post");
+        LobbyRenderer scene(root / "assets/world/lobby");
+        LobbyEffects effects(root / "assets/effects/particles");
+        PlayerShowcase showcase(root / "assets/models/characters");
+        RenderPipeline pipeline(root / "assets/effects/post",root / "assets/shaders");
         pipeline.Configure(4, true, true, true);
         checkGl("Lobby asset loading");
         PlayerProfile profile;
@@ -278,7 +278,7 @@ int main(int argc, char** argv) {
         idleRemote->dance = "menu_idle";
         idleRemote->speed = 0.0;
         idleRemote->velocityWorld = glm::dvec3(0.0);
-        PlayerShowcase idleShowcase(root / "assets/reference/characters");
+        PlayerShowcase idleShowcase(root / "assets/models/characters");
         const auto swimPixels = render(scene, effects, showcase, pipeline, entry.actors(), entryEvents,
                                        entry.hubMode(), time, 1280, 720, true, true, true);
         const auto swimNoEffects = render(scene, effects, showcase, pipeline, entry.actors(), entryEvents,

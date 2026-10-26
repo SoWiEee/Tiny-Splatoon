@@ -19,7 +19,7 @@ class DirectionalShadow;
 
 class EnvironmentRenderer {
 public:
-    explicit EnvironmentRenderer(std::filesystem::path assets="assets/reference/environment");
+    explicit EnvironmentRenderer(std::filesystem::path assets="assets/world/environment");
     ~EnvironmentRenderer();
     EnvironmentRenderer(const EnvironmentRenderer&)=delete;
     EnvironmentRenderer& operator=(const EnvironmentRenderer&)=delete;

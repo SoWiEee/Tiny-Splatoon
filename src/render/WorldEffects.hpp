@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -26,11 +27,11 @@ public:
     using Item = WorldFxParticle;
     struct Counts { std::size_t drops=0,puffs=0,glows=0,rings=0,shells=0,beams=0,world=0,bossBlobs=0; };
 
-    explicit WorldEffects(const CharacterData& data);
+    explicit WorldEffects(const CharacterData& data,std::filesystem::path assets="assets");
     ~WorldEffects();
     WorldEffects(const WorldEffects&) = delete;
     WorldEffects& operator=(const WorldEffects&) = delete;
-    void Update(double dt, CombatWorld& world, glm::dvec3 camera);
+    void Update(double dt, CombatWorld& world, glm::dvec3 camera, const std::vector<WorldVisualEvent>& events);
     int Draw(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camera,const CharacterLightState* lights=nullptr);
     void SetDeviceRenderer(DeviceRenderer* models){models_=models;}
     void SetPaintSurface(FacePaint* paint){paint_=paint;}
@@ -41,19 +42,16 @@ public:
     Counts counts() const;
     const std::vector<Item>& liveItems() const { return live_; }
     const std::vector<Item>& worldItems() const { return world_; }
-    // The queue has a single simulation consumer; screen FX may read this
-    // immutable copy without draining CombatWorld a second time.
-    const std::vector<WorldVisualEvent>& lastEvents() const { return lastEvents_; }
 
 private:
     void spawn(Item item);
     void burst(glm::vec3 pos, glm::vec3 normal, glm::vec3 color, float size=0.1f, int count=12);
     void explosion(glm::vec3 pos, glm::vec3 color, float radius);
     void emitSpecial(const char* kind, glm::vec3 pos, glm::vec3 normal, glm::vec3 color, float radius, glm::vec3 camera);
-    void weaponHooks(double dt, CombatWorld& world, glm::dvec3 camera);
-    void weaponDeviceHooks(double dt, CombatWorld& world, glm::dvec3 camera);
-    void kitHooks(double dt, CombatWorld& world, glm::dvec3 camera);
-    void specialHooks(double dt, CombatWorld& world, glm::dvec3 camera);
+    void weaponHooks(double dt, CombatWorld& world, glm::dvec3 camera, const std::vector<WorldVisualEvent>& events);
+    void weaponDeviceHooks(double dt, CombatWorld& world, glm::dvec3 camera, const std::vector<WorldVisualEvent>& events);
+    void kitHooks(double dt, CombatWorld& world, glm::dvec3 camera, const std::vector<WorldVisualEvent>& events);
+    void specialHooks(double dt, CombatWorld& world, glm::dvec3 camera, const std::vector<WorldVisualEvent>& events);
     void warningHooks(double dt, CombatWorld& world, glm::dvec3 camera);
     float random();
     glm::vec3 cone(glm::vec3 normal, float spread);
@@ -65,8 +63,8 @@ private:
     FacePaint* paint_=nullptr;
     glm::dvec3 camera_{0.0};
     const CharacterData* data_ = nullptr;
+    std::filesystem::path assets_;
     std::vector<Item> live_, world_;
-    std::vector<WorldVisualEvent> lastEvents_;
     struct ActorState { glm::dvec3 pos{0}; double hp=100,charge=0,step=0,born=0,climbEnd=-9,wakeTimer=0; bool initialized=false,alive=true,squid=false,swimming=false,climbing=false,grounded=false,footsteps=false; std::string special,phase; };
     std::unordered_map<const void*,ActorState> actors_;
     struct WeaponFxState { double drip=0,spark=0,spin=0,dryT=-9,flickT=-9,dodgeTime=0; int shotsFired=-1; bool full=false,spinFull=false,burstFiring=false; };

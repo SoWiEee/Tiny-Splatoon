@@ -94,7 +94,7 @@ int main(){
         std::vector<std::unique_ptr<CharacterShader>> characterShaders;
         CharacterShader* physical=nullptr;
         for(const auto& definition:CharacterMaterials()){
-            const auto path=std::filesystem::path("assets/reference/characters/shaders-shadow");
+            const auto path=std::filesystem::path("assets/models/characters/shaders-shadow");
             auto shader=std::make_unique<CharacterShader>(CharacterShader::readSource(path/(definition.key+".vert")),CharacterShader::readSource(path/(definition.key+".frag")));
             shader->use();for(const auto& [name,values]:definition.uniforms)shader->uniform(name,values);
             if(definition.key=="dark_plain")physical=shader.get();characterShaders.push_back(std::move(shader));

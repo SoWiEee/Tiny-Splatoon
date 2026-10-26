@@ -21,7 +21,7 @@ public:
         bool visible=true,airborne=false,landed=false;
     };
 
-    explicit PlayerShowcase(std::filesystem::path directory="assets/reference/characters");
+    explicit PlayerShowcase(std::filesystem::path directory="assets/models/characters");
     ~PlayerShowcase();
     PlayerShowcase(const PlayerShowcase&)=delete;
     PlayerShowcase& operator=(const PlayerShowcase&)=delete;

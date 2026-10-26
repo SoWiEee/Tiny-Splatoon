@@ -88,7 +88,7 @@ int main(int argc,char** argv) {
     try {
         using namespace restoration;
         Target output(512,512,true),other(1,1,false);
-        PlayerShowcase showcase(argc>1?argv[1]:"assets/reference/characters");
+        PlayerShowcase showcase(argc>1?argv[1]:"assets/models/characters");
         PlayerProfile profile;profile.name="showcase-test";
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER,output.framebuffer);glBindFramebuffer(GL_READ_FRAMEBUFFER,other.framebuffer);

@@ -14,7 +14,7 @@ int main(int argc,char** argv) {
         StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
         StageGeometry geometry(stage);FacePaint paint(stage,geometry);
         PlayerSimulation a(stage,geometry,paint,0),b(stage,geometry,paint,1);
-        std::ifstream input(argc>1?argv[1]:"assets/reference/projectiles/blob-fixtures.txt");
+        std::ifstream input(argc>1?argv[1]:"tests/fixtures/projectile-blob-fixtures.txt");
         int cases=0;if(!(input>>cases)||cases!=24)throw std::runtime_error("Missing source projectile draw fixtures");
         std::vector<ProjectileBlob> reused;reused.reserve(700);const auto reusedCapacity=reused.capacity();
         reused.push_back({});
@@ -84,6 +84,44 @@ int main(int argc,char** argv) {
         if(glm::length(a.muzzle()-glm::dvec3(.2,1.1,.5))>1e-9)throw std::runtime_error("Rig muzzle was ignored");
         a.setMuzzleSource([](int){return glm::dvec3(900);});
         if(glm::length(a.muzzle()-a.state.pos)>2)throw std::runtime_error("Invalid rig muzzle escaped source fallback");
-        std::cout<<cases<<" source Projectiles._draw fixtures and reusable output passed; shooter ink deterministic/filter/bounds and rig muzzle guards passed.\n";
+        ProjectileFrame frame;
+        CombatWorld snapshotWorld(stage,geometry,paint);
+        ShooterProjectile ownedShot;ownedShot.kind="shot";ownedShot.weaponId="spinner";ownedShot.pos={12,12,12};ownedShot.start={11,12,12};
+        ownedShot.vel={0,0,30};ownedShot.age=.2;ownedShot.life=1.3;ownedShot.seed=.7;ownedShot.look={.12,.8,1.1,.03,24,.2,2};
+        ownedShot.straight=.23;ownedShot.gravity=35;ownedShot.drag=.7;
+        {
+            PlayerSimulation spinner(stage,geometry,paint,1,&snapshotWorld);spinner.setLoadout("spinner");spinner.state.alive=true;spinner.state.pos={4,4,6};
+            spinner.setNetworkIdentity(41,9);spinner.setMuzzleSource([](int){return glm::dvec3(4,5,6);});
+            CombatPose pose;pose.streaming=true;spinner.setNetworkGhostPose(pose,{});ownedShot.owner=&spinner;
+            snapshotWorld.launch(ownedShot);
+            PlayerSimulation charger(stage,geometry,paint,0,&snapshotWorld);charger.setLoadout("charger");charger.state.alive=true;
+            charger.input.hasAimPoint=true;charger.input.aimPoint={0,1,10};charger.setMuzzleSource([](int){return glm::dvec3(0,1,0);});
+            CombatPose charge;charge.charging=true;charge.charge=.5;charger.setNetworkGhostPose(charge,{});
+            const auto posBefore=snapshotWorld.projectiles().front().pos;const auto ageBefore=snapshotWorld.projectiles().front().age;const auto timeBefore=snapshotWorld.time();
+            frame=BuildProjectileFrame(snapshotWorld);
+            if(frame.time!=timeBefore||frame.projectiles.size()!=1||frame.projectiles[0].team!=1||
+               frame.projectiles[0].weaponId!="spinner"||frame.projectiles[0].look.satellites!=2||
+               glm::length(frame.projectiles[0].pos-posBefore)>1e-9||frame.streamEmitters.size()!=1||frame.streamEmitters[0].id!=41||
+               frame.streamEmitters[0].team!=1||glm::length(frame.streamEmitters[0].position-glm::dvec3(4,5,6))>1e-9||
+               glm::length(frame.streamEmitters[0].velocity-ownedShot.vel)>1e-9||frame.streamEmitters[0].straight!=ownedShot.straight||
+               frame.streamEmitters[0].gravity!=ownedShot.gravity||frame.streamEmitters[0].drag!=ownedShot.drag||
+               frame.streamEmitters[0].radius!=.10||frame.chargerSights.size()!=1||
+               glm::length(frame.chargerSights[0].direction-glm::dvec3(0,0,1))>1e-9||frame.chargerSights[0].team!=0)
+                throw std::runtime_error("Projectile frame lost team, spinner or charger presentation values");
+            if(snapshotWorld.projectiles().size()!=1||glm::length(snapshotWorld.projectiles().front().pos-posBefore)>1e-9||
+               snapshotWorld.projectiles().front().age!=ageBefore||snapshotWorld.time()!=timeBefore||!spinner.state.alive||!charger.state.alive)
+                throw std::runtime_error("Projectile frame construction changed gameplay state");
+            snapshotWorld.tick(.01);spinner.setMuzzleSource([](int){return glm::dvec3(7,8,9);});
+            if(glm::length(snapshotWorld.projectiles().front().pos-posBefore)<1e-9||snapshotWorld.projectiles().front().age==ageBefore||
+               frame.projectiles[0].age!=ageBefore||glm::length(frame.projectiles[0].pos-posBefore)>1e-9||
+               glm::length(frame.streamEmitters[0].position-glm::dvec3(4,5,6))>1e-9)
+                throw std::runtime_error("Projectile frame changed with the source projectile or actor");
+            snapshotWorld.cleanup(spinner);
+        }
+        if(!snapshotWorld.projectiles().empty()||frame.projectiles.size()!=1||frame.projectiles[0].team!=1||
+           glm::length(frame.projectiles[0].pos-glm::dvec3(12,12,12))>1e-9||frame.streamEmitters.size()!=1||
+           glm::length(frame.streamEmitters[0].position-glm::dvec3(4,5,6))>1e-9||frame.chargerSights.size()!=1)
+            throw std::runtime_error("Projectile frame retained an actor pointer or changed after cleanup");
+        std::cout<<cases<<" source Projectiles._draw fixtures and reusable output passed; shooter ink deterministic/filter/bounds, owned projectile snapshot, and rig muzzle guards passed.\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

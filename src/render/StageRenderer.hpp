@@ -19,7 +19,7 @@ struct CharacterLightState;
 
 class StageRenderer {
 public:
-    explicit StageRenderer(std::filesystem::path stageAssets="assets/reference/stages",bool environment=false);
+    explicit StageRenderer(std::filesystem::path stageAssets="assets/world/stages",bool environment=false);
     ~StageRenderer();
     StageRenderer(const StageRenderer&)=delete;
     StageRenderer& operator=(const StageRenderer&)=delete;

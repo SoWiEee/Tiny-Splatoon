@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
         for (const auto& candidate : ReferenceStages())
             if (candidate.id == "tidewater" && candidate.mode == "turf") { stage = &candidate; break; }
         check(stage != nullptr, "Missing source Turf stage fixture");
-        const auto assetRoot = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::path("assets/reference/stages");
+        const auto assetRoot = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::path("assets/world/stages");
         const auto outputRoot = argc > 2 ? std::filesystem::path(argv[2]) : std::filesystem::path("build/captures/stage-visual");
         StageGeometry geometry(*stage);
         FacePaint paint(*stage, geometry);

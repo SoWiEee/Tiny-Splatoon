@@ -23,7 +23,7 @@ int main(int argc,char** argv){
     glfwMakeContextCurrent(window);if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))){glfwDestroyWindow(window);glfwTerminate();return 1;}
     int status=0;
     try{using namespace restoration;
-        const std::filesystem::path assets=argc>1?argv[1]:"assets/reference",output=argc>2?argv[2]:"build/captures/zones";
+        const std::filesystem::path assets=argc>1?argv[1]:"assets/world",output=argc>2?argv[2]:"build/captures/zones";
         std::filesystem::create_directories(output);
         const auto found=std::find_if(ReferenceStages().begin(),ReferenceStages().end(),[](const auto& s){return s.id=="tidewater"&&s.mode=="zones";});check(found!=ReferenceStages().end(),"Missing Zones stage");
         const auto& stage=*found;StageGeometry geometry(stage);FacePaint paint(stage,geometry);StageRenderer renderer(assets/"stages");renderer.Load(stage,0,paint);renderer.UploadInk(stage,paint);

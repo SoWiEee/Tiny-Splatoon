@@ -268,7 +268,7 @@ void attribute(const CharacterShader& shader,const char* name,GLint components,G
 }
 
 struct LobbyEffects::Impl {
-    explicit Impl(std::filesystem::path root):particles(root/"worldfx-particles"){}
+    explicit Impl(std::filesystem::path particleAssets):particles(std::move(particleAssets)){}
     ~Impl(){
         if(sparkInstance)glDeleteBuffers(1,&sparkInstance);
         if(sparkVertex)glDeleteBuffers(1,&sparkVertex);
@@ -566,7 +566,7 @@ struct LobbyEffects::Impl {
     }
 };
 
-LobbyEffects::LobbyEffects(std::filesystem::path assetsRoot):impl_(std::make_unique<Impl>(std::move(assetsRoot))){}
+LobbyEffects::LobbyEffects(std::filesystem::path particleAssets):impl_(std::make_unique<Impl>(std::move(particleAssets))){}
 LobbyEffects::~LobbyEffects()=default;
 void LobbyEffects::Update(const std::vector<LobbyActorState>& actors,const std::vector<LobbyPresentationEvent>& events,double dt,double time){impl_->update(actors,events,dt,time);}
 int LobbyEffects::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,double time){return impl_->draw(view,projection,eye,lights,time);}

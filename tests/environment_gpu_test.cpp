@@ -73,7 +73,7 @@ void testTextureCatalog(const std::filesystem::path& assets){
 }
 
 int main(int argc,char** argv){
-    const std::filesystem::path assets=argc>1?argv[1]:"assets/reference/environment";
+    const std::filesystem::path assets=argc>1?argv[1]:"assets/world/environment";
     try{testTextureCatalog(assets);}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
     if(!glfwInit())return 1;glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
     auto* window=glfwCreateWindow(384,256,"Source environment pixels",nullptr,nullptr);if(!window)return 1;glfwMakeContextCurrent(window);if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))return 1;int result=0;

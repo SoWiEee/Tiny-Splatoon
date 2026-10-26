@@ -51,6 +51,10 @@ add_library(restoration_core STATIC
     src/game/FollowCamera.cpp
     src/game/ArsenalData.cpp
     src/game/CombatWorld.cpp
+    src/game/CombatDevices.cpp
+    src/game/CombatProjectiles.cpp
+    src/game/CombatDamage.cpp
+    src/game/CombatPaint.cpp
     src/game/WeaponRunner.cpp
     src/game/NavGraph.cpp
     src/game/CharacterData.cpp
@@ -90,10 +94,10 @@ target_include_directories(game_audio
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
     PRIVATE "${MINIAUDIO_INCLUDE_DIR}")
 target_link_libraries(game_audio PUBLIC restoration_core Threads::Threads ${CMAKE_DL_LIBS})
-add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp src/render/InkStream.cpp src/render/InkStreamRenderer.cpp)
+add_library(projectile_visuals STATIC src/render/ProjectileVisuals.cpp src/render/ProjectileSnapshot.cpp src/render/InkStream.cpp src/render/InkStreamRenderer.cpp)
 target_include_directories(projectile_visuals PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/render")
 target_link_libraries(projectile_visuals PUBLIC restoration_core PRIVATE glad::glad)
-target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/MatchInputState.cpp src/app/OnlinePlay.cpp
+target_sources(Tiny-Splatoon PRIVATE src/app/StageViewer.cpp src/app/MatchSession.cpp src/app/AppFrame.cpp src/app/MatchInputState.cpp src/app/OnlinePlay.cpp
     src/render/CharacterArt.cpp src/render/CharacterLod.cpp src/render/CharacterShader.cpp src/render/PerformanceCapture.cpp src/render/StageRenderer.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp
     src/render/WorldEffects.cpp src/render/LobbyEffects.cpp src/render/WorldFxParticleRenderer.cpp src/render/ScreenEffectsController.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/BossRenderer.cpp
     src/render/WorldFxRecipes.cpp src/render/StageMapView.cpp src/render/StageMapCamera.cpp
@@ -122,6 +126,9 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(match_event_batch_test tests/match_event_batch_test.cpp)
+    target_link_libraries(match_event_batch_test PRIVATE restoration_core)
+    add_test(NAME native_match_event_batch COMMAND match_event_batch_test)
     add_executable(hud_view_model_test tests/hud_view_model_test.cpp)
     target_link_libraries(hud_view_model_test PRIVATE hud_view_model)
     add_test(NAME native_hud_view_model COMMAND hud_view_model_test)
@@ -174,13 +181,13 @@ if(BUILD_TESTING)
     add_test(NAME native_zone_hum COMMAND zone_hum_test)
     add_executable(zone_visual_gpu_test tests/zone_visual_gpu_test.cpp src/render/ZoneRenderer.cpp src/render/StageRenderer.cpp src/render/CharacterShader.cpp src/render/DirectionalShadow.cpp src/app/GpuPreference.cpp)
     target_link_libraries(zone_visual_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
-    add_test(NAME native_zone_visual_gpu COMMAND zone_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference" "${CMAKE_BINARY_DIR}/captures/zones")
+    add_test(NAME native_zone_visual_gpu COMMAND zone_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/world" "${CMAKE_BINARY_DIR}/captures/zones")
     add_executable(player_profile_test tests/player_profile_test.cpp)
     target_link_libraries(player_profile_test PRIVATE restoration_core)
     add_test(NAME native_player_profile COMMAND player_profile_test)
     add_executable(player_showcase_test tests/player_showcase_test.cpp src/render/PlayerShowcase.cpp src/render/CharacterArt.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(player_showcase_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
-    add_test(NAME native_player_showcase COMMAND player_showcase_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters")
+    add_test(NAME native_player_showcase COMMAND player_showcase_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/characters")
     add_executable(team_palette_test tests/team_palette_test.cpp)
     target_link_libraries(team_palette_test PRIVATE glm::glm)
     add_test(NAME native_team_palette COMMAND team_palette_test)
@@ -219,22 +226,22 @@ if(BUILD_TESTING)
     add_test(NAME reference_worldfx_transitions COMMAND worldfx_transition_test)
     add_executable(environment_gpu_test tests/environment_gpu_test.cpp src/render/EnvironmentRenderer.cpp src/render/EnvironmentScene.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(environment_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
-    add_test(NAME reference_environment_gpu COMMAND environment_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/environment" "${CMAKE_BINARY_DIR}/captures/environment")
+    add_test(NAME reference_environment_gpu COMMAND environment_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/world/environment" "${CMAKE_BINARY_DIR}/captures/environment")
     add_executable(device_visual_gpu_test tests/device_visual_gpu_test.cpp src/render/DeviceRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(device_visual_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
-    add_test(NAME reference_device_visual_gpu COMMAND device_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/devices" "${CMAKE_BINARY_DIR}/captures/devices")
+    add_test(NAME reference_device_visual_gpu COMMAND device_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/devices" "${CMAKE_BINARY_DIR}/captures/devices")
     add_executable(character_footstep_test tests/character_footstep_test.cpp)
     target_link_libraries(character_footstep_test PRIVATE restoration_core)
     add_test(NAME reference_character_footstep COMMAND character_footstep_test)
     add_executable(boss_material_gpu_test tests/boss_material_gpu_test.cpp src/render/BossRenderer.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(boss_material_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
-    add_test(NAME reference_boss_material_gpu COMMAND boss_material_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/boss")
+    add_test(NAME reference_boss_material_gpu COMMAND boss_material_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/boss")
     add_executable(stage_visual_gpu_test tests/stage_visual_gpu_test.cpp src/render/StageRenderer.cpp src/render/CharacterShader.cpp src/render/DirectionalShadow.cpp src/app/GpuPreference.cpp)
     target_link_libraries(stage_visual_gpu_test PRIVATE restoration_core glad::glad glfw OpenGL::GL ZLIB::ZLIB)
-    add_test(NAME reference_stage_visual_gpu COMMAND stage_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/stages" "${CMAKE_BINARY_DIR}/captures/stage-visual")
+    add_test(NAME reference_stage_visual_gpu COMMAND stage_visual_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/world/stages" "${CMAKE_BINARY_DIR}/captures/stage-visual")
     add_executable(projectile_visual_test tests/projectile_visual_test.cpp)
     target_link_libraries(projectile_visual_test PRIVATE projectile_visuals)
-    add_test(NAME reference_projectile_visuals COMMAND projectile_visual_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/projectiles/blob-fixtures.txt")
+    add_test(NAME reference_projectile_visuals COMMAND projectile_visual_test "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/projectile-blob-fixtures.txt")
     add_executable(shooter_impact_test tests/shooter_impact_test.cpp src/render/WorldFxRecipes.cpp)
     target_link_libraries(shooter_impact_test PRIVATE glm::glm)
     add_test(NAME native_shooter_impact COMMAND shooter_impact_test)
@@ -258,7 +265,8 @@ if(BUILD_TESTING)
             target_compile_definitions(projectile_gpu_test PRIVATE TINY_RENDERDOC_CAPTURE)
         endif()
     endif()
-    add_test(NAME reference_projectile_gpu COMMAND projectile_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/projectiles" "${CMAKE_BINARY_DIR}/captures/projectile-teardrops.png")
+    add_test(NAME reference_projectile_gpu COMMAND projectile_gpu_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/projectiles" "${CMAKE_BINARY_DIR}/captures/projectile-teardrops.png")
+    set_tests_properties(reference_projectile_gpu PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     add_executable(rml_renderer_test tests/rml_renderer_test.cpp src/app/GpuPreference.cpp)
     target_link_libraries(rml_renderer_test PRIVATE player_ui)
     add_test(NAME reference_player_ui_renderer COMMAND rml_renderer_test "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -355,7 +363,7 @@ if(BUILD_TESTING)
 
     add_executable(character_data_test tests/character_data_test.cpp)
     target_link_libraries(character_data_test PRIVATE restoration_core)
-    add_test(NAME reference_character_data COMMAND character_data_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters")
+    add_test(NAME reference_character_data COMMAND character_data_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/characters")
 
     add_executable(character_pose_eval tests/character_pose_eval.cpp)
     target_link_libraries(character_pose_eval PRIVATE restoration_core)
@@ -375,7 +383,7 @@ if(BUILD_TESTING)
 
     add_executable(boss_model_asset_test tests/boss_model_asset_test.cpp)
     target_link_libraries(boss_model_asset_test PRIVATE restoration_core)
-    add_test(NAME reference_boss_model_asset COMMAND boss_model_asset_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/boss/model.bin")
+    add_test(NAME reference_boss_model_asset COMMAND boss_model_asset_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/boss/model.bin")
 
     add_executable(combat_runner_test tests/combat_runner_test.cpp)
     target_link_libraries(combat_runner_test PRIVATE restoration_core)
@@ -395,11 +403,11 @@ if(BUILD_TESTING)
 
     add_executable(character_pose_shader_test tests/character_pose_shader_test.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(character_pose_shader_test PRIVATE glm::glm glad::glad glfw OpenGL::GL)
-    add_test(NAME reference_character_shaders COMMAND character_pose_shader_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters/shaders")
+    add_test(NAME reference_character_shaders COMMAND character_pose_shader_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/characters/shaders")
 
     add_executable(character_art_test tests/character_art_test.cpp src/render/CharacterArt.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(character_art_test PRIVATE restoration_core glad::glad glfw OpenGL::GL)
-    add_test(NAME reference_character_art COMMAND character_art_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/reference/characters" "${CMAKE_BINARY_DIR}/captures/character")
+    add_test(NAME reference_character_art COMMAND character_art_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/models/characters" "${CMAKE_BINARY_DIR}/captures/character")
 
     add_executable(render_pipeline_test tests/render_pipeline_test.cpp src/render/RenderPipeline.cpp src/render/DirectionalShadow.cpp src/render/LensInk.cpp src/render/LensField.cpp src/render/CharacterShader.cpp src/app/GpuPreference.cpp)
     target_link_libraries(render_pipeline_test PRIVATE glad::glad glfw OpenGL::GL glm::glm)

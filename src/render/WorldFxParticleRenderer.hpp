@@ -13,8 +13,8 @@ struct CharacterLightState;
 // exported source GLSL and source base meshes.
 class WorldFxParticleRenderer {
 public:
-    explicit WorldFxParticleRenderer(std::filesystem::path assets = "assets/reference/worldfx-particles",
-                                    std::filesystem::path bossAssets = "assets/reference/boss/shaders");
+    explicit WorldFxParticleRenderer(std::filesystem::path assets = "assets/effects/particles",
+                                    std::filesystem::path bossAssets = "assets/models/boss/shaders");
     ~WorldFxParticleRenderer();
     WorldFxParticleRenderer(const WorldFxParticleRenderer&) = delete;
     WorldFxParticleRenderer& operator=(const WorldFxParticleRenderer&) = delete;

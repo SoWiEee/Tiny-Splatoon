@@ -4,8 +4,8 @@
 #include "TeamPalette.hpp"
 #include "CharacterShader.hpp"
 #include "CharacterRenderData.hpp"
-#include "CombatWorld.hpp"
-#include "PlayerSimulation.hpp"
+#include "WorldVisualEvent.hpp"
+#include "StageGeometry.hpp"
 #include "ArsenalData.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -40,18 +40,18 @@ struct ProjectileRenderer::Impl {
     std::unique_ptr<InkStreamRenderer> streamRenderer;
     std::size_t legacyCount=0;
     std::vector<Ribbon> beams,sights;
-    std::vector<ShooterProjectile> custom;
+    std::vector<ProjectileSnapshot> custom;
     std::vector<Wave> waves;
     std::vector<FadingWave> fadingWaves;
     std::map<std::string,std::unique_ptr<Part>> parts;
     std::filesystem::path assets;
     double gameTime=0;bool environment=false,timeInitialized=false,blobsUploaded=false;
-    explicit Impl(const std::filesystem::path& assets,bool environment)
+    explicit Impl(const std::filesystem::path& assets,const std::filesystem::path& shaderAssets,bool environment)
       :blobShader(CharacterShader::readSource(assets/"blob.vert"),CharacterShader::readSource(assets/"blob.frag"),true,environment),
        ribbonShader(CharacterShader::readSource(assets/"ribbon.vert"),CharacterShader::readSource(assets/"ribbon.frag"),true),
-       inkShader(CharacterShader::readSource(assets.parent_path().parent_path()/"shaders/ink-shot/shot.vert"),
-                 CharacterShader::readSource(assets.parent_path().parent_path()/"shaders/ink-shot/shot.frag"),true),assets(assets),environment(environment) {
-        streamRenderer=std::make_unique<InkStreamRenderer>(assets.parent_path().parent_path()/"shaders/ink-stream");
+       inkShader(CharacterShader::readSource(shaderAssets/"ink-shot/shot.vert"),
+                 CharacterShader::readSource(shaderAssets/"ink-shot/shot.frag"),true),assets(assets),environment(environment) {
+        streamRenderer=std::make_unique<InkStreamRenderer>(shaderAssets/"ink-stream");
         std::ifstream file(assets/"blob.bin",std::ios::binary);
         char magic[8]{};std::uint32_t vertices=0,indices=0;
         file.read(magic,8);file.read(reinterpret_cast<char*>(&vertices),4);file.read(reinterpret_cast<char*>(&indices),4);
@@ -132,29 +132,16 @@ struct ProjectileRenderer::Impl {
         return *parts.emplace(name,std::move(p)).first->second;
     }
 };
-ProjectileRenderer::ProjectileRenderer(const std::filesystem::path& assets,bool environment):impl_(std::make_unique<Impl>(assets,environment)){}
+ProjectileRenderer::ProjectileRenderer(const std::filesystem::path& assets,bool environment,const std::filesystem::path& shaderAssets):impl_(std::make_unique<Impl>(assets,shaderAssets,environment)){}
 ProjectileRenderer::~ProjectileRenderer()=default;
 const std::vector<ProjectileBlob>& ProjectileRenderer::blobs()const{return impl_->blobs;}
 std::size_t ProjectileRenderer::ribbons()const{return impl_->beams.size()+impl_->sights.size();}
-void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::vector<WorldVisualEvent>& events) {
-    const double now=world.time();
+void ProjectileRenderer::Update(double dt,const ProjectileFrame& frame,const StageGeometry& geometry,const std::vector<WorldVisualEvent>& events) {
+    const double now=frame.time;
     if(impl_->timeInitialized&&now<impl_->gameTime){impl_->waves.clear();impl_->fadingWaves.clear();impl_->beams.clear();impl_->stream.Clear();}
     impl_->gameTime=now;impl_->timeInitialized=true;
-    const auto& shots=world.projectiles();
-    std::vector<InkStreamEmitter> emitters;
-    for(const auto* actor:world.actors()){
-        if(!actor||!actor->state.alive||actor->state.squid||actor->mainId()!="spinner"||!actor->combatPose().streaming)continue;
-        const ShooterProjectile* newest=nullptr;
-        for(const auto& shot:shots)if(shot.owner==actor&&shot.weaponId=="spinner"&&shot.kind=="shot"&&(!newest||shot.age<newest->age))newest=&shot;
-        const auto& weapon=actor->weapon();
-        InkStreamEmitter emitter;emitter.id=actor->networkNid()?actor->networkNid():reinterpret_cast<std::uintptr_t>(actor);emitter.active=true;emitter.team=actor->team();
-        emitter.position=actor->muzzle();emitter.velocity=newest?newest->vel:actor->aimDirection()*weapon.number("speedMax",40);
-        const double speed=glm::length(emitter.velocity),power=std::clamp((speed-weapon.number("speedMin",25))/std::max(1.0,weapon.number("speedMax",40)-weapon.number("speedMin",25)),0.0,1.0);
-        emitter.straight=newest?newest->straight:.12;emitter.gravity=newest?newest->gravity:28;emitter.drag=newest?newest->drag:.8;
-        emitter.life=std::clamp((weapon.number("rangeMin",10)+(weapon.number("rangeMax",21)-weapon.number("rangeMin",10))*power)/std::max(1.0,speed),.15,.7);
-        emitter.seed=.37;emitter.radius=.10;emitters.push_back(emitter);
-    }
-    impl_->stream.Update(dt,emitters,world.geometry());
+    const auto& shots=frame.projectiles;
+    impl_->stream.Update(dt,frame.streamEmitters,geometry);
     impl_->streamRenderer->Update(impl_->stream.pieces(),impl_->stream.drops());
     BuildProjectileBlobs(shots,impl_->blobs,false);
     impl_->legacyCount=impl_->blobs.size();
@@ -163,9 +150,9 @@ void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::ve
     auto previousWaves=std::move(impl_->waves);
     impl_->waves.clear();
     impl_->custom.clear();
-    for(const auto& p:shots)if(p.owner&&p.delay<=0&&(p.kind=="arrow"||p.kind=="fist"||p.kind=="bladewave")){
+    for(const auto& p:shots)if(p.delay<=0&&(p.kind=="arrow"||p.kind=="fist"||p.kind=="bladewave")){
         impl_->custom.push_back(p);
-        if(p.kind=="bladewave")impl_->waves.push_back({p.id,p.pos,p.vel,teamColor(p.owner->team()),p.age,p.distance});
+        if(p.kind=="bladewave")impl_->waves.push_back({p.id,p.pos,p.vel,teamColor(p.team),p.age,p.distance});
     }
     impl_->fadingWaves.erase(std::remove_if(impl_->fadingWaves.begin(),impl_->fadingWaves.end(),[&](const auto& wave){return now-wave.started>=.14;}),impl_->fadingWaves.end());
     for(const auto& event:events)if(event.kind=="blade_wave_wall"||event.kind=="blade_wave_stop"){
@@ -183,16 +170,9 @@ void ProjectileRenderer::Update(double dt,const CombatWorld& world,const std::ve
     for(const auto& event:events)if(event.kind=="beam"&&beams.size()<64)
         beams.push_back({event.pos,event.normal,teamColor(event.team),0,.3+.1*event.charge,event.radius,event.width,event.charge,event.seed,false});
     impl_->sights.clear();
-    for(const auto* actor:world.actors()) {
-        if(!actor||!actor->state.alive||actor->weapon().kind!="charger")continue;
-        const auto pose=actor->combatPose();if(!pose.charging)continue;
-        const auto muzzle=actor->muzzle();
-        auto direction=actor->input.aimPoint-muzzle;
-        const auto fallback=glm::dvec3(std::sin(actor->input.aimYaw)*std::cos(actor->input.aimPitch),std::sin(actor->input.aimPitch),std::cos(actor->input.aimYaw)*std::cos(actor->input.aimPitch));
-        direction=actor->input.hasAimPoint&&glm::length(direction)>=2&&glm::dot(direction,fallback)>=0?glm::normalize(direction):fallback;
-        const auto& weapon=actor->weapon();const double range=weapon.number("rangeMin")+(weapon.number("rangeMax")-weapon.number("rangeMin"))*pose.charge;
-        const auto hit=world.geometry().raycast(muzzle,direction,range);
-        impl_->sights.push_back({muzzle,direction,teamColor(actor->team()),world.time(),1,hit.hit?hit.dist:range,.014+pose.charge*.02,pose.charge,0,true});
+    for(const auto& sight:frame.chargerSights) {
+        const auto hit=geometry.raycast(sight.muzzle,sight.direction,sight.range);
+        impl_->sights.push_back({sight.muzzle,sight.direction,teamColor(sight.team),frame.time,1,hit.hit?hit.dist:sight.range,.014+sight.charge*.02,sight.charge,0,true});
     }
 }
 int ProjectileRenderer::Draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights) {
@@ -252,7 +232,7 @@ int ProjectileRenderer::DrawPass(const glm::dmat4& view,const glm::dmat4& projec
         drawPart("wave",glm::translate(glm::dmat4(1),pos)*basis*glm::scale(glm::dmat4(1),glm::dvec3(weapon.number("waveWidth")*1.45*grow,weapon.number("waveHeight")*.5*grow,1+std::min(1.0,distance/4)*.9)),color,age,fade);
     };
     for(const auto& p:impl_->custom) {
-        const auto color=teamColor(p.owner->team());
+        const auto color=teamColor(p.team);
         auto direction=p.kind=="arrow"?p.flightDir:p.vel;
         direction=glm::length(direction)>1e-8?glm::normalize(direction):glm::dvec3(0,0,1);
         const auto rotation=glm::mat4_cast(glm::rotation(glm::dvec3(0,0,1),direction));

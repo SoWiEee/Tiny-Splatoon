@@ -19,7 +19,7 @@ int main(int argc,char** argv){
     if(!glfwInit())return 1;glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,5);glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
     auto* window=glfwCreateWindow(256,256,"Source device pixels",nullptr,nullptr);if(!window)return 1;glfwMakeContextCurrent(window);if(!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))return 1;int result=0;
     try{
-        using namespace restoration;const std::filesystem::path assets=argc>1?argv[1]:"assets/reference/devices";
+        using namespace restoration;const std::filesystem::path assets=argc>1?argv[1]:"assets/models/devices";
         const std::filesystem::path output=argc>2?argv[2]:"build/captures/devices";std::filesystem::create_directories(output);
         DeviceRenderer renderer(assets);CharacterLightState lights;lights.ambient={.3,.3,.3};lights.sunDirection=glm::normalize(glm::vec3(-.4,.8,.3));lights.sunColor={2,1.8,1.6};lights.skyColor={.4,.5,.65};lights.groundColor={.25,.2,.16};
         const glm::dvec3 eye(3,2.6,4);const auto view=glm::lookAt(eye,glm::dvec3(0,.5,0),glm::dvec3(0,1,0)),projection=glm::perspective(glm::radians(48.),1.,.05,100.);

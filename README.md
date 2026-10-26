@@ -95,7 +95,7 @@ ctest --test-dir build -C Release --output-on-failure
 | `src/game/`、`src/world/` | 模式、角色、武器、AI、地形與墨水 |
 | `src/render/`、`src/gui/`、`src/audio/` | OpenGL、RmlUi 與 miniaudio |
 | `src/network/` | GNS 傳輸、房間服務及遊戲同步 |
-| `assets/` | 已匯出的原生資產、UI、字體與音訊 |
+| [assets/](assets/README.md) | `models` 模型、`world` 場景、`effects` 視效，以及 UI、字體與音訊 |
 | [tests/](tests/README.md)、[tools/](tools/README.md) | 原生回歸、來源 oracle、fixtures 與量測工具 |
 | [docs/](docs/README.md) | 目前規格、領域契約、進度紀錄與量測資料 |
 

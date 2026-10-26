@@ -2,7 +2,6 @@
 #include "ProjectileVisuals.hpp"
 #include "TeamPalette.hpp"
 #include "CombatWorld.hpp"
-#include "PlayerSimulation.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -11,12 +10,26 @@
 #include <limits>
 
 namespace restoration {
-std::vector<ProjectileBlob> BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots) {
+namespace {
+std::vector<ProjectileSnapshot> snapshot(const std::vector<ShooterProjectile>& shots) {
+    std::vector<ProjectileSnapshot> result;
+    result.reserve(shots.size());
+    for(const auto& p:shots)if(p.owner)result.push_back(SnapshotProjectile(p));
+    return result;
+}
+}
+std::vector<ProjectileBlob> BuildProjectileBlobs(const std::vector<ProjectileSnapshot>& shots) {
     std::vector<ProjectileBlob> result;
     BuildProjectileBlobs(shots,result);
     return result;
 }
+std::vector<ProjectileBlob> BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots) {
+    return BuildProjectileBlobs(snapshot(shots));
+}
 void BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots,std::vector<ProjectileBlob>& result,bool includeShooter) {
+    BuildProjectileBlobs(snapshot(shots),result,includeShooter);
+}
+void BuildProjectileBlobs(const std::vector<ProjectileSnapshot>& shots,std::vector<ProjectileBlob>& result,bool includeShooter) {
     constexpr double pi=3.14159265358979323846;
     constexpr double satelliteSize[]={0.46,0.33,0.24,0.17};
     const auto& colors=InkColors;
@@ -25,7 +38,7 @@ void BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots,std::vecto
     for(const auto& p:shots) {
         if(result.size()>=695)break;
         if(!includeShooter&&p.kind=="shot"&&(p.weaponId=="shooter"||p.weaponId=="spinner"))continue;
-        if(!p.owner||p.delay>0||p.kind=="arrow"||p.kind=="bladewave"||p.kind=="fist")continue;
+        if(p.delay>0||p.kind=="arrow"||p.kind=="bladewave"||p.kind=="fist")continue;
         const double speed=glm::length(p.vel);
         const auto direction=p.vel/std::max(speed,1e-3);
         const auto rotation=glm::rotation(glm::dvec3(0,0,1),speed>1e-8?direction:glm::dvec3(0,0,1));
@@ -38,7 +51,7 @@ void BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots,std::vecto
             double k=std::clamp((p.age/p.life-0.8)/0.2,0.0,1.0);k=k*k*(3-2*k);
             size*=1+0.34*k;wobble*=1+2.4*k;bright=1+0.9*k;tail*=1-0.55*k;
         }
-        const auto color=colors[p.owner->team()==1?1:0];
+        const auto color=colors[p.team==1?1:0];
         const auto add=[&](glm::dvec3 at,double radius,glm::dvec4 shape,glm::dvec3 tint) {
             const auto matrix=glm::translate(glm::dmat4(1),at)*glm::mat4_cast(rotation)*glm::scale(glm::dmat4(1),glm::dvec3(radius));
             result.push_back({glm::mat4(matrix),glm::vec4(shape),glm::vec3(tint)});
@@ -63,6 +76,9 @@ void BuildProjectileBlobs(const std::vector<ShooterProjectile>& shots,std::vecto
 }
 
 void AppendShooterInkBlobs(const std::vector<ShooterProjectile>& shots,std::vector<ProjectileBlob>& output) {
+    AppendShooterInkBlobs(snapshot(shots),output);
+}
+void AppendShooterInkBlobs(const std::vector<ProjectileSnapshot>& shots,std::vector<ProjectileBlob>& output) {
     constexpr double pi=3.14159265358979323846;
     constexpr double twoPi=2*pi;
     const auto smooth=[](double a,double b,double x) {
@@ -78,7 +94,7 @@ void AppendShooterInkBlobs(const std::vector<ShooterProjectile>& shots,std::vect
     if(output.capacity()<700)output.reserve(700);
     for(const auto& p:shots) {
         if(output.size()>=700)break;
-        if(p.kind!="shot"||p.weaponId!="shooter"||!p.owner||!std::isfinite(p.delay)||p.delay>0||
+        if(p.kind!="shot"||p.weaponId!="shooter"||!std::isfinite(p.delay)||p.delay>0||
            !finiteVec(p.pos)||!finiteVec(p.start)||!finiteVec(p.vel)||!std::isfinite(p.age)||
            !std::isfinite(p.life)||p.life<=1e-6||!std::isfinite(p.seed))continue;
         const double base=p.look.size>0?p.look.size:p.size;
@@ -89,7 +105,7 @@ void AppendShooterInkBlobs(const std::vector<ShooterProjectile>& shots,std::vect
         const double distance=glm::length(travelVector),travel=std::min(distance,1000.0),speed=glm::length(p.vel);
         const glm::dvec3 direction=speed>1e-8?p.vel/speed:distance>1e-8?travelVector/distance:glm::dvec3(0,0,1);
         const auto rotation=glm::rotation(glm::dvec3(0,0,1),direction);
-        const auto color=InkColors[p.owner->team()==1?1:0];
+        const auto color=InkColors[p.team==1?1:0];
         if(!std::isfinite(color.x)||!std::isfinite(color.y)||!std::isfinite(color.z))continue;
         const auto add=[&](glm::dvec3 at,glm::dvec3 scale,glm::dvec4 shape,glm::dvec3 tint) {
             const auto matrix=glm::translate(glm::dmat4(1),at)*glm::mat4_cast(rotation)*glm::scale(glm::dmat4(1),scale);

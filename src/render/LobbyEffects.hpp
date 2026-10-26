@@ -15,8 +15,7 @@ class LobbyEffects {
 public:
     struct Counts { std::size_t trailDomes=0, particles=0, sparkles=0, splats=0; };
 
-    // assetsRoot is the generated assets/reference directory.
-    explicit LobbyEffects(std::filesystem::path assetsRoot);
+    explicit LobbyEffects(std::filesystem::path particleAssets);
     ~LobbyEffects();
     LobbyEffects(const LobbyEffects&) = delete;
     LobbyEffects& operator=(const LobbyEffects&) = delete;

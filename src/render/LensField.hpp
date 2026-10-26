@@ -6,7 +6,7 @@
 namespace restoration {
 class LensField {
 public:
-    explicit LensField(std::filesystem::path assets="assets/reference/post");
+    explicit LensField(std::filesystem::path assets="assets/effects/post");
     ~LensField();
     LensField(const LensField&)=delete;
     LensField& operator=(const LensField&)=delete;

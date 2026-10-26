@@ -18,7 +18,7 @@ struct BossPoseAudioEvent;
 // Renders the source-built HULLBREAKER mesh and its telegraphed attack geometry.
 class BossRenderer {
 public:
-    explicit BossRenderer(std::filesystem::path assets="assets/reference/boss",bool environment=false);
+    explicit BossRenderer(std::filesystem::path assets="assets/models/boss",bool environment=false);
     ~BossRenderer();
     BossRenderer(const BossRenderer&)=delete;
     BossRenderer& operator=(const BossRenderer&)=delete;

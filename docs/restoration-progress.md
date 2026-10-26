@@ -14,7 +14,10 @@
 | ✅ | 投射物、裝置與 World FX | 24 組來源投射物 fixture、裝置模型、來源粒子 shader 及 53 個粒子配方 oracle 已有針對性檢查。原生玩法測試涵蓋 15 種副武器與 19 種特殊技能；各 ID 的生命週期階段覆蓋不同。正式程式以玩法事件驅動呈現；墨水裝飾不重算傷害或得分。 | 此表的元件測試不代表完整近鏡／全場景逐影格視覺對照。 |
 | ✅ | 原生空中墨水 VFX，第 3／4 節 | 第 3 節連射槍局部 SDF／Smooth Union、實際表面深度、遠距網格、固定 seed 擾動與撞擊水花已接入；屬使用者指定的新呈現，不聲稱原版逐像素一致。第 4 節以獨立 120 Hz 時間線、彈道節點、受限 Hermite、弧長重採樣及平行傳輸 Tube 接入 Spinner 蓄力連射，保留原有傷害、耗墨與塗地判定。 | 螢幕空間模式有最近層與視角限制；Tube／局部 SDF／螢幕空間模式的元件結果不代表多人、Boss、跨 GPU 或多發射器全場景 parity。 |
 | ✅ | 原生武器墨水 VFX，第 5 節 | Bucket／Roller／Brush 甩墨與爆炸接入 `inkSlosh`、`inkFlick`、`inkExplosion`、`inkImpact`、`inkAnticipation` 配方。視效含 3–7 個 hero mesh drops、10–40 個 mid drops、24–96 個 micro billboard spray；micro 依投影像素及視錐剔除，Brush 低係數降低粒子量。最終 16 項受影響 CPU／GPU／戰鬥／資產檢查全數通過，包含真實 Bucket／Roller／Brush 發射與塗地案例。三段 180-frame 新舊擷取：Bucket 15/15 impact、8/8 paint；Roller 27/27、13/13；explosion 3/3、3/3。 | 僅涵蓋固定鏡頭、列出的武器與配方；額外粒子／mesh drops 不造成玩法傷害或塗地，邏輯投射物仍負責塗地。此證據不代表全遊戲來源 parity。 |
-| ✅ | 共用型別、建置依賴與 HUD 資料介面 | `CharacterStyle`／`MatchParticipant` 為共用純值型別；CMake 已移除全域 include 路徑。戰鬥 HUD、Boss、Zones 與結果讀取獨立 `HudViewModel`；地圖更新保留明確的模擬入口。Windows Release 全目標建置成功；新增 CPU 快照測試與 18 項既有 UI／網路／保存／輸入／角色姿勢／對戰回歸共 19/19 通過。 | 本輪未導入 ECS、MatchSession 或通用 RenderSnapshot；角色姿勢實作仍私有讀取來源材質資料。未重跑完整 CTest、Linux 或跨機網路驗收。 |
+| ✅ | 原生資產目錄 | 正式資產依用途分為 `assets/models/`、`assets/world/`、`assets/effects/`；1,328 個搬移檔案與搬移前 Git blob 完全相同，catalog 與 hash ID 保留。投射物 oracle 移至 tests/fixtures；兩份無使用者的舊 JSON 快照移除。部署使用新目錄，從系統暫存工作目錄啟動主選單、練習、Boss、Zones 均成功。 | 四次 6-frame 啟動不等於完整對局或跨平台安裝驗收；舊的未列管部署檔已保留於忽略的 build/retired-reference-assets，正式部署樹沒有 reference 目錄。 |
+| ✅ | 對戰 Session 與呈現資料 | `RunMatchSession` 管理單場幾何、墨水、導航、模擬與同步 adapter；離場及例外時解除姿勢／傷害／Boss 回呼並結束音訊。Session 每固定 tick 收取一次視效事件，供 FX／投射物／音訊共讀，多 tick 累積按順序供畫面消費。投射物與 Spinner／Charger 輸入轉為無 actor 指標的持有式快照，陰影與色彩 pass 共用準備結果。 | 保留既有 tick/frame 順序；沒有導入 ECS、通用事件匯流排或全場景 RenderSnapshot。沒有由此證明效能提升。 |
+| ✅ | CombatWorld 內部責任 | 裝置、投射物、傷害、塗墨移至各自編譯單元；公開 facade、50 個原有方法內容、儲存方式及 tick 定序保持不變。Windows Release 全目標建置成功，89 項 CTest 最終通過，包含新事件批次、快照所有權、來源數值、GPU、網路、音訊與對戰回歸。 | 是相同行為下的內部拆分，未重寫玩法或將各模組改為獨立狀態系統；Linux、跨機網路與最壞負載本輪未補驗。 |
+| ✅ | 共用型別、建置依賴與 HUD 資料介面 | `CharacterStyle`／`MatchParticipant` 為共用純值型別；CMake 已移除全域 include 路徑。戰鬥 HUD、Boss、Zones 與結果讀取獨立 `HudViewModel`；地圖更新保留明確的模擬入口。Windows Release 全目標建置成功；新增 CPU 快照測試與 18 項既有 UI／網路／保存／輸入／角色姿勢／對戰回歸共 19/19 通過。 | 角色姿勢實作仍私有讀取來源材質資料；此項的 19 項驗收僅限共用型別與 HUD，不代表通用全場景快照或 ECS 已完成。 |
 | ✅ | 玩家流程、UI 與保存 | 標題、首頁、裝備、置物櫃、設定、練習、結果與暫停流程已接入；繁中／英數字體與 profile 原子保存、一次性 XP 結算有原生回歸。720p／1080p 設定、地圖、HUD、結果及暫停畫面曾以互動測試和實際 framebuffer 檢查。 | 實體手把手感、觸控與震動未驗收； UI 檢查不代表來源隨機動畫逐幀一致。 |
 | ✅ | 音訊 | 資產目錄有 201 個 cue、31 個 loop bed、九首 FLAC 配樂；音訊引擎、事件路由、場景切換、loop 清理、Boss sockets 與 Zones hum 有原生檢查。2026-10-21 來源離線重渲染曾完成資產數量、曲目長度／loop 點與 waveform 界線檢查；選單曲使用量測出的重複渲染容差，單影格錯位負向案例會被拒絕。 | Edge 來源重渲染不是所有平台皆可用；主觀定位、HRTF、全混音與跨裝置聽感未驗收。 |
 | ✅ | GNS 房間與同步 | 獨立服務、五字元房碼、八人房間、遊戲權責、重連、事件去重、換主及同房重開已接入；loopback 2／3／8 client、跨程序服務與三模式同步有通過紀錄。 | 同機與 loopback 不證明跨機、跨網、公開部署或最壞網路負載。 |
@@ -28,6 +31,7 @@
 | ✅ | v0.8.5，2026-10-24 | 無 `splat-ref/` 隔離副本冷建置；原生測試 73/73 通過，290.03 秒。 | 證明該版本原生執行與 fixture 不需來源樹；後續修改以受影響檢查為主，沒有聲稱重跑現有全套。 |
 | ✅ | 2026-10-26，空中墨水第 3／4 節 | 10 項針對性 CPU／GPU／戰鬥／FX 驗收通過，涵蓋固定更新切分、彈道、速度改變、收頸分段、撞牆／停射、遮擋、正交視角、陰影及實際 Spinner 啟停。 | 元件比較中 Tube／Capsule SDF／螢幕空間模式平均 GPU 時間為 0.085／1.073／0.140 ms。整局 38–41 FPS 短測與旁路結果波動，不能推論該視效的整局 FPS 成本。 |
 | ✅ | 2026-10-26，第 5 節與文件／工具整理 | Windows Release 受影響目標建置成功；16/16 針對性 CTest 通過（31.80 秒），涵蓋墨水 CPU／GPU、戰鬥、World FX、loader、場景、貼圖、音訊與來源 oracle。已移除停用的 51 個匯出腳本及對應再匯出測試，保留仍供音訊驗收使用的匯出工具。 | 這是受影響測試集合，未重跑完整 CTest；來源樹與既有二進位參考資產未變更。 |
+| ✅ | 2026-10-26，資產與架構第 3–5 項 | Windows Release 全目標建置通過；全套初跑 87/89 通過（367.69 秒），部署測試在 MSVC 開發環境補跑通過，投射物快照測試的槍口位置修正為合法範圍後補跑通過，最終 89/89。另有四個非專案工作目錄的部署版啟動／擷取通過。 | 本機 Windows／GTX 1650，未啟動 WSL 或查看遠端 CI；不代表全硬體或跨平台驗收。 |
 
 歷史驗收紀錄中的修正與證據已收錄於本表，不以早期失敗當作目前狀態，也不將後續受影響測試冒充完整套件重跑。
 

@@ -1,5 +1,5 @@
 // Included inside restoration after WorldEffects::Update.
-void WorldEffects::weaponHooks(double dt,CombatWorld& combat,glm::dvec3 camera){
+void WorldEffects::weaponHooks(double dt,CombatWorld& combat,glm::dvec3 camera,const std::vector<WorldVisualEvent>& events){
     if(!(dt>0))return;
     const auto near=[&](glm::dvec3 p,double r){return glm::length2(p-camera)<r*r;};
     WorldFxRippleSink ripple;if(paint_)ripple=[this](glm::dvec3 p,double a,double w,double s,double l){paint_->requestVisualRipple({p,a,w,s,l});};
@@ -41,7 +41,7 @@ void WorldEffects::weaponHooks(double dt,CombatWorld& combat,glm::dvec3 camera){
         }
     }
     for(auto it=weaponTrailDistance_.begin();it!=weaponTrailDistance_.end();){if(std::find(liveIds.begin(),liveIds.end(),it->first)==liveIds.end())it=weaponTrailDistance_.erase(it);else ++it;}
-    for(const auto& e:lastEvents_)if(e.kind=="beam"){
+    for(const auto& e:events)if(e.kind=="beam"){
         const auto end=e.pos+e.normal*e.radius;
         if(!near(e.pos,60)&&!near(end,40))continue;
         emit("beamTrail",e.pos,end,e.team,e.charge);

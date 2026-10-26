@@ -43,7 +43,11 @@ int main(int argc,char** argv){
         StageData stage{};stage.bounds={-30,30,-30,30};stage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
         StageGeometry geometry(stage);FacePaint paint(stage,geometry);CombatWorld world(stage,geometry,paint);PlayerSimulation actor(stage,geometry,paint,0,&world);actor.state.alive=true;
         ShooterProjectile shot;shot.owner=&actor;shot.weaponId="twins";shot.pos={0,0,0};shot.start={-3,0,0};shot.vel={28,0,2};shot.age=.12;shot.seed=.31;shot.look={.19,.8,1.3,.035,26,.3,3};world.launch(shot);
-        ProjectileRenderer renderer(argc>1?argv[1]:"assets/reference/projectiles");renderer.Update(1.0/60,world,{});
+        ProjectileRenderer renderer(argc>1?argv[1]:"assets/models/projectiles");
+        const auto update=[&](double dt,const CombatWorld& source,const StageGeometry& sourceGeometry,const std::vector<WorldVisualEvent>& events){
+            const auto frame=BuildProjectileFrame(source);renderer.Update(dt,frame,sourceGeometry,events);
+        };
+        update(1.0/60,world,geometry,{});
         if(renderer.blobs().size()!=4)throw std::runtime_error("Shot plus satellite draw instances missing");
         CharacterLightState lights;lights.ambient={.3,.3,.3};lights.sunDirection=glm::normalize(glm::vec3(-.4,.85,.35));lights.sunColor={1,.92,.82};
         const glm::dvec3 eye(0,.5,4);const auto view=glm::lookAt(eye,glm::dvec3(0),glm::dvec3(0,1,0));const auto projection=glm::perspective(glm::radians(45.0),1.0,.05,50.0);
@@ -73,9 +77,9 @@ int main(int argc,char** argv){
 #ifdef TINY_RENDERDOC_CAPTURE
         if(capture&&!capture->EndFrameCapture(nullptr,nullptr))throw std::runtime_error("RenderDoc did not save the projectile capture");
 #endif
-        renderer.Update(0,world,{});renderer.Draw(view,projection,eye,lights);
+        update(0,world,geometry,{});renderer.Draw(view,projection,eye,lights);
         if(instanceUploads!=2)throw std::runtime_error("A changed snapshot must invalidate its GPU upload");
-        world.clear();auto inkShot=shot;inkShot.weaponId="shooter";inkShot.seed=.83;inkShot.age=.22;world.launch(inkShot);renderer.Update(0,world,{});
+        world.clear();auto inkShot=shot;inkShot.weaponId="shooter";inkShot.seed=.83;inkShot.age=.22;world.launch(inkShot);update(0,world,geometry,{});
         for(int angle=0;angle<2;angle++){
             const glm::dvec3 inkEye=angle?glm::dvec3(4,.5,0):eye;
             const auto inkView=glm::lookAt(inkEye,glm::dvec3(0),glm::dvec3(0,1,0));
@@ -86,7 +90,7 @@ int main(int argc,char** argv){
             if(inkPixels<60||glGetError()!=GL_NO_ERROR)throw std::runtime_error("Shooter volume missing from front or side");
             if(argc>2){const auto path=std::filesystem::path(argv[2]).parent_path()/(angle?"shooter-volume-side.png":"shooter-volume-front.png");stbi_write_png(path.string().c_str(),256,256,4,pixels.data(),256*4);}
         }
-        auto mixedShot=shot;mixedShot.pos={-.5,0,0};world.launch(mixedShot);renderer.Update(0,world,{});
+        auto mixedShot=shot;mixedShot.pos={-.5,0,0};world.launch(mixedShot);update(0,world,geometry,{});
         const auto mixedUploads=instanceUploads;
         if(renderer.Draw(view,projection,eye,lights)!=2||instanceUploads!=mixedUploads+1)
             throw std::runtime_error("Legacy and shooter batches must share one upload");
@@ -117,12 +121,12 @@ int main(int argc,char** argv){
                 return count;
             };
             for(int phase=0;phase<3;phase++){
-                fused.age=phase==2?.4:phase==1?.19:.08;world.clear();world.launch(fused);renderer.Update(0,world,{});
+                fused.age=phase==2?.4:phase==1?.19:.08;world.clear();world.launch(fused);update(0,world,geometry,{});
                 glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);renderer.Draw(closeView,projection,closeEye,lights);
                 if(readInk()<100||components()!=(phase==2?2:1))throw std::runtime_error("SDF must join early lobes and detach the tail later");
                 if(argc>2){const auto path=std::filesystem::path(argv[2]).parent_path()/(phase==2?"shooter-sdf-breakup.png":phase==1?"shooter-sdf-neck.png":"shooter-sdf-fused.png");stbi_write_png(path.string().c_str(),256,256,4,pixels.data(),256*4);}
             }
-            fused.age=.08;world.clear();world.launch(fused);renderer.Update(0,world,{});
+            fused.age=.08;world.clear();world.launch(fused);update(0,world,geometry,{});
             const auto planeDepth=[&](double z){const auto clip=projection*closeView*glm::dvec4(0,0,z,1);return clip.z/clip.w*.5+.5;};
             glClearDepth(planeDepth(0));glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
             renderer.Draw(closeView,projection,closeEye,lights);
@@ -148,21 +152,21 @@ int main(int argc,char** argv){
             world.clear();actor.setLoadout("spinner");actor.setMuzzleSource([](int){return glm::dvec3(0);});
             CombatPose pose;pose.streaming=true;actor.setNetworkGhostPose(pose,{});
             auto streamShot=shot;streamShot.weaponId="spinner";streamShot.pos=glm::dvec3(0);streamShot.vel={0,0,20};world.launch(streamShot);
-            for(int i=0;i<20;i++)renderer.Update(1.0/60,world,{});
+            for(int i=0;i<20;i++)update(1.0/60,world,geometry,{});
             const glm::dvec3 streamEye(3,1,3);const auto streamView=glm::lookAt(streamEye,glm::dvec3(0,0,1),glm::dvec3(0,1,0));
             if(!renderer.blobs().empty()||renderer.Draw(streamView,projection,streamEye,lights)<1)throw std::runtime_error("Actual spinner streaming pose failed to reach the jet renderer");
             pose.streaming=false;actor.setNetworkGhostPose(pose,{});
-            for(int i=0;i<100;i++)renderer.Update(1.0/60,world,{});
+            for(int i=0;i<100;i++)update(1.0/60,world,geometry,{});
             if(renderer.Draw(streamView,projection,streamEye,lights)!=0)throw std::runtime_error("Stopped spinner retained a stale stream");
             actor.setLoadout("shooter");actor.setMuzzleSource({});actor.setNetworkGhostPose({},{});
         }
-        world.clear();world.launch(shot);renderer.Update(0,world,{});
-        renderer.Update(.01,world,{{"beam",{-1,0,0},{1,0,0},2,0,.8,.17,.4}});
+        world.clear();world.launch(shot);update(0,world,geometry,{});
+        update(.01,world,geometry,{{"beam",{-1,0,0},{1,0,0},2,0,.8,.17,.4}});
         if(renderer.ribbons()!=1||renderer.Draw(view,projection,eye,lights)!=2)throw std::runtime_error("Source charger ribbon absent");
-        renderer.Update(1,world,{});if(renderer.ribbons()!=0)throw std::runtime_error("Charger ribbon did not expire");
+        update(1,world,geometry,{});if(renderer.ribbons()!=0)throw std::runtime_error("Charger ribbon did not expire");
         for(const auto* kind:{"arrow","fist","bladewave"}){
             world.clear();auto custom=shot;custom.kind=kind;custom.weaponId=kind;custom.flightDir=glm::normalize(custom.vel);custom.distance=3;custom.tier=2;
-            world.launch(custom);renderer.Update(0,world,{});
+            world.launch(custom);update(0,world,geometry,{});
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);const auto calls=renderer.Draw(view,projection,eye,lights);
             glReadPixels(0,0,256,256,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
             std::size_t visible=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++visible;
@@ -176,21 +180,21 @@ int main(int argc,char** argv){
             PlayerSimulation waveOwner(wallStage,wallGeometry,wallPaint,0,&wallWorld);waveOwner.state.alive=true;
             ShooterProjectile wave;wave.owner=&waveOwner;wave.kind="bladewave";wave.weaponId="blade";wave.pos={0,0,0};wave.vel={0,0,28};wave.range=10;wave.life=1;wave.radius=.35;wave.size=1.7;wallWorld.launch(wave);
             const auto waveId=wallWorld.projectiles().back().id;
-            renderer.Update(0,wallWorld,{});
-            renderer.Update(0,wallWorld,{{"blade_wave_hit",{0,0,0},{0,0,-1},.09,0,0,.08,0,"blade",waveId}});
+            update(0,wallWorld,wallGeometry,{});
+            update(0,wallWorld,wallGeometry,{{"blade_wave_hit",{0,0,0},{0,0,-1},.09,0,0,.08,0,"blade",waveId}});
             if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave hit event incorrectly ended the projectile");
             wallWorld.tick(.02);const auto wallEvents=wallWorld.takeVisualEvents();
             if(std::none_of(wallEvents.begin(),wallEvents.end(),[&](const auto& event){return event.kind=="blade_wave_wall"&&event.id==waveId;}))throw std::runtime_error("Blade wave wall impact event missing");
-            renderer.Update(.02,wallWorld,wallEvents);
+            update(.02,wallWorld,wallGeometry,wallEvents);
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
             if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave wall fade did not render");
             glReadPixels(0,0,256,256,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
             std::size_t fading=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++fading;
             if(fading<8)throw std::runtime_error("Blade wave wall fade produced no visible pixels");
         }
-        wallWorld.tick(.07);renderer.Update(.07,wallWorld,{});
+        wallWorld.tick(.07);update(.07,wallWorld,wallGeometry,{});
         if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave fade expired before 0.14 seconds");
-        wallWorld.tick(.08);renderer.Update(.08,wallWorld,{});
+        wallWorld.tick(.08);update(.08,wallWorld,wallGeometry,{});
         if(renderer.Draw(view,projection,eye,lights)!=0)throw std::runtime_error("Blade wave wall fade outlived 0.14 seconds");
 
         StageData rangeStage{};rangeStage.bounds={-30,30,-30,30};rangeStage.spawnPads={glm::dvec3(0),glm::dvec3(20,0,20)};
@@ -199,12 +203,12 @@ int main(int argc,char** argv){
             PlayerSimulation waveOwner(rangeStage,rangeGeometry,rangePaint,0,&rangeWorld);waveOwner.state.alive=true;
             ShooterProjectile wave;wave.owner=&waveOwner;wave.kind="bladewave";wave.weaponId="blade";wave.pos={0,0,0};wave.vel={0,0,28};wave.range=.1;wave.life=.1;wave.radius=.35;wave.size=1.7;rangeWorld.launch(wave);
             const auto waveId=rangeWorld.projectiles().back().id;
-            renderer.Update(0,rangeWorld,{});rangeWorld.tick(.02);const auto rangeEvents=rangeWorld.takeVisualEvents();
+            update(0,rangeWorld,rangeGeometry,{});rangeWorld.tick(.02);const auto rangeEvents=rangeWorld.takeVisualEvents();
             if(std::none_of(rangeEvents.begin(),rangeEvents.end(),[&](const auto& event){return event.kind=="blade_wave_stop"&&event.id==waveId;}))throw std::runtime_error("Blade wave range stop event missing");
-            renderer.Update(.02,rangeWorld,rangeEvents);
+            update(.02,rangeWorld,rangeGeometry,rangeEvents);
             if(renderer.Draw(view,projection,eye,lights)!=1)throw std::runtime_error("Blade wave range expiry did not start its fade");
         }
-        rangeWorld.tick(.15);renderer.Update(.15,rangeWorld,{});
+        rangeWorld.tick(.15);update(.15,rangeWorld,rangeGeometry,{});
         if(renderer.Draw(view,projection,eye,lights)!=0)throw std::runtime_error("Blade wave range fade outlived 0.14 seconds");
 
         GLuint shadowFramebuffer=0,shadowDepth=0;glGenFramebuffers(1,&shadowFramebuffer);glBindFramebuffer(GL_FRAMEBUFFER,shadowFramebuffer);
@@ -216,7 +220,7 @@ int main(int argc,char** argv){
         const auto checkShadow=[&](const char* kind,int expectedDraws,bool expectedDepth,bool shooterInk=false){
             world.clear();auto caster=shot;caster.kind=kind;caster.weaponId=kind;caster.state="fly";caster.pos={0,0,0};caster.vel={28,0,2};caster.flightDir=glm::normalize(caster.vel);caster.age=.12;caster.distance=3;caster.tier=2;
             if(shooterInk)caster.weaponId="shooter";
-            world.launch(caster);renderer.Update(0,world,{});glClearDepth(1.0);glClear(GL_DEPTH_BUFFER_BIT);
+            world.launch(caster);update(0,world,geometry,{});glClearDepth(1.0);glClear(GL_DEPTH_BUFFER_BIT);
             const auto draws=renderer.DrawShadow(projection*view,lights);
             std::vector<float> depth(256*256);glReadPixels(0,0,256,256,GL_DEPTH_COMPONENT,GL_FLOAT,depth.data());
             const auto covered=std::count_if(depth.begin(),depth.end(),[](float value){return value<.9999f;});

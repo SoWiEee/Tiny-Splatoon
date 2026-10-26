@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
 import { inflateSync } from 'node:zlib';
 
-const root = new URL('../assets/reference/stages/', import.meta.url);
+const root = new URL('../assets/world/stages/', import.meta.url);
 
 function parseMeshPack(buffer) {
   assert.equal(buffer.subarray(0, 8).toString('ascii'), 'TSSTG001');

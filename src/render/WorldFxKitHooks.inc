@@ -1,4 +1,4 @@
-void WorldEffects::kitHooks(double seconds,CombatWorld& combat,glm::dvec3 camera){
+void WorldEffects::kitHooks(double seconds,CombatWorld& combat,glm::dvec3 camera,const std::vector<WorldVisualEvent>& events){
     const double dt=std::clamp(seconds,0.0,0.05);
     const double waterY=PlayerTuning().number("waterY",-1.6);
     const auto near=[&](glm::dvec3 pos,double distance){return glm::length2(pos-camera)<distance*distance;};
@@ -139,7 +139,7 @@ void WorldEffects::kitHooks(double seconds,CombatWorld& combat,glm::dvec3 camera
         }
     }
 
-    for(const auto& event:lastEvents_){
+    for(const auto& event:events){
         if(!near(event.pos,45))continue;
         const auto color=glm::dvec3(ink(event.team));
         if(event.kind=="bow_lodge"){

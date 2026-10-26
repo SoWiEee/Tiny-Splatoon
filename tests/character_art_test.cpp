@@ -20,7 +20,7 @@ int main(int argc,char** argv){
     int result=0;
     try {
         using namespace restoration;
-        const std::filesystem::path assets=argc>1?argv[1]:"assets/reference/characters",captures=argc>2?argv[2]:"build/captures/character";
+        const std::filesystem::path assets=argc>1?argv[1]:"assets/models/characters",captures=argc>2?argv[2]:"build/captures/character";
         std::filesystem::create_directories(captures);
         CharacterArt art(assets);
         GLuint fbo=0,color=0,depth=0;

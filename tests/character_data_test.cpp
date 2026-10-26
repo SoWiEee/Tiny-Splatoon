@@ -10,7 +10,7 @@ int main(int argc,char** argv){
     int failures=0;
     auto check=[&](bool ok,const char* message){if(!ok){++failures;std::cerr<<message<<'\n';}};
     try{
-        CharacterData data(argc>1?argv[1]:"assets/reference/characters");
+        CharacterData data(argc>1?argv[1]:"assets/models/characters");
         check(data.rigCount()==128 && data.models().size()==411,"complete source rig/model roster");
         std::set<std::string> meshes;
         for(int hair=0;hair<8;++hair)for(int hat=0;hat<4;++hat)for(int brows=0;brows<4;++brows){

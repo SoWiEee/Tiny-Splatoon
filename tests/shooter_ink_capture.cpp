@@ -134,8 +134,8 @@ int main(int argc,char** argv){
             PlayerSimulation la(stage,geometry,lp,0,&lw),sa(stage,geometry,sp,0,&sw);la.state.alive=sa.state.alive=true;
             la.setLoadout(o.weapon=="explosion"?"shooter":o.weapon);sa.setLoadout(o.weapon=="explosion"?"shooter":o.weapon);const bool stream=o.weapon=="spinner",wide=o.weapon=="bucket"||o.weapon=="roller"||o.weapon=="explosion";
             if(stream){sa.state.pos={0,0,-2};sa.setMuzzleSource([](int){return glm::dvec3(0,1,-2);});}
-            ProjectileRenderer lr(o.assets/"reference/projectiles"),sr(o.assets/"reference/projectiles");
-            WorldFxParticleRenderer fx(o.assets/"reference/worldfx-particles",o.assets/"reference/boss/shaders");MatteFloor floor;
+            ProjectileRenderer lr(o.assets/"models/projectiles",false,o.assets/"shaders"),sr(o.assets/"models/projectiles",false,o.assets/"shaders");
+            WorldFxParticleRenderer fx(o.assets/"effects/particles",o.assets/"models/boss/shaders");MatteFloor floor;
             Lane lanes[2]={{&lw,&lp,&la,&lr,{},0x13579BDFu},{&sw,&sp,&sa,&sr,{},0x13579BDFu}};
             CharacterLightState light;light.ambient={.22f,.22f,.22f};light.sunDirection=glm::normalize(glm::vec3(-.45f,.82f,.34f));
             light.sunColor={1,.92f,.82f};light.skyColor={.25f,.31f,.42f};light.groundColor={.24f,.21f,.19f};
@@ -149,7 +149,7 @@ int main(int argc,char** argv){
                 const glm::dvec3 eye(std::cos(angle)*4.2,2.7,std::sin(angle)*4.2),target(0,.45,0);
                 const auto vd=glm::lookAt(eye,target,glm::dvec3(0,1,0));
                 const auto pd=glm::perspective(glm::radians(48.0),double(PW)/H,.08,60.0);const glm::mat4 v(vd),p(pd);
-                for(auto& l:lanes){l.world->tick(DT);const auto events=l.world->takeVisualEvents();l.renderer->Update(DT,*l.world,events);
+                for(auto& l:lanes){l.world->tick(DT);const auto events=l.world->takeVisualEvents();l.renderer->Update(DT,BuildProjectileFrame(*l.world),l.world->geometry(),events);
                     for(const auto& e:events)impact(l,e,o.weapon=="shooter"&&l.actor==&sa,l.actor==&sa,eye);UpdateWorldFxRecipe(l.fx,DT,l.rng,{},-1.6f,false,false);
                     check(finite(l.fx),"World FX particle contains a non-finite value");}
                 glViewport(0,0,W,H);glClearColor(.055f,.062f,.078f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);

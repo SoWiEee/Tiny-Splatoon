@@ -1,5 +1,5 @@
 // Included inside restoration after WorldEffects::Update.
-void WorldEffects::specialHooks(double dt,CombatWorld& combat,glm::dvec3 camera){
+void WorldEffects::specialHooks(double dt,CombatWorld& combat,glm::dvec3 camera,const std::vector<WorldVisualEvent>& events){
     if(!(dt>0))return;
     const auto near=[&](glm::dvec3 p,double r){return glm::length2(p-camera)<r*r;};
     WorldFxRippleSink ripple;
@@ -64,7 +64,7 @@ void WorldEffects::specialHooks(double dt,CombatWorld& combat,glm::dvec3 camera)
         }
     }
 
-    for(const auto& event:lastEvents_){
+    for(const auto& event:events){
         if(event.kind=="bubble_pop"&&event.source=="blower"&&near(event.pos,40)){
             emit("bubblePop",event.pos,{0,1,0},event.team,event.radius);
         }else if(event.kind=="special_audio"&&event.source=="shield_pop"&&near(event.pos,40)){

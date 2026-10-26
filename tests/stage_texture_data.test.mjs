@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { inflateSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-const root=resolve(import.meta.dirname,'..'),directory=resolve(root,'assets/reference/stage-textures');
+const root=resolve(import.meta.dirname,'..'),directory=resolve(root,'assets/world/stage-textures');
 const metadata=JSON.parse(await readFile(resolve(directory,'metadata.json'),'utf8'));
 assert.equal(metadata.schema,1);assert.equal(metadata.texlib.names.length,46);assert.equal(metadata.texlib.size,512);
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');

@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
             if(normal!=fast||fast[16]!=1.f||fast[48]>=1.f)throw std::runtime_error("Depth-only PBR bypass changed alpha-clipped shadow coverage");
             glDeleteVertexArrays(1,&vao);
         }
-        const std::filesystem::path directory = argc > 1 ? argv[1] : "assets/reference/characters/shaders";
+        const std::filesystem::path directory = argc > 1 ? argv[1] : "assets/models/characters/shaders";
         int count = 0;
         std::set<std::string> families;
         for (const auto& entry : std::filesystem::directory_iterator(directory)) {

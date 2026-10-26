@@ -956,15 +956,15 @@ int main(int argc,char** argv){
             MatchSimulation sceneMatch(*stage,geometry,scenePaint,nav,options);sceneMatch.startPlaying();
             for(int i=0;i<60;++i)sceneMatch.tick(.1);
             SetInkPalette(ProfilePaletteColors(ui.profile().settings.palette,ui.profile().settings.colorblind));
-            const auto references=std::filesystem::path(argv[1])/"assets/reference";
-            StageRenderer sceneRenderer(references/"stages",true);sceneRenderer.Load(*stage,0,scenePaint);
+            const auto assets=std::filesystem::path(argv[1])/"assets";
+            StageRenderer sceneRenderer(assets/"world/stages",true);sceneRenderer.Load(*stage,0,scenePaint);
             sceneRenderer.UploadInk(*stage,scenePaint);
-            EnvironmentRenderer environment(references/"environment");environment.SetReflectionsEnabled(false);environment.Load(*stage);
+            EnvironmentRenderer environment(assets/"world/environment");environment.SetReflectionsEnabled(false);environment.Load(*stage);
             StageMapView smallMap(stage->bounds,sceneMatch.local().team()==1);
             const double frameTime=glfwGetTime();
             Check(smallMap.Render(sceneRenderer,environment,scenePaint.version(),frameTime),"Native minimap must render an initial stage frame");
             Check(!smallMap.Render(sceneRenderer,environment,scenePaint.version()+1,frameTime+.01),"Painting must not bypass the native minimap render cadence");
-            RenderPipeline pipeline(references/"post");pipeline.Configure(0,false,false);
+            RenderPipeline pipeline(assets/"effects/post",assets/"shaders");pipeline.Configure(0,false,false);
             auto background=[&](int w,int h){
                 const auto camera=FitStageMapCamera(stage->bounds,double(w)/h,sceneMatch.local().team()==1);
                 pipeline.Begin(w,h,glm::mat4(camera.projection),glm::inverse(glm::mat4(camera.view)),1,6000);
@@ -1004,7 +1004,7 @@ int main(int argc,char** argv){
             ui.SetReward({});background(1600,900);RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,1600,900,false,true);
             Capture(std::filesystem::path(argv[2])/"source-native-results-intro.png",1600,900);
             hud->GetElementById("result-skip")->Click();RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,1600,900,false,true);
-            PlayerShowcase showcase(references/"characters");std::vector<PlayerShowcase::PodiumPlayer> squad;
+            PlayerShowcase showcase(assets/"models/characters");std::vector<PlayerShowcase::PodiumPlayer> squad;
             for(std::size_t i=0;i<sceneMatch.actors().size();++i){const auto& actor=*sceneMatch.actors()[i];if(actor.team()==sceneMatch.local().team())squad.push_back({sceneMatch.roster()[i].name,sceneMatch.roster()[i].style,actor.mainId(),actor.subId()});}
             for(const auto dims:{std::pair<int,int>{1280,720},{1920,1080}}){
                 background(dims.first,dims.second);RenderHudSnapshot(ui,*stage,scenePaint,sceneMatch,dims.first,dims.second,false,true);const auto preview=ui.preview();background(dims.first,dims.second);

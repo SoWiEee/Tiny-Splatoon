@@ -158,7 +158,7 @@ int main() {
                       "Airborne BossFX blobs must keep the source velocity-aligned stretch");
             }
             {
-                std::ifstream defaults("assets/reference/boss/shaders/crablet-pop-blob.uniforms");
+                std::ifstream defaults("assets/models/boss/shaders/crablet-pop-blob.uniforms");
                 check(static_cast<bool>(defaults),"Missing exported source BossFX physical-material fixture");
                 std::map<std::string,std::vector<double>> values;std::string name;std::size_t count=0;
                 while(defaults>>name>>count){std::vector<double> v(count);for(auto& component:v)defaults>>component;values.emplace(name,std::move(v));}
@@ -168,7 +168,7 @@ int main() {
                       "Exported BossFX material must preserve source roughness, metalness, and clearcoat");
             }
             {
-                std::ifstream mesh("assets/reference/boss/shaders/crablet-pop-blob.mesh",std::ios::binary);
+                std::ifstream mesh("assets/models/boss/shaders/crablet-pop-blob.mesh",std::ios::binary);
                 char magic[8]{};std::array<unsigned char,8> sizes{};mesh.read(magic,8);mesh.read(reinterpret_cast<char*>(sizes.data()),8);
                 const auto readU32=[&](std::size_t offset){return std::uint32_t(sizes[offset])|(std::uint32_t(sizes[offset+1])<<8)|(std::uint32_t(sizes[offset+2])<<16)|(std::uint32_t(sizes[offset+3])<<24);};
                 check(mesh&&std::string(magic,8)=="TSBOSSFX"&&readU32(0)==60&&readU32(4)==60,
@@ -208,7 +208,7 @@ int main() {
             }
             const auto beforePositions=popEffects.liveItems();
             const glm::dvec3 popCamera=anchor+glm::dvec3(0,1.5,3.0);
-            popEffects.Update(1.0/60.0,popWorld,popCamera);
+            popEffects.Update(1.0/60.0,popWorld,popCamera,popWorld.takeVisualEvents());
             const auto updatedPopItems=popEffects.liveItems();
             check(countShape(updatedPopItems,WorldFxShape::BossBlob)==10,"The source-mesh pop burst must remain live after its first simulation frame");
             check(std::any_of(updatedPopItems.begin(),updatedPopItems.end(),[&](const auto& item){
@@ -293,7 +293,7 @@ int main() {
             bomb.pos=anchor+glm::dvec3(0,.2,0);bomb.vel={0,0,0};
             const double fuse=GetEquipment(EquipmentCategory::Sub,"bomb").number("fuse");bomb.fuse=fuse*.5;
             DeviceRenderer sourceModels;WorldEffects danger(characterData);danger.SetDeviceRenderer(&sourceModels);
-            danger.Update(1./60,bombWorld,anchor+glm::dvec3(0,12,0));
+            danger.Update(1./60,bombWorld,anchor+glm::dvec3(0,12,0),bombWorld.takeVisualEvents());
             auto ring=std::find_if(danger.worldItems().begin(),danger.worldItems().end(),[](const auto& p){return p.shape==WorldFxShape::Ring&&p.style==3;});
             check(ring!=danger.worldItems().end(),"Source device models must not suppress the armed bomb danger ring");
             check(std::abs(ring->age-.5)<1e-6&&std::abs(ring->radius-GetEquipment(EquipmentCategory::Sub,"bomb").number("radius"))<1e-6,"Bomb warning must use source fuse progress and actual blast radius");
@@ -302,7 +302,7 @@ int main() {
             std::vector<unsigned char> pixels(128*128*4);glReadPixels(0,0,128,128,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());
             int visible=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>20||pixels[i+1]>20||pixels[i+2]>20)++visible;
             check(visible>100,"The fuse danger region must produce visible native GPU pixels");
-            bomb.live=false;danger.Update(1./60,bombWorld,anchor);
+            bomb.live=false;danger.Update(1./60,bombWorld,anchor,bombWorld.takeVisualEvents());
             check(danger.worldItems().empty(),"An exploded or removed bomb must not leave a stale danger region");
         }
         {
@@ -313,13 +313,13 @@ int main() {
             walker.state.grounded=true;walker.state.squid=false;walker.state.submerged=false;
             walker.state.groundTeam=1;walker.state.vel={5,0,0};
             WorldEffects steps(characterData);steps.SetPaintSurface(&walkPaint);
-            steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7));
+            steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7),walkWorld.takeVisualEvents());
             walker.state.pos.x+=0.8;
-            steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7));
+            steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7),walkWorld.takeVisualEvents());
             check(steps.counts().shells==0,"Wet footsteps must not emit a generic explosion shell on the floor");
             check(!walkPaint.takeVisualRipples().empty(),"Wet foot plants must ripple the ink surface");
             const auto gridBefore=walkPaint.grid();const auto versionBefore=walkPaint.version();
-            for(int i=0;i<90;++i)steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7));
+            for(int i=0;i<90;++i)steps.Update(1.0/60.0,walkWorld,anchor+glm::dvec3(0,4,7),walkWorld.takeVisualEvents());
             const auto specks=walkPaint.takeVisualSplats();
             check(!specks.empty(),"Landing walking droplets must enter the cosmetic paint atlas path");
             check(std::all_of(specks.begin(),specks.end(),[](const auto& item){return item.cosmetic&&item.kind==SplatKind::Speck;}),"Walking droplets must remain cosmetic specks");
@@ -328,7 +328,7 @@ int main() {
             walker.state.groundTeam=2;steps.Footstep(walker,walker.state.pos,5);
             walker.state.groundTeam=0;
             const glm::vec3 closeEye=glm::vec3(walker.state.pos)+glm::vec3(0,0.7f,1.5f);
-            steps.Update(1.0/60.0,walkWorld,closeEye);
+            steps.Update(1.0/60.0,walkWorld,closeEye,walkWorld.takeVisualEvents());
             check(steps.counts().glows>0,"Enemy-ink footsteps must exercise the source bubble-glow draw path");
             const auto closeView=glm::lookAt(closeEye,glm::vec3(walker.state.pos)+glm::vec3(0,0.05f,0),glm::vec3(0,1,0));
             const auto closeProjection=glm::perspective(glm::radians(45.f),1.f,0.01f,20.f);
@@ -352,7 +352,7 @@ int main() {
         }
         WorldEffects effects(characterData);
         const glm::dvec3 camera(anchor.x, anchor.y + 5.2, anchor.z - 11.5);
-        effects.Update(1.0 / 60.0, world, camera);
+        effects.Update(1.0 / 60.0, world, camera, world.takeVisualEvents());
         const auto& items = effects.worldItems();
         check(countShape(items, WorldFxShape::Swirl) >= 2,
               "Persistent tornado did not emit its two source funnel shapes");
@@ -393,7 +393,7 @@ int main() {
             CombatWorld impactWorld(*stage,geometry,paint);WorldEffects impactEffects(characterData);impactEffects.SetPaintSurface(&paint);
             const auto paintVersion=paint.version();
             WorldVisualEvent impact;impact.kind="bulletImpact";impact.source="shooter";impact.pos=glm::dvec3(target);impact.normal={0,1,0};impact.radius=.28;impact.seed=.42;impact.id=17;
-            impactWorld.emitVisual(impact);impactEffects.Update(1.0/60,impactWorld,camera);
+            impactWorld.emitVisual(impact);impactEffects.Update(1.0/60,impactWorld,camera,impactWorld.takeVisualEvents());
             check(std::count_if(impactEffects.liveItems().begin(),impactEffects.liveItems().end(),[](const auto& p){return (static_cast<int>(p.flags)&128)!=0;})>=4,"Shooter impact must dispatch its visual-only drop recipe");
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
             const glm::vec3 splashEye=target+glm::vec3(0,.6f,1.2f);
@@ -403,11 +403,11 @@ int main() {
             std::size_t splashPixels=0;for(std::size_t i=0;i<pixels.size();i+=4)if(pixels[i]>30||pixels[i+1]>30||pixels[i+2]>30)++splashPixels;
             check(splashPixels>40&&glGetError()==GL_NO_ERROR,"Shooter impact must have visible 3D pixels");
             std::filesystem::create_directories("build/captures");stbi_flip_vertically_on_write(1);stbi_write_png("build/captures/shooter-impact.png",128,128,4,pixels.data(),128*4);
-            for(int i=0;i<24;i++)impactEffects.Update(1.0/60,impactWorld,camera);
+            for(int i=0;i<24;i++)impactEffects.Update(1.0/60,impactWorld,camera,impactWorld.takeVisualEvents());
             check(impactEffects.liveItems().empty()&&paint.version()==paintVersion,"Shooter splash must expire without adding paint");
         }
         {
-            WorldFxParticleRenderer burstRenderer("assets/reference/worldfx-particles","assets/reference/boss/shaders");
+            WorldFxParticleRenderer burstRenderer("assets/effects/particles","assets/models/boss/shaders");
             std::uint32_t seed=37;WorldFxRecipeContext context;context.speed=12;
             auto burst=BuildWorldFxRecipe("inkSlosh",{0,0,0},{0,1,0},{1,.2,.01},1,seed,-100,{0,1,3},{},context,{0,.2,1});
             UpdateWorldFxRecipe(burst,.06,seed,{},-100,false,false);
@@ -426,11 +426,11 @@ int main() {
         for(const char* weapon:{"bucket","roller","brush"}){
             FacePaint burstPaint(*stage,geometry);CombatWorld burstWorld(*stage,geometry,burstPaint);
             PlayerSimulation burstActor(*stage,geometry,burstPaint,0,&burstWorld);burstActor.spawnAt(anchor,0);burstActor.setLoadout(weapon,"bomb","storm");
-            WorldEffects burstEffects(characterData);burstEffects.SetPaintSurface(&burstPaint);burstEffects.Update(1.0/60,burstWorld,camera);
+            WorldEffects burstEffects(characterData);burstEffects.SetPaintSurface(&burstPaint);burstEffects.Update(1.0/60,burstWorld,camera,burstWorld.takeVisualEvents());
             bool hero=false,mid=false,micro=false;
             for(int frame=0;frame<60;frame++){
                 burstActor.input.fire=frame<2;burstActor.tick(1.0/60);burstWorld.tick(1.0/60);
-                const auto version=burstPaint.version();burstEffects.Update(1.0/60,burstWorld,camera);
+                const auto version=burstPaint.version();burstEffects.Update(1.0/60,burstWorld,camera,burstWorld.takeVisualEvents());
                 check(burstPaint.version()==version,"Burst cosmetics modified gameplay paint");
                 for(const auto& item:burstEffects.liveItems()){hero|=(int(item.flags)&InkBurstHero)!=0;mid|=(int(item.flags)&InkBurstMid)!=0;micro|=(int(item.flags)&InkBurstMicro)!=0;}
             }

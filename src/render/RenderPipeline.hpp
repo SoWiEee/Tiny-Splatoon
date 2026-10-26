@@ -31,7 +31,7 @@ struct ScreenEffects {
 // Begin binds the linear scene target; End resolves to the default framebuffer before GUI.
 class RenderPipeline {
 public:
-    explicit RenderPipeline(std::filesystem::path assets="assets/reference/post");
+    explicit RenderPipeline(std::filesystem::path assets="assets/effects/post",std::filesystem::path shaderAssets="assets/shaders");
     ~RenderPipeline();
     RenderPipeline(const RenderPipeline&)=delete;
     RenderPipeline& operator=(const RenderPipeline&)=delete;

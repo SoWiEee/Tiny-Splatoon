@@ -32,7 +32,7 @@ struct CharacterModel {
 // Source geometry is shared by content hash; only selected meshes are loaded.
 class CharacterData {
 public:
-    explicit CharacterData(std::filesystem::path directory="assets/reference/characters");
+    explicit CharacterData(std::filesystem::path directory="assets/models/characters");
     const CharacterRig& rig(int hair,int hat,int brows) const;
     const CharacterModel& model(const std::string& id) const;
     const CharacterMesh& mesh(const std::string& file) const;

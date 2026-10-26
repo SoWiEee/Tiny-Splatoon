@@ -125,7 +125,7 @@ struct WorldEffects::GpuMesh {
     }
 };
 
-WorldEffects::WorldEffects(const CharacterData& data):data_(&data) {}
+WorldEffects::WorldEffects(const CharacterData& data,std::filesystem::path assets):data_(&data),assets_(std::move(assets)) {}
 
 WorldEffects::~WorldEffects() {
     sourceMeshes_.clear();
@@ -199,7 +199,7 @@ void WorldEffects::Footstep(const PlayerSimulation& actor,glm::dvec3 position,do
     for(auto& particle:particles)spawn(std::move(particle));
 }
 
-void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) {
+void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera,const std::vector<WorldVisualEvent>& events) {
     const float dt=std::clamp(float(seconds),0.0f,0.05f);
     camera_=camera;
     time_+=dt;
@@ -207,13 +207,12 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
     const auto near=[&](glm::dvec3 at,double range){return glm::length2(at-camera)<range*range;};
     const auto add=[&](Item item){if(world_.size()<2048)world_.push_back(item);};
 
-    lastEvents_=combat.takeVisualEvents();
-    weaponHooks(dt,combat,camera);
-    weaponDeviceHooks(dt,combat,camera);
-    kitHooks(dt,combat,camera);
-    specialHooks(dt,combat,camera);
+    weaponHooks(dt,combat,camera,events);
+    weaponDeviceHooks(dt,combat,camera,events);
+    kitHooks(dt,combat,camera,events);
+    specialHooks(dt,combat,camera,events);
     warningHooks(dt,combat,camera);
-    for(const auto& event:lastEvents_) {
+    for(const auto& event:events) {
         if(event.kind=="device_arm"||event.kind=="device_warning"||event.kind=="device_hit"||event.kind=="device_destroy"
            ||event.kind=="special_warning"||event.kind=="special_audio"||event.kind=="bubble_pop")continue;
         if(event.kind=="beam")continue; // Source charger ribbons are owned by ProjectileRenderer.
@@ -456,7 +455,7 @@ void WorldEffects::Update(double seconds,CombatWorld& combat,glm::dvec3 camera) 
 #include "WorldFxWeaponDeviceHooks.inc"
 #include "WorldFxKitWarnings.inc"
 
-void WorldEffects::Clear(){live_.clear();world_.clear();lastEvents_.clear();actors_.clear();weaponActors_.clear();kitActors_.clear();kitDevices_.clear();sloshHeads_.clear();weaponTrailDistance_.clear();bombFx_.clear();specialFx_.clear();warningActors_.clear();warningObjects_.clear();time_=0;}
+void WorldEffects::Clear(){live_.clear();world_.clear();actors_.clear();weaponActors_.clear();kitActors_.clear();kitDevices_.clear();sloshHeads_.clear();weaponTrailDistance_.clear();bombFx_.clear();specialFx_.clear();warningActors_.clear();warningObjects_.clear();time_=0;}
 WorldEffects::Counts WorldEffects::counts() const {
     Counts c;c.world=world_.size();
     for(const auto& p:live_)switch(p.shape){case Shape::Drop:++c.drops;break;case Shape::Puff:++c.puffs;break;
@@ -630,7 +629,7 @@ int WorldEffects::drawSourceItems(const glm::mat4& view,const glm::mat4& project
 
 int WorldEffects::Draw(const glm::mat4& view,const glm::mat4& projection,const glm::vec3& camera,const CharacterLightState* lights) {
     if(live_.empty()&&world_.empty())return 0;
-    if(!particles_)particles_=std::make_unique<WorldFxParticleRenderer>();
+    if(!particles_)particles_=std::make_unique<WorldFxParticleRenderer>(assets_/"effects/particles",assets_/"models/boss/shaders");
     const int props=drawSourceItems(view,projection,camera,lights);
     return props+particles_->Draw(live_,world_,view,projection,camera,lights,time_);
 }

@@ -8,7 +8,7 @@ class PlayerSimulation;
 struct DeviceActorPose {const PlayerSimulation* actor;const CharacterPoseFrame* frame;const CharacterStyle* style;glm::dmat4 tank{1};};
 class DeviceRenderer {
 public:
-    explicit DeviceRenderer(std::filesystem::path assets="assets/reference/devices");
+    explicit DeviceRenderer(std::filesystem::path assets="assets/models/devices");
     ~DeviceRenderer();
     void Update(double dt,const CombatWorld& world,glm::dvec3 eye);
     int Draw(const glm::dmat4& view,const glm::dmat4& projection,glm::dvec3 eye,const CharacterLightState& lights,

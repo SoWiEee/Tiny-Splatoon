@@ -71,9 +71,9 @@ struct RenderPipeline::State {
     GLuint vao=0,noise=0,pdNoise=0;
     int samples=4,width=0,height=0,allocatedSamples=-1;bool useAo=true,useBloom=true,useFxaa=false,active=false;
     glm::mat4 projection{1},world{1};float nearPlane=.1f,farPlane=1000;
-    explicit State(const std::filesystem::path& path){
+    explicit State(const std::filesystem::path& path,const std::filesystem::path& shaderAssets){
         auto load=[&](const char* name){return std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(path/name));};
-        gtao=load("gtao.frag");denoise=load("denoise.frag");highpass=load("highpass.frag");composite=load("bloom-composite.frag");grade=load("grade.frag");screen=load("screen.frag");output=load("output.frag");fxaa=std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(path.parent_path().parent_path()/"shaders/post/fxaa.frag"));
+        gtao=load("gtao.frag");denoise=load("denoise.frag");highpass=load("highpass.frag");composite=load("bloom-composite.frag");grade=load("grade.frag");screen=load("screen.frag");output=load("output.frag");fxaa=std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(shaderAssets/"post/fxaa.frag"));
         mul=std::make_unique<CharacterShader>(fullscreen,multiply);sum=std::make_unique<CharacterShader>(fullscreen,add);
         for(int i=0;i<5;i++){
             blur[i]=load(("blur-"+std::to_string(i)+".frag").c_str());
@@ -99,7 +99,7 @@ struct RenderPipeline::State {
     void target(const Target& t){glBindFramebuffer(GL_FRAMEBUFFER,t.fbo);glViewport(0,0,t.width,t.height);}
     void draw(){glBindVertexArray(vao);glDrawArrays(GL_TRIANGLES,0,3);}
 };
-RenderPipeline::RenderPipeline(std::filesystem::path assets):state_(std::make_unique<State>(assets)){}
+RenderPipeline::RenderPipeline(std::filesystem::path assets,std::filesystem::path shaderAssets):state_(std::make_unique<State>(assets,shaderAssets)){}
 RenderPipeline::~RenderPipeline()=default;
 void RenderPipeline::Configure(int samples,bool ao,bool bloom,bool antialiasing){
     GLint maximum=0;glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES,&maximum);

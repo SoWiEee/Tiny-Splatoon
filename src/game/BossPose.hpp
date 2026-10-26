@@ -38,7 +38,7 @@ struct BossPoseAudioEvent {
 // side. This class has no GL dependency; its frames can be rendered later.
 class BossPose {
 public:
-    explicit BossPose(const std::filesystem::path& asset="assets/reference/boss/model.bin");
+    explicit BossPose(const std::filesystem::path& asset="assets/models/boss/model.bin");
     ~BossPose();
     BossPose(const BossPose&)=delete;
     BossPose& operator=(const BossPose&)=delete;
