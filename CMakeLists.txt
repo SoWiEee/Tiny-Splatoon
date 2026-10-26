@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(Tiny-Splatoon VERSION 0.8.7 LANGUAGES CXX C)
+project(Tiny-Splatoon VERSION 0.8.8 LANGUAGES CXX C)
 
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
     # MSVC emits UTF-8 here; a system-codepage probe can corrupt Ninja's include prefix.

@@ -1,22 +1,33 @@
-# Tiny Splatoon v0.8.7
+# Tiny Splatoon v0.8.8
 
 ## 更新內容
 
-- 加入 Linux x64 支援與 Ubuntu 22.04 建置／發布流程，隨包附上獨立房間服務。Linux 玩家資料遵循 XDG_DATA_HOME，未設定時使用 ~/.local/share/Tiny-Splatoon/profile.json。
-- Linux 入口以實際執行檔位置尋找 assets，可從其他工作目錄或 PATH 啟動；本機房間服務改用 POSIX 程序啟動。修正 GCC LOD 引數、fixture include 與 Boss Float32 粒子精度，保留來源姿勢。
-- 繁中換成華康新綜藝體，英文與數字換成 BlitzMain；保留 Noto Sans TC／Inter 作為玩家姓名等字元的後備字體，修正 UTF-8 字體檔名部署。
-- 選單、裝備卡片、設定列表、結算與 HUD 加強字級層級、間距、深墨描邊及橘藍互動狀態；保留暖紙色與既有減少動態設定。
-- 撤回本輪尚未提交的實驗墨片、水束與體積墨水改動，回到既有投射物與 RT 墨面；實驗備份不隨遊戲發布。
-- 收入 v0.8.6 發布後完成的 Boss、UI 與潛水驗收修正。
+- GTAO 與降噪改為半解析度計算，以完整解析度深度導引上採樣；補上細前景、深度邊界、天空及極小尺寸的 GPU 檢查。
+- 地圖陰影於覆蓋判斷後提前結束 opaque depth-only 路徑，省去地面／濕墨材質運算；格柵保留原遮罩，陰影尺寸、範圍、caster 及更新頻率不變。
+- 精簡停用的地面 baked AO、light UV 與未使用中間值；benchmark 新增陰影 pass 的 GPU 平均、p95 及逐幀時間。
+- 收入 v0.8.7 之後的空中墨水 VFX：連射槍局部 SDF、撞擊水花、Spinner 連續 Tube，以及潑桶／滾筒／筆刷分層墨滴與次級飛濺。保留原有傷害、耗墨及 RT 塗地判定。
+- 投射物準備結果由色彩與陰影 pass 共用；拆分對戰 Session、HUD 呈現資料及 CombatWorld 內部責任，整理共用型別與建置依賴。
+- 資產改按 models／world／effects 分類，整合規格、領域契約與還原進度，清除停用的來源匯出工具。
+- 一併提交 README 參考連結及 Tracy 本機工具目錄的忽略規則。
+
+## 本機效能紀錄
+
+GTX 1650 Max-Q、1920×1080、Tidewater、固定 seed、player camera；暖身 120 frame 後量測 240 frame：
+
+- AO／降噪優化的相鄰 Medium 短測，整幀 GPU 平均 20.91 → 14.98 ms，FPS 47.69 → 66.62。
+- 再獨立比較地圖陰影優化：Medium 陰影平均 2.00 → 1.44 ms，High 3.75 → 1.87 ms；該組整體 FPS 分別約 74.21 → 75.40、50.02 → 51.59。
+- 上述為不同階段的本機比較，受溫度、時脈與場景影響，不能相乘或當作跨地圖／硬體的效能承諾。
 
 ## 安裝
 
-Windows：完整解壓 Tiny-Splatoon-v0.8.7-windows-x64.zip，執行 Tiny-Splatoon.exe。
+Windows：完整解壓 Tiny-Splatoon-v0.8.8-windows-x64.zip，執行 Tiny-Splatoon.exe。
 
-Linux：解壓 Tiny-Splatoon-v0.8.7-linux-x64.tar.gz，執行 ./Tiny-Splatoon-linux-x64/Tiny-Splatoon。目標為 Ubuntu 22.04 或更新的 x64 系統，需安裝系統圖形／音訊執行庫與支援 OpenGL 4.5 core 的 GPU 驅動，詳見 README 與開發指引。保留 lib 與 assets 目錄。
+Linux：解壓 Tiny-Splatoon-v0.8.8-linux-x64.tar.gz，執行 ./Tiny-Splatoon-linux-x64/Tiny-Splatoon。目標為 Ubuntu 22.04 或更新的 x64 系統，需 OpenGL 4.5 core 驅動及系統圖形／音訊執行庫；保留 lib 與 assets 目錄，詳見 README 與開發指引。
 
-玩家資料格式維持相容；Windows 仍使用 %LOCALAPPDATA%/Tiny-Splatoon/profile.json。一般遊玩不需要 splat-ref/。
+玩家資料格式保持相容，一般遊玩不需要 splat-ref/。Windows／Linux 安裝包由版本標籤的發布流程產生。
 
 ## 驗收界線
 
-Windows UI／音訊／Boss 與受影響回歸通過；Linux Mesa UI／正式入口五項通過，Boss 16 情境及已部署素材的完整音訊通過。五項來源重匯出因缺 Edge 未完成，Windows 掛載來源的 MP3 非同步 seek 測試仍有時限差異；一般執行不需要這些來源工具。詳細結果記錄於 docs/restoration-progress.md。Linux 以 Ubuntu 22.04／WSL 與軟體 Mesa 執行建置與啟動測試；實體 Linux NVIDIA／AMD／Intel 的效能、手把及跨網多人矩陣未完整驗收。此次更新不宣稱墨水視效已與商業版完全一致。
+Windows Release 受影響目標建置成功；AO／材質的 6 項針對性回歸與陰影的 3 項回歸通過。固定場景的完整 1024×1024 陰影深度圖在 shader 替換前後逐位元一致，六張材質畫面逐像素相同；另有乾地／濕墨投影深度不變及低畫質關閉陰影的檢查。
+
+本次依要求未執行 Linux 實機或 WSL 驗證，也未重跑現有全套測試或完整跨地圖／裝備／網路矩陣。半解析度 AO 可能減少細小接觸陰影；新增空中墨水 VFX 不宣稱與商業版逐像素一致。詳細證據與限制見 docs/restoration-progress.md 及 docs/contracts/rendering-stage-environment.md。

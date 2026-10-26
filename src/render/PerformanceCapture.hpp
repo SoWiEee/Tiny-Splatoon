@@ -28,6 +28,8 @@ public:
     PerformanceCapture& operator=(const PerformanceCapture&) = delete;
 
     void beginFrame(); // Before poll, fixed-step simulation and rendering.
+    void beginShadow();
+    void endShadow();
     void endGpu();     // After the last GL draw, before swapping buffers.
     bool endFrame(FrameCounts counts); // After swap; true when the run is complete.
     void write();
@@ -35,7 +37,7 @@ public:
 private:
     struct Frame {
         double cpuMs = 0.0;
-        double gpuMs = 0.0;
+        double gpuMs = 0.0, shadowGpuMs = 0.0;
         FrameCounts counts;
         std::optional<std::uint64_t> workingSetBytes;
         std::optional<int> gpuAvailableKiB;
@@ -47,6 +49,7 @@ private:
     int width_, height_, warmupFrames_, measuredFrames_, frameIndex_ = 0;
     unsigned logicalCpus_ = 0;
     bool inFrame_ = false, gpuOpen_ = false, written_ = false, nvxMemory_ = false, playerView_ = false;
+    bool shadowOpen_ = false, shadowRecorded_ = false;
     std::chrono::steady_clock::time_point frameStart_, captureStart_;
     std::vector<GLuint> queries_;
     std::vector<Frame> frames_;

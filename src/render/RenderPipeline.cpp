@@ -14,10 +14,6 @@ const char* fullscreen=R"GLSL(#version 450 core
 out vec2 vUv;
 void main(){vUv=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(vUv*2.-1.,0.,1.);}
 )GLSL";
-const char* multiply=R"GLSL(#version 450 core
-in vec2 vUv;out vec4 color;uniform sampler2D scene;uniform sampler2D ao;
-void main(){color=vec4(texture(scene,vUv).rgb*mix(vec3(1),texture(ao,vUv).rgb,.8),1);}
-)GLSL";
 const char* add=R"GLSL(#version 450 core
 in vec2 vUv;out vec4 color;uniform sampler2D scene;uniform sampler2D bloom;
 void main(){color=vec4(texture(scene,vUv).rgb+texture(bloom,vUv).rgb,1);}
@@ -33,7 +29,7 @@ struct Target {
         auto texture=[&](GLuint& id,GLenum internal,GLenum attachment){
             glGenTextures(1,&id);glBindTexture(type,id);
             if(samples)glTexImage2DMultisample(type,samples,internal,w,h,GL_TRUE);
-            else{glTexStorage2D(type,1,internal,w,h);glTexParameteri(type,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(type,GL_TEXTURE_MAG_FILTER,GL_LINEAR);glTexParameteri(type,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(type,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);}
+            else{glTexStorage2D(type,1,internal,w,h);glTexParameteri(type,GL_TEXTURE_MIN_FILTER,withDepth&&internal==GL_DEPTH_COMPONENT32F?GL_NEAREST:GL_LINEAR);glTexParameteri(type,GL_TEXTURE_MAG_FILTER,withDepth&&internal==GL_DEPTH_COMPONENT32F?GL_NEAREST:GL_LINEAR);glTexParameteri(type,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(type,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);}
             glFramebufferTexture2D(GL_FRAMEBUFFER,attachment,type,id,0);
         };
         texture(color,GL_RGBA16F,GL_COLOR_ATTACHMENT0);
@@ -74,7 +70,7 @@ struct RenderPipeline::State {
     explicit State(const std::filesystem::path& path,const std::filesystem::path& shaderAssets){
         auto load=[&](const char* name){return std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(path/name));};
         gtao=load("gtao.frag");denoise=load("denoise.frag");highpass=load("highpass.frag");composite=load("bloom-composite.frag");grade=load("grade.frag");screen=load("screen.frag");output=load("output.frag");fxaa=std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(shaderAssets/"post/fxaa.frag"));
-        mul=std::make_unique<CharacterShader>(fullscreen,multiply);sum=std::make_unique<CharacterShader>(fullscreen,add);
+        mul=std::make_unique<CharacterShader>(fullscreen,CharacterShader::readSource(shaderAssets/"post/ao-composite.frag"));sum=std::make_unique<CharacterShader>(fullscreen,add);
         for(int i=0;i<5;i++){
             blur[i]=load(("blur-"+std::to_string(i)+".frag").c_str());
             const int radius=6+4*i;const double sigma=radius/3.;
@@ -91,7 +87,8 @@ struct RenderPipeline::State {
         if(width==w&&height==h&&allocatedSamples==samples)return;
         width=w;height=h;allocatedSamples=samples;
         scene.resize(w,h,samples,true);resolved.resize(w,h,0,true);
-        for(auto* t:{&ao,&filtered,&ping,&pong})t->resize(w,h);
+        for(auto* t:{&ping,&pong})t->resize(w,h);
+        ao.resize(std::max(1,(w+1)/2),std::max(1,(h+1)/2));filtered.resize(ao.width,ao.height);
         int bw=std::max(1,(w+1)/2),bh=std::max(1,(h+1)/2);
         bright.resize(bw,bh);bloom.resize(bw,bh);
         for(int i=0;i<5;i++){horizontal[i].resize(bw,bh);vertical[i].resize(bw,bh);bw=std::max(1,(bw+1)/2);bh=std::max(1,(bh+1)/2);}
@@ -123,12 +120,12 @@ int RenderPipeline::End(const GradeSettings& g,const ScreenEffects& f,int output
     if(s.useAo){
         s.target(s.ao);glClearColor(1,1,1,1);glClear(GL_COLOR_BUFFER_BIT);auto& a=*s.gtao;a.use();
         bindTexture(a,"tDepth",s.resolved.depth,0);bindTexture(a,"tNoise",s.noise,1);
-        a.uniform("resolution",{double(s.width),double(s.height)});a.uniform("cameraNear",s.nearPlane);a.uniform("cameraFar",s.farPlane);
+        a.uniform("resolution",{double(s.ao.width),double(s.ao.height)});a.uniform("cameraNear",s.nearPlane);a.uniform("cameraFar",s.farPlane);
         a.uniform("cameraProjectionMatrix",matrix(s.projection));a.uniform("cameraProjectionMatrixInverse",matrix(glm::inverse(s.projection)));a.uniform("cameraWorldMatrix",matrix(s.world));
         a.uniform("radius",1.1);a.uniform("distanceExponent",1.6);a.uniform("thickness",1.);a.uniform("scale",1.5);a.uniform("distanceFallOff",1.);s.draw();draws++;
         s.target(s.filtered);glClear(GL_COLOR_BUFFER_BIT);auto& d=*s.denoise;d.use();bindTexture(d,"tDiffuse",s.ao.color,0);bindTexture(d,"tDepth",s.resolved.depth,1);bindTexture(d,"tNoise",s.pdNoise,2);
-        d.uniform("resolution",{double(s.width),double(s.height)});d.uniform("cameraProjectionMatrixInverse",matrix(glm::inverse(s.projection)));d.uniform("lumaPhi",10.);d.uniform("depthPhi",2.);d.uniform("normalPhi",3.);d.uniform("radius",6.);d.uniform("index",0.);s.draw();draws++;
-        s.target(s.ping);s.mul->use();bindTexture(*s.mul,"scene",current,0);bindTexture(*s.mul,"ao",s.filtered.color,1);s.draw();draws++;current=s.ping.color;
+        d.uniform("resolution",{double(s.ao.width),double(s.ao.height)});d.uniform("cameraProjectionMatrixInverse",matrix(glm::inverse(s.projection)));d.uniform("lumaPhi",10.);d.uniform("depthPhi",2.);d.uniform("normalPhi",3.);d.uniform("radius",3.);d.uniform("index",0.);s.draw();draws++;
+        s.target(s.ping);s.mul->use();bindTexture(*s.mul,"scene",current,0);bindTexture(*s.mul,"ao",s.filtered.color,1);bindTexture(*s.mul,"depth",s.resolved.depth,2);s.mul->uniform("cameraNear",s.nearPlane);s.mul->uniform("cameraFar",s.farPlane);s.draw();draws++;current=s.ping.color;
     }
     if(s.useBloom){
         s.target(s.bright);auto& h=*s.highpass;h.use();bindTexture(h,"tDiffuse",current,0);h.uniform("luminosityThreshold",g.bloomThreshold);h.uniform("smoothWidth",.01);h.uniform("defaultColor",{0.,0.,0.});h.uniform("defaultOpacity",0.);s.draw();draws++;

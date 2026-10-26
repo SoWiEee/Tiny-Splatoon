@@ -305,7 +305,7 @@ struct StageRenderer::Source {
         glGenBuffers(1,&gpu->ebo);glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,gpu->ebo);glBufferData(GL_ELEMENT_ARRAY_BUFFER,mesh.elements.size()*sizeof(std::uint32_t),mesh.elements.data(),GL_STATIC_DRAW);
         const std::size_t stride=mesh.stride*sizeof(float);
         if(mesh.name=="stage"){
-            const std::array<std::pair<const char*,std::pair<int,std::size_t>>,9> attrs={{{"position",{3,0}}, {"normal",{3,3}}, {"color",{3,6}}, {"paintUv",{2,9}}, {"lightUv",{2,11}}, {"faceUv",{2,13}}, {"faceData",{4,15}}, {"faceFlags",{3,19}}, {"faceTan",{3,22}}}};
+            const std::array<std::pair<const char*,std::pair<int,std::size_t>>,8> attrs={{{"position",{3,0}}, {"normal",{3,3}}, {"color",{3,6}}, {"paintUv",{2,9}}, {"faceUv",{2,13}}, {"faceData",{4,15}}, {"faceFlags",{3,19}}, {"faceTan",{3,22}}}};
             for(const auto& a:attrs){const GLint loc=shader.shader->attribute(a.first);if(loc<0)continue;glEnableVertexAttribArray(loc);glVertexAttribPointer(loc,a.second.first,GL_FLOAT,GL_FALSE,static_cast<GLsizei>(stride),reinterpret_cast<void*>(a.second.second*sizeof(float)));}
         }else{
             const std::array<std::pair<const char*,std::pair<int,std::size_t>>,4> attrs={{{"position",{3,0}}, {"normal",{3,3}}, {"color",{3,6}}, {"uv",{2,9}}}};
@@ -342,17 +342,17 @@ struct StageRenderer::Source {
     }
     void bindCommonTextures(ShaderEntry& entry,bool level,const std::string& shaderName,const DirectionalShadow* shadow){
         auto& shader=*entry.shader;
-        shader.uniform("uPaint",0.0);shader.uniform("uMural",1.0);shader.uniform("uLight",8.0);
+        shader.uniform("uPaint",0.0);shader.uniform("uMural",1.0);
         shader.uniform("map",1.0);shader.uniform("alphaMap",1.0);
         shader.uniform("tAlbedo",3.0);shader.uniform("tNormal",4.0);shader.uniform("tOrm",5.0);shader.uniform("uTLTex",2.0);
         shader.uniform("dfgLUT",6.0);shader.uniform("directionalShadowMap[0]",7.0);
         const auto bind=[&](int unit,GLuint texture){glActiveTexture(GL_TEXTURE0+unit);glBindTexture(GL_TEXTURE_2D,texture);};
         bind(0,atlas);bind(1,level?mural:propMap(shaderName));bind(2,tlTexture);bind(6,dfg);
-        bind(7,shadow&&shadow->texture()?shadow->texture():dummyShadow);bind(8,white);
+        bind(7,shadow&&shadow->texture()?shadow->texture():dummyShadow);
         const auto bindArray=[&](int unit,GLuint texture){glActiveTexture(GL_TEXTURE0+unit);glBindTexture(GL_TEXTURE_2D_ARRAY,texture);};
         bindArray(3,textureArrays.at("albedo"));bindArray(4,textureArrays.at("normal"));bindArray(5,textureArrays.at("orm"));
         if(level){shader.uniform("uAtlasSize",static_cast<double>(atlasSize));shader.uniform("uTexel",1.0/atlasSize);shader.uniform("uPpm",ppm);
-            shader.uniform("uInkClock",clock);shader.uniform("uTime",clock);shader.uniform("uAO",0.0);}
+            shader.uniform("uInkClock",clock);shader.uniform("uTime",clock);}
     }
     void uploadSwimWake(ShaderEntry& entry){
         const auto& values=swimWake.uniformValues();

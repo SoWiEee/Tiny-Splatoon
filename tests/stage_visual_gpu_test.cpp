@@ -3,6 +3,7 @@
 #include "StageGeometry.hpp"
 #include "StageRenderer.hpp"
 #include "ReferenceData.hpp"
+#include "DirectionalShadow.hpp"
 #include "CombatWorld.hpp"
 #include "PlayerSimulation.hpp"
 
@@ -129,6 +130,29 @@ int main(int argc, char** argv) {
         const glm::vec4 wet = renderer->ReadVisualInk(faceId, paintU, paintV);
         inkWet=wet.g;
         check(wet.a > 0.05f && wet.g > 0.65f, "Source GPU paint atlas did not contain a wet, covered splat");
+        const auto captureShadowDepth = [&](StageRenderer& scene) {
+            constexpr int size = 256;
+            DirectionalShadow shadow;
+            shadow.Begin(stage->bounds, glm::dvec3(lights.sunDirection), size);
+            scene.DrawShadow(glm::mat4(shadow.matrix()));
+            std::vector<float> depth(size * size);
+            glReadPixels(0, 0, size, size, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
+            shadow.End();
+            const GLenum error = glGetError();
+            check(error == GL_NO_ERROR, "Source stage shadow rendering generated OpenGL error " + std::to_string(error));
+            return depth;
+        };
+        const auto wetShadowDepth = captureShadowDepth(*renderer);
+        check(std::any_of(wetShadowDepth.begin(), wetShadowDepth.end(), [](float depth) { return depth < 1.0f; }),
+              "Source stage shadow map contained no caster depth");
+        {
+            FacePaint blankPaint(*stage, geometry);
+            StageRenderer blankRenderer(assetRoot);
+            blankRenderer.Load(*stage, 0, blankPaint);
+            blankRenderer.UploadInk(*stage, blankPaint, 0.1);
+            check(wetShadowDepth == captureShadowDepth(blankRenderer),
+                  "Wet ink changed directional shadow depth despite identical stage geometry and animation time");
+        }
         paintEye = center + glm::dvec3(2.4, 5.2, 6.4);
         paintView = glm::lookAt(paintEye, center, glm::dvec3(0, 1, 0));
         paintProjection = glm::perspective(glm::radians(48.0), 1.0, 0.05, 60.0);

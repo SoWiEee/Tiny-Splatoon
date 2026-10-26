@@ -100,3 +100,10 @@ ctest --test-dir build -C Release --output-on-failure
 | [docs/](docs/README.md) | 目前規格、領域契約、進度紀錄與量測資料 |
 
 [架構說明](architecture.md) · [UI 翻譯](docs/ui-translations.md) · [場景與渲染](docs/contracts/rendering-stage-environment.md) · [戰鬥視覺](docs/contracts/combat-visuals.md) · [音訊](docs/contracts/audio.md)
+
+## 📝 References
+
+- [RenderDoc](https://github.com/baldurk/renderdoc)
+- [Tract Profiler](https://github.com/wolfpld/tracy)
+- [miniaudio](https://github.com/mackron/miniaudio)
+- [inkwave](https://github.com/zgjzgj1985/inkwave) (MIT)

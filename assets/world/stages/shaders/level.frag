@@ -273,8 +273,6 @@ uniform vec3 uTeamB;
 uniform float uTime;
 uniform float uInkGlow;
 uniform sampler2D uMural;
-uniform sampler2D uLight;
-uniform float uAO;
 uniform vec3 uLamps[12];
 uniform int uLampN;
 uniform vec3 uLampCol;
@@ -290,7 +288,6 @@ uniform vec4 uWake[48];
 uniform vec4 uWakeB[4];
 uniform vec4 uSwimH[4];
 uniform vec4 uSwimF[4];
-varying vec2 vLightUv;
 varying vec3 vFaceTan;
 varying vec2 vPaintUv;
 varying vec2 vFaceUv;
@@ -538,11 +535,9 @@ float gTexAlpha = 1.0;
 float gInk = 0.0;
 vec3 gInkCol = vec3(0.0);
 float gBaseRough = 0.8;
-float gInkH = 0.0;
 vec2 gInkD = vec2(0.0);
 float gRib = 0.0;
 float gFresh = 0.0;
-float gInkNear = 0.0;
 float gInkS = 0.0;
 float gWake = 0.0;
 
@@ -2096,6 +2091,10 @@ void main() {
       }
     }
   }
+  // Opaque stage shadows need coverage, not ground textures or wet-ink shading.
+#ifndef GRATE
+  if (iwDepthOnly) { gl_FragColor = vec4(0.0); return; }
+#endif
   vec2 fu = vFaceUv;
   float pattern = vFaceData.x;
 #ifdef GRATE
@@ -2417,10 +2416,6 @@ void main() {
     mc.a *= mix(1.0, gTexPaint, mC.y);
     base = mix(base, mc.rgb * (0.92 + 0.1 * big), mc.a * 0.96);
   }
-  // crisp modelled edges: thin bright chamfer + soft inner shadow
-  float e = min(min(fu.x, fsz.x - fu.x), min(fu.y, fsz.y - fu.y));
-  float ew = fwidth(e);
-  // (edges are real bevel geometry now; the old painted chamfer lines drew seams where faces stack)
   // contact darkening at the foot of walls that stand on something
   if (vFaceFlags.x > 0.5 && vFaceFlags.y > 0.5) {
     base *= mix(0.55, 1.0, smoothstep(0.0, 0.85, fu.y));
@@ -2445,7 +2440,6 @@ void main() {
       pnt = mix(pnt, cub, near);
       gX = cX * near; gY = cY * near;
     }
-    gInkNear = near;
     float amt = pnt.a;
     float fw = fwidth(amt);
     float w = clamp(fw * 0.8, 0.008, 0.25);
@@ -3110,13 +3104,7 @@ if (gInk > 0.0) {
 	#endif
 #endif
 
-if (uAO > 0.0 && vLightUv.x >= 0.0) {
-  // baked ambient occlusion: full on sky/indirect light, a touch on the sun so contact shadows read in daylight
-  float bao = mix(1.0, texture2D(uLight, vLightUv).r, uAO);
-  reflectedLight.indirectDiffuse *= bao;
-  reflectedLight.indirectSpecular *= mix(1.0, bao, 0.85);
-  reflectedLight.directDiffuse *= mix(1.0, bao, 0.4);
-}
+
 	vec3 totalDiffuse = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
 	vec3 totalSpecular = reflectedLight.directSpecular + reflectedLight.indirectSpecular;
 	

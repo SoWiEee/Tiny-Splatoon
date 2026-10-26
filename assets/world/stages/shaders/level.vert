@@ -110,8 +110,6 @@ attribute vec2 faceUv;
 attribute vec4 faceData;
 attribute vec3 faceFlags;
 attribute vec3 faceTan;
-attribute vec2 lightUv;
-varying vec2 vLightUv;
 varying vec3 vFaceTan;
 varying vec2 vPaintUv;
 varying vec2 vFaceUv;
@@ -637,7 +635,6 @@ gl_Position = projectionMatrix * mvPosition;
 
 vPaintUv = paintUv; vFaceUv = faceUv; vFaceData = faceData; vFaceFlags = faceFlags;
 vFaceTan = normalize(mat3(modelMatrix) * faceTan);
-vLightUv = lightUv;
 vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
 vWNorm = normalize(mat3(modelMatrix) * objectNormal);
 	

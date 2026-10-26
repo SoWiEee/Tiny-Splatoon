@@ -540,6 +540,7 @@ MatchExit RunMatchSession(GLFWwindow* window,const LaunchOptions& options,const 
         for(std::size_t i=0;i<characters.size();i++){if(!match.roster()[i].active)continue;const auto& character=*characters[i];const auto special=match.actors()[i]->specialPose();deviceActors.push_back({match.actors()[i].get(),&character.pose->frame(),&character.style,special.active&&special.kind=="jetpack"?art.attachment(character.pose->frame(),character.style,"tank/group"):glm::dmat4(1)});}
         int shadowDraws=0;
         if(graphics.shadows){
+        if(capture)capture->beginShadow();
         directionalShadow.Begin(stage.bounds,glm::dvec3(lighting.sunDirection),graphics.shadowMapSize);
         GLboolean colorMask[4]{};glGetBooleanv(GL_COLOR_WRITEMASK,colorMask);glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
         shadowDraws=renderer.DrawShadow(glm::mat4(directionalShadow.matrix()));
@@ -566,6 +567,7 @@ MatchExit RunMatchSession(GLFWwindow* window,const LaunchOptions& options,const 
         }
         glColorMask(colorMask[0],colorMask[1],colorMask[2],colorMask[3]);
         directionalShadow.End();
+        if(capture)capture->endShadow();
         }
 
         for(const auto& event:eventBatch.TakeFrame()){
